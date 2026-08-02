@@ -49,24 +49,28 @@ export default {
                     return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
                 }
 
-                // Process Avatar Upload with Strict Failsafes
+                // Process Avatar Upload
                 let avatarDriveUrl = null;
                 if (body.avatarBase64) {
-                    // FAILSAFE 1: Ensure the Worker has the URL loaded
                     if (!env.GAS_WEBHOOK_URL) {
                         return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
                     }
 
-                    const yearFolder = body.year || "General";
-                    const sectionFolder = body.section || "General";
-                    const yearAndSection = `${yearFolder} - ${sectionFolder}`;
+                    // Dynamically combine Course, Year, and Section into one folder name
+                    const courseVal = body.course ? body.course.trim() : "";
+                    const yearVal = body.year ? body.year.trim() : "";
+                    const sectionVal = body.section ? body.section.trim() : "";
+                    
+                    // Filters out empty strings so it doesn't create weird spacing if a field is left blank
+                    const courseYearSection = [courseVal, yearVal, sectionVal].filter(Boolean).join(" ") || "General";
+                    
                     const formattedFilename = `${body.student_number}_${body.name}.jpg`;
 
                     const gasPayload = {
                         filename: formattedFilename,
                         mimeType: "image/jpeg",
                         base64: body.avatarBase64,
-                        pathParts: [yearAndSection, "Profile Picture"]
+                        pathParts: [courseYearSection, "Profile Picture"] // E.g. ["BSIT 4 A", "Profile Picture"]
                     };
 
                     const gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
@@ -81,19 +85,17 @@ export default {
                     try {
                         gasData = JSON.parse(gasText);
                     } catch (parseError) {
-                        // FAILSAFE 2: Catch HTML login page blocks from Google
                         return new Response(JSON.stringify({ error: "Google Apps Script blocked the upload. Ensure it is deployed as 'Execute as: Me' and 'Access: Anyone'." }), { status: 500, headers: corsHeaders });
                     }
 
                     if (gasData.success) {
                         avatarDriveUrl = gasData.fileUrl;
                     } else {
-                        // FAILSAFE 3: Catch native Google Drive API errors
                         return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
                     }
                 }
 
-                // Insert User only if Avatar successfully uploaded (or was deliberately bypassed)
+                // Insert User
                 const userId = crypto.randomUUID();
                 const hashedPassword = await hashPassword(body.password);
 
@@ -120,7 +122,6 @@ export default {
             }
 
             if (request.method === "POST" && url.pathname === "/api/login") {
-                // ... (Login logic remains identical)
                 const body = await request.json();
                 const hashedPassword = await hashPassword(body.password);
                 const id = body.identifier;
