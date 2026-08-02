@@ -12,6 +12,10 @@ export const CourseModule = {
             e.preventDefault();
             await CourseModule.createCourse();
         }
+        if (e.target.id === 'addProgramForm') {
+            e.preventDefault();
+            await CourseModule.createProgram();
+        }
     },
 
     handleClicks: async (e) => {
@@ -38,6 +42,46 @@ export const CourseModule = {
             await CourseModule.renderLecturerDashboard(container);
         } else {
             await CourseModule.renderStudentDashboard(container);
+        }
+    },
+
+    createProgram: async () => {
+        const btn = document.getElementById('addProgramBtn');
+        const errorDiv = document.getElementById('programError');
+        const successDiv = document.getElementById('programSuccess');
+        errorDiv.classList.add('hidden');
+        successDiv.classList.add('hidden');
+        btn.disabled = true;
+        btn.innerHTML = 'Saving...';
+        
+        const payload = {
+            programCode: document.getElementById('programCode').value.trim()
+        };
+        
+        try {
+            await apiFetch('/api/programs', { method: 'POST', body: JSON.stringify(payload) });
+            successDiv.textContent = "Added to Registration List successfully!";
+            successDiv.classList.remove('hidden');
+            document.getElementById('addProgramForm').reset();
+            
+            // Repopulate Target Course list in the Course Module modal
+            const programsData = await apiFetch('/api/programs');
+            const targetCourseSelect = document.getElementById('targetCourse');
+            if (targetCourseSelect && programsData.programs) {
+                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
+                    programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+            }
+
+            setTimeout(() => {
+                successDiv.classList.add('hidden');
+                document.getElementById('apModal').classList.add('hidden');
+            }, 1500);
+        } catch (err) {
+            errorDiv.textContent = err.message;
+            errorDiv.classList.remove('hidden');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Add to Registration List';
         }
     },
 
@@ -88,6 +132,14 @@ export const CourseModule = {
 
     renderLecturerDashboard: async (container) => {
         try {
+            // Load programs for the target course select in Create Course Modal
+            const programsData = await apiFetch('/api/programs');
+            const targetCourseSelect = document.getElementById('targetCourse');
+            if (targetCourseSelect && programsData.programs) {
+                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
+                    programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+            }
+
             const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer`);
             
             let coursesHtml = data.courses.map(c => `
