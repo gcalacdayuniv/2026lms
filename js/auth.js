@@ -54,6 +54,24 @@ export const AuthModule = {
                 overlay.classList.add('hidden');
             }
         }
+
+        // Change Password Modal Toggle Logic
+        if (e.target.closest('#openCpModalBtn')) {
+            document.getElementById('cpModal').classList.remove('hidden');
+            // Ensure sidebar is closed when modal opens for better UX on mobile
+            const panel = document.getElementById('profilePanel');
+            const overlay = document.getElementById('profilePanelOverlay');
+            if (panel && overlay) {
+                panel.classList.add('translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+        if (e.target.closest('#closeCpModalBtn') || e.target.id === 'cpModalOverlay') {
+            document.getElementById('cpModal').classList.add('hidden');
+            document.getElementById('changePasswordForm').reset();
+            document.getElementById('cpError').classList.add('hidden');
+            document.getElementById('cpSuccess').classList.add('hidden');
+        }
     },
 
     handleChanges: (e) => {
@@ -227,7 +245,8 @@ export const AuthModule = {
             
             setTimeout(() => {
                 successDiv.classList.add('hidden');
-            }, 3000);
+                document.getElementById('cpModal').classList.add('hidden');
+            }, 2500);
             
         } catch (error) {
             errorDiv.textContent = error.message;
