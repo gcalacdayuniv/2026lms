@@ -41,7 +41,7 @@ export const Components = {
                 <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-3">Profile Photo (Required)</label>
                     <div class="flex justify-center mb-3">
-                        <img id="avatarPreview" class="hidden w-24 h-24 rounded-full object-cover border-2 border-green-500 shadow-sm" />
+                        <img id="avatarPreview" class="hidden w-24 h-24 rounded-full object-cover aspect-square border-2 border-green-500 shadow-sm" />
                     </div>
                     <div class="flex justify-center space-x-3">
                         <button type="button" id="btnCamera" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
@@ -51,7 +51,6 @@ export const Components = {
                             <i class="fa-solid fa-upload mr-2"></i> File
                         </button>
                     </div>
-                    <!-- capture="camera" forces the hardware camera directly on mobile iOS/Android -->
                     <input type="file" id="regCameraInput" accept="image/*" capture="camera" class="hidden" />
                     <input type="file" id="regFileInput" accept="image/*" class="hidden" />
                     <input type="hidden" id="regAvatarBase64" />
@@ -119,23 +118,31 @@ export const Components = {
         <div class="w-full max-w-4xl bg-white rounded-lg shadow-md p-8 fade-in">
              <div class="flex justify-between items-center border-b pb-4 mb-4">
                 <div class="flex items-center space-x-4">
-                    ${user.Avatar ? `<img src="${user.Avatar}" class="w-12 h-12 rounded-full object-cover border border-gray-300" />` : '<i class="fa-solid fa-circle-user text-4xl text-gray-400"></i>'}
+                    ${user.Avatar ? `<img src="${user.Avatar}" id="dashboardAvatarBtn" class="w-14 h-14 rounded-full object-cover aspect-square border-2 border-gray-300 cursor-pointer hover:opacity-80 transition-opacity shadow-sm" alt="Profile Picture" title="Click to view" />` : '<i class="fa-solid fa-circle-user text-4xl text-gray-400"></i>'}
                     <h1 class="text-2xl font-bold text-gray-800">Portal Dashboard</h1>
                 </div>
-                <button id="logoutBtn" class="text-sm bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded">Logout</button>
+                <button id="logoutBtn" class="text-sm bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded shadow-sm">Logout</button>
              </div>
              <p>Welcome, <strong>${user.Name}</strong> (@${user.Username})</p>
              <p class="text-sm mt-2">Status: <span class="font-semibold ${user.account_status === 'Active' ? 'text-green-600' : 'text-red-600'}">${user.account_status}</span></p>
              <div class="mt-6 grid grid-cols-2 gap-4">
-                <div class="p-4 bg-gray-50 rounded border">
+                <div class="p-4 bg-gray-50 rounded border shadow-sm">
                     <p class="text-sm text-gray-500">Student Number</p>
                     <p class="font-semibold">${user.Student_Number || 'N/A'}</p>
                 </div>
-                <div class="p-4 bg-gray-50 rounded border">
+                <div class="p-4 bg-gray-50 rounded border shadow-sm">
                     <p class="text-sm text-gray-500">Course / Year / Section</p>
                     <p class="font-semibold">${user.course || 'N/A'} - ${user.year || 'N/A'} - ${user.section || 'N/A'}</p>
                 </div>
              </div>
+        </div>
+
+        <!-- Clean Image Modal -->
+        <div id="imageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm fade-in">
+            <div class="relative scale-up p-4 flex flex-col items-center">
+                <button id="closeModalBtn" class="absolute -top-12 right-0 md:-right-12 text-white hover:text-gray-300 text-4xl font-bold focus:outline-none transition-colors">&times;</button>
+                ${user.Avatar ? `<img src="${user.Avatar}" class="w-64 h-64 md:w-96 md:h-96 rounded-full object-cover aspect-square shadow-2xl border-4 border-white" alt="Expanded Profile Picture" />` : ''}
+            </div>
         </div>
     `
 };
