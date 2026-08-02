@@ -107,7 +107,9 @@ export const Components = {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Course</label>
-                            <input type="text" id="regCourse" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <select id="regCourse" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="" disabled selected>Loading courses...</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Year</label>
@@ -144,7 +146,15 @@ export const Components = {
         const createCourseBtn = user.role.toLowerCase() === 'lecturer' ? `
             <div class="mt-6">
                 <button id="openCreateCourseModalBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
-                    <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course
+                    <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course Module
+                </button>
+            </div>
+        ` : '';
+
+        const createProgramBtn = user.role.toLowerCase() === 'lecturer' ? `
+            <div class="mt-3">
+                <button id="openApModalBtn" class="w-full flex justify-center py-2 px-4 border border-purple-300 rounded-md shadow-sm text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none transition-colors">
+                    <i class="fa-solid fa-graduation-cap mr-2 mt-0.5"></i> Add Registration Course List
                 </button>
             </div>
         ` : '';
@@ -212,6 +222,7 @@ export const Components = {
                 </div>
 
                 ${createCourseBtn}
+                ${createProgramBtn}
 
                 <div class="mt-6">
                     <button id="openCpModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
@@ -305,7 +316,9 @@ export const Components = {
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Course</label>
-                                <input type="text" id="targetCourse" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. BSCS">
+                                <select id="targetCourse" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                                    <option value="">All Courses</option>
+                                </select>
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Year</label>
@@ -321,6 +334,33 @@ export const Components = {
                     
                     <button type="submit" id="addCourseBtn" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors mt-4">
                         Create Course
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Program Modal (For Registration List) -->
+        <div id="apModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+            <div id="apModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-sm p-6 relative z-10 scale-up">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-graduation-cap text-purple-600 mr-2"></i>Add Course (Program)</h3>
+                    <button id="closeApModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="addProgramForm" class="space-y-4">
+                    <div id="programError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    <div id="programSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course / Program Code</label>
+                        <input type="text" id="programCode" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 text-sm uppercase" placeholder="e.g. BSCS">
+                    </div>
+                    
+                    <button type="submit" id="addProgramBtn" class="w-full bg-purple-600 text-white py-2.5 px-4 rounded-md hover:bg-purple-700 shadow-sm font-bold transition-colors mt-4">
+                        Add to Registration List
                     </button>
                 </form>
             </div>
