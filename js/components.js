@@ -51,7 +51,8 @@ export const Components = {
                             <i class="fa-solid fa-upload mr-2"></i> File
                         </button>
                     </div>
-                    <input type="file" id="regCameraInput" accept="image/*" capture="environment" class="hidden" />
+                    <!-- capture="camera" forces the hardware camera directly on mobile iOS/Android -->
+                    <input type="file" id="regCameraInput" accept="image/*" capture="camera" class="hidden" />
                     <input type="file" id="regFileInput" accept="image/*" class="hidden" />
                     <input type="hidden" id="regAvatarBase64" />
                 </div>
@@ -70,7 +71,7 @@ export const Components = {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Student Number</label>
-                        <input type="text" id="regStudentNo" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <input type="text" id="regStudentNo" required placeholder="00-0000" maxlength="7" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Contact Number</label>
