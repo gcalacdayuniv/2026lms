@@ -14,10 +14,10 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 
 * **`index.html` & `styles.css`:** Main entry point, the static layout shell, and custom animations.
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
-* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header and a sliding right Profile Sidebar Panel.
+* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, and a backdrop-blurred Change Password modal.
 * **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously.
-* **`js/auth.js`:** Handles login, registration, session management, DOM event delegation, dynamic form masking, password updating logic, and interactive panel toggling.
-* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, fetches API course data, handles lecturer creation pipelines, and builds the specialized UI strings based on the user's role.
+* **`js/auth.js`:** Handles login, registration, session management, DOM event delegation, dynamic form masking, password updating logic, and interactive panel/modal toggling.
+* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, and builds specialized UI strings.
 * **`js/app.js`:** The master orchestrator that imports and initializes all modules.
 
 ### 2. Backend API (Cloudflare Workers)
@@ -40,16 +40,16 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
-* **Dashboard UX Redesign & Sliding Sidebar:** The frontend architecture was restructured to include a full width application layout containing a top fixed navigation header. The user's personal context and settings were shifted into an interactive sliding right panel to declutter the main viewing area for module browsing.
-* **Security & Credential Management:** Introduced the `/api/change-password` endpoint. Users can now securely update their password directly from their profile sidebar. The edge network handles hashing standardizations and strict validations natively.
-* **Role Restructuring:** The default user registration role was formally shifted to `Student` across the SQL schema and backend allocation flows.
-* **Course & Enrollment Pipeline:** Implemented a new decoupled modular domain file (`course.js`) enabling role-based dashboard architectures.
+* **Profile Layout Revamp & Modals:** The sidebar profile panel was refined for a cleaner look. Instead of cards, data (Course, Year, Section, Email, Contact Number) is displayed in simple text lines. On portrait mobile displays, the sidebar takes up 80% of the screen width with the background layered in a backdrop-blur. The Change Password feature was successfully abstracted into a dedicated floating modal.
+* **Enrollment Safety Gate:** Inserted a native browser confirmation prompt when a student attempts to enroll in a module to prevent accidental enrollments.
+* **Dashboard UX Redesign & Sliding Sidebar:** The frontend architecture was restructured to include a full width application layout containing a top fixed navigation header.
+* **Security & Credential Management:** Introduced the `/api/change-password` endpoint. Users can now securely update their password directly from their profile sidebar.
 * **Avatar Storage Optimization & Hotlinking Bypass:** Updated the database schema approach to store Google Drive file URLs instead of heavy Base64 strings to drastically conserve D1 SQL storage limits.
 
 ## Development Directives
 When asked to add features, debug, or refactor, you must strictly adhere to the following rules:
 
-1. **Enforce the Architecture via File Separation:** Group logic into its specific domain file inside the `js/` directory. Use internal namespace objects (e.g., `AuthModule`, `AppRouter`, `CourseModule`).
+1. **Enforce the Architecture via File Separation:** Group logic into its specific domain file inside the `js/` directory. Use internal namespace objects.
 2. **No Build Step / Native ES Modules:** Do not suggest npm packages, Webpack, or JS frameworks (React/Vue). Rely exclusively on native browser Web APIs and ES Modules (`import`/`export`).
 3. **Strict Static Deployment Constraints:** The frontend is deployed via Cloudflare Pages via GitHub, which ONLY allows `.html`, `.css`, and `.js` files. Never suggest creating `.json` files for the frontend.
 4. **Database & Security Integrity:** All new database records MUST utilize `crypto.randomUUID()` for primary keys. The backend API must NEVER require an `api_secret` from the frontend (security is handled via strict CORS origins). D1 batch operations (`env.DB.batch`) should be used for multiple insertions. 
