@@ -16,6 +16,11 @@ export const CourseModule = {
 
     handleClicks: async (e) => {
         if (e.target.classList.contains('enroll-btn')) {
+            const confirmation = window.confirm("Are you sure you want to enroll in this module? This action cannot be undone.");
+            if (!confirmation) {
+                return;
+            }
+            
             const btn = e.target;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
@@ -85,7 +90,7 @@ export const CourseModule = {
                     <div class="font-bold text-xl text-blue-700">${c.CourseCode}</div>
                     <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
                     <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
-                        <i class="fa-regular fa-calendar mr-1"></i> ${c.ScheduleDay} | <i class="fa-regular fa-clock mr-1"></i> ${c.TimePeriod}
+                        <i class="fa-regular fa-calendar mr-1"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${c.TimePeriod}
                     </div>
                 </div>
             `).join('');
@@ -121,7 +126,7 @@ export const CourseModule = {
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Time Period</label>
-                                    <input type="text" id="timePeriod" required class="w-full border border-gray-300 p-3 rounded-lg mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" placeholder="9:00 AM - 12:00 PM">
+                                    <input type="text" id="timePeriod" required class="w-full border border-gray-300 p-3 rounded-lg mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" placeholder="9:00 AM to 12:00 PM">
                                 </div>
                             </div>
                             
