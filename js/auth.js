@@ -19,10 +19,14 @@ export const AuthModule = {
             e.preventDefault();
             await AuthModule.register();
         }
+        if (e.target.id === 'changePasswordForm') {
+            e.preventDefault();
+            await AuthModule.changePassword();
+        }
     },
 
     handleClicks: (e) => {
-        if (e.target.id === 'logoutBtn') {
+        if (e.target.closest('#logoutBtn')) {
             AuthModule.logout();
         }
         if (e.target.closest('#btnCamera')) {
@@ -32,12 +36,23 @@ export const AuthModule = {
             document.getElementById('regFileInput').click();
         }
         
-        // Avatar Modal Functionality
-        if (e.target.id === 'dashboardAvatarBtn') {
-            document.getElementById('imageModal').classList.remove('hidden');
+        // Sliding Panel Toggle Logic
+        if (e.target.closest('#profileToggleBtn')) {
+            const panel = document.getElementById('profilePanel');
+            const overlay = document.getElementById('profilePanelOverlay');
+            if (panel && overlay) {
+                panel.classList.remove('translate-x-full');
+                overlay.classList.remove('hidden');
+            }
         }
-        if (e.target.id === 'closeModalBtn' || e.target.id === 'imageModal') {
-            document.getElementById('imageModal').classList.add('hidden');
+        
+        if (e.target.closest('#closeProfilePanel') || e.target.id === 'profilePanelOverlay') {
+            const panel = document.getElementById('profilePanel');
+            const overlay = document.getElementById('profilePanelOverlay');
+            if (panel && overlay) {
+                panel.classList.add('translate-x-full');
+                overlay.classList.add('hidden');
+            }
         }
     },
 
@@ -49,11 +64,9 @@ export const AuthModule = {
 
     handleInput: (e) => {
         if (e.target.id === 'regStudentNo') {
-            // Strip all non-digit characters
             let val = e.target.value.replace(/\D/g, '');
-            if (val.length > 6) val = val.substring(0, 6); // Max 6 digits
+            if (val.length > 6) val = val.substring(0, 6);
 
-            // Automatically format as 00-0000
             if (val.length >= 3) {
                 e.target.value = val.substring(0, 2) + '-' + val.substring(2);
             } else {
@@ -65,7 +78,6 @@ export const AuthModule = {
     handleKeydown: (e) => {
         if (e.target.id === 'regStudentNo' && e.key === 'Backspace') {
             const input = e.target;
-            // If deleting from the end of the dash (e.g., "12-"), delete the dash AND the 2nd digit
             if (input.value.length === 3 && input.value.endsWith('-')) {
                 input.value = input.value.substring(0, 1);
                 e.preventDefault();
@@ -93,7 +105,6 @@ export const AuthModule = {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
-                // Compress payload string size to 80% JPEG quality
                 const base64String = canvas.toDataURL('image/jpeg', 0.8);
                 
                 document.getElementById('avatarPreview').src = base64String;
@@ -175,6 +186,55 @@ export const AuthModule = {
             errorDiv.classList.remove('hidden');
             submitBtn.disabled = false;
             submitBtn.innerHTML = 'Create Account';
+        }
+    },
+    
+    changePassword: async () => {
+        const currentPassword = document.getElementById('cpCurrent').value;
+        const newPassword = document.getElementById('cpNew').value;
+        const repeatPassword = document.getElementById('cpRepeat').value;
+        const errorDiv = document.getElementById('cpError');
+        const successDiv = document.getElementById('cpSuccess');
+        const submitBtn = document.getElementById('cpSubmitBtn');
+
+        errorDiv.classList.add('hidden');
+        successDiv.classList.add('hidden');
+
+        if (newPassword !== repeatPassword) {
+            errorDiv.textContent = "New passwords do not match.";
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>';
+
+        try {
+            const payload = {
+                userId: AppState.user.User_ID,
+                currentPassword: currentPassword,
+                newPassword: newPassword
+            };
+            
+            const data = await apiFetch('/api/change-password', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            successDiv.textContent = data.message || "Password updated successfully.";
+            successDiv.classList.remove('hidden');
+            document.getElementById('changePasswordForm').reset();
+            
+            setTimeout(() => {
+                successDiv.classList.add('hidden');
+            }, 3000);
+            
+        } catch (error) {
+            errorDiv.textContent = error.message;
+            errorDiv.classList.remove('hidden');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Update Password';
         }
     },
 
