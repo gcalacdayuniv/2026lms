@@ -31,6 +31,14 @@ export const AuthModule = {
         if (e.target.closest('#btnFile')) {
             document.getElementById('regFileInput').click();
         }
+        
+        // Avatar Modal Functionality
+        if (e.target.id === 'dashboardAvatarBtn') {
+            document.getElementById('imageModal').classList.remove('hidden');
+        }
+        if (e.target.id === 'closeModalBtn' || e.target.id === 'imageModal') {
+            document.getElementById('imageModal').classList.add('hidden');
+        }
     },
 
     handleChanges: (e) => {
