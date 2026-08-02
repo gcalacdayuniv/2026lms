@@ -29,7 +29,8 @@ export const AuthModule = {
         errorDiv.classList.add('hidden');
         
         const payload = {
-            identifier: document.getElementById('loginIdentifier').value,
+            // Added .trim() to strip accidental hidden spaces around special characters
+            identifier: document.getElementById('loginIdentifier').value.trim(),
             password: document.getElementById('loginPassword').value
         };
 
@@ -58,15 +59,16 @@ export const AuthModule = {
         submitBtn.disabled = true;
 
         const payload = {
-            username: document.getElementById('regUsername').value,
+            // Added .trim() across all text inputs to ensure database purity
+            username: document.getElementById('regUsername').value.trim(),
             password: document.getElementById('regPassword').value,
-            name: document.getElementById('regName').value,
-            email: document.getElementById('regEmail').value,
-            student_number: document.getElementById('regStudentNo').value,
-            contact_number: document.getElementById('regContact').value,
-            course: document.getElementById('regCourse').value,
-            year: document.getElementById('regYear').value,
-            section: document.getElementById('regSection').value
+            name: document.getElementById('regName').value.trim(),
+            email: document.getElementById('regEmail').value.trim(),
+            student_number: document.getElementById('regStudentNo').value.trim(),
+            contact_number: document.getElementById('regContact').value.trim(),
+            course: document.getElementById('regCourse').value.trim(),
+            year: document.getElementById('regYear').value.trim(),
+            section: document.getElementById('regSection').value.trim()
         };
 
         try {
