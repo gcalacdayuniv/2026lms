@@ -177,28 +177,33 @@ export const Components = {
                     <h2 class="text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
                 </div>
                 
-                <!-- Side-by-Side Profile Information (Values Only) -->
+                <!-- Side-by-Side Profile Information -->
                 <div class="mt-8 px-2 space-y-4">
                     <!-- Row 1 -->
                     <div class="flex justify-between items-start border-b border-gray-200 pb-4">
                         <div class="flex-1 pr-1">
-                            <span class="block text-sm font-bold text-blue-600">${user.role || 'N/A'}</span>
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role</span>
+                            <span class="block text-sm font-bold text-blue-600 mt-1">${user.role || 'N/A'}</span>
                         </div>
                         <div class="flex-1 text-center border-x border-gray-200 px-1">
-                            <span class="block text-sm font-medium text-gray-800">${user.Student_Number || 'N/A'}</span>
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Student No</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1">${user.Student_Number || 'N/A'}</span>
                         </div>
                         <div class="flex-1 text-right pl-1">
-                            <span class="block text-sm font-medium text-gray-800">${displayCourse}</span>
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Course / Section</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1">${displayCourse}</span>
                         </div>
                     </div>
                     
                     <!-- Row 2 -->
                     <div class="flex justify-between items-start">
                         <div class="flex-1 pr-2">
-                            <span class="block text-sm font-medium text-gray-800 break-all">${user.Email || 'N/A'}</span>
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1 break-all">${user.Email || 'N/A'}</span>
                         </div>
                         <div class="flex-1 text-right border-l border-gray-200 pl-2">
-                            <span class="block text-sm font-medium text-gray-800">${user.Contact_Number || 'N/A'}</span>
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contact</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1">${user.Contact_Number || 'N/A'}</span>
                         </div>
                     </div>
                 </div>
