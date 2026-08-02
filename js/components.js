@@ -136,6 +136,11 @@ export const Components = {
         const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
         const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
         
+        let displayCourse = 'N/A';
+        if (user.course) {
+            displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
+        }
+        
         return `
         <!-- Top Header Bar -->
         <header class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
@@ -170,17 +175,37 @@ export const Components = {
                 <div class="text-center mt-6">
                     ${panelAvatar}
                     <h2 class="text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
-                    <p class="text-sm text-blue-600 font-bold uppercase tracking-widest mt-1">${user.role}</p>
                 </div>
                 
-                <!-- Clean Text Profile Information -->
-                <div class="mt-8 px-4 space-y-3">
-                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Student No:</span> ${user.Student_Number || 'N/A'}</p>
-                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Course:</span> ${user.course || 'N/A'}</p>
-                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Year:</span> ${user.year || 'N/A'}</p>
-                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Section:</span> ${user.section || 'N/A'}</p>
-                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Email:</span> ${user.Email || 'N/A'}</p>
-                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Contact:</span> ${user.Contact_Number || 'N/A'}</p>
+                <!-- Side-by-Side Profile Information -->
+                <div class="mt-8 px-2 space-y-4">
+                    <!-- Row 1 -->
+                    <div class="flex justify-between items-start border-b border-gray-200 pb-4">
+                        <div class="flex-1 pr-1">
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role</span>
+                            <span class="block text-sm font-bold text-blue-600 mt-1">${user.role || 'N/A'}</span>
+                        </div>
+                        <div class="flex-1 text-center border-x border-gray-200 px-1">
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Student No</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1">${user.Student_Number || 'N/A'}</span>
+                        </div>
+                        <div class="flex-1 text-right pl-1">
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Course / Section</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1">${displayCourse}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Row 2 -->
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1 pr-2">
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Email</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1 break-all">${user.Email || 'N/A'}</span>
+                        </div>
+                        <div class="flex-1 text-right border-l border-gray-200 pl-2">
+                            <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contact</span>
+                            <span class="block text-sm font-medium text-gray-800 mt-1">${user.Contact_Number || 'N/A'}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mt-10 pt-6">
