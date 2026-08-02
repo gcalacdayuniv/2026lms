@@ -10,6 +10,18 @@ export const AuthModule = {
         document.addEventListener('keydown', AuthModule.handleKeydown);
     },
 
+    loadPrograms: async () => {
+        const select = document.getElementById('regCourse');
+        if (!select) return;
+        try {
+            const data = await apiFetch('/api/programs');
+            select.innerHTML = '<option value="" disabled selected>Select Course</option>' + 
+                data.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+        } catch (e) {
+            select.innerHTML = '<option value="" disabled>Error loading courses</option>';
+        }
+    },
+
     handleForms: async (e) => {
         if (e.target.id === 'loginForm') {
             e.preventDefault();
@@ -58,7 +70,6 @@ export const AuthModule = {
         // Change Password Modal Toggle Logic
         if (e.target.closest('#openCpModalBtn')) {
             document.getElementById('cpModal').classList.remove('hidden');
-            // Ensure sidebar is closed when modal opens for better UX on mobile
             const panel = document.getElementById('profilePanel');
             const overlay = document.getElementById('profilePanelOverlay');
             if (panel && overlay) {
@@ -88,6 +99,25 @@ export const AuthModule = {
             document.getElementById('addCourseForm').reset();
             const courseErr = document.getElementById('courseError');
             if(courseErr) courseErr.classList.add('hidden');
+        }
+
+        // Add Program Modal Toggle Logic (For Lecturers)
+        if (e.target.closest('#openApModalBtn')) {
+            document.getElementById('apModal').classList.remove('hidden');
+            const panel = document.getElementById('profilePanel');
+            const overlay = document.getElementById('profilePanelOverlay');
+            if (panel && overlay) {
+                panel.classList.add('translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+        if (e.target.closest('#closeApModalBtn') || e.target.id === 'apModalOverlay') {
+            document.getElementById('apModal').classList.add('hidden');
+            document.getElementById('addProgramForm').reset();
+            const err = document.getElementById('programError');
+            const succ = document.getElementById('programSuccess');
+            if(err) err.classList.add('hidden');
+            if(succ) succ.classList.add('hidden');
         }
     },
 
