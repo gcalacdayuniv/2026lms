@@ -12,3 +12,4 @@ GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxdDYLnAPCgm-VTXQmZbn
 binding = "DB"
 database_name = "online-portal-db"
 database_id = "429e0eb9-79e2-4ddf-84e6-d54c857e0943"
+ 
