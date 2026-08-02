@@ -146,6 +146,39 @@ export default {
             }
 
             // ==========================================
+            // PROGRAMS (REGISTRATION COURSE LIST)
+            // ==========================================
+            if (request.method === "POST" && url.pathname === "/api/programs") {
+                const body = await request.json();
+                const code = body.programCode ? body.programCode.trim().toUpperCase() : "";
+                
+                if (!code) {
+                    return new Response(JSON.stringify({ error: "Program code is required" }), { status: 400, headers: corsHeaders });
+                }
+                
+                // Avoid duplication
+                const existing = await env.DB.prepare("SELECT Program_ID FROM Programs WHERE ProgramCode = ?").bind(code).first();
+                if (existing) {
+                    return new Response(JSON.stringify({ error: "Course (Program) already exists in the list." }), { status: 400, headers: corsHeaders });
+                }
+                
+                const id = crypto.randomUUID();
+                await env.DB.prepare("INSERT INTO Programs (Program_ID, ProgramCode) VALUES (?, ?)").bind(id, code).run();
+                
+                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && url.pathname === "/api/programs") {
+                try {
+                    const programs = await env.DB.prepare("SELECT * FROM Programs ORDER BY ProgramCode ASC").all();
+                    return new Response(JSON.stringify({ success: true, programs: programs.results }), { status: 200, headers: corsHeaders });
+                } catch (err) {
+                    // Fail gracefully returning empty array if schema isn't prepared yet
+                    return new Response(JSON.stringify({ success: true, programs: [] }), { status: 200, headers: corsHeaders });
+                }
+            }
+
+            // ==========================================
             // COURSE MANAGEMENT ENDPOINTS
             // ==========================================
             if (request.method === "POST" && url.pathname === "/api/courses") {
