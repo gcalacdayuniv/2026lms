@@ -6,6 +6,8 @@ export const AuthModule = {
         document.addEventListener('submit', AuthModule.handleForms);
         document.addEventListener('click', AuthModule.handleClicks);
         document.addEventListener('change', AuthModule.handleChanges);
+        document.addEventListener('input', AuthModule.handleInput);
+        document.addEventListener('keydown', AuthModule.handleKeydown);
     },
 
     handleForms: async (e) => {
@@ -34,6 +36,32 @@ export const AuthModule = {
     handleChanges: (e) => {
         if (e.target.id === 'regCameraInput' || e.target.id === 'regFileInput') {
             AuthModule.processImageUpload(e.target.files[0]);
+        }
+    },
+
+    handleInput: (e) => {
+        if (e.target.id === 'regStudentNo') {
+            // Strip all non-digit characters
+            let val = e.target.value.replace(/\D/g, '');
+            if (val.length > 6) val = val.substring(0, 6); // Max 6 digits
+
+            // Automatically format as 00-0000
+            if (val.length >= 3) {
+                e.target.value = val.substring(0, 2) + '-' + val.substring(2);
+            } else {
+                e.target.value = val;
+            }
+        }
+    },
+
+    handleKeydown: (e) => {
+        if (e.target.id === 'regStudentNo' && e.key === 'Backspace') {
+            const input = e.target;
+            // If deleting from the end of the dash (e.g., "12-"), delete the dash AND the 2nd digit
+            if (input.value.length === 3 && input.value.endsWith('-')) {
+                input.value = input.value.substring(0, 1);
+                e.preventDefault();
+            }
         }
     },
 
