@@ -22,21 +22,20 @@ export default {
         }
 
         try {
+            // ==========================================
+            // AUTHENTICATION & REGISTRATION ENDPOINTS
+            // ==========================================
             if (request.method === "POST" && url.pathname === "/api/register") {
                 const body = await request.json();
                 
-                // Format Validations
                 const studentNoFormat = /^\d{2}-\d{4}$/;
-                
                 if (!studentNoFormat.test(body.student_number)) {
                     return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
                 }
-
                 if (studentNoFormat.test(body.username)) {
                     return new Response(JSON.stringify({ error: "Username cannot match the Student Number format (00-0000)" }), { status: 400, headers: corsHeaders });
                 }
 
-                // Check Uniqueness
                 const existing = await env.DB.prepare(
                     `SELECT User_ID FROM Users 
                      WHERE Username COLLATE NOCASE = ? 
@@ -49,9 +48,7 @@ export default {
                     return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
                 }
 
-                // Process Avatar Upload to Google Drive
                 let finalAvatarUrl = null;
-
                 if (body.avatarBase64) {
                     if (!env.GAS_WEBHOOK_URL) {
                         return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
@@ -61,7 +58,6 @@ export default {
                     const yearVal = body.year ? body.year.trim() : "";
                     const sectionVal = body.section ? body.section.trim() : "";
                     const courseYearSection = [courseVal, yearVal, sectionVal].filter(Boolean).join(" ") || "General";
-                    
                     const formattedFilename = `${body.student_number}_${body.name}.jpg`;
 
                     const gasPayload = {
@@ -89,12 +85,9 @@ export default {
                     if (!gasData.success) {
                         return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
                     }
-
-                    // Store the Google Drive URL instead of Base64 to save D1 storage space
                     finalAvatarUrl = gasData.fileUrl;
                 }
 
-                // Insert User
                 const userId = crypto.randomUUID();
                 const hashedPassword = await hashPassword(body.password);
 
@@ -102,19 +95,9 @@ export default {
                     `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
                 ).bind(
-                    userId,
-                    body.username,
-                    hashedPassword,
-                    body.name,
-                    finalAvatarUrl, // Using the Google Drive link
-                    body.email,
-                    body.contact_number,
-                    body.student_number,
-                    'Inactive', // Default status
-                    body.course,
-                    body.year,
-                    body.section,
-                    'user'
+                    userId, body.username, hashedPassword, body.name, finalAvatarUrl, 
+                    body.email, body.contact_number, body.student_number, 
+                    'Inactive', body.course, body.year, body.section, 'user'
                 ).run();
 
                 return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });
@@ -136,7 +119,6 @@ export default {
                     return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: corsHeaders });
                 }
 
-                // Account Activation Check (Case-Insensitive)
                 if (user.account_status.toLowerCase() !== 'active') {
                     return new Response(JSON.stringify({ 
                         error: "Account is pending approval. Please wait for an admin or lecturer to activate your account." 
@@ -144,6 +126,70 @@ export default {
                 }
 
                 return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: corsHeaders });
+            }
+
+            // ==========================================
+            // COURSE MANAGEMENT ENDPOINTS
+            // ==========================================
+            if (request.method === "POST" && url.pathname === "/api/courses") {
+                const body = await request.json();
+                const courseId = crypto.randomUUID();
+                
+                await env.DB.prepare(
+                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID) VALUES (?, ?, ?, ?, ?, ?)`
+                ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId).run();
+                
+                return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && url.pathname === "/api/courses") {
+                const courses = await env.DB.prepare(
+                    `SELECT c.*, u.Name as LecturerName 
+                     FROM Courses c 
+                     JOIN Users u ON c.Lecturer_ID = u.User_ID`
+                ).all();
+                
+                return new Response(JSON.stringify({ success: true, courses: courses.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && url.pathname === "/api/enroll") {
+                const body = await request.json();
+                
+                const existing = await env.DB.prepare(
+                    `SELECT Enrollment_ID FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.courseId, body.studentId).first();
+
+                if (existing) {
+                     return new Response(JSON.stringify({ error: "You are already enrolled in this course." }), { status: 400, headers: corsHeaders });
+                }
+
+                const enrollId = crypto.randomUUID();
+                await env.DB.prepare(
+                    `INSERT INTO Enrollments (Enrollment_ID, Course_ID, Student_ID) VALUES (?, ?, ?)`
+                ).bind(enrollId, body.courseId, body.studentId).run();
+                
+                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && url.pathname === "/api/my-courses") {
+                const userId = url.searchParams.get("userId");
+                const role = url.searchParams.get("role");
+                
+                if (role === 'lecturer') {
+                    const myCourses = await env.DB.prepare(
+                        `SELECT * FROM Courses WHERE Lecturer_ID = ?`
+                    ).bind(userId).all();
+                    return new Response(JSON.stringify({ success: true, courses: myCourses.results }), { status: 200, headers: corsHeaders });
+                } else {
+                    const enrolled = await env.DB.prepare(
+                        `SELECT c.*, u.Name as LecturerName 
+                         FROM Enrollments e 
+                         JOIN Courses c ON e.Course_ID = c.Course_ID 
+                         JOIN Users u ON c.Lecturer_ID = u.User_ID 
+                         WHERE e.Student_ID = ?`
+                    ).bind(userId).all();
+                    return new Response(JSON.stringify({ success: true, courses: enrolled.results }), { status: 200, headers: corsHeaders });
+                }
             }
 
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
