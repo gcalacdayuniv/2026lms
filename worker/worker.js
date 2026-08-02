@@ -25,28 +25,49 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/register") {
                 const body = await request.json();
                 
-                // Replaced LOWER() with COLLATE NOCASE for safer special character handling
                 const existing = await env.DB.prepare(
                     "SELECT User_ID FROM Users WHERE Username COLLATE NOCASE = ? OR Student_Number COLLATE NOCASE = ?"
-                )
-                    .bind(body.username, body.student_number)
-                    .first();
+                ).bind(body.username, body.student_number).first();
                     
                 if (existing) {
                     return new Response(JSON.stringify({ error: "Username or Student Number already exists" }), { status: 400, headers: corsHeaders });
+                }
+
+                // Process Avatar upload to Google Drive Webhook
+                let avatarDriveUrl = null;
+                if (body.avatarBase64 && env.GAS_WEBHOOK_URL) {
+                    const gasPayload = {
+                        filename: `${body.username}_avatar.jpg`,
+                        mimeType: "image/jpeg",
+                        base64: body.avatarBase64
+                    };
+
+                    const gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(gasPayload)
+                    });
+                    
+                    const gasData = await gasResponse.json();
+                    if (gasData.success) {
+                        avatarDriveUrl = gasData.fileUrl; // Use the Google Drive URL returned from GAS
+                    } else {
+                        throw new Error("Failed to save avatar image to Drive");
+                    }
                 }
 
                 const userId = crypto.randomUUID();
                 const hashedPassword = await hashPassword(body.password);
 
                 await env.DB.prepare(
-                    `INSERT INTO Users (User_ID, Username, Password, Name, Email, Contact_Number, Student_Number, account_status, course, year, section, role) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                    `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
                 ).bind(
                     userId,
                     body.username,
                     hashedPassword,
                     body.name,
+                    avatarDriveUrl,
                     body.email,
                     body.contact_number,
                     body.student_number,
@@ -63,9 +84,8 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/login") {
                 const body = await request.json();
                 const hashedPassword = await hashPassword(body.password);
-                const id = body.identifier; // The frontend already sent this trimmed
+                const id = body.identifier;
 
-                // Replaced LOWER() with COLLATE NOCASE for safer special character handling
                 const user = await env.DB.prepare(
                     `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section 
                      FROM Users 
