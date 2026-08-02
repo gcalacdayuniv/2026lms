@@ -49,19 +49,15 @@ export default {
                     return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
                 }
 
-                // Process Avatar Upload
-                let avatarDriveUrl = null;
+                // Process Avatar Upload to Google Drive for Backup/Admin Records
                 if (body.avatarBase64) {
                     if (!env.GAS_WEBHOOK_URL) {
                         return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
                     }
 
-                    // Dynamically combine Course, Year, and Section into one folder name
                     const courseVal = body.course ? body.course.trim() : "";
                     const yearVal = body.year ? body.year.trim() : "";
                     const sectionVal = body.section ? body.section.trim() : "";
-                    
-                    // Filters out empty strings so it doesn't create weird spacing if a field is left blank
                     const courseYearSection = [courseVal, yearVal, sectionVal].filter(Boolean).join(" ") || "General";
                     
                     const formattedFilename = `${body.student_number}_${body.name}.jpg`;
@@ -70,7 +66,7 @@ export default {
                         filename: formattedFilename,
                         mimeType: "image/jpeg",
                         base64: body.avatarBase64,
-                        pathParts: [courseYearSection, "Profile Picture"] // E.g. ["BSIT 4 A", "Profile Picture"]
+                        pathParts: [courseYearSection, "Profile Picture"]
                     };
 
                     const gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
@@ -88,14 +84,12 @@ export default {
                         return new Response(JSON.stringify({ error: "Google Apps Script blocked the upload. Ensure it is deployed as 'Execute as: Me' and 'Access: Anyone'." }), { status: 500, headers: corsHeaders });
                     }
 
-                    if (gasData.success) {
-                        avatarDriveUrl = gasData.fileUrl;
-                    } else {
+                    if (!gasData.success) {
                         return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
                     }
                 }
 
-                // Insert User
+                // Insert User. We are binding body.avatarBase64 natively into the D1 DB to prevent broken images.
                 const userId = crypto.randomUUID();
                 const hashedPassword = await hashPassword(body.password);
 
@@ -107,11 +101,11 @@ export default {
                     body.username,
                     hashedPassword,
                     body.name,
-                    avatarDriveUrl,
+                    body.avatarBase64, // SAVING COMPRESSED BASE64 DIRECTLY TO AVOID HOTLINKING ISSUES
                     body.email,
                     body.contact_number,
                     body.student_number,
-                    'Inactive',
+                    'Inactive', // Default status
                     body.course,
                     body.year,
                     body.section,
@@ -135,6 +129,13 @@ export default {
 
                 if (!user) {
                     return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: corsHeaders });
+                }
+
+                // Account Activation Check (Case-Insensitive)
+                if (user.account_status.toLowerCase() !== 'active') {
+                    return new Response(JSON.stringify({ 
+                        error: "Account is pending approval. Please wait for an admin or lecturer to activate your account." 
+                    }), { status: 403, headers: corsHeaders });
                 }
 
                 return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: corsHeaders });
