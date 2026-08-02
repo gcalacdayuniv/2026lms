@@ -72,6 +72,23 @@ export const AuthModule = {
             document.getElementById('cpError').classList.add('hidden');
             document.getElementById('cpSuccess').classList.add('hidden');
         }
+
+        // Create Course Modal Toggle Logic
+        if (e.target.closest('#openCreateCourseModalBtn')) {
+            document.getElementById('ccModal').classList.remove('hidden');
+            const panel = document.getElementById('profilePanel');
+            const overlay = document.getElementById('profilePanelOverlay');
+            if (panel && overlay) {
+                panel.classList.add('translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+        if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') {
+            document.getElementById('ccModal').classList.add('hidden');
+            document.getElementById('addCourseForm').reset();
+            const courseErr = document.getElementById('courseError');
+            if(courseErr) courseErr.classList.add('hidden');
+        }
     },
 
     handleChanges: (e) => {
