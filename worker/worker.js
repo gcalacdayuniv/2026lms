@@ -25,12 +25,28 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/register") {
                 const body = await request.json();
                 
+                // Format Validations via Regex
+                const studentNoFormat = /^\d{2}-\d{4}$/;
+                
+                if (!studentNoFormat.test(body.student_number)) {
+                    return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+                }
+
+                if (studentNoFormat.test(body.username)) {
+                    return new Response(JSON.stringify({ error: "Username cannot match the Student Number format (00-0000)" }), { status: 400, headers: corsHeaders });
+                }
+
+                // Check Uniqueness for Username, Student Number, Email, and Contact
                 const existing = await env.DB.prepare(
-                    "SELECT User_ID FROM Users WHERE Username COLLATE NOCASE = ? OR Student_Number COLLATE NOCASE = ?"
-                ).bind(body.username, body.student_number).first();
+                    `SELECT User_ID FROM Users 
+                     WHERE Username COLLATE NOCASE = ? 
+                     OR Student_Number COLLATE NOCASE = ? 
+                     OR Email COLLATE NOCASE = ? 
+                     OR Contact_Number = ?`
+                ).bind(body.username, body.student_number, body.email, body.contact_number).first();
                     
                 if (existing) {
-                    return new Response(JSON.stringify({ error: "Username or Student Number already exists" }), { status: 400, headers: corsHeaders });
+                    return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
                 }
 
                 let avatarDriveUrl = null;
@@ -50,14 +66,22 @@ export default {
                     const gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(gasPayload)
+                        body: JSON.stringify(gasPayload),
+                        redirect: 'follow'
                     });
                     
-                    const gasData = await gasResponse.json();
+                    const gasText = await gasResponse.text();
+                    let gasData;
+                    try {
+                        gasData = JSON.parse(gasText);
+                    } catch (parseError) {
+                        throw new Error(`Google Apps Script is blocking the upload. Ensure it is deployed as 'Execute as: Me' and 'Access: Anyone'.`);
+                    }
+
                     if (gasData.success) {
                         avatarDriveUrl = gasData.fileUrl;
                     } else {
-                        throw new Error("Failed to save avatar image to Drive");
+                        throw new Error("Google Drive Error: " + gasData.error);
                     }
                 }
 
