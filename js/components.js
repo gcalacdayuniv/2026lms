@@ -141,6 +141,14 @@ export const Components = {
             displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
         }
         
+        const createCourseBtn = user.role.toLowerCase() === 'lecturer' ? `
+            <div class="mt-6">
+                <button id="openCreateCourseModalBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
+                    <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course
+                </button>
+            </div>
+        ` : '';
+
         return `
         <!-- Top Header Bar -->
         <header class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
@@ -165,7 +173,7 @@ export const Components = {
         <!-- Sliding Profile Panel overlay with blur -->
         <div id="profilePanelOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm z-40 hidden transition-opacity"></div>
         
-        <!-- Sliding Profile Panel (80% width on portrait mobile, fixed width on larger screens) -->
+        <!-- Sliding Profile Panel -->
         <div id="profilePanel" class="fixed inset-y-0 right-0 w-4/5 sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto flex flex-col">
             <div class="p-6 bg-gradient-to-b from-blue-50 to-white flex-grow relative">
                 <button id="closeProfilePanel" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
@@ -203,7 +211,9 @@ export const Components = {
                     </div>
                 </div>
 
-                <div class="mt-10 pt-6">
+                ${createCourseBtn}
+
+                <div class="mt-6">
                     <button id="openCpModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
                         <i class="fa-solid fa-lock text-gray-400 mr-2 mt-0.5"></i> Change Password
                     </button>
@@ -219,10 +229,7 @@ export const Components = {
 
         <!-- Change Password Pop-Up Modal -->
         <div id="cpModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
-            <!-- Modal Background -->
             <div id="cpModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            
-            <!-- Modal Content -->
             <div class="bg-white rounded-lg shadow-xl w-11/12 sm:w-96 p-6 relative z-10 scale-up">
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-shield-halved text-blue-600 mr-2"></i>Change Password</h3>
@@ -250,6 +257,70 @@ export const Components = {
                     
                     <button type="submit" id="cpSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
                         Update Password
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create Course Pop-Up Modal -->
+        <div id="ccModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+            <div id="ccModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-md p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-folder-plus text-blue-600 mr-2"></i>Create Course</h3>
+                    <button id="closeCcModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="addCourseForm" class="space-y-4">
+                    <div id="courseError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course Code</label>
+                        <input type="text" id="courseCode" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. CS101">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course Title</label>
+                        <input type="text" id="courseTitle" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. Introduction to Programming">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Schedule Day</label>
+                            <select id="scheduleDay" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                                <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+                                <option>Thursday</option><option>Friday</option><option>Saturday</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Time Period</label>
+                            <input type="text" id="timePeriod" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="9:00 AM - 12:00 PM">
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-4 mt-4">
+                        <p class="text-xs font-bold text-gray-800 mb-2 uppercase">Target Audience (Restriction)</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Course</label>
+                                <input type="text" id="targetCourse" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. BSCS">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Year</label>
+                                <input type="text" id="targetYear" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. 1">
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Section</label>
+                            <input type="text" id="targetSection" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. A">
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-1 italic">*Leave blank to make it available to all students.</p>
+                    </div>
+                    
+                    <button type="submit" id="addCourseBtn" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors mt-4">
+                        Create Course
                     </button>
                 </form>
             </div>
