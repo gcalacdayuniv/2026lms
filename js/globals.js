@@ -1,7 +1,7 @@
 // js/globals.js
-// Update this URL once your Cloudflare Worker is deployed
 export const CONFIG = {
-    API_URL: "https://your-worker-domain.workers.dev" 
+    // An empty string ensures the app uses the exact same domain it is currently running on.
+    API_URL: "" 
 };
 
 export const AppState = {
