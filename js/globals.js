@@ -1,7 +1,6 @@
 // js/globals.js
 export const CONFIG = {
-    // An empty string ensures the app uses the exact same domain it is currently running on.
-    API_URL: "" 
+    API_URL: "https://2026lms.plv.workers.dev" 
 };
 
 export const AppState = {
@@ -18,7 +17,14 @@ export async function apiFetch(endpoint, options = {}) {
 
     try {
         const response = await fetch(url, { ...options, headers });
-        const data = await response.json();
+        const text = await response.text(); 
+        
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (parseError) {
+            throw new Error(`Server returned non-JSON response. Status: ${response.status}`);
+        }
         
         if (!response.ok) {
             throw new Error(data.error || "API request failed");
