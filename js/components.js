@@ -157,11 +157,11 @@ export const Components = {
             <div id="courseContainer" class="w-full"></div>
         </main>
 
-        <!-- Sliding Profile Panel overlay -->
-        <div id="profilePanelOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
+        <!-- Sliding Profile Panel overlay with blur -->
+        <div id="profilePanelOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm z-40 hidden transition-opacity"></div>
         
-        <!-- Sliding Profile Panel -->
-        <div id="profilePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto flex flex-col">
+        <!-- Sliding Profile Panel (80% width on portrait mobile, fixed width on larger screens) -->
+        <div id="profilePanel" class="fixed inset-y-0 right-0 w-4/5 sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto flex flex-col">
             <div class="p-6 bg-gradient-to-b from-blue-50 to-white flex-grow relative">
                 <button id="closeProfilePanel" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
                     <i class="fa-solid fa-xmark text-2xl"></i>
@@ -173,36 +173,20 @@ export const Components = {
                     <p class="text-sm text-blue-600 font-bold uppercase tracking-widest mt-1">${user.role}</p>
                 </div>
                 
-                <div class="mt-8 space-y-3">
-                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                        <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-1">Student Number</p>
-                        <p class="font-bold text-gray-800 text-lg">${user.Student_Number || 'N/A'}</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                        <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-1">Course / Year / Section</p>
-                        <p class="font-bold text-gray-800">${user.course || 'N/A'} ${user.year ? `| Year ${user.year}` : ''} ${user.section ? `| Sec ${user.section}` : ''}</p>
-                    </div>
+                <!-- Clean Text Profile Information -->
+                <div class="mt-8 px-4 space-y-3">
+                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Student No:</span> ${user.Student_Number || 'N/A'}</p>
+                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Course:</span> ${user.course || 'N/A'}</p>
+                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Year:</span> ${user.year || 'N/A'}</p>
+                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Section:</span> ${user.section || 'N/A'}</p>
+                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Email:</span> ${user.Email || 'N/A'}</p>
+                    <p class="text-base text-gray-700"><span class="font-bold text-gray-900 w-24 inline-block">Contact:</span> ${user.Contact_Number || 'N/A'}</p>
                 </div>
 
-                <div class="mt-8 border-t border-gray-200 pt-6">
-                    <h3 class="text-md font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-lock text-gray-400 mr-2"></i> Change Password</h3>
-                    <form id="changePasswordForm" class="space-y-4">
-                        <div id="cpError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
-                        <div id="cpSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
-                        
-                        <div>
-                            <input type="password" id="cpCurrent" placeholder="Current Password" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                        </div>
-                        <div>
-                            <input type="password" id="cpNew" placeholder="New Password" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                        </div>
-                        <div>
-                            <input type="password" id="cpRepeat" placeholder="Repeat New Password" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                        </div>
-                        <button type="submit" id="cpSubmitBtn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 focus:outline-none transition-colors">
-                            Update Password
-                        </button>
-                    </form>
+                <div class="mt-10 pt-6">
+                    <button id="openCpModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-lock text-gray-400 mr-2 mt-0.5"></i> Change Password
+                    </button>
                 </div>
             </div>
             
@@ -210,6 +194,44 @@ export const Components = {
                 <button id="logoutBtn" class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none transition-colors">
                     <i class="fa-solid fa-power-off mr-2"></i> Log Out
                 </button>
+            </div>
+        </div>
+
+        <!-- Change Password Pop-Up Modal -->
+        <div id="cpModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+            <!-- Modal Background -->
+            <div id="cpModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            
+            <!-- Modal Content -->
+            <div class="bg-white rounded-lg shadow-xl w-11/12 sm:w-96 p-6 relative z-10 scale-up">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-shield-halved text-blue-600 mr-2"></i>Change Password</h3>
+                    <button id="closeCpModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="changePasswordForm" class="space-y-4">
+                    <div id="cpError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    <div id="cpSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Current Password</label>
+                        <input type="password" id="cpCurrent" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">New Password</label>
+                        <input type="password" id="cpNew" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Repeat New Password</label>
+                        <input type="password" id="cpRepeat" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    
+                    <button type="submit" id="cpSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
+                        Update Password
+                    </button>
+                </form>
             </div>
         </div>
         `;
