@@ -25,7 +25,10 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/register") {
                 const body = await request.json();
                 
-                const existing = await env.DB.prepare("SELECT User_ID FROM Users WHERE LOWER(Username) = LOWER(?) OR LOWER(Student_Number) = LOWER(?)")
+                // Replaced LOWER() with COLLATE NOCASE for safer special character handling
+                const existing = await env.DB.prepare(
+                    "SELECT User_ID FROM Users WHERE Username COLLATE NOCASE = ? OR Student_Number COLLATE NOCASE = ?"
+                )
                     .bind(body.username, body.student_number)
                     .first();
                     
@@ -60,12 +63,13 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/login") {
                 const body = await request.json();
                 const hashedPassword = await hashPassword(body.password);
-                const id = body.identifier;
+                const id = body.identifier; // The frontend already sent this trimmed
 
+                // Replaced LOWER() with COLLATE NOCASE for safer special character handling
                 const user = await env.DB.prepare(
                     `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section 
                      FROM Users 
-                     WHERE (LOWER(Username) = LOWER(?) OR LOWER(Email) = LOWER(?) OR Contact_Number = ? OR LOWER(Student_Number) = LOWER(?)) 
+                     WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?) 
                      AND Password = ?`
                 ).bind(id, id, id, id, hashedPassword).first();
 
