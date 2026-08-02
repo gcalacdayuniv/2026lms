@@ -1,6 +1,7 @@
 // js/globals.js
 export const CONFIG = {
-    API_URL: "https://2026lms.plv.workers.dev" 
+    // Points to your dedicated Cloudflare Worker backend API
+    API_URL: "https://2026-api.plv.workers.dev" 
 };
 
 export const AppState = {
