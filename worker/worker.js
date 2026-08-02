@@ -25,21 +25,20 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/register") {
                 const body = await request.json();
                 
-                // Check if user exists
-                const existing = await env.DB.prepare("SELECT User_ID FROM Users WHERE Username = ?")
-                    .bind(body.username)
+                const existing = await env.DB.prepare("SELECT User_ID FROM Users WHERE LOWER(Username) = LOWER(?) OR LOWER(Student_Number) = LOWER(?)")
+                    .bind(body.username, body.student_number)
                     .first();
                     
                 if (existing) {
-                    return new Response(JSON.stringify({ error: "Username already exists" }), { status: 400, headers: corsHeaders });
+                    return new Response(JSON.stringify({ error: "Username or Student Number already exists" }), { status: 400, headers: corsHeaders });
                 }
 
                 const userId = crypto.randomUUID();
                 const hashedPassword = await hashPassword(body.password);
 
                 await env.DB.prepare(
-                    `INSERT INTO Users (User_ID, Username, Password, Name, Email, Contact_Number, course, year, section, role) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                    `INSERT INTO Users (User_ID, Username, Password, Name, Email, Contact_Number, Student_Number, account_status, course, year, section, role) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
                 ).bind(
                     userId,
                     body.username,
@@ -47,6 +46,8 @@ export default {
                     body.name,
                     body.email,
                     body.contact_number,
+                    body.student_number,
+                    'Inactive',
                     body.course,
                     body.year,
                     body.section,
@@ -59,12 +60,14 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/login") {
                 const body = await request.json();
                 const hashedPassword = await hashPassword(body.password);
+                const id = body.identifier;
 
                 const user = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, role, course, year, section 
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section 
                      FROM Users 
-                     WHERE Username = ? AND Password = ?`
-                ).bind(body.username, hashedPassword).first();
+                     WHERE (LOWER(Username) = LOWER(?) OR LOWER(Email) = LOWER(?) OR Contact_Number = ? OR LOWER(Student_Number) = LOWER(?)) 
+                     AND Password = ?`
+                ).bind(id, id, id, id, hashedPassword).first();
 
                 if (!user) {
                     return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: corsHeaders });
