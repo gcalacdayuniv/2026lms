@@ -132,26 +132,39 @@ export const Components = {
         const avatarSrc = getLoadableAvatarSrc(user.Avatar);
         
         return `
-        <div class="w-full max-w-4xl bg-white rounded-lg shadow-md p-8 fade-in">
+        <div class="w-full max-w-5xl bg-white rounded-lg shadow-md p-8 fade-in">
              <div class="flex justify-between items-center border-b pb-4 mb-4">
                 <div class="flex items-center space-x-4">
                     ${avatarSrc ? `<img src="${avatarSrc}" id="dashboardAvatarBtn" class="w-14 h-14 rounded-full object-cover aspect-square border-2 border-gray-300 cursor-pointer hover:opacity-80 transition-opacity shadow-sm" alt="Profile Picture" title="Click to view" />` : '<i class="fa-solid fa-circle-user text-4xl text-gray-400"></i>'}
-                    <h1 class="text-2xl font-bold text-gray-800">Portal Dashboard</h1>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Portal Dashboard</h1>
+                        <p class="text-sm text-blue-600 font-bold uppercase tracking-wider">${user.role}</p>
+                    </div>
                 </div>
-                <button id="logoutBtn" class="text-sm bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded shadow-sm">Logout</button>
+                <button id="logoutBtn" class="text-sm bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded shadow-sm font-medium transition-colors">Logout</button>
              </div>
-             <p>Welcome, <strong>${user.Name}</strong> (@${user.Username})</p>
-             <p class="text-sm mt-2">Status: <span class="font-semibold ${user.account_status === 'Active' ? 'text-green-600' : 'text-red-600'}">${user.account_status}</span></p>
-             <div class="mt-6 grid grid-cols-2 gap-4">
-                <div class="p-4 bg-gray-50 rounded border shadow-sm">
-                    <p class="text-sm text-gray-500">Student Number</p>
-                    <p class="font-semibold">${user.Student_Number || 'N/A'}</p>
+             <p class="text-lg">Welcome, <strong>${user.Name}</strong> (@${user.Username})</p>
+             <p class="text-sm mt-1">Status: <span class="font-semibold ${user.account_status === 'Active' ? 'text-green-600' : 'text-red-600'}">${user.account_status}</span></p>
+             
+             <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 bg-gray-50 rounded-md border shadow-sm flex items-center">
+                    <i class="fa-regular fa-id-card text-2xl text-gray-400 mr-4"></i>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Student Number</p>
+                        <p class="font-bold text-gray-800 text-lg">${user.Student_Number || 'N/A'}</p>
+                    </div>
                 </div>
-                <div class="p-4 bg-gray-50 rounded border shadow-sm">
-                    <p class="text-sm text-gray-500">Course / Year / Section</p>
-                    <p class="font-semibold">${user.course || 'N/A'} - ${user.year || 'N/A'} - ${user.section || 'N/A'}</p>
+                <div class="p-4 bg-gray-50 rounded-md border shadow-sm flex items-center">
+                    <i class="fa-solid fa-graduation-cap text-2xl text-gray-400 mr-4"></i>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Course / Year / Section</p>
+                        <p class="font-bold text-gray-800 text-lg">${user.course || 'N/A'} - ${user.year || 'N/A'} - ${user.section || 'N/A'}</p>
+                    </div>
                 </div>
              </div>
+             
+             <!-- Dynamic Course Content Injected Here by course.js -->
+             <div id="courseContainer" class="mt-8 pt-4 border-t border-gray-100"></div>
         </div>
 
         <!-- Clean Image Modal -->
