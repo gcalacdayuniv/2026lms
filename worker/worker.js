@@ -25,7 +25,7 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/register") {
                 const body = await request.json();
                 
-                // Format Validations via Regex
+                // Format Validations
                 const studentNoFormat = /^\d{2}-\d{4}$/;
                 
                 if (!studentNoFormat.test(body.student_number)) {
@@ -36,7 +36,7 @@ export default {
                     return new Response(JSON.stringify({ error: "Username cannot match the Student Number format (00-0000)" }), { status: 400, headers: corsHeaders });
                 }
 
-                // Check Uniqueness for Username, Student Number, Email, and Contact
+                // Check Uniqueness
                 const existing = await env.DB.prepare(
                     `SELECT User_ID FROM Users 
                      WHERE Username COLLATE NOCASE = ? 
@@ -49,8 +49,14 @@ export default {
                     return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
                 }
 
+                // Process Avatar Upload with Strict Failsafes
                 let avatarDriveUrl = null;
-                if (body.avatarBase64 && env.GAS_WEBHOOK_URL) {
+                if (body.avatarBase64) {
+                    // FAILSAFE 1: Ensure the Worker has the URL loaded
+                    if (!env.GAS_WEBHOOK_URL) {
+                        return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
+                    }
+
                     const yearFolder = body.year || "General";
                     const sectionFolder = body.section || "General";
                     const yearAndSection = `${yearFolder} - ${sectionFolder}`;
@@ -75,16 +81,19 @@ export default {
                     try {
                         gasData = JSON.parse(gasText);
                     } catch (parseError) {
-                        throw new Error(`Google Apps Script is blocking the upload. Ensure it is deployed as 'Execute as: Me' and 'Access: Anyone'.`);
+                        // FAILSAFE 2: Catch HTML login page blocks from Google
+                        return new Response(JSON.stringify({ error: "Google Apps Script blocked the upload. Ensure it is deployed as 'Execute as: Me' and 'Access: Anyone'." }), { status: 500, headers: corsHeaders });
                     }
 
                     if (gasData.success) {
                         avatarDriveUrl = gasData.fileUrl;
                     } else {
-                        throw new Error("Google Drive Error: " + gasData.error);
+                        // FAILSAFE 3: Catch native Google Drive API errors
+                        return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
                     }
                 }
 
+                // Insert User only if Avatar successfully uploaded (or was deliberately bypassed)
                 const userId = crypto.randomUUID();
                 const hashedPassword = await hashPassword(body.password);
 
@@ -111,6 +120,7 @@ export default {
             }
 
             if (request.method === "POST" && url.pathname === "/api/login") {
+                // ... (Login logic remains identical)
                 const body = await request.json();
                 const hashedPassword = await hashPassword(body.password);
                 const id = body.identifier;
