@@ -33,13 +33,18 @@ export default {
                     return new Response(JSON.stringify({ error: "Username or Student Number already exists" }), { status: 400, headers: corsHeaders });
                 }
 
-                // Process Avatar upload to Google Drive Webhook
                 let avatarDriveUrl = null;
                 if (body.avatarBase64 && env.GAS_WEBHOOK_URL) {
+                    const yearFolder = body.year || "General";
+                    const sectionFolder = body.section || "General";
+                    const yearAndSection = `${yearFolder} - ${sectionFolder}`;
+                    const formattedFilename = `${body.student_number}_${body.name}.jpg`;
+
                     const gasPayload = {
-                        filename: `${body.username}_avatar.jpg`,
+                        filename: formattedFilename,
                         mimeType: "image/jpeg",
-                        base64: body.avatarBase64
+                        base64: body.avatarBase64,
+                        pathParts: [yearAndSection, "Profile Picture"]
                     };
 
                     const gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
@@ -50,7 +55,7 @@ export default {
                     
                     const gasData = await gasResponse.json();
                     if (gasData.success) {
-                        avatarDriveUrl = gasData.fileUrl; // Use the Google Drive URL returned from GAS
+                        avatarDriveUrl = gasData.fileUrl;
                     } else {
                         throw new Error("Failed to save avatar image to Drive");
                     }
