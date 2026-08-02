@@ -97,7 +97,7 @@ export default {
                 ).bind(
                     userId, body.username, hashedPassword, body.name, finalAvatarUrl, 
                     body.email, body.contact_number, body.student_number, 
-                    'Inactive', body.course, body.year, body.section, 'Student'
+                    'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, 'Student'
                 ).run();
 
                 return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });
@@ -152,9 +152,9 @@ export default {
                 const body = await request.json();
                 const courseId = crypto.randomUUID();
                 
-                const targetCourse = body.targetCourse || "";
-                const targetYear = body.targetYear || "";
-                const targetSection = body.targetSection || "";
+                const targetCourse = body.targetCourse ? body.targetCourse.trim() : "";
+                const targetYear = body.targetYear ? body.targetYear.trim() : "";
+                const targetSection = body.targetSection ? body.targetSection.trim() : "";
                 
                 await env.DB.prepare(
                     `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -169,21 +169,24 @@ export default {
                 let courses;
                 
                 if (studentId) {
-                    // Fetch student context to apply filtering logic
                     const student = await env.DB.prepare("SELECT course, year, section FROM Users WHERE User_ID = ?").bind(studentId).first();
                     
                     if (!student) {
                         return new Response(JSON.stringify({ error: "Student not found" }), { status: 404, headers: corsHeaders });
                     }
                     
+                    const sCourse = student.course ? student.course.trim() : "";
+                    const sYear = student.year ? student.year.trim() : "";
+                    const sSection = student.section ? student.section.trim() : "";
+                    
                     courses = await env.DB.prepare(
                         `SELECT c.*, u.Name as LecturerName 
                          FROM Courses c 
                          JOIN Users u ON c.Lecturer_ID = u.User_ID
-                         WHERE (c.Target_Course IS NULL OR c.Target_Course = '' OR c.Target_Course COLLATE NOCASE = ?)
-                           AND (c.Target_Year IS NULL OR c.Target_Year = '' OR c.Target_Year COLLATE NOCASE = ?)
-                           AND (c.Target_Section IS NULL OR c.Target_Section = '' OR c.Target_Section COLLATE NOCASE = ?)`
-                    ).bind(student.course, student.year, student.section).all();
+                         WHERE (c.Target_Course IS NULL OR TRIM(c.Target_Course) = '' OR TRIM(c.Target_Course) COLLATE NOCASE = ?)
+                           AND (c.Target_Year IS NULL OR TRIM(c.Target_Year) = '' OR TRIM(c.Target_Year) COLLATE NOCASE = ?)
+                           AND (c.Target_Section IS NULL OR TRIM(c.Target_Section) = '' OR TRIM(c.Target_Section) COLLATE NOCASE = ?)`
+                    ).bind(sCourse, sYear, sSection).all();
                 } else {
                     courses = await env.DB.prepare(
                         `SELECT c.*, u.Name as LecturerName 
