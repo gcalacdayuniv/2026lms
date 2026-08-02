@@ -29,7 +29,7 @@ export const AuthModule = {
         errorDiv.classList.add('hidden');
         
         const payload = {
-            username: document.getElementById('loginUsername').value,
+            identifier: document.getElementById('loginIdentifier').value,
             password: document.getElementById('loginPassword').value
         };
 
@@ -62,6 +62,7 @@ export const AuthModule = {
             password: document.getElementById('regPassword').value,
             name: document.getElementById('regName').value,
             email: document.getElementById('regEmail').value,
+            student_number: document.getElementById('regStudentNo').value,
             contact_number: document.getElementById('regContact').value,
             course: document.getElementById('regCourse').value,
             year: document.getElementById('regYear').value,
