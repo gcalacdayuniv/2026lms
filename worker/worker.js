@@ -1,217 +1,218 @@
-// js/components.js
+// worker/worker.js
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
-// Helper function to bypass Google Drive's hotlinking block for legacy accounts
-const getLoadableAvatarSrc = (src) => {
-    if (!src) return null;
-    if (src.includes('drive.google.com/uc')) {
-        const match = src.match(/[?&]id=([^&]+)/);
-        if (match && match[1]) {
-            return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+export default {
+    async fetch(request, env, ctx) {
+        const url = new URL(request.url);
+        
+        const corsHeaders = {
+            "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+        };
+
+        if (request.method === "OPTIONS") {
+            return new Response(null, { headers: corsHeaders });
         }
-    }
-    return src;
-};
 
-export const Components = {
-    renderLogin: () => `
-        <div class="flex flex-col justify-center items-center min-h-screen p-4">
-            <div class="w-full max-w-md bg-white rounded-lg shadow-md p-8 fade-in">
-                <div class="text-center mb-8">
-                    <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-4"></i>
-                    <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
-                    <p class="text-gray-500 text-sm">Please sign in to your account</p>
-                </div>
-                <form id="loginForm" class="space-y-4">
-                    <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Username, Email, Contact, or Student No.</label>
-                        <input type="text" id="loginIdentifier" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Password</label>
-                        <input type="password" id="loginPassword" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Sign In
-                    </button>
-                </form>
-                <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-600">Don't have an account? <a href="#register" class="text-blue-600 font-medium hover:text-blue-500">Register here</a></p>
-                </div>
-            </div>
-        </div>
-    `,
-
-    renderRegister: () => `
-        <div class="flex flex-col justify-center items-center min-h-screen p-4">
-            <div class="w-full max-w-lg bg-white rounded-lg shadow-md p-8 fade-in my-8">
-                <div class="text-center mb-8">
-                    <i class="fa-solid fa-user-plus text-4xl text-green-600 mb-4"></i>
-                    <h2 class="text-2xl font-bold text-gray-800">Create Account</h2>
-                    <p class="text-gray-500 text-sm">Fill in your details to register</p>
-                </div>
-                <form id="registerForm" class="space-y-4">
-                    <div id="registerError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
-                    <div id="registerSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm">Registration successful! Redirecting to login...</div>
-                    
-                    <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-3">Profile Photo (Required)</label>
-                        <div class="flex justify-center mb-3">
-                            <img id="avatarPreview" class="hidden w-24 h-24 rounded-full object-cover aspect-square border-2 border-green-500 shadow-sm" />
-                        </div>
-                        <div class="flex justify-center space-x-3">
-                            <button type="button" id="btnCamera" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
-                                <i class="fa-solid fa-camera mr-2"></i> Camera
-                            </button>
-                            <button type="button" id="btnFile" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
-                                <i class="fa-solid fa-upload mr-2"></i> File
-                            </button>
-                        </div>
-                        <input type="file" id="regCameraInput" accept="image/*" capture="camera" class="hidden" />
-                        <input type="file" id="regFileInput" accept="image/*" class="hidden" />
-                        <input type="hidden" id="regAvatarBase64" />
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Name</label>
-                            <input type="text" id="regName" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Username</label>
-                            <input type="text" id="regUsername" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Student Number</label>
-                            <input type="text" id="regStudentNo" required placeholder="00-0000" maxlength="7" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Contact Number</label>
-                            <input type="text" id="regContact" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Email</label>
-                        <input type="email" id="regEmail" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Password</label>
-                        <input type="password" id="regPassword" required minlength="6" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Course</label>
-                            <input type="text" id="regCourse" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Year</label>
-                            <input type="text" id="regYear" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Section</label>
-                        <input type="text" id="regSection" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                    </div>
-                    
-                    <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
-                        Create Account
-                    </button>
-                </form>
-                <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-600">Already have an account? <a href="#login" class="text-green-600 font-medium hover:text-green-500">Sign in here</a></p>
-                </div>
-            </div>
-        </div>
-    `,
-
-    renderDashboard: (user) => {
-        const avatarSrc = getLoadableAvatarSrc(user.Avatar);
-        const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
-        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
-        
-        return `
-        <!-- Top Header Bar -->
-        <header class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
-            <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-                <div class="flex justify-between items-center h-16">
-                    <div class="flex items-center">
-                        <h1 class="text-xl font-bold text-gray-800 tracking-tight"><i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard</h1>
-                    </div>
-                    <div class="flex items-center cursor-pointer hover:bg-gray-50 px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200" id="profileToggleBtn">
-                        <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${user.Name}</span>
-                        ${headerAvatar}
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Main Content (Courses Container) -->
-        <main class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full fade-in">
-            <div id="courseContainer" class="w-full"></div>
-        </main>
-
-        <!-- Sliding Profile Panel overlay -->
-        <div id="profilePanelOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
-        
-        <!-- Sliding Profile Panel -->
-        <div id="profilePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto flex flex-col">
-            <div class="p-6 bg-gradient-to-b from-blue-50 to-white flex-grow relative">
-                <button id="closeProfilePanel" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
-                    <i class="fa-solid fa-xmark text-2xl"></i>
-                </button>
+        try {
+            // ==========================================
+            // AUTHENTICATION & REGISTRATION ENDPOINTS
+            // ==========================================
+            if (request.method === "POST" && url.pathname === "/api/register") {
+                const body = await request.json();
                 
-                <div class="text-center mt-6">
-                    ${panelAvatar}
-                    <h2 class="text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
-                    <p class="text-sm text-blue-600 font-bold uppercase tracking-widest mt-1">${user.role}</p>
-                </div>
-                
-                <div class="mt-8 space-y-3">
-                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                        <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-1">Student Number</p>
-                        <p class="font-bold text-gray-800 text-lg">${user.Student_Number || 'N/A'}</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                        <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-1">Course / Year / Section</p>
-                        <p class="font-bold text-gray-800">${user.course || 'N/A'} ${user.year ? `| Year ${user.year}` : ''} ${user.section ? `| Sec ${user.section}` : ''}</p>
-                    </div>
-                </div>
+                const studentNoFormat = /^\d{2}-\d{4}$/;
+                if (!studentNoFormat.test(body.student_number)) {
+                    return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+                }
+                if (studentNoFormat.test(body.username)) {
+                    return new Response(JSON.stringify({ error: "Username cannot match the Student Number format (00-0000)" }), { status: 400, headers: corsHeaders });
+                }
 
-                <div class="mt-8 border-t border-gray-200 pt-6">
-                    <h3 class="text-md font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-lock text-gray-400 mr-2"></i> Change Password</h3>
-                    <form id="changePasswordForm" class="space-y-4">
-                        <div id="cpError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
-                        <div id="cpSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
-                        
-                        <div>
-                            <input type="password" id="cpCurrent" placeholder="Current Password" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                        </div>
-                        <div>
-                            <input type="password" id="cpNew" placeholder="New Password" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                        </div>
-                        <div>
-                            <input type="password" id="cpRepeat" placeholder="Repeat New Password" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                        </div>
-                        <button type="submit" id="cpSubmitBtn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 focus:outline-none transition-colors">
-                            Update Password
-                        </button>
-                    </form>
-                </div>
-            </div>
-            
-            <div class="p-4 border-t border-gray-200 bg-white">
-                <button id="logoutBtn" class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none transition-colors">
-                    <i class="fa-solid fa-power-off mr-2"></i> Log Out
-                </button>
-            </div>
-        </div>
-        `;
+                const existing = await env.DB.prepare(
+                    `SELECT User_ID FROM Users 
+                     WHERE Username COLLATE NOCASE = ? 
+                     OR Student_Number COLLATE NOCASE = ? 
+                     OR Email COLLATE NOCASE = ? 
+                     OR Contact_Number = ?`
+                ).bind(body.username, body.student_number, body.email, body.contact_number).first();
+                    
+                if (existing) {
+                    return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
+                }
+
+                let finalAvatarUrl = null;
+                if (body.avatarBase64) {
+                    if (!env.GAS_WEBHOOK_URL) {
+                        return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
+                    }
+
+                    const courseVal = body.course ? body.course.trim() : "";
+                    const yearVal = body.year ? body.year.trim() : "";
+                    const sectionVal = body.section ? body.section.trim() : "";
+                    const courseYearSection = [courseVal, yearVal, sectionVal].filter(Boolean).join(" ") || "General";
+                    const formattedFilename = `${body.student_number}_${body.name}.jpg`;
+
+                    const gasPayload = {
+                        filename: formattedFilename,
+                        mimeType: "image/jpeg",
+                        base64: body.avatarBase64,
+                        pathParts: [courseYearSection, "Profile Picture"]
+                    };
+
+                    const gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(gasPayload),
+                        redirect: 'follow'
+                    });
+                    
+                    const gasText = await gasResponse.text();
+                    let gasData;
+                    try {
+                        gasData = JSON.parse(gasText);
+                    } catch (parseError) {
+                        return new Response(JSON.stringify({ error: "Google Apps Script blocked the upload. Ensure it is deployed as 'Execute as: Me' and 'Access: Anyone'." }), { status: 500, headers: corsHeaders });
+                    }
+
+                    if (!gasData.success) {
+                        return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
+                    }
+                    finalAvatarUrl = gasData.fileUrl;
+                }
+
+                const userId = crypto.randomUUID();
+                const hashedPassword = await hashPassword(body.password);
+
+                await env.DB.prepare(
+                    `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                ).bind(
+                    userId, body.username, hashedPassword, body.name, finalAvatarUrl, 
+                    body.email, body.contact_number, body.student_number, 
+                    'Inactive', body.course, body.year, body.section, 'Student'
+                ).run();
+
+                return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && url.pathname === "/api/login") {
+                const body = await request.json();
+                const hashedPassword = await hashPassword(body.password);
+                const id = body.identifier;
+
+                const user = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section 
+                     FROM Users 
+                     WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?) 
+                     AND Password = ?`
+                ).bind(id, id, id, id, hashedPassword).first();
+
+                if (!user) {
+                    return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: corsHeaders });
+                }
+
+                if (user.account_status.toLowerCase() !== 'active') {
+                    return new Response(JSON.stringify({ 
+                        error: "Account is pending approval. Please wait for an admin or lecturer to activate your account." 
+                    }), { status: 403, headers: corsHeaders });
+                }
+
+                return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && url.pathname === "/api/change-password") {
+                const body = await request.json();
+                const { userId, currentPassword, newPassword } = body;
+                
+                const currentHash = await hashPassword(currentPassword);
+                const user = await env.DB.prepare("SELECT Password FROM Users WHERE User_ID = ?").bind(userId).first();
+                
+                if (!user || user.Password !== currentHash) {
+                    return new Response(JSON.stringify({ error: "Incorrect current password" }), { status: 400, headers: corsHeaders });
+                }
+                
+                const newHash = await hashPassword(newPassword);
+                await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, userId).run();
+                
+                return new Response(JSON.stringify({ success: true, message: "Password updated successfully" }), { status: 200, headers: corsHeaders });
+            }
+
+            // ==========================================
+            // COURSE MANAGEMENT ENDPOINTS
+            // ==========================================
+            if (request.method === "POST" && url.pathname === "/api/courses") {
+                const body = await request.json();
+                const courseId = crypto.randomUUID();
+                
+                await env.DB.prepare(
+                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID) VALUES (?, ?, ?, ?, ?, ?)`
+                ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId).run();
+                
+                return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && url.pathname === "/api/courses") {
+                const courses = await env.DB.prepare(
+                    `SELECT c.*, u.Name as LecturerName 
+                     FROM Courses c 
+                     JOIN Users u ON c.Lecturer_ID = u.User_ID`
+                ).all();
+                
+                return new Response(JSON.stringify({ success: true, courses: courses.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && url.pathname === "/api/enroll") {
+                const body = await request.json();
+                
+                const existing = await env.DB.prepare(
+                    `SELECT Enrollment_ID FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.courseId, body.studentId).first();
+
+                if (existing) {
+                     return new Response(JSON.stringify({ error: "You are already enrolled in this course." }), { status: 400, headers: corsHeaders });
+                }
+
+                const enrollId = crypto.randomUUID();
+                await env.DB.prepare(
+                    `INSERT INTO Enrollments (Enrollment_ID, Course_ID, Student_ID) VALUES (?, ?, ?)`
+                ).bind(enrollId, body.courseId, body.studentId).run();
+                
+                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && url.pathname === "/api/my-courses") {
+                const userId = url.searchParams.get("userId");
+                const role = url.searchParams.get("role");
+                
+                if (role === 'lecturer') {
+                    const myCourses = await env.DB.prepare(
+                        `SELECT * FROM Courses WHERE Lecturer_ID = ?`
+                    ).bind(userId).all();
+                    return new Response(JSON.stringify({ success: true, courses: myCourses.results }), { status: 200, headers: corsHeaders });
+                } else {
+                    const enrolled = await env.DB.prepare(
+                        `SELECT c.*, u.Name as LecturerName 
+                         FROM Enrollments e 
+                         JOIN Courses c ON e.Course_ID = c.Course_ID 
+                         JOIN Users u ON c.Lecturer_ID = u.User_ID 
+                         WHERE e.Student_ID = ?`
+                    ).bind(userId).all();
+                    return new Response(JSON.stringify({ success: true, courses: enrolled.results }), { status: 200, headers: corsHeaders });
+                }
+            }
+
+            return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
+
+        } catch (err) {
+            return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        }
     }
 };
