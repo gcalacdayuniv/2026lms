@@ -49,7 +49,9 @@ export default {
                     return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
                 }
 
-                // Process Avatar Upload to Google Drive for Backup/Admin Records
+                // Process Avatar Upload to Google Drive
+                let finalAvatarUrl = null;
+
                 if (body.avatarBase64) {
                     if (!env.GAS_WEBHOOK_URL) {
                         return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
@@ -87,9 +89,12 @@ export default {
                     if (!gasData.success) {
                         return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
                     }
+
+                    // Store the Google Drive URL instead of Base64 to save D1 storage space
+                    finalAvatarUrl = gasData.fileUrl;
                 }
 
-                // Insert User. We are binding body.avatarBase64 natively into the D1 DB to prevent broken images.
+                // Insert User
                 const userId = crypto.randomUUID();
                 const hashedPassword = await hashPassword(body.password);
 
@@ -101,7 +106,7 @@ export default {
                     body.username,
                     hashedPassword,
                     body.name,
-                    body.avatarBase64, // SAVING COMPRESSED BASE64 DIRECTLY TO AVOID HOTLINKING ISSUES
+                    finalAvatarUrl, // Using the Google Drive link
                     body.email,
                     body.contact_number,
                     body.student_number,
