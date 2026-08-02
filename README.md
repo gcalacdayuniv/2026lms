@@ -14,20 +14,20 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 
 * **`index.html` & `styles.css`:** Main entry point, the static layout shell, and custom animations.
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
-* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes parsing helpers to bypass Google Drive hotlinking limits.
-* **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines (like Dashboard populations) asynchronously.
-* **`js/auth.js`:** Handles login, registration, session management (`localStorage`), DOM event delegation, dynamic form masking, and Base64 image compression.
-* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, fetches API course data, handles lecturer creation pipelines, and builds the specialized UI strings based on the user's role (Lecturer vs. User).
+* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header and a sliding right Profile Sidebar Panel.
+* **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously.
+* **`js/auth.js`:** Handles login, registration, session management, DOM event delegation, dynamic form masking, password updating logic, and interactive panel toggling.
+* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, fetches API course data, handles lecturer creation pipelines, and builds the specialized UI strings based on the user's role.
 * **`js/app.js`:** The master orchestrator that imports and initializes all modules.
 
 ### 2. Backend API (Cloudflare Workers)
-* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, and Student Enrollments.
+* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Student Enrollments, and Password modification logic.
 
 ### 3. Database Layer (Cloudflare D1 - Serverless SQLite)
 The database uses Universally Unique Identifiers (UUIDs) for all primary keys, generated on the edge via `crypto.randomUUID()`. 
 
 **Note: Ensure the following tables are created for the system to function correctly:**
-* **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role (e.g. 'lecturer' or 'user').
+* **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role (Default: 'Student').
 * **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID).
 * **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK).
 
@@ -40,9 +40,11 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
-* **Course & Enrollment Pipeline:** Implemented a new decoupled modular domain file (`course.js`) enabling role-based dashboard architectures. Users with the 'lecturer' role are provided an interface to create and manage their subjects. Users with the standard 'user' role are provided an interface detailing their enrolled subjects alongside an interactive list allowing them to enroll in available courses. Database relations (Courses and Enrollments) have been directly integrated into the Cloudflare Worker proxy.
-* **Avatar Storage Optimization & Hotlinking Bypass:** Updated the database schema approach to store Google Drive file URLs instead of heavy Base64 strings to drastically conserve D1 SQL storage limits. The frontend dynamically parses these Google Drive download URLs and seamlessly converts them into Google's hidden `thumbnail` endpoint to bypass hotlinking and CORS restrictions on the client side.
-* **Login Authorization Gate:** Added a strict case-insensitive validation check inside the `/api/login` endpoint.
+* **Dashboard UX Redesign & Sliding Sidebar:** The frontend architecture was restructured to include a full width application layout containing a top fixed navigation header. The user's personal context and settings were shifted into an interactive sliding right panel to declutter the main viewing area for module browsing.
+* **Security & Credential Management:** Introduced the `/api/change-password` endpoint. Users can now securely update their password directly from their profile sidebar. The edge network handles hashing standardizations and strict validations natively.
+* **Role Restructuring:** The default user registration role was formally shifted to `Student` across the SQL schema and backend allocation flows.
+* **Course & Enrollment Pipeline:** Implemented a new decoupled modular domain file (`course.js`) enabling role-based dashboard architectures.
+* **Avatar Storage Optimization & Hotlinking Bypass:** Updated the database schema approach to store Google Drive file URLs instead of heavy Base64 strings to drastically conserve D1 SQL storage limits.
 
 ## Development Directives
 When asked to add features, debug, or refactor, you must strictly adhere to the following rules:
