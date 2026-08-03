@@ -6,6 +6,7 @@ export const CourseModule = {
     init: () => {
         document.addEventListener('submit', CourseModule.handleForms);
         document.addEventListener('click', CourseModule.handleClicks);
+        document.addEventListener('change', CourseModule.handleChanges);
     },
 
     handleForms: async (e) => {
@@ -16,6 +17,26 @@ export const CourseModule = {
         if (e.target.id === 'addProgramForm') {
             e.preventDefault();
             await CourseModule.createProgram();
+        }
+    },
+
+    handleChanges: async (e) => {
+        // Auto-save logic for Seat Number and Group Name
+        if (e.target.classList.contains('seat-input') || e.target.classList.contains('group-input')) {
+            const row = e.target.closest('.student-row');
+            const studentId = row.dataset.studentId;
+            const seatNumber = row.querySelector('.seat-input').value.trim();
+            const groupName = row.querySelector('.group-input').value.trim();
+            const courseId = window.location.hash.replace('#class-', '');
+            
+            try {
+                await apiFetch('/api/update-student-info', {
+                    method: 'POST',
+                    body: JSON.stringify({ courseId, studentId, seatNumber, groupName })
+                });
+            } catch (err) {
+                console.error('Failed to update student info:', err);
+            }
         }
     },
 
@@ -94,11 +115,14 @@ export const CourseModule = {
         rows.forEach(row => {
             const studentId = row.dataset.studentId;
             const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+            const pointsInput = row.querySelector('.points-input');
+            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
             
             if (selectedBtn) {
                 attendanceData.push({
                     studentId: studentId,
-                    status: selectedBtn.dataset.status
+                    status: selectedBtn.dataset.status,
+                    points: points
                 });
             } else {
                 missingCount++;
