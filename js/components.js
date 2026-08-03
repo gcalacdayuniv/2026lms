@@ -1,5 +1,5 @@
 // js/components.js
-// hehehe
+
 // Helper function to bypass Google Drive's hotlinking block for legacy accounts
 const getLoadableAvatarSrc = (src) => {
     if (!src) return null;
@@ -379,7 +379,9 @@ export const Components = {
             
             return `
                 <div class="flex items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row" data-student-id="${s.User_ID}">
-                    <div class="flex items-center space-x-4">
+                    
+                    <!-- Profile Info -->
+                    <div class="flex items-center space-x-4 w-1/3">
                         <span class="text-xs font-bold text-gray-400 w-6 text-center">${index + 1}</span>
                         <div class="flex-shrink-0">
                             ${avatarImg}
@@ -391,18 +393,36 @@ export const Components = {
                             </div>
                         </div>
                     </div>
+
+                    <!-- Editable Seat & Group Info -->
+                    <div class="flex items-center space-x-2 w-1/4 justify-center">
+                        <div>
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 text-center">Seat</label>
+                            <input type="text" placeholder="--" class="seat-input w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition" value="${s.Seat_Number || ''}" data-student-id="${s.User_ID}">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 text-center">Group</label>
+                            <input type="text" placeholder="--" class="group-input w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition" value="${s.Group_Name || ''}" data-student-id="${s.User_ID}">
+                        </div>
+                    </div>
                     
-                    <!-- Attendance Action Toggles -->
-                    <div class="flex items-center space-x-2">
-                        <button type="button" data-status="Present" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition">
-                            Present
-                        </button>
-                        <button type="button" data-status="Late" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-300 transition">
-                            Late
-                        </button>
-                        <button type="button" data-status="Absent" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition">
-                            Absent
-                        </button>
+                    <!-- Attendance Action Toggles & Points -->
+                    <div class="flex items-end space-x-2">
+                        <div>
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 text-center">Pts (+/-)</label>
+                            <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center mr-2 bg-gray-50 focus:bg-white transition font-mono" value="0">
+                        </div>
+                        <div class="flex space-x-1">
+                            <button type="button" data-status="Present" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition">
+                                Present
+                            </button>
+                            <button type="button" data-status="Late" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-300 transition">
+                                Late
+                            </button>
+                            <button type="button" data-status="Absent" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition">
+                                Absent
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -413,7 +433,7 @@ export const Components = {
         return `
         <!-- Top Header Bar -->
         <header class="bg-blue-700 shadow-md fixed top-0 w-full z-40">
-            <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
+            <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
                 <div class="flex items-center h-16">
                     <a href="#dashboard" class="text-white hover:text-blue-200 transition mr-4 p-2 -ml-2">
                         <i class="fa-solid fa-arrow-left text-xl"></i>
@@ -427,7 +447,7 @@ export const Components = {
         </header>
 
         <!-- Main Content -->
-        <main class="pt-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full fade-in">
+        <main class="pt-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in">
             <!-- Action Header -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 mt-4 gap-4">
                 <div>
