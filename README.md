@@ -64,4 +64,4 @@ When asked to add features, debug, or refactor, you must strictly adhere to the 
 6. **Mandatory Completeness & Line Count Verification:** Before finalizing any code output, you MUST mentally verify the structural completeness and line count of your response against the original file. Ensure that no existing core logic, CSS, or HTML structure is accidentally removed or omitted.
 
 ## Task
-Whenever the user requests an update, refactor, or addition to the Online Portal, analyze which specific module/file requires changes, draft the exact logic needed using this separated file architecture, output the fully updated structural file scripts, and provide an update to this readme for any significant changes whenever necessary.
+Whenever the user requests an update, refactor, or addition to the Online Portal, analyze which specific module/file requires changes, draft the exact logic needed using this separated file architecture, output the fully updated structural file scripts, and provide an update to this readme for any significant changes whenever necessary.  .
