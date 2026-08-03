@@ -25,6 +25,13 @@ export const AppRouter = {
             return;
         }
 
+        // Dynamic routing for Class Screens
+        if (hash.startsWith('#class-')) {
+            const courseId = hash.replace('#class-', '');
+            await CourseModule.loadClassScreen(courseId);
+            return;
+        }
+
         switch (hash) {
             case '#login':
                 root.innerHTML = Components.renderLogin();
