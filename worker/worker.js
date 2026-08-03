@@ -282,7 +282,7 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email 
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, e.Seat_Number, e.Group_Name 
                      FROM Enrollments e 
                      JOIN Users u ON e.Student_ID = u.User_ID 
                      WHERE e.Course_ID = ? 
@@ -290,6 +290,19 @@ export default {
                 ).bind(courseId).all();
 
                 return new Response(JSON.stringify({ success: true, course: course, students: students.results }), { status: 200, headers: corsHeaders });
+            }
+
+            // ==========================================
+            // STUDENT INFO UPDATES (SEAT/GROUP)
+            // ==========================================
+            if (request.method === "POST" && url.pathname === "/api/update-student-info") {
+                const body = await request.json();
+                
+                await env.DB.prepare(
+                    `UPDATE Enrollments SET Seat_Number = ?, Group_Name = ? WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.seatNumber, body.groupName, body.courseId, body.studentId).run();
+                
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
             // ==========================================
@@ -312,8 +325,8 @@ export default {
                         const attId = crypto.randomUUID();
                         statements.push(
                             env.DB.prepare(
-                                "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status) VALUES (?, ?, ?, ?, ?)"
-                            ).bind(attId, courseId, record.studentId, date, record.status)
+                                "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
+                            ).bind(attId, courseId, record.studentId, date, record.status, record.points)
                         );
                     }
                     
