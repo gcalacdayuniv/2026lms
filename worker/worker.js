@@ -173,7 +173,6 @@ export default {
                     const programs = await env.DB.prepare("SELECT * FROM Programs ORDER BY ProgramCode ASC").all();
                     return new Response(JSON.stringify({ success: true, programs: programs.results }), { status: 200, headers: corsHeaders });
                 } catch (err) {
-                    // Fail gracefully returning empty array if schema isn't prepared yet
                     return new Response(JSON.stringify({ success: true, programs: [] }), { status: 200, headers: corsHeaders });
                 }
             }
@@ -271,9 +270,6 @@ export default {
                 }
             }
 
-            // ==========================================
-            // COURSE SCREEN (LECTURER VIEW) ENDPOINT
-            // ==========================================
             if (request.method === "GET" && url.pathname === "/api/course-details") {
                 const courseId = url.searchParams.get("courseId");
                 if (!courseId) {
@@ -294,6 +290,37 @@ export default {
                 ).bind(courseId).all();
 
                 return new Response(JSON.stringify({ success: true, course: course, students: students.results }), { status: 200, headers: corsHeaders });
+            }
+
+            // ==========================================
+            // ATTENDANCE ENDPOINTS
+            // ==========================================
+            if (request.method === "POST" && url.pathname === "/api/attendance") {
+                const body = await request.json();
+                const { courseId, date, records } = body;
+
+                if (!courseId || !date || !records || !Array.isArray(records)) {
+                    return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: corsHeaders });
+                }
+
+                // Delete existing records for this course and date to allow overwriting
+                await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+
+                if (records.length > 0) {
+                    const statements = [];
+                    for (const record of records) {
+                        const attId = crypto.randomUUID();
+                        statements.push(
+                            env.DB.prepare(
+                                "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status) VALUES (?, ?, ?, ?, ?)"
+                            ).bind(attId, courseId, record.studentId, date, record.status)
+                        );
+                    }
+                    
+                    await env.DB.batch(statements);
+                }
+
+                return new Response(JSON.stringify({ success: true, message: "Attendance saved" }), { status: 201, headers: corsHeaders });
             }
 
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
