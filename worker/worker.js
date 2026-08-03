@@ -293,6 +293,27 @@ export default {
             }
 
             // ==========================================
+            // LECTURER MANUAL ENROLL (UNENROLLED STUDENTS LIST)
+            // ==========================================
+            if (request.method === "GET" && url.pathname === "/api/unenrolled-students") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const students = await env.DB.prepare(
+                    `SELECT User_ID, Student_Number, Name, course, year, section 
+                     FROM Users 
+                     WHERE role COLLATE NOCASE = 'student' 
+                     AND account_status COLLATE NOCASE = 'active'
+                     AND User_ID NOT IN (SELECT Student_ID FROM Enrollments WHERE Course_ID = ?)
+                     ORDER BY Name ASC`
+                ).bind(courseId).all();
+
+                return new Response(JSON.stringify({ success: true, students: students.results }), { status: 200, headers: corsHeaders });
+            }
+
+            // ==========================================
             // STUDENT INFO UPDATES (SEAT/GROUP)
             // ==========================================
             if (request.method === "POST" && url.pathname === "/api/update-student-info") {
