@@ -456,6 +456,9 @@ export const Components = {
                 </div>
                 
                 <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <button id="openAddStudentModalBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center flex-1 sm:flex-initial">
+                        <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
+                    </button>
                     <input type="date" id="attendanceDate" class="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
                     <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center flex-1 sm:flex-initial">
                         <i class="fa-solid fa-floppy-disk mr-2"></i> Save Attendance
@@ -480,6 +483,25 @@ export const Components = {
                 </div>
             </div>
         </main>
+
+        <!-- Add Student Modal -->
+        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm modal-backdrop" id="closeAddStudentModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-2xl p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
+                    <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div class="mb-4">
+                    <input type="text" id="studentSearchInput" placeholder="Search by Name or Student No..." class="w-full px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                </div>
+                <div id="unenrolledStudentsList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
+                    <div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>
+                </div>
+            </div>
+        </div>
         `;
     }
 };
