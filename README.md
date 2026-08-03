@@ -14,24 +14,24 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 
 * **`index.html` & `styles.css`:** Main entry point, the static layout shell, and custom animations.
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
-* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, and Program Management.
+* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, Program Management, and Manual Student Enrollment.
 * **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously, including dynamic route parsing mapping to specific Class IDs.
 * **`js/auth.js`:** Handles login, registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, and interactive panel/modal toggling.
-* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, enforces target audience restrictions, loads detailed class roster screens, controls attendance state toggling/submission, and builds specialized UI strings.
+* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, enforces target audience restrictions, loads detailed class roster screens, controls attendance state toggling/submission, triggers auto-saves for student info, manages manual student overrides, and builds specialized UI strings.
 * **`js/app.js`:** The master orchestrator that imports and initializes all modules.
 
 ### 2. Backend API (Cloudflare Workers)
-* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments (including specific Course Roster API mappings), Batch Attendance inserting, and Password modification logic.
+* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments (including specific Course Roster API mappings, Seat and Group assignments, Manual Overrides), Batch Attendance inserting (with performance points), and Password modification logic.
 
 ### 3. Database Layer (Cloudflare D1 - Serverless SQLite)
 The database uses Universally Unique Identifiers (UUIDs) for all primary keys, generated on the edge via `crypto.randomUUID()`. 
 
-**Note: Ensure the following tables are created for the system to function correctly:**
+**Note: Ensure the following tables are created and updated for the system to function correctly:**
 * **`Programs`:** Program_ID (UUID), ProgramCode (e.g., BSCS, BSIT).
 * **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role (Default: 'Student').
 * **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section.
-* **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK).
-* **`Attendance`:** Attendance_ID (UUID), Course_ID (FK mapped to Courses.Course_ID), Student_ID (FK mapped to Users.User_ID), Date, Status (Present, Late, Absent).
+* **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name.
+* **`Attendance`:** Attendance_ID (UUID), Course_ID (FK mapped to Courses.Course_ID), Student_ID (FK mapped to Users.User_ID), Date, Status (Present, Late, Absent), Performance_Points (Integer).
 
 ### 4. External Integrations (Google Apps Script)
 * **`gas/Code.gs`:** A deployed Web App webhook that catches payloads from the Cloudflare Worker, decodes Base64 image data, dynamically creates or traverses nested folder structures, and saves files directly to a designated root Google Drive folder.
@@ -42,6 +42,8 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Lecturer Manual Student Enrollment:** Added a modal utility within the Class Roster screen allowing lecturers to search and manually assign active students into their courses, overriding existing strict target audience gating parameters. Added a backend endpoint mapping unenrolled students for explicit assignment routing. 
+* **Student Organization & Performance Tracking:** Added inline editable fields for `Seat` and `Group` in the Class Roster, mapped securely to the enrollments table via an auto-save blur event mapping. Included a numeric `Pts (+/-)` input alongside the attendance toggles to record merit or demerit points concurrently.
 * **Interactive Attendance Tracking:** Appended attendance toggles into the Class Roster screen. Included a bulk selection utility ("Mark All Present"), Date selection, and error handling for missing inputs. 
 * **Batch SQL Inserts for Attendance Data:** Implemented the `/api/attendance` endpoint. The logic clears existing records for a specific date and course, then efficiently utilizes D1's `env.DB.batch()` technique to execute the array of new attendance status values simultaneously.
 * **Lecturer Class Screen & Roster Mapping:** Created a dynamic route mapping system allowing lecturers to click their created modules to view a dedicated detailed class screen. Added a backend endpoint returning an alphabetically sorted array combining users and enrollments table data (Avatar, Name, Info) to facilitate upcoming attendance modules.
@@ -62,6 +64,3 @@ When asked to add features, debug, or refactor, you must strictly adhere to the 
 4. **Database & Security Integrity:** All new database records MUST utilize `crypto.randomUUID()` for primary keys. The backend API must NEVER require an `api_secret` from the frontend (security is handled via strict CORS origins). D1 batch operations (`env.DB.batch`) should be used for multiple insertions. 
 5. **Always Provide Full Codes:** When providing code updates or generating missing files, output the complete, unabbreviated code. Never truncate blocks using placeholders.
 6. **Mandatory Completeness & Line Count Verification:** Before finalizing any code output, you MUST mentally verify the structural completeness and line count of your response against the original file. Ensure that no existing core logic, CSS, or HTML structure is accidentally removed or omitted.
-
-## Task
-Whenever the user requests an update, refactor, or addition to the Online Portal, analyze which specific module/file requires changes, draft the exact logic needed using this separated file architecture, output the fully updated structural file scripts, and provide an update to this readme for any significant changes whenever necessary.  .
