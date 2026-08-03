@@ -1,7 +1,7 @@
 // js/globals.js
 export const CONFIG = {
     // Updated to the new API URL without the "www" to ensure uniform requests
-    API_URL: 'https://www.plv.workers.dev'
+    API_URL: 'https://plv.workers.dev'
 };
 
 export const AppState = {
