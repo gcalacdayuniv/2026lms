@@ -14,14 +14,14 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 
 * **`index.html` & `styles.css`:** Main entry point, the static layout shell, and custom animations.
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
-* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, and backdrop-blurred modals for Change Password, Course Creation, and Program Management.
-* **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously.
+* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, and Program Management.
+* **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously, including dynamic route parsing mapping to specific Class IDs.
 * **`js/auth.js`:** Handles login, registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, and interactive panel/modal toggling.
-* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, enforces target audience restrictions, and builds specialized UI strings.
+* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, enforces target audience restrictions, loads detailed class roster screens, and builds specialized UI strings.
 * **`js/app.js`:** The master orchestrator that imports and initializes all modules.
 
 ### 2. Backend API (Cloudflare Workers)
-* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments, and Password modification logic.
+* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments (including specific Course Roster API mappings), and Password modification logic.
 
 ### 3. Database Layer (Cloudflare D1 - Serverless SQLite)
 The database uses Universally Unique Identifiers (UUIDs) for all primary keys, generated on the edge via `crypto.randomUUID()`. 
@@ -41,6 +41,7 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Lecturer Class Screen & Roster Mapping:** Created a dynamic route mapping system allowing lecturers to click their created modules to view a dedicated detailed class screen. Added a backend endpoint returning an alphabetically sorted array combining users and enrollments table data (Avatar, Name, Info) to facilitate upcoming attendance modules.
 * **Dynamic Registration Course Lists:** Abstracted the textual string input for "Course" in the Student Registration block into a Dynamic Dropdown Select element. Lecturers can now manage the contents of this list explicitly via a modal from their side panel.
 * **Course Restrictions & Creation Modal:** Abstracted the course creation process for lecturers into a popup modal mapped exclusively within their profile side panel. Added backend parameters enforcing enrollment restrictions by mapping available courses directly against a student's Course, Year, and Section inputs dynamically.
 * **Profile Layout Revamp & Modals:** The sidebar profile panel was refined for a cleaner look. Instead of cards, data is displayed side-by-side using minimal text lines with values only. On portrait mobile displays, the sidebar takes up 80% of the screen width with the background layered in a backdrop-blur. 
