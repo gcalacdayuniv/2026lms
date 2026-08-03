@@ -7,6 +7,7 @@ export const CourseModule = {
         document.addEventListener('submit', CourseModule.handleForms);
         document.addEventListener('click', CourseModule.handleClicks);
         document.addEventListener('change', CourseModule.handleChanges);
+        document.addEventListener('input', CourseModule.handleInput);
     },
 
     handleForms: async (e) => {
@@ -17,6 +18,21 @@ export const CourseModule = {
         if (e.target.id === 'addProgramForm') {
             e.preventDefault();
             await CourseModule.createProgram();
+        }
+    },
+
+    handleInput: (e) => {
+        if (e.target.id === 'studentSearchInput') {
+            const searchTerm = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('.student-enroll-item');
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
         }
     },
 
@@ -51,6 +67,41 @@ export const CourseModule = {
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             await CourseModule.enrollCourse(btn.dataset.id);
+        }
+
+        // Add Student Modal Logic
+        if (e.target.closest('#openAddStudentModalBtn')) {
+            document.getElementById('addStudentModal').classList.remove('hidden');
+            const courseId = window.location.hash.replace('#class-', '');
+            await CourseModule.loadUnenrolledStudents(courseId);
+        }
+
+        if (e.target.closest('#closeAddStudentModalBtn') || e.target.id === 'closeAddStudentModalBg') {
+            document.getElementById('addStudentModal').classList.add('hidden');
+            document.getElementById('studentSearchInput').value = '';
+        }
+
+        // Lecturer manually enrolling a student
+        if (e.target.closest('.lecturer-enroll-btn')) {
+            const btn = e.target.closest('.lecturer-enroll-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            const courseId = window.location.hash.replace('#class-', '');
+            const studentId = btn.dataset.studentId;
+            
+            try {
+                await apiFetch('/api/enroll', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ courseId: courseId, studentId: studentId }) 
+                });
+                // Reload the modal list and the main roster
+                await CourseModule.loadUnenrolledStudents(courseId);
+                await CourseModule.loadClassScreen(courseId, true); // true param prevents full spinner reload if implemented
+            } catch (err) {
+                alert(err.message);
+                btn.disabled = false;
+                btn.innerHTML = 'Enroll';
+            }
         }
 
         // Attendance Toggle Logic
@@ -93,6 +144,42 @@ export const CourseModule = {
         // Save Attendance Submission
         if (e.target.closest('#saveAttendanceBtn')) {
             await CourseModule.saveAttendance();
+        }
+    },
+
+    loadUnenrolledStudents: async (courseId) => {
+        const listContainer = document.getElementById('unenrolledStudentsList');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = '<div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>';
+        
+        try {
+            const data = await apiFetch(`/api/unenrolled-students?courseId=${courseId}`);
+            if (!data.students || data.students.length === 0) {
+                listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded-md shadow-sm">No new students available to enroll.</div>';
+                return;
+            }
+
+            const html = data.students.map(s => {
+                const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
+                return `
+                    <div class="student-enroll-item flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md shadow-sm hover:border-blue-300 transition">
+                        <div>
+                            <div class="font-bold text-gray-800 text-sm">${s.Name}</div>
+                            <div class="text-[11px] text-gray-500 mt-0.5">
+                                <span class="font-bold text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
+                            </div>
+                        </div>
+                        <button type="button" data-student-id="${s.User_ID}" class="lecturer-enroll-btn bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition">
+                            Enroll
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            listContainer.innerHTML = html;
+        } catch (err) {
+            listContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-sm font-medium border border-red-200 text-center">${err.message}</div>`;
         }
     },
 
@@ -177,15 +264,25 @@ export const CourseModule = {
         }
     },
 
-    loadClassScreen: async (courseId) => {
+    loadClassScreen: async (courseId, skipSpinner = false) => {
         const root = document.getElementById('app-root');
         if (!root || !AppState.user) return;
         
-        root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
+        if(!skipSpinner) {
+            root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
+        }
         
         try {
             const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
+            // Check if modal was open to keep it open on re-render
+            const modalWasOpen = document.getElementById('addStudentModal') && !document.getElementById('addStudentModal').classList.contains('hidden');
+            
             root.innerHTML = Components.renderClassScreen(data.course, data.students);
+            
+            if (modalWasOpen) {
+                document.getElementById('addStudentModal').classList.remove('hidden');
+                CourseModule.loadUnenrolledStudents(courseId);
+            }
         } catch (err) {
             root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
         }
