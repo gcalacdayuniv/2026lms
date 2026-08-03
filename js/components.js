@@ -366,5 +366,78 @@ export const Components = {
             </div>
         </div>
         `;
+    },
+
+    renderClassScreen: (course, students) => {
+        const studentList = students.map(s => {
+            const avatarSrc = getLoadableAvatarSrc(s.Avatar);
+            const avatarImg = avatarSrc 
+                ? `<img src="${avatarSrc}" class="w-12 h-12 rounded-full object-cover border border-gray-200" alt="${s.Name}">` 
+                : `<i class="fa-solid fa-circle-user text-[48px] text-gray-300"></i>`;
+            
+            const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
+            
+            return `
+                <div class="flex items-center p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition">
+                    <div class="flex-shrink-0 mr-4">
+                        ${avatarImg}
+                    </div>
+                    <div class="flex-grow">
+                        <div class="font-bold text-gray-800">${s.Name}</div>
+                        <div class="text-xs text-gray-500 mt-0.5">
+                            <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const emptyState = `<div class="p-8 text-center text-gray-500 bg-white rounded-b-xl border-dashed border-gray-300">No students enrolled yet.</div>`;
+
+        return `
+        <!-- Top Header Bar -->
+        <header class="bg-blue-700 shadow-md fixed top-0 w-full z-40">
+            <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+                <div class="flex items-center h-16">
+                    <a href="#dashboard" class="text-white hover:text-blue-200 transition mr-4 p-2 -ml-2">
+                        <i class="fa-solid fa-arrow-left text-xl"></i>
+                    </a>
+                    <div class="overflow-hidden">
+                        <h1 class="text-lg font-bold text-white truncate">${course.CourseCode}</h1>
+                        <p class="text-xs text-blue-200 truncate">${course.CourseTitle}</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="pt-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full fade-in">
+            <!-- Action Header -->
+            <div class="flex justify-between items-end mb-6 mt-4">
+                <div>
+                    <h2 class="text-2xl font-black text-gray-800 tracking-tight">Class Roster</h2>
+                    <p class="text-sm text-gray-500 mt-1"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
+                </div>
+                <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center">
+                    <i class="fa-solid fa-clipboard-user mr-2"></i> Attendance
+                </button>
+            </div>
+            
+            <!-- Student List Container -->
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        ${students.length} Enrolled Students
+                    </span>
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Sorted A-Z
+                    </span>
+                </div>
+                <div>
+                    ${students.length > 0 ? studentList : emptyState}
+                </div>
+            </div>
+        </main>
+        `;
     }
 };
