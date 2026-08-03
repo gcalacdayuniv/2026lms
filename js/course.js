@@ -31,6 +31,113 @@ export const CourseModule = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             await CourseModule.enrollCourse(btn.dataset.id);
         }
+
+        // Attendance Toggle Logic
+        if (e.target.classList.contains('attendance-btn')) {
+            const row = e.target.closest('.student-row');
+            const buttons = row.querySelectorAll('.attendance-btn');
+            
+            buttons.forEach(btn => {
+                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400');
+                btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                btn.removeAttribute('data-selected');
+            });
+            
+            const status = e.target.dataset.status;
+            e.target.setAttribute('data-selected', 'true');
+            
+            if(status === 'Present') {
+                e.target.classList.replace('bg-gray-50', 'bg-green-100');
+                e.target.classList.replace('text-gray-600', 'text-green-800');
+                e.target.classList.replace('border-gray-200', 'border-green-400');
+            } else if(status === 'Late') {
+                e.target.classList.replace('bg-gray-50', 'bg-yellow-100');
+                e.target.classList.replace('text-gray-600', 'text-yellow-800');
+                e.target.classList.replace('border-gray-200', 'border-yellow-400');
+            } else if(status === 'Absent') {
+                e.target.classList.replace('bg-gray-50', 'bg-red-100');
+                e.target.classList.replace('text-gray-600', 'text-red-800');
+                e.target.classList.replace('border-gray-200', 'border-red-400');
+            }
+        }
+
+        // Mark All Present Logic
+        if (e.target.id === 'markAllPresent') {
+            document.querySelectorAll('.student-row').forEach(row => {
+                const presentBtn = row.querySelector('[data-status="Present"]');
+                if (presentBtn) presentBtn.click();
+            });
+        }
+
+        // Save Attendance Submission
+        if (e.target.closest('#saveAttendanceBtn')) {
+            await CourseModule.saveAttendance();
+        }
+    },
+
+    saveAttendance: async () => {
+        const btn = document.getElementById('saveAttendanceBtn');
+        const alertBox = document.getElementById('attendanceAlert');
+        const dateVal = document.getElementById('attendanceDate').value;
+        const courseId = window.location.hash.replace('#class-', '');
+        
+        if (!dateVal) {
+            alertBox.textContent = "Please select a date.";
+            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
+            return;
+        }
+
+        const rows = document.querySelectorAll('.student-row');
+        const attendanceData = [];
+        let missingCount = 0;
+
+        rows.forEach(row => {
+            const studentId = row.dataset.studentId;
+            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+            
+            if (selectedBtn) {
+                attendanceData.push({
+                    studentId: studentId,
+                    status: selectedBtn.dataset.status
+                });
+            } else {
+                missingCount++;
+            }
+        });
+
+        if (missingCount > 0) {
+            const confirmProceed = window.confirm(`${missingCount} student(s) have no attendance marked. Do you want to proceed anyway? Unmarked students will not be saved.`);
+            if (!confirmProceed) return;
+        }
+
+        if (attendanceData.length === 0) {
+             alertBox.textContent = "No attendance data to save.";
+             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
+             return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
+
+        try {
+            const payload = {
+                courseId: courseId,
+                date: dateVal,
+                records: attendanceData
+            };
+
+            await apiFetch('/api/attendance', { method: 'POST', body: JSON.stringify(payload) });
+            
+            alertBox.textContent = "Attendance saved successfully!";
+            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
+        } catch (err) {
+            alertBox.textContent = err.message;
+            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save Attendance';
+            setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
+        }
     },
 
     loadDashboardData: async () => {
