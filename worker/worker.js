@@ -10,9 +10,16 @@ async function hashPassword(password) {
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
+        const requestOrigin = request.headers.get("Origin");
+        
+        // Default to environment variable, but dynamically allow both www and non-www
+        let allowedOrigin = env.ALLOWED_ORIGIN || "*";
+        if (requestOrigin === "https://plv.workers.dev" || requestOrigin === "https://www.plv.workers.dev") {
+            allowedOrigin = requestOrigin;
+        }
         
         const corsHeaders = {
-            "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
+            "Access-Control-Allow-Origin": allowedOrigin,
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type"
         };
