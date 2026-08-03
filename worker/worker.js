@@ -271,6 +271,31 @@ export default {
                 }
             }
 
+            // ==========================================
+            // COURSE SCREEN (LECTURER VIEW) ENDPOINT
+            // ==========================================
+            if (request.method === "GET" && url.pathname === "/api/course-details") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const course = await env.DB.prepare("SELECT * FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+
+                const students = await env.DB.prepare(
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email 
+                     FROM Enrollments e 
+                     JOIN Users u ON e.Student_ID = u.User_ID 
+                     WHERE e.Course_ID = ? 
+                     ORDER BY u.Name ASC`
+                ).bind(courseId).all();
+
+                return new Response(JSON.stringify({ success: true, course: course, students: students.results }), { status: 200, headers: corsHeaders });
+            }
+
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
 
         } catch (err) {
