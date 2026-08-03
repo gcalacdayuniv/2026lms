@@ -1,5 +1,5 @@
 // js/components.js
-
+// hehehe
 // Helper function to bypass Google Drive's hotlinking block for legacy accounts
 const getLoadableAvatarSrc = (src) => {
     if (!src) return null;
