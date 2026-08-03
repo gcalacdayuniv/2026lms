@@ -1,6 +1,6 @@
 // js/course.js
-import { apiFetch, AppState, Components } from './globals.js';
-import { Components as UIComponents } from './components.js'; // Ensure correct mapping if needed
+import { apiFetch, AppState } from './globals.js';
+import { Components } from './components.js'; 
 
 export const CourseModule = {
     init: () => {
@@ -54,7 +54,7 @@ export const CourseModule = {
         
         try {
             const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
-            root.innerHTML = UIComponents.renderClassScreen(data.course, data.students);
+            root.innerHTML = Components.renderClassScreen(data.course, data.students);
         } catch (err) {
             root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
         }
