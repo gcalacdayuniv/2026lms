@@ -1,5 +1,6 @@
 // js/course.js
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, Components } from './globals.js';
+import { Components as UIComponents } from './components.js'; // Ensure correct mapping if needed
 
 export const CourseModule = {
     init: () => {
@@ -42,6 +43,20 @@ export const CourseModule = {
             await CourseModule.renderLecturerDashboard(container);
         } else {
             await CourseModule.renderStudentDashboard(container);
+        }
+    },
+
+    loadClassScreen: async (courseId) => {
+        const root = document.getElementById('app-root');
+        if (!root || !AppState.user) return;
+        
+        root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
+        
+        try {
+            const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
+            root.innerHTML = UIComponents.renderClassScreen(data.course, data.students);
+        } catch (err) {
+            root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
         }
     },
 
@@ -143,7 +158,7 @@ export const CourseModule = {
             const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer`);
             
             let coursesHtml = data.courses.map(c => `
-                <div class="p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md">
+                <a href="#class-${c.Course_ID}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
                     <div class="flex justify-between items-start mb-1">
                         <div class="font-bold text-xl text-blue-700">${c.CourseCode}</div>
                         ${(c.Target_Course || c.Target_Year || c.Target_Section) ? 
@@ -157,7 +172,7 @@ export const CourseModule = {
                     <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
                         <i class="fa-regular fa-calendar mr-1"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${c.TimePeriod}
                     </div>
-                </div>
+                </a>
             `).join('');
             
             if(!coursesHtml) {
