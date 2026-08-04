@@ -58,7 +58,7 @@ export const CourseModule = {
 
     handleClicks: async (e) => {
         if (e.target.classList.contains('enroll-btn')) {
-            const confirmation = window.confirm("Are you sure you want to enroll in this module? This action cannot be undone.");
+            const confirmation = window.confirm("Are you sure you want to enroll in this Course? This action cannot be undone.");
             if (!confirmation) {
                 return;
             }
@@ -281,7 +281,7 @@ export const CourseModule = {
         const container = document.getElementById('courseContainer');
         if (!container || !AppState.user) return;
         
-        container.innerHTML = '<div class="text-center py-12"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i><p class="mt-4 text-gray-500 font-medium">Loading modules...</p></div>';
+        container.innerHTML = '<div class="text-center py-12"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i><p class="mt-4 text-gray-500 font-medium">Loading Courses...</p></div>';
         
         if (AppState.user.role.toLowerCase() === 'lecturer') {
             await CourseModule.renderLecturerDashboard(container);
@@ -491,14 +491,14 @@ export const CourseModule = {
             container.innerHTML = `
                 <div class="space-y-12 fade-in">
                     <section>
-                        <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Modules</h2>
+                        <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             ${enrolledHtml}
                         </div>
                     </section>
                     
                     <section>
-                        <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center pt-8 border-t border-gray-200"><div class="bg-blue-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-book-open text-blue-600"></i></div>Available Modules</h2>
+                        <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center pt-8 border-t border-gray-200"><div class="bg-blue-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-book-open text-blue-600"></i></div>Available Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             ${availableHtml}
                         </div>
