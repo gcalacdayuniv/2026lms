@@ -415,9 +415,9 @@ export const Components = {
                 const numA = parseFloat(seatAStr);
                 const numB = parseFloat(seatBStr);
                 if (!isNaN(numA) && !isNaN(numB)) {
-                    if (numA !== numB) return numB - numA;
+                    if (numA !== numB) return numA - numB;
                 } else {
-                    if (seatAStr !== seatBStr) return seatBStr.localeCompare(seatAStr);
+                    if (seatAStr !== seatBStr) return seatAStr.localeCompare(seatBStr);
                 }
             }
 
