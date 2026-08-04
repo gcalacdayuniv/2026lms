@@ -177,7 +177,7 @@ export const Components = {
         const createCourseBtn = user.role.toLowerCase() === 'lecturer' ? `
             <div class="mt-6">
                 <button id="openCreateCourseModalBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
-                    <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course Module
+                    <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course
                 </button>
             </div>
         ` : '';
