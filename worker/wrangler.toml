@@ -5,7 +5,7 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ALLOWED_ORIGIN = "https://plv.workers.dev" 
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxP-2Vdoy_qql7AKZiz8QJVanB60Gfyx2QA4eQ43XjdNObjxe11gjCJemeYQuGu2XKB/exec"
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbz1yDwSQxGfbxT-ra0t1zC0TBCQKTFTFYhYi34dYtlc1E0jv6T1SE1mbcD0JZ3ZY6rJ/exec"
 
 [[d1_databases]]
 binding = "DB"
