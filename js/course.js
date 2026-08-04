@@ -104,6 +104,32 @@ export const CourseModule = {
             }
         }
 
+        // Student Password Reset Logic
+        if (e.target.closest('.reset-pwd-btn')) {
+            const btn = e.target.closest('.reset-pwd-btn');
+            const studentId = btn.dataset.studentId;
+            const confirmReset = window.confirm("Are you sure you want to reset this student's password to '123456'?");
+            
+            if (confirmReset) {
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                
+                try {
+                    await apiFetch('/api/reset-student-password', {
+                        method: 'POST',
+                        body: JSON.stringify({ studentId })
+                    });
+                    alert("Password successfully reset to 123456.");
+                } catch (err) {
+                    alert(err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        }
+
         // Attendance Toggle Logic
         if (e.target.classList.contains('attendance-btn')) {
             const row = e.target.closest('.student-row');
