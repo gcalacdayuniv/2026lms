@@ -86,7 +86,10 @@ export default {
                     try {
                         gasData = JSON.parse(gasText);
                     } catch (parseError) {
-                        return new Response(JSON.stringify({ error: "Google Apps Script blocked the upload. Ensure it is deployed as 'Execute as: Me' and 'Access: Anyone'." }), { status: 500, headers: corsHeaders });
+                        // Capture the raw HTML/text from Google to identify the block reason
+                        return new Response(JSON.stringify({ 
+                            error: `Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...` 
+                        }), { status: 500, headers: corsHeaders });
                     }
 
                     if (!gasData.success) {
