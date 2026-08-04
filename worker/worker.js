@@ -159,6 +159,20 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Password updated successfully" }), { status: 200, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && url.pathname === "/api/reset-student-password") {
+                const body = await request.json();
+                const { studentId } = body;
+                
+                if (!studentId) {
+                    return new Response(JSON.stringify({ error: "Missing studentId" }), { status: 400, headers: corsHeaders });
+                }
+                
+                const newHash = await hashPassword("123456");
+                await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, studentId).run();
+                
+                return new Response(JSON.stringify({ success: true, message: "Password reset successfully" }), { status: 200, headers: corsHeaders });
+            }
+
             // ==========================================
             // PROGRAMS (REGISTRATION COURSE LIST)
             // ==========================================
