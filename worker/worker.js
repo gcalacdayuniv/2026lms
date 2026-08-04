@@ -74,19 +74,23 @@ export default {
                         pathParts: [courseYearSection, "Profile Picture"]
                     };
 
-                    const gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
+                    let gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(gasPayload),
-                        redirect: 'follow'
+                        redirect: 'manual'
                     });
+
+                    if (gasResponse.status === 302 || gasResponse.status === 303) {
+                        const redirectUrl = gasResponse.headers.get('Location');
+                        gasResponse = await fetch(redirectUrl);
+                    }
                     
                     const gasText = await gasResponse.text();
                     let gasData;
                     try {
                         gasData = JSON.parse(gasText);
                     } catch (parseError) {
-                        // Capture the raw HTML/text from Google to identify the block reason
                         return new Response(JSON.stringify({ 
                             error: `Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...` 
                         }), { status: 500, headers: corsHeaders });
