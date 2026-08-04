@@ -226,7 +226,12 @@ export const AuthModule = {
         const givenName = document.getElementById('regGivenName').value.trim();
         const lastName = document.getElementById('regLastName').value.trim();
         const suffix = document.getElementById('regSuffix').value.trim();
-        const fullName = `${givenName} ${lastName} ${suffix}`.trim().replace(/\s+/g, ' ');
+        
+        let fullName = `${lastName}, ${givenName}`;
+        if (suffix) {
+            fullName += ` ${suffix}`;
+        }
+        fullName = fullName.trim().replace(/\s+/g, ' ');
 
         const payload = {
             username: document.getElementById('regUsername').value.trim(),
