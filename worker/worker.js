@@ -99,12 +99,12 @@ export default {
                 const hashedPassword = await hashPassword(body.password);
 
                 await env.DB.prepare(
-                    `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                    `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
                 ).bind(
                     userId, body.username, hashedPassword, body.name, finalAvatarUrl, 
                     body.email, body.contact_number, body.student_number, 
-                    'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, 'Student'
+                    'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, body.eye_condition ? body.eye_condition.trim() : null, 'Student'
                 ).run();
 
                 return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });
@@ -116,7 +116,7 @@ export default {
                 const id = body.identifier;
 
                 const user = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section 
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, eye_condition 
                      FROM Users 
                      WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?) 
                      AND Password = ?`
