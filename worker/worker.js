@@ -310,11 +310,10 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, e.Seat_Number, e.Group_Name 
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.eye_condition, e.Seat_Number, e.Group_Name 
                      FROM Enrollments e 
                      JOIN Users u ON e.Student_ID = u.User_ID 
-                     WHERE e.Course_ID = ? 
-                     ORDER BY u.Name ASC`
+                     WHERE e.Course_ID = ?`
                 ).bind(courseId).all();
 
                 return new Response(JSON.stringify({ success: true, course: course, students: students.results }), { status: 200, headers: corsHeaders });
