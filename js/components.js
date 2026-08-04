@@ -483,7 +483,7 @@ export const Components = {
                             <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center mr-2 bg-gray-50 focus:bg-white transition font-mono" value="0">
                         </div>
                         <div class="flex space-x-1">
-                            <button type="button" data-status="Present" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition">
+                            <button type="button" data-status="Present" data-selected="true" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition">
                                 Present
                             </button>
                             <button type="button" data-status="Late" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-300 transition">
