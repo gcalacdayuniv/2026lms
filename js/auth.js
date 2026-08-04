@@ -223,16 +223,22 @@ export const AuthModule = {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
 
+        const givenName = document.getElementById('regGivenName').value.trim();
+        const lastName = document.getElementById('regLastName').value.trim();
+        const suffix = document.getElementById('regSuffix').value.trim();
+        const fullName = `${givenName} ${lastName} ${suffix}`.trim().replace(/\s+/g, ' ');
+
         const payload = {
             username: document.getElementById('regUsername').value.trim(),
             password: document.getElementById('regPassword').value,
-            name: document.getElementById('regName').value.trim(),
+            name: fullName,
             email: document.getElementById('regEmail').value.trim(),
             student_number: document.getElementById('regStudentNo').value.trim(),
             contact_number: document.getElementById('regContact').value.trim(),
             course: document.getElementById('regCourse').value.trim(),
             year: document.getElementById('regYear').value.trim(),
             section: document.getElementById('regSection').value.trim(),
+            eye_condition: document.getElementById('regEyeCondition').value.trim(),
             avatarBase64: avatarBase64
         };
 
