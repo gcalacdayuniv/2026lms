@@ -400,6 +400,36 @@ export const Components = {
     },
 
     renderClassScreen: (course, students) => {
+        const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
+        
+        students.sort((a, b) => {
+            const seatAStr = (a.Seat_Number || '').toString().trim();
+            const seatBStr = (b.Seat_Number || '').toString().trim();
+            const hasSeatA = seatAStr !== '';
+            const hasSeatB = seatBStr !== '';
+
+            if (hasSeatA && !hasSeatB) return -1;
+            if (!hasSeatA && hasSeatB) return 1;
+
+            if (hasSeatA && hasSeatB) {
+                const numA = parseFloat(seatAStr);
+                const numB = parseFloat(seatBStr);
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    if (numA !== numB) return numB - numA;
+                } else {
+                    if (seatAStr !== seatBStr) return seatBStr.localeCompare(seatAStr);
+                }
+            }
+
+            const eyeA = eyeOrder[a.eye_condition] || 4;
+            const eyeB = eyeOrder[b.eye_condition] || 4;
+            if (eyeA !== eyeB) return eyeA - eyeB;
+
+            const nameA = a.Name || '';
+            const nameB = b.Name || '';
+            return nameA.localeCompare(nameB);
+        });
+
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
             const avatarImg = avatarSrc 
@@ -408,6 +438,10 @@ export const Components = {
             
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
             
+            const eyeConditionBadge = s.eye_condition 
+                ? `<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
+                : '';
+
             return `
                 <div class="flex items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row" data-student-id="${s.User_ID}">
                     
@@ -419,8 +453,8 @@ export const Components = {
                         </div>
                         <div>
                             <div class="font-bold text-gray-800">${s.Name}</div>
-                            <div class="text-xs text-gray-500 mt-0.5">
-                                <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
+                            <div class="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center">
+                                <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
                             </div>
                             <div class="mt-1">
                                 <button type="button" class="reset-pwd-btn text-[9px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition" data-student-id="${s.User_ID}">
@@ -508,7 +542,7 @@ export const Components = {
             <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
                 <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                     <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        ${students.length} Enrolled Students (Sorted A-Z)
+                        ${students.length} Enrolled Students
                     </span>
                     <div class="space-x-2">
                         <button type="button" id="markAllPresent" class="text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
