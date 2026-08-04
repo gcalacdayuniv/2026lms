@@ -422,6 +422,11 @@ export const Components = {
                             <div class="text-xs text-gray-500 mt-0.5">
                                 <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
                             </div>
+                            <div class="mt-1">
+                                <button type="button" class="reset-pwd-btn text-[9px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition" data-student-id="${s.User_ID}">
+                                    <i class="fa-solid fa-key mr-1"></i>Reset Pwd
+                                </button>
+                            </div>
                         </div>
                     </div>
 
