@@ -82,7 +82,7 @@ export const CourseModule = {
         }
 
         // Handle dynamically filtering the manual enrollment list 
-        if (e.target.id === 'filterCourse' || e.target.id === 'filterYear' || e.target.id === 'filterSection') {
+        if (e.target.id === 'filterCourse' || e.target.id === 'filterYear' || e.target.id === 'filterSection' || e.target.id === 'filterStatus') {
             const courseId = window.location.hash.replace('#class-', '');
             await CourseModule.loadUnenrolledStudents(courseId);
         }
@@ -123,6 +123,7 @@ export const CourseModule = {
         if (e.target.closest('#closeAddStudentModalBtn') || e.target.id === 'closeAddStudentModalBg') {
             document.getElementById('addStudentModal').classList.add('hidden');
             document.getElementById('studentSearchInput').value = '';
+            document.getElementById('filterStatus').value = 'Active';
             document.getElementById('filterCourse').value = '';
             document.getElementById('filterYear').value = '';
             document.getElementById('filterSection').value = '';
@@ -250,6 +251,7 @@ export const CourseModule = {
         const listContainer = document.getElementById('unenrolledStudentsList');
         if (!listContainer) return;
         
+        const filterStatus = document.getElementById('filterStatus')?.value ?? 'Active';
         const filterCourse = document.getElementById('filterCourse')?.value || '';
         const filterYear = document.getElementById('filterYear')?.value || '';
         const filterSection = document.getElementById('filterSection')?.value || '';
@@ -258,6 +260,7 @@ export const CourseModule = {
         
         try {
             let url = `/api/unenrolled-students?courseId=${courseId}`;
+            if (filterStatus) url += `&statusFilter=${encodeURIComponent(filterStatus)}`;
             if (filterCourse) url += `&courseFilter=${encodeURIComponent(filterCourse)}`;
             if (filterYear) url += `&yearFilter=${encodeURIComponent(filterYear)}`;
             if (filterSection) url += `&sectionFilter=${encodeURIComponent(filterSection)}`;
@@ -270,10 +273,20 @@ export const CourseModule = {
 
             const html = data.students.map(s => {
                 const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
+                const statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                    s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' : 
+                    s.account_status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
+                    s.account_status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
+                    s.account_status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
+                    s.account_status === 'Dropped' ? 'text-red-700 border-red-300 bg-red-100' : 'text-gray-500 border-gray-200 bg-gray-50'
+                }">${s.account_status || 'Inactive'}</span>`;
+
                 return `
                     <div class="student-enroll-item flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md shadow-sm hover:border-blue-300 transition">
                         <div>
-                            <div class="font-bold text-gray-800 text-sm">${s.Name}</div>
+                            <div class="font-bold text-gray-800 text-sm flex items-center gap-2">
+                                ${s.Name} ${statusBadge}
+                            </div>
                             <div class="text-[11px] text-gray-500 mt-0.5">
                                 <span class="font-bold text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
                             </div>
@@ -385,6 +398,7 @@ export const CourseModule = {
         
         let modalWasOpen = false;
         let searchVal = '';
+        let statusVal = 'Active';
         let courseVal = '';
         let yearVal = '';
         let sectionVal = '';
@@ -393,6 +407,7 @@ export const CourseModule = {
         if (modal && !modal.classList.contains('hidden')) {
             modalWasOpen = true;
             searchVal = document.getElementById('studentSearchInput')?.value || '';
+            statusVal = document.getElementById('filterStatus')?.value || 'Active';
             courseVal = document.getElementById('filterCourse')?.value || '';
             yearVal = document.getElementById('filterYear')?.value || '';
             sectionVal = document.getElementById('filterSection')?.value || '';
@@ -422,6 +437,7 @@ export const CourseModule = {
                 }
                 
                 if (document.getElementById('studentSearchInput')) document.getElementById('studentSearchInput').value = searchVal;
+                if (document.getElementById('filterStatus')) document.getElementById('filterStatus').value = statusVal;
                 if (document.getElementById('filterCourse')) document.getElementById('filterCourse').value = courseVal;
                 if (document.getElementById('filterYear')) document.getElementById('filterYear').value = yearVal;
                 if (document.getElementById('filterSection')) document.getElementById('filterSection').value = sectionVal;
