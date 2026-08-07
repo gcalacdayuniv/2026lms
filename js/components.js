@@ -456,9 +456,25 @@ export const Components = {
                             <div class="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center">
                                 <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
                             </div>
-                            <div class="mt-1">
+                            <div class="mt-1 flex items-center space-x-2">
+                                <select class="status-select text-[9px] font-bold px-1 py-0.5 rounded border outline-none cursor-pointer transition
+                                    ${s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' : 
+                                      s.account_status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
+                                      s.account_status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
+                                      s.account_status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
+                                      s.account_status === 'Dropped' ? 'text-red-700 border-red-300 bg-red-100' : 'text-gray-500 border-gray-200 bg-gray-50'}" 
+                                    data-student-id="${s.User_ID}">
+                                    <option value="Active" ${s.account_status === 'Active' ? 'selected' : ''}>Active</option>
+                                    <option value="Inactive" ${s.account_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                                    <option value="Suspended" ${s.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                                    <option value="UD" ${s.account_status === 'UD' ? 'selected' : ''}>UD</option>
+                                    <option value="Dropped" ${s.account_status === 'Dropped' ? 'selected' : ''}>Dropped</option>
+                                </select>
                                 <button type="button" class="reset-pwd-btn text-[9px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition" data-student-id="${s.User_ID}">
                                     <i class="fa-solid fa-key mr-1"></i>Reset Pwd
+                                </button>
+                                <button type="button" class="remove-student-btn text-[9px] font-bold text-gray-500 hover:text-red-700 bg-gray-50 hover:bg-red-100 px-2 py-0.5 rounded border border-gray-200 transition" data-student-id="${s.User_ID}">
+                                    <i class="fa-solid fa-trash mr-1"></i>Remove
                                 </button>
                             </div>
                         </div>
@@ -564,9 +580,16 @@ export const Components = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                <div class="mb-4">
-                    <input type="text" id="studentSearchInput" placeholder="Search by Name or Student No..." class="w-full px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                
+                <div class="mb-4 flex flex-col md:flex-row gap-2">
+                    <input type="text" id="studentSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                    <select id="filterCourse" class="w-full md:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                        <option value="">Course (All)</option>
+                    </select>
+                    <input type="text" id="filterYear" placeholder="Year" class="w-full md:w-20 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                    <input type="text" id="filterSection" placeholder="Section" class="w-full md:w-24 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
                 </div>
+
                 <div id="unenrolledStudentsList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
                     <div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>
                 </div>
