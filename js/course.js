@@ -10,6 +10,17 @@ export const CourseModule = {
         document.addEventListener('input', CourseModule.handleInput);
     },
 
+    updateManageStatusColor: (selectEl) => {
+        const status = selectEl.value;
+        selectEl.className = `w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition ${
+            status === 'Active' ? 'text-green-600 border-green-300 bg-green-50 focus:ring-green-500' : 
+            status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' :
+            status === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50 focus:ring-orange-500' :
+            status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' :
+            status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50'
+        }`;
+    },
+
     handleForms: async (e) => {
         if (e.target.id === 'addCourseForm') {
             e.preventDefault();
@@ -22,7 +33,6 @@ export const CourseModule = {
     },
 
     handleInput: async (e) => {
-        // Client-side quick search by name
         if (e.target.id === 'studentSearchInput') {
             const searchTerm = e.target.value.toLowerCase();
             const items = document.querySelectorAll('.student-enroll-item');
@@ -38,12 +48,10 @@ export const CourseModule = {
     },
 
     handleChanges: async (e) => {
-        // Auto-save logic for Seat Number and Group Name
-        if (e.target.classList.contains('seat-input') || e.target.classList.contains('group-input')) {
-            const row = e.target.closest('.student-row');
-            const studentId = row.dataset.studentId;
-            const seatNumber = row.querySelector('.seat-input').value.trim();
-            const groupName = row.querySelector('.group-input').value.trim();
+        if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput') {
+            const studentId = document.getElementById('manageStudentId').value;
+            const seatNumber = document.getElementById('manageSeatInput').value.trim();
+            const groupName = document.getElementById('manageGroupInput').value.trim();
             const courseId = window.location.hash.replace('#class-', '');
             
             try {
@@ -56,32 +64,22 @@ export const CourseModule = {
             }
         }
         
-        // Auto-save logic for User Account Status
-        if (e.target.classList.contains('status-select')) {
-            const studentId = e.target.dataset.studentId;
+        if (e.target.id === 'manageStatusSelect') {
+            const studentId = document.getElementById('manageStudentId').value;
             const status = e.target.value;
+            CourseModule.updateManageStatusColor(e.target);
             
             try {
                 await apiFetch('/api/update-user-status', {
                     method: 'POST',
                     body: JSON.stringify({ studentId, status })
                 });
-                
-                // Update styling based on new status
-                e.target.className = `status-select text-[9px] font-bold px-1 py-0.5 rounded border outline-none cursor-pointer transition ${
-                    status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' : 
-                    status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
-                    status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
-                    status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
-                    status === 'Dropped' ? 'text-red-700 border-red-300 bg-red-100' : 'text-gray-500 border-gray-200 bg-gray-50'
-                }`;
             } catch (err) {
                 console.error('Failed to update user status:', err);
                 alert('Failed to update student status.');
             }
         }
 
-        // Handle dynamically filtering the manual enrollment list 
         if (e.target.id === 'filterCourse' || e.target.id === 'filterYear' || e.target.id === 'filterSection' || e.target.id === 'filterStatus') {
             const courseId = window.location.hash.replace('#class-', '');
             await CourseModule.loadUnenrolledStudents(courseId);
@@ -99,6 +97,78 @@ export const CourseModule = {
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             await CourseModule.enrollCourse(btn.dataset.id);
+        }
+
+        // Manage Student Modal Logic
+        if (e.target.closest('.manage-student-btn')) {
+            const btn = e.target.closest('.manage-student-btn');
+            document.getElementById('manageStudentName').textContent = btn.dataset.name;
+            document.getElementById('manageStudentId').value = btn.dataset.studentId;
+            document.getElementById('manageSeatInput').value = btn.dataset.seat;
+            document.getElementById('manageGroupInput').value = btn.dataset.group;
+            
+            const statusSelect = document.getElementById('manageStatusSelect');
+            statusSelect.value = btn.dataset.status;
+            CourseModule.updateManageStatusColor(statusSelect);
+
+            document.getElementById('manageStudentModal').classList.remove('hidden');
+        }
+
+        if (e.target.closest('#closeManageStudentModalBtn') || e.target.id === 'closeManageStudentModalBg') {
+            document.getElementById('manageStudentModal').classList.add('hidden');
+            const courseId = window.location.hash.replace('#class-', '');
+            await CourseModule.loadClassScreen(courseId, true); 
+        }
+
+        if (e.target.closest('#manageResetPwdBtn')) {
+            const studentId = document.getElementById('manageStudentId').value;
+            const confirmReset = window.confirm("Are you sure you want to reset this student's password to '123456'?");
+            
+            if (confirmReset) {
+                const btn = e.target.closest('#manageResetPwdBtn');
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                
+                try {
+                    await apiFetch('/api/reset-student-password', {
+                        method: 'POST',
+                        body: JSON.stringify({ studentId })
+                    });
+                    alert("Password successfully reset to 123456.");
+                } catch (err) {
+                    alert(err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        }
+
+        if (e.target.closest('#manageRemoveBtn')) {
+            const studentId = document.getElementById('manageStudentId').value;
+            const courseId = window.location.hash.replace('#class-', '');
+            const confirmRemove = window.confirm("Are you sure you want to remove this student from the course?");
+            
+            if (confirmRemove) {
+                const btn = e.target.closest('#manageRemoveBtn');
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                
+                try {
+                    await apiFetch('/api/unenroll', {
+                        method: 'POST',
+                        body: JSON.stringify({ courseId, studentId })
+                    });
+                    document.getElementById('manageStudentModal').classList.add('hidden');
+                    await CourseModule.loadClassScreen(courseId, true);
+                } catch (err) {
+                    alert(err.message);
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
         }
 
         // Add Student Modal Logic
@@ -129,7 +199,6 @@ export const CourseModule = {
             document.getElementById('filterSection').value = '';
         }
 
-        // Lecturer manually enrolling a student
         if (e.target.closest('.lecturer-enroll-btn')) {
             const btn = e.target.closest('.lecturer-enroll-btn');
             btn.disabled = true;
@@ -143,64 +212,11 @@ export const CourseModule = {
                     body: JSON.stringify({ courseId: courseId, studentId: studentId }) 
                 });
                 
-                // Re-fetch the class screen seamlessly keeping the modal active
                 await CourseModule.loadClassScreen(courseId, true);
             } catch (err) {
                 alert(err.message);
                 btn.disabled = false;
                 btn.innerHTML = 'Enroll';
-            }
-        }
-
-        // Lecturer removing a student from a course
-        if (e.target.closest('.remove-student-btn')) {
-            const btn = e.target.closest('.remove-student-btn');
-            const studentId = btn.dataset.studentId;
-            const courseId = window.location.hash.replace('#class-', '');
-            const confirmRemove = window.confirm("Are you sure you want to remove this student from the course?");
-            
-            if (confirmRemove) {
-                const originalHtml = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                
-                try {
-                    await apiFetch('/api/unenroll', {
-                        method: 'POST',
-                        body: JSON.stringify({ courseId, studentId })
-                    });
-                    await CourseModule.loadClassScreen(courseId, true);
-                } catch (err) {
-                    alert(err.message);
-                    btn.disabled = false;
-                    btn.innerHTML = originalHtml;
-                }
-            }
-        }
-
-        // Student Password Reset Logic
-        if (e.target.closest('.reset-pwd-btn')) {
-            const btn = e.target.closest('.reset-pwd-btn');
-            const studentId = btn.dataset.studentId;
-            const confirmReset = window.confirm("Are you sure you want to reset this student's password to '123456'?");
-            
-            if (confirmReset) {
-                const originalHtml = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                
-                try {
-                    await apiFetch('/api/reset-student-password', {
-                        method: 'POST',
-                        body: JSON.stringify({ studentId })
-                    });
-                    alert("Password successfully reset to 123456.");
-                } catch (err) {
-                    alert(err.message);
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = originalHtml;
-                }
             }
         }
 
@@ -233,7 +249,6 @@ export const CourseModule = {
             }
         }
 
-        // Mark All Present Logic
         if (e.target.id === 'markAllPresent') {
             document.querySelectorAll('.student-row').forEach(row => {
                 const presentBtn = row.querySelector('[data-status="Present"]');
@@ -241,7 +256,6 @@ export const CourseModule = {
             });
         }
 
-        // Save Attendance Submission
         if (e.target.closest('#saveAttendanceBtn')) {
             await CourseModule.saveAttendance();
         }
@@ -300,7 +314,6 @@ export const CourseModule = {
 
             listContainer.innerHTML = html;
             
-            // Re-trigger client-side text search if populated
             const searchInput = document.getElementById('studentSearchInput');
             if (searchInput && searchInput.value) {
                 searchInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -468,7 +481,6 @@ export const CourseModule = {
             successDiv.classList.remove('hidden');
             document.getElementById('addProgramForm').reset();
             
-            // Repopulate Target Course list in the Course Module modal
             const programsData = await apiFetch('/api/programs');
             const targetCourseSelect = document.getElementById('targetCourse');
             if (targetCourseSelect && programsData.programs) {
@@ -536,7 +548,6 @@ export const CourseModule = {
 
     renderLecturerDashboard: async (container) => {
         try {
-            // Load programs for the target course select in Create Course Modal
             const programsData = await apiFetch('/api/programs');
             const targetCourseSelect = document.getElementById('targetCourse');
             if (targetCourseSelect && programsData.programs) {
@@ -545,6 +556,24 @@ export const CourseModule = {
             }
 
             const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer`);
+            
+            const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+            const parseTime = (timeStr) => {
+                if(!timeStr) return 0;
+                const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                if(!match) return 0;
+                let [ , h, m, period ] = match;
+                h = parseInt(h);
+                if(period.toUpperCase() === 'PM' && h !== 12) h += 12;
+                if(period.toUpperCase() === 'AM' && h === 12) h = 0;
+                return h * 60 + parseInt(m);
+            };
+
+            data.courses.sort((a, b) => {
+                const dayDiff = (dayMap[a.ScheduleDay] || 8) - (dayMap[b.ScheduleDay] || 8);
+                if (dayDiff !== 0) return dayDiff;
+                return parseTime(a.TimePeriod) - parseTime(b.TimePeriod);
+            });
             
             let coursesHtml = data.courses.map(c => `
                 <a href="#class-${c.Course_ID}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
