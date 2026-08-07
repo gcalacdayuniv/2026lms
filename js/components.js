@@ -167,7 +167,7 @@ export const Components = {
     renderDashboard: (user) => {
         const avatarSrc = getLoadableAvatarSrc(user.Avatar);
         const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
-        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
+        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
         
         let displayCourse = 'N/A';
         if (user.course) {
@@ -433,7 +433,7 @@ export const Components = {
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-12 h-12 rounded-full object-cover border border-gray-200" alt="${s.Name}">` 
+                ? `<img src="${avatarSrc}" class="w-12 h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" alt="${s.Name}">` 
                 : `<i class="fa-solid fa-circle-user text-[48px] text-gray-300"></i>`;
             
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
@@ -456,40 +456,22 @@ export const Components = {
                             <div class="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center">
                                 <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
                             </div>
-                            <div class="mt-1 flex items-center space-x-2">
-                                <select class="status-select text-[9px] font-bold px-1 py-0.5 rounded border outline-none cursor-pointer transition
-                                    ${s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' : 
-                                      s.account_status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
-                                      s.account_status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
-                                      s.account_status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
-                                      s.account_status === 'Dropped' ? 'text-red-700 border-red-300 bg-red-100' : 'text-gray-500 border-gray-200 bg-gray-50'}" 
-                                    data-student-id="${s.User_ID}">
-                                    <option value="Active" ${s.account_status === 'Active' ? 'selected' : ''}>Active</option>
-                                    <option value="Inactive" ${s.account_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                                    <option value="Suspended" ${s.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
-                                    <option value="UD" ${s.account_status === 'UD' ? 'selected' : ''}>UD</option>
-                                    <option value="Dropped" ${s.account_status === 'Dropped' ? 'selected' : ''}>Dropped</option>
-                                </select>
-                                <button type="button" class="reset-pwd-btn text-[9px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition" data-student-id="${s.User_ID}">
-                                    <i class="fa-solid fa-key mr-1"></i>Reset Pwd
-                                </button>
-                                <button type="button" class="remove-student-btn text-[9px] font-bold text-gray-500 hover:text-red-700 bg-gray-50 hover:bg-red-100 px-2 py-0.5 rounded border border-gray-200 transition" data-student-id="${s.User_ID}">
-                                    <i class="fa-solid fa-trash mr-1"></i>Remove
-                                </button>
+                            <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
+                                Seat: <span class="text-gray-800">${s.Seat_Number || '--'}</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Editable Seat & Group Info -->
-                    <div class="flex items-center space-x-2 w-1/4 justify-center">
-                        <div>
-                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 text-center">Seat</label>
-                            <input type="text" placeholder="--" class="seat-input w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition" value="${s.Seat_Number || ''}" data-student-id="${s.User_ID}">
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 text-center">Group</label>
-                            <input type="text" placeholder="--" class="group-input w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition" value="${s.Group_Name || ''}" data-student-id="${s.User_ID}">
-                        </div>
+                    <!-- Manage Actions -->
+                    <div class="flex items-center justify-center space-x-2 w-1/4">
+                        <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm" 
+                            data-student-id="${s.User_ID}" 
+                            data-name="${s.Name}" 
+                            data-seat="${s.Seat_Number || ''}" 
+                            data-group="${s.Group_Name || ''}" 
+                            data-status="${s.account_status || 'Inactive'}">
+                            <i class="fa-solid fa-gear mr-1"></i> Manage
+                        </button>
                     </div>
                     
                     <!-- Attendance Action Toggles & Points -->
@@ -570,13 +552,61 @@ export const Components = {
             </div>
         </main>
 
+        <!-- Manage Student Modal -->
+        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeManageStudentModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-sm p-6 relative z-10 scale-up">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-gear text-blue-600 mr-2"></i>Manage Student</h3>
+                    <button id="closeManageStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="manageStudentName" class="font-black text-gray-800 text-center mb-4 text-lg"></div>
+                <input type="hidden" id="manageStudentId">
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Seat</label>
+                            <input type="text" id="manageSeatInput" class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Group</label>
+                            <input type="text" id="manageGroupInput" class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
+                        <select id="manageStatusSelect" class="w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Suspended">Suspended</option>
+                            <option value="UD">UD</option>
+                            <option value="Dropped">Dropped</option>
+                        </select>
+                    </div>
+                    
+                    <div class="border-t border-gray-200 pt-4 mt-4 flex flex-col space-y-2">
+                        <button type="button" id="manageResetPwdBtn" class="w-full py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded text-sm font-bold border border-red-200 transition focus:outline-none">
+                            <i class="fa-solid fa-key mr-2"></i> Reset Password
+                        </button>
+                        <button type="button" id="manageRemoveBtn" class="w-full py-2 bg-white text-gray-500 hover:bg-red-600 hover:text-white rounded text-sm font-bold border border-gray-300 hover:border-red-600 transition focus:outline-none">
+                            <i class="fa-solid fa-trash mr-2"></i> Remove from Course
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Add Student Modal -->
         <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm modal-backdrop" id="closeAddStudentModalBg"></div>
             <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-3xl p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
-                    <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors">
+                    <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
