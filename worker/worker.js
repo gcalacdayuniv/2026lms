@@ -20,7 +20,7 @@ export default {
         
         const corsHeaders = {
             "Access-Control-Allow-Origin": allowedOrigin,
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
             "Access-Control-Allow-Headers": "Content-Type"
         };
 
@@ -174,6 +174,20 @@ export default {
             }
 
             // ==========================================
+            // USER STATUS UPDATE
+            // ==========================================
+            if (request.method === "POST" && url.pathname === "/api/update-user-status") {
+                const body = await request.json();
+                if (!body.studentId || !body.status) {
+                    return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400, headers: corsHeaders });
+                }
+                await env.DB.prepare(
+                    `UPDATE Users SET account_status = ? WHERE User_ID = ?`
+                ).bind(body.status, body.studentId).run();
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            // ==========================================
             // PROGRAMS (REGISTRATION COURSE LIST)
             // ==========================================
             if (request.method === "POST" && url.pathname === "/api/programs") {
@@ -277,6 +291,24 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && url.pathname === "/api/unenroll") {
+                const body = await request.json();
+                
+                if (!body.courseId || !body.studentId) {
+                    return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare(
+                    `DELETE FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.courseId, body.studentId).run();
+
+                await env.DB.prepare(
+                    `DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.courseId, body.studentId).run();
+                
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "GET" && url.pathname === "/api/my-courses") {
                 const userId = url.searchParams.get("userId");
                 const role = url.searchParams.get("role");
@@ -310,7 +342,7 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.eye_condition, e.Seat_Number, e.Group_Name 
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name 
                      FROM Enrollments e 
                      JOIN Users u ON e.Student_ID = u.User_ID 
                      WHERE e.Course_ID = ?`
@@ -324,18 +356,36 @@ export default {
             // ==========================================
             if (request.method === "GET" && url.pathname === "/api/unenrolled-students") {
                 const courseId = url.searchParams.get("courseId");
+                const courseFilter = url.searchParams.get("courseFilter");
+                const yearFilter = url.searchParams.get("yearFilter");
+                const sectionFilter = url.searchParams.get("sectionFilter");
+                
                 if (!courseId) {
                     return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
                 }
 
-                const students = await env.DB.prepare(
-                    `SELECT User_ID, Student_Number, Name, course, year, section 
-                     FROM Users 
-                     WHERE role COLLATE NOCASE = 'student' 
-                     AND account_status COLLATE NOCASE = 'active'
-                     AND User_ID NOT IN (SELECT Student_ID FROM Enrollments WHERE Course_ID = ?)
-                     ORDER BY Name ASC`
-                ).bind(courseId).all();
+                let query = `SELECT User_ID, Student_Number, Name, course, year, section 
+                             FROM Users 
+                             WHERE role COLLATE NOCASE = 'student' 
+                             AND account_status COLLATE NOCASE = 'active'
+                             AND User_ID NOT IN (SELECT Student_ID FROM Enrollments WHERE Course_ID = ?)`;
+                const params = [courseId];
+
+                if (courseFilter) {
+                    query += ` AND course COLLATE NOCASE = ?`;
+                    params.push(courseFilter);
+                }
+                if (yearFilter) {
+                    query += ` AND year COLLATE NOCASE = ?`;
+                    params.push(yearFilter);
+                }
+                if (sectionFilter) {
+                    query += ` AND section COLLATE NOCASE = ?`;
+                    params.push(sectionFilter);
+                }
+
+                query += ` ORDER BY Name ASC`;
+                const students = await env.DB.prepare(query).bind(...params).all();
 
                 return new Response(JSON.stringify({ success: true, students: students.results }), { status: 200, headers: corsHeaders });
             }
