@@ -359,18 +359,22 @@ export default {
                 const courseFilter = url.searchParams.get("courseFilter");
                 const yearFilter = url.searchParams.get("yearFilter");
                 const sectionFilter = url.searchParams.get("sectionFilter");
+                const statusFilter = url.searchParams.get("statusFilter");
                 
                 if (!courseId) {
                     return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
                 }
 
-                let query = `SELECT User_ID, Student_Number, Name, course, year, section 
+                let query = `SELECT User_ID, Student_Number, Name, course, year, section, account_status 
                              FROM Users 
                              WHERE role COLLATE NOCASE = 'student' 
-                             AND account_status COLLATE NOCASE = 'active'
                              AND User_ID NOT IN (SELECT Student_ID FROM Enrollments WHERE Course_ID = ?)`;
                 const params = [courseId];
 
+                if (statusFilter) {
+                    query += ` AND account_status COLLATE NOCASE = ?`;
+                    params.push(statusFilter);
+                }
                 if (courseFilter) {
                     query += ` AND course COLLATE NOCASE = ?`;
                     params.push(courseFilter);
