@@ -21,7 +21,8 @@ export const CourseModule = {
         }
     },
 
-    handleInput: (e) => {
+    handleInput: async (e) => {
+        // Client-side quick search by name
         if (e.target.id === 'studentSearchInput') {
             const searchTerm = e.target.value.toLowerCase();
             const items = document.querySelectorAll('.student-enroll-item');
@@ -54,6 +55,37 @@ export const CourseModule = {
                 console.error('Failed to update student info:', err);
             }
         }
+        
+        // Auto-save logic for User Account Status
+        if (e.target.classList.contains('status-select')) {
+            const studentId = e.target.dataset.studentId;
+            const status = e.target.value;
+            
+            try {
+                await apiFetch('/api/update-user-status', {
+                    method: 'POST',
+                    body: JSON.stringify({ studentId, status })
+                });
+                
+                // Update styling based on new status
+                e.target.className = `status-select text-[9px] font-bold px-1 py-0.5 rounded border outline-none cursor-pointer transition ${
+                    status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' : 
+                    status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
+                    status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
+                    status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
+                    status === 'Dropped' ? 'text-red-700 border-red-300 bg-red-100' : 'text-gray-500 border-gray-200 bg-gray-50'
+                }`;
+            } catch (err) {
+                console.error('Failed to update user status:', err);
+                alert('Failed to update student status.');
+            }
+        }
+
+        // Handle dynamically filtering the manual enrollment list 
+        if (e.target.id === 'filterCourse' || e.target.id === 'filterYear' || e.target.id === 'filterSection') {
+            const courseId = window.location.hash.replace('#class-', '');
+            await CourseModule.loadUnenrolledStudents(courseId);
+        }
     },
 
     handleClicks: async (e) => {
@@ -73,12 +105,27 @@ export const CourseModule = {
         if (e.target.closest('#openAddStudentModalBtn')) {
             document.getElementById('addStudentModal').classList.remove('hidden');
             const courseId = window.location.hash.replace('#class-', '');
+            
+            const filterCourse = document.getElementById('filterCourse');
+            if (filterCourse && filterCourse.options.length <= 1) {
+                try {
+                    const programsData = await apiFetch('/api/programs');
+                    if (programsData.programs) {
+                        filterCourse.innerHTML = '<option value="">Course (All)</option>' + 
+                            programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+                    }
+                } catch(err) {}
+            }
+            
             await CourseModule.loadUnenrolledStudents(courseId);
         }
 
         if (e.target.closest('#closeAddStudentModalBtn') || e.target.id === 'closeAddStudentModalBg') {
             document.getElementById('addStudentModal').classList.add('hidden');
             document.getElementById('studentSearchInput').value = '';
+            document.getElementById('filterCourse').value = '';
+            document.getElementById('filterYear').value = '';
+            document.getElementById('filterSection').value = '';
         }
 
         // Lecturer manually enrolling a student
@@ -94,13 +141,39 @@ export const CourseModule = {
                     method: 'POST', 
                     body: JSON.stringify({ courseId: courseId, studentId: studentId }) 
                 });
-                // Reload the modal list and the main roster
-                await CourseModule.loadUnenrolledStudents(courseId);
-                await CourseModule.loadClassScreen(courseId, true); // true param prevents full spinner reload if implemented
+                
+                // Re-fetch the class screen seamlessly keeping the modal active
+                await CourseModule.loadClassScreen(courseId, true);
             } catch (err) {
                 alert(err.message);
                 btn.disabled = false;
                 btn.innerHTML = 'Enroll';
+            }
+        }
+
+        // Lecturer removing a student from a course
+        if (e.target.closest('.remove-student-btn')) {
+            const btn = e.target.closest('.remove-student-btn');
+            const studentId = btn.dataset.studentId;
+            const courseId = window.location.hash.replace('#class-', '');
+            const confirmRemove = window.confirm("Are you sure you want to remove this student from the course?");
+            
+            if (confirmRemove) {
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+                
+                try {
+                    await apiFetch('/api/unenroll', {
+                        method: 'POST',
+                        body: JSON.stringify({ courseId, studentId })
+                    });
+                    await CourseModule.loadClassScreen(courseId, true);
+                } catch (err) {
+                    alert(err.message);
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
             }
         }
 
@@ -176,13 +249,22 @@ export const CourseModule = {
     loadUnenrolledStudents: async (courseId) => {
         const listContainer = document.getElementById('unenrolledStudentsList');
         if (!listContainer) return;
+        
+        const filterCourse = document.getElementById('filterCourse')?.value || '';
+        const filterYear = document.getElementById('filterYear')?.value || '';
+        const filterSection = document.getElementById('filterSection')?.value || '';
 
         listContainer.innerHTML = '<div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>';
         
         try {
-            const data = await apiFetch(`/api/unenrolled-students?courseId=${courseId}`);
+            let url = `/api/unenrolled-students?courseId=${courseId}`;
+            if (filterCourse) url += `&courseFilter=${encodeURIComponent(filterCourse)}`;
+            if (filterYear) url += `&yearFilter=${encodeURIComponent(filterYear)}`;
+            if (filterSection) url += `&sectionFilter=${encodeURIComponent(filterSection)}`;
+            
+            const data = await apiFetch(url);
             if (!data.students || data.students.length === 0) {
-                listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded-md shadow-sm">No new students available to enroll.</div>';
+                listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded-md shadow-sm">No new students available to enroll matching criteria.</div>';
                 return;
             }
 
@@ -204,6 +286,13 @@ export const CourseModule = {
             }).join('');
 
             listContainer.innerHTML = html;
+            
+            // Re-trigger client-side text search if populated
+            const searchInput = document.getElementById('studentSearchInput');
+            if (searchInput && searchInput.value) {
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            
         } catch (err) {
             listContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-sm font-medium border border-red-200 text-center">${err.message}</div>`;
         }
@@ -294,19 +383,49 @@ export const CourseModule = {
         const root = document.getElementById('app-root');
         if (!root || !AppState.user) return;
         
+        let modalWasOpen = false;
+        let searchVal = '';
+        let courseVal = '';
+        let yearVal = '';
+        let sectionVal = '';
+        
+        const modal = document.getElementById('addStudentModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            modalWasOpen = true;
+            searchVal = document.getElementById('studentSearchInput')?.value || '';
+            courseVal = document.getElementById('filterCourse')?.value || '';
+            yearVal = document.getElementById('filterYear')?.value || '';
+            sectionVal = document.getElementById('filterSection')?.value || '';
+        }
+        
         if(!skipSpinner) {
             root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
         }
         
         try {
             const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
-            // Check if modal was open to keep it open on re-render
-            const modalWasOpen = document.getElementById('addStudentModal') && !document.getElementById('addStudentModal').classList.contains('hidden');
             
             root.innerHTML = Components.renderClassScreen(data.course, data.students);
             
             if (modalWasOpen) {
                 document.getElementById('addStudentModal').classList.remove('hidden');
+                
+                const filterCourseSelect = document.getElementById('filterCourse');
+                if (filterCourseSelect) {
+                    try {
+                        const programsData = await apiFetch('/api/programs');
+                        if (programsData.programs) {
+                            filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' + 
+                                programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+                        }
+                    } catch(e) {}
+                }
+                
+                if (document.getElementById('studentSearchInput')) document.getElementById('studentSearchInput').value = searchVal;
+                if (document.getElementById('filterCourse')) document.getElementById('filterCourse').value = courseVal;
+                if (document.getElementById('filterYear')) document.getElementById('filterYear').value = yearVal;
+                if (document.getElementById('filterSection')) document.getElementById('filterSection').value = sectionVal;
+                
                 CourseModule.loadUnenrolledStudents(courseId);
             }
         } catch (err) {
