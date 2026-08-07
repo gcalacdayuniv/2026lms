@@ -573,7 +573,7 @@ export const Components = {
         <!-- Add Student Modal -->
         <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm modal-backdrop" id="closeAddStudentModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-2xl p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-3xl p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
                     <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors">
@@ -583,6 +583,14 @@ export const Components = {
                 
                 <div class="mb-4 flex flex-col md:flex-row gap-2">
                     <input type="text" id="studentSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                    <select id="filterStatus" class="w-full md:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                        <option value="Active">Active Only</option>
+                        <option value="">All Statuses</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Suspended">Suspended</option>
+                        <option value="UD">UD</option>
+                        <option value="Dropped">Dropped</option>
+                    </select>
                     <select id="filterCourse" class="w-full md:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
                         <option value="">Course (All)</option>
                     </select>
