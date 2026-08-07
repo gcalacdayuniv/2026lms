@@ -15,7 +15,7 @@ const getLoadableAvatarSrc = (src) => {
 export const Components = {
     renderLogin: () => `
         <div class="flex flex-col justify-center items-center min-h-screen p-4">
-            <div class="w-full max-w-md bg-white rounded-lg shadow-md p-8 fade-in">
+            <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in">
                 <div class="text-center mb-8">
                     <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-4"></i>
                     <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
@@ -44,7 +44,7 @@ export const Components = {
 
     renderRegister: () => `
         <div class="flex flex-col justify-center items-center min-h-screen p-4">
-            <div class="w-full max-w-lg bg-white rounded-lg shadow-md p-8 fade-in my-8">
+            <div class="w-full max-w-lg bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in my-8">
                 <div class="text-center mb-8">
                     <i class="fa-solid fa-user-plus text-4xl text-green-600 mb-4"></i>
                     <h2 class="text-2xl font-bold text-gray-800">Create Account</h2>
@@ -59,11 +59,11 @@ export const Components = {
                         <div class="flex justify-center mb-3">
                             <img id="avatarPreview" class="hidden w-24 h-24 rounded-full object-cover aspect-square border-2 border-green-500 shadow-sm" />
                         </div>
-                        <div class="flex justify-center space-x-3">
-                            <button type="button" id="btnCamera" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
+                        <div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full">
+                            <button type="button" id="btnCamera" class="w-full sm:w-auto px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
                                 <i class="fa-solid fa-camera mr-2"></i> Camera
                             </button>
-                            <button type="button" id="btnFile" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
+                            <button type="button" id="btnFile" class="w-full sm:w-auto px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
                                 <i class="fa-solid fa-upload mr-2"></i> File
                             </button>
                         </div>
@@ -153,7 +153,7 @@ export const Components = {
                         </div>
                     </div>
                     
-                    <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
+                    <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
                         Create Account
                     </button>
                 </form>
@@ -196,9 +196,9 @@ export const Components = {
             <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
                 <div class="flex justify-between items-center h-16">
                     <div class="flex items-center">
-                        <h1 class="text-xl font-bold text-gray-800 tracking-tight"><i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard</h1>
+                        <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight"><i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard</h1>
                     </div>
-                    <div class="flex items-center cursor-pointer hover:bg-gray-50 px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200" id="profileToggleBtn">
+                    <div class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200" id="profileToggleBtn">
                         <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${user.Name}</span>
                         ${headerAvatar}
                     </div>
@@ -223,7 +223,7 @@ export const Components = {
                 
                 <div class="text-center mt-6">
                     ${panelAvatar}
-                    <h2 class="text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
+                    <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
                 </div>
                 
                 <!-- Side-by-Side Profile Information (Values Only) -->
@@ -231,23 +231,23 @@ export const Components = {
                     <!-- Row 1 -->
                     <div class="flex justify-between items-start border-b border-gray-200 pb-4">
                         <div class="flex-1 pr-1">
-                            <span class="block text-sm font-bold text-blue-600">${user.role || 'N/A'}</span>
+                            <span class="block text-xs sm:text-sm font-bold text-blue-600">${user.role || 'N/A'}</span>
                         </div>
                         <div class="flex-1 text-center border-x border-gray-200 px-1">
-                            <span class="block text-sm font-medium text-gray-800">${user.Student_Number || 'N/A'}</span>
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Student_Number || 'N/A'}</span>
                         </div>
                         <div class="flex-1 text-right pl-1">
-                            <span class="block text-sm font-medium text-gray-800">${displayCourse}</span>
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${displayCourse}</span>
                         </div>
                     </div>
                     
                     <!-- Row 2 -->
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1 pr-2">
-                            <span class="block text-sm font-medium text-gray-800 break-all">${user.Email || 'N/A'}</span>
+                    <div class="flex flex-col sm:flex-row justify-between items-start space-y-2 sm:space-y-0">
+                        <div class="flex-1 pr-2 w-full">
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Email || 'N/A'}</span>
                         </div>
-                        <div class="flex-1 text-right border-l border-gray-200 pl-2">
-                            <span class="block text-sm font-medium text-gray-800">${user.Contact_Number || 'N/A'}</span>
+                        <div class="flex-1 text-left sm:text-right sm:border-l border-gray-200 sm:pl-2 w-full">
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${user.Contact_Number || 'N/A'}</span>
                         </div>
                     </div>
                 </div>
@@ -270,9 +270,9 @@ export const Components = {
         </div>
 
         <!-- Change Password Pop-Up Modal -->
-        <div id="cpModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+        <div id="cpModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
             <div id="cpModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            <div class="bg-white rounded-lg shadow-xl w-11/12 sm:w-96 p-6 relative z-10 scale-up">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-shield-halved text-blue-600 mr-2"></i>Change Password</h3>
                     <button id="closeCpModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
@@ -305,9 +305,9 @@ export const Components = {
         </div>
 
         <!-- Create Course Pop-Up Modal -->
-        <div id="ccModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+        <div id="ccModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
             <div id="ccModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-md p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-folder-plus text-blue-600 mr-2"></i>Create Course</h3>
                     <button id="closeCcModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
@@ -328,7 +328,7 @@ export const Components = {
                         <input type="text" id="courseTitle" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. Introduction to Programming">
                     </div>
                     
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Schedule Day</label>
                             <select id="scheduleDay" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
@@ -344,7 +344,7 @@ export const Components = {
 
                     <div class="border-t border-gray-200 pt-4 mt-4">
                         <p class="text-xs font-bold text-gray-800 mb-2 uppercase">Target Audience (Restriction)</p>
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Course</label>
                                 <select id="targetCourse" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
@@ -371,9 +371,9 @@ export const Components = {
         </div>
 
         <!-- Add Program Modal (For Registration List) -->
-        <div id="apModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+        <div id="apModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
             <div id="apModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-sm p-6 relative z-10 scale-up">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-graduation-cap text-purple-600 mr-2"></i>Add Course (Program)</h3>
                     <button id="closeApModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
@@ -433,37 +433,51 @@ export const Components = {
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-12 h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" alt="${s.Name}">` 
-                : `<i class="fa-solid fa-circle-user text-[48px] text-gray-300"></i>`;
+                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" alt="${s.Name}">` 
+                : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
             
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
             
             const eyeConditionBadge = s.eye_condition 
-                ? `<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
+                ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
                 : '';
 
             return `
-                <div class="flex items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row" data-student-id="${s.User_ID}">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 md:gap-2" data-student-id="${s.User_ID}">
                     
-                    <!-- Profile Info -->
-                    <div class="flex items-center space-x-4 w-1/3">
-                        <span class="text-xs font-bold text-gray-400 w-6 text-center">${index + 1}</span>
-                        <div class="flex-shrink-0">
-                            ${avatarImg}
+                    <!-- Profile Info & Manage Button (Mobile Stack) -->
+                    <div class="flex items-start justify-between w-full md:w-1/2">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs font-bold text-gray-400 w-5 text-center">${index + 1}</span>
+                            <div class="flex-shrink-0">
+                                ${avatarImg}
+                            </div>
+                            <div>
+                                <div class="font-bold text-gray-800 text-sm sm:text-base">${s.Name}</div>
+                                <div class="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
+                                    <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
+                                </div>
+                                <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
+                                    Seat: <span class="text-gray-800">${s.Seat_Number || '--'}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <div class="font-bold text-gray-800">${s.Name}</div>
-                            <div class="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center">
-                                <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
-                            </div>
-                            <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
-                                Seat: <span class="text-gray-800">${s.Seat_Number || '--'}</span>
-                            </div>
+                        
+                        <div class="md:hidden">
+                            <!-- Mobile Manage Button -->
+                            <button type="button" class="manage-student-btn px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm" 
+                                data-student-id="${s.User_ID}" 
+                                data-name="${s.Name}" 
+                                data-seat="${s.Seat_Number || ''}" 
+                                data-group="${s.Group_Name || ''}" 
+                                data-status="${s.account_status || 'Inactive'}">
+                                <i class="fa-solid fa-gear"></i>
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Manage Actions -->
-                    <div class="flex items-center justify-center space-x-2 w-1/4">
+                    <!-- Manage Actions (Desktop) -->
+                    <div class="hidden md:flex items-center justify-center w-auto px-2">
                         <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm" 
                             data-student-id="${s.User_ID}" 
                             data-name="${s.Name}" 
@@ -475,19 +489,19 @@ export const Components = {
                     </div>
                     
                     <!-- Attendance Action Toggles & Points -->
-                    <div class="flex items-end space-x-2">
-                        <div>
-                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5 text-center">Pts (+/-)</label>
-                            <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center mr-2 bg-gray-50 focus:bg-white transition font-mono" value="0">
+                    <div class="flex items-end justify-between md:justify-end w-full md:w-auto space-x-2 border-t md:border-t-0 border-gray-100 pt-3 md:pt-0 mt-1 md:mt-0">
+                        <div class="flex items-center md:items-start md:flex-col gap-2 md:gap-0">
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider md:mb-0.5 text-center">Pts</label>
+                            <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono" value="0">
                         </div>
-                        <div class="flex space-x-1">
-                            <button type="button" data-status="Present" data-selected="true" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition">
+                        <div class="flex space-x-1 flex-1 md:flex-initial justify-end">
+                            <button type="button" data-status="Present" data-selected="true" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 transition text-center">
                                 Present
                             </button>
-                            <button type="button" data-status="Late" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-300 transition">
+                            <button type="button" data-status="Late" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 transition text-center">
                                 Late
                             </button>
-                            <button type="button" data-status="Absent" class="attendance-btn px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition">
+                            <button type="button" data-status="Absent" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
                                 Absent
                             </button>
                         </div>
@@ -503,47 +517,47 @@ export const Components = {
         <header class="bg-blue-700 shadow-md fixed top-0 w-full z-40">
             <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
                 <div class="flex items-center h-16">
-                    <a href="#dashboard" class="text-white hover:text-blue-200 transition mr-4 p-2 -ml-2">
+                    <a href="#dashboard" class="text-white hover:text-blue-200 transition mr-2 sm:mr-4 p-2 -ml-2">
                         <i class="fa-solid fa-arrow-left text-xl"></i>
                     </a>
                     <div class="overflow-hidden">
-                        <h1 class="text-lg font-bold text-white truncate">${course.CourseCode}</h1>
-                        <p class="text-xs text-blue-200 truncate">${course.CourseTitle}</p>
+                        <h1 class="text-base sm:text-lg font-bold text-white truncate">${course.CourseCode}</h1>
+                        <p class="text-[11px] sm:text-xs text-blue-200 truncate">${course.CourseTitle}</p>
                     </div>
                 </div>
             </div>
         </header>
 
         <!-- Main Content -->
-        <main class="pt-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in">
+        <main class="pt-20 pb-12 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in">
             <!-- Action Header -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 mt-4 gap-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 mt-2 sm:mt-4 gap-4 px-2 sm:px-0">
                 <div>
-                    <h2 class="text-2xl font-black text-gray-800 tracking-tight">Class Roster & Attendance</h2>
-                    <p class="text-sm text-gray-500 mt-1"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
+                    <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight">Class Roster & Attendance</h2>
+                    <p class="text-xs sm:text-sm text-gray-500 mt-1"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
                 </div>
                 
-                <div class="flex items-center space-x-3 w-full sm:w-auto">
-                    <button id="openAddStudentModalBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center flex-1 sm:flex-initial">
+                <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
+                    <button id="openAddStudentModalBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
                         <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
                     </button>
-                    <input type="date" id="attendanceDate" class="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
-                    <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center flex-1 sm:flex-initial">
+                    <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
+                    <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
                         <i class="fa-solid fa-floppy-disk mr-2"></i> Save Attendance
                     </button>
                 </div>
             </div>
             
-            <div id="attendanceAlert" class="hidden mb-4 p-3 rounded-md text-sm font-medium"></div>
+            <div id="attendanceAlert" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium"></div>
 
             <!-- Student List Container -->
-            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mx-0 sm:mx-0">
                 <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <span class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">
                         ${students.length} Enrolled Students
                     </span>
                     <div class="space-x-2">
-                        <button type="button" id="markAllPresent" class="text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
+                        <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
                     </div>
                 </div>
                 <div>
@@ -553,16 +567,16 @@ export const Components = {
         </main>
 
         <!-- Manage Student Modal -->
-        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in">
+        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeManageStudentModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-sm p-6 relative z-10 scale-up">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-gear text-blue-600 mr-2"></i>Manage Student</h3>
                     <button id="closeManageStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                <div id="manageStudentName" class="font-black text-gray-800 text-center mb-4 text-lg"></div>
+                <div id="manageStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
                 <input type="hidden" id="manageStudentId">
                 
                 <div class="space-y-4">
@@ -601,9 +615,9 @@ export const Components = {
         </div>
 
         <!-- Add Student Modal -->
-        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in">
+        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-2 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm modal-backdrop" id="closeAddStudentModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-3xl p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] sm:max-h-[90vh] flex flex-col">
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
                     <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -613,19 +627,23 @@ export const Components = {
                 
                 <div class="mb-4 flex flex-col md:flex-row gap-2">
                     <input type="text" id="studentSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
-                    <select id="filterStatus" class="w-full md:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
-                        <option value="Active">Active Only</option>
-                        <option value="">All Statuses</option>
-                        <option value="Inactive">Inactive</option>
-                        <option value="Suspended">Suspended</option>
-                        <option value="UD">UD</option>
-                        <option value="Dropped">Dropped</option>
-                    </select>
-                    <select id="filterCourse" class="w-full md:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
-                        <option value="">Course (All)</option>
-                    </select>
-                    <input type="text" id="filterYear" placeholder="Year" class="w-full md:w-20 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
-                    <input type="text" id="filterSection" placeholder="Section" class="w-full md:w-24 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <select id="filterStatus" class="w-full sm:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                            <option value="Active">Active Only</option>
+                            <option value="">All Statuses</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Suspended">Suspended</option>
+                            <option value="UD">UD</option>
+                            <option value="Dropped">Dropped</option>
+                        </select>
+                        <select id="filterCourse" class="w-full sm:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                            <option value="">Course (All)</option>
+                        </select>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <input type="text" id="filterYear" placeholder="Year" class="w-full sm:w-20 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                            <input type="text" id="filterSection" placeholder="Section" class="w-full sm:w-24 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                        </div>
+                    </div>
                 </div>
 
                 <div id="unenrolledStudentsList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
