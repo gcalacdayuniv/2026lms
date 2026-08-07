@@ -119,6 +119,27 @@ export const AuthModule = {
             if(err) err.classList.add('hidden');
             if(succ) succ.classList.add('hidden');
         }
+
+        // Global Image Viewer Logic
+        if (e.target.closest('.view-avatar-btn')) {
+            const btn = e.target.closest('.view-avatar-btn');
+            const src = btn.dataset.src;
+            const modal = document.getElementById('globalImageModal');
+            const img = document.getElementById('globalImageSrc');
+            
+            if (modal && img && src) {
+                img.src = src;
+                modal.classList.remove('hidden');
+            }
+        }
+        if (e.target.closest('#closeGlobalImageBtn') || e.target.id === 'closeGlobalImageBg') {
+            const modal = document.getElementById('globalImageModal');
+            const img = document.getElementById('globalImageSrc');
+            if (modal && img) {
+                modal.classList.add('hidden');
+                img.src = '';
+            }
+        }
     },
 
     handleChanges: (e) => {
