@@ -466,7 +466,7 @@ export default {
                 }
 
                 const records = await env.DB.prepare(
-                    "SELECT Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ?"
+                    "SELECT Date, Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ? ORDER BY Date ASC"
                 ).bind(courseId, studentId).all();
 
                 let present = 0, late = 0, absent = 0, totalPoints = 0;
@@ -478,7 +478,11 @@ export default {
                     totalPoints += (r.Performance_Points || 0);
                 });
 
-                return new Response(JSON.stringify({ success: true, summary: { present, late, absent, totalPoints } }), { status: 200, headers: corsHeaders });
+                return new Response(JSON.stringify({ 
+                    success: true, 
+                    summary: { present, late, absent, totalPoints },
+                    records: records.results
+                }), { status: 200, headers: corsHeaders });
             }
 
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
