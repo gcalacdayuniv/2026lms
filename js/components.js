@@ -314,7 +314,6 @@ export const Components = {
         </div>
 
         <!-- Change Password Pop-Up Modal -->
-        <!-- ... (Rest of dashboard modals: cpModal, ccModal, apModal) ... -->
         <div id="cpModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
             <div id="cpModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
             <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
@@ -480,7 +479,7 @@ export const Components = {
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
 
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" role="button" tabindex="0" alt="${s.Name}">` 
+                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200" alt="${s.Name}">` 
                 : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
             
             const eyeConditionBadge = s.eye_condition 
@@ -492,7 +491,7 @@ export const Components = {
                     
                     <!-- Profile Info & Manage Button (Mobile Stack) -->
                     <div class="flex items-start justify-between w-full md:w-1/2">
-                        <div class="flex items-center space-x-3">
+                        <div class="flex items-center space-x-3 cursor-pointer view-summary-trigger hover:bg-gray-100 p-1.5 -ml-1.5 rounded-lg transition" data-name="${s.Name}" title="View Performance Summary">
                             <span class="text-xs font-bold text-gray-400 w-5 text-center">${index + 1}</span>
                             <div class="flex-shrink-0">
                                 ${avatarImg}
@@ -539,7 +538,7 @@ export const Components = {
                             <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider md:mb-0.5 text-center">Pts</label>
                             <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono" value="0">
                         </div>
-                        <div class="flex space-x-1 flex-1 md:flex-initial justify-end">
+                        <div class="flex space-x-1 flex-1 md:flex-initial justify-end items-center">
                             <button type="button" data-status="Present" data-selected="true" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 transition text-center">
                                 Present
                             </button>
@@ -548,6 +547,11 @@ export const Components = {
                             </button>
                             <button type="button" data-status="Absent" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
                                 Absent
+                            </button>
+                            
+                            <!-- Individual Save Button -->
+                            <button type="button" class="save-single-attendance-btn ml-1 px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition shadow-sm" title="Save Individual Attendance">
+                                <i class="fa-solid fa-floppy-disk"></i>
                             </button>
                         </div>
                     </div>
@@ -598,7 +602,7 @@ export const Components = {
                     </button>
                     <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
                     <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save Attendance
+                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save All Attendance
                     </button>
                 </div>
             </div>
@@ -665,6 +669,40 @@ export const Components = {
                             <i class="fa-solid fa-trash mr-2"></i> Remove from Course
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Summary Modal -->
+        <div id="summaryModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSummaryModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>Performance Summary</h3>
+                    <button id="closeSummaryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="summaryStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
+                
+                <div class="grid grid-cols-3 gap-2 text-center mb-4">
+                    <div class="bg-green-50 border border-green-200 p-2 rounded-lg">
+                        <div class="text-[10px] sm:text-xs font-bold text-green-600 uppercase">Present</div>
+                        <div id="summaryPresent" class="text-xl font-black text-green-800">...</div>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 p-2 rounded-lg">
+                        <div class="text-[10px] sm:text-xs font-bold text-yellow-600 uppercase">Late</div>
+                        <div id="summaryLate" class="text-xl font-black text-yellow-800">...</div>
+                    </div>
+                    <div class="bg-red-50 border border-red-200 p-2 rounded-lg">
+                        <div class="text-[10px] sm:text-xs font-bold text-red-600 uppercase">Absent</div>
+                        <div id="summaryAbsent" class="text-xl font-black text-red-800">...</div>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center">
+                    <div class="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-1">Grand Total Pts</div>
+                    <div id="summaryTotalPoints" class="text-3xl font-black text-blue-800">...</div>
                 </div>
             </div>
         </div>
