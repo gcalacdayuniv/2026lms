@@ -140,6 +140,38 @@ export const CourseModule = {
             await CourseModule.loadClassScreen(courseId, true); 
         }
 
+        // Summary Modal Logic
+        if (e.target.closest('.view-summary-trigger')) {
+            const trigger = e.target.closest('.view-summary-trigger');
+            const studentId = trigger.closest('.student-row').dataset.studentId;
+            const name = trigger.dataset.name;
+            const courseId = window.location.hash.replace('#class-', '');
+            
+            document.getElementById('summaryStudentName').textContent = name;
+            document.getElementById('summaryModal').classList.remove('hidden');
+            
+            document.getElementById('summaryPresent').textContent = '...';
+            document.getElementById('summaryLate').textContent = '...';
+            document.getElementById('summaryAbsent').textContent = '...';
+            document.getElementById('summaryTotalPoints').textContent = '...';
+            
+            try {
+                const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}`);
+                if (data.summary) {
+                    document.getElementById('summaryPresent').textContent = data.summary.present;
+                    document.getElementById('summaryLate').textContent = data.summary.late;
+                    document.getElementById('summaryAbsent').textContent = data.summary.absent;
+                    document.getElementById('summaryTotalPoints').textContent = data.summary.totalPoints;
+                }
+            } catch(err) {
+                console.error("Failed to load summary", err);
+            }
+        }
+        
+        if (e.target.closest('#closeSummaryModalBtn') || e.target.id === 'closeSummaryModalBg') {
+            document.getElementById('summaryModal').classList.add('hidden');
+        }
+
         if (e.target.closest('#manageResetPwdBtn')) {
             const studentId = document.getElementById('manageStudentId').value;
             const confirmReset = window.confirm("Are you sure you want to reset this student's password to '123456'?");
@@ -276,6 +308,51 @@ export const CourseModule = {
 
         if (e.target.closest('#saveAttendanceBtn')) {
             await CourseModule.saveAttendance();
+        }
+
+        // Individual Save Single Attendance Record Logic
+        if (e.target.closest('.save-single-attendance-btn')) {
+            const btn = e.target.closest('.save-single-attendance-btn');
+            const row = btn.closest('.student-row');
+            const studentId = row.dataset.studentId;
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateVal = document.getElementById('attendanceDate').value;
+            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+            const pointsInput = row.querySelector('.points-input');
+            
+            if (!dateVal) {
+                alert("Please select a date first to save attendance.");
+                return;
+            }
+            
+            const status = selectedBtn ? selectedBtn.dataset.status : null;
+            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
+            
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            
+            try {
+                await apiFetch('/api/attendance/single', {
+                    method: 'POST',
+                    body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
+                });
+                
+                btn.classList.replace('text-blue-600', 'text-green-600');
+                btn.classList.replace('bg-blue-50', 'bg-green-50');
+                btn.classList.replace('border-blue-200', 'border-green-200');
+                
+                setTimeout(() => {
+                    btn.classList.replace('text-green-600', 'text-blue-600');
+                    btn.classList.replace('bg-green-50', 'bg-blue-50');
+                    btn.classList.replace('border-green-200', 'border-blue-200');
+                }, 2000);
+            } catch (err) {
+                alert("Failed to save individually: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
     },
 
@@ -509,14 +586,14 @@ export const CourseModule = {
 
             await apiFetch('/api/attendance', { method: 'POST', body: JSON.stringify(payload) });
             
-            alertBox.textContent = "Attendance saved successfully!";
+            alertBox.textContent = "All Attendance saved successfully!";
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
         } catch (err) {
             alertBox.textContent = err.message;
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save Attendance';
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save All Attendance';
             setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
         }
     },
