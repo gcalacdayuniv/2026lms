@@ -14,14 +14,14 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 
 * **`index.html` & `styles.css`:** Main entry point, the static layout shell, and custom animations.
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
-* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, Program Management, and Manual Student Enrollment.
+* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, Program Management, User Management, and Manual Student Enrollment.
 * **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously, including dynamic route parsing mapping to specific Class IDs.
-* **`js/auth.js`:** Handles login, registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, and interactive panel/modal toggling.
-* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, enforces target audience restrictions, loads detailed class roster screens, controls attendance state toggling/submission, triggers auto-saves for student info, manages manual student overrides, and builds specialized UI strings.
+* **`js/auth.js`:** Handles login (with password visibility toggling), registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, interactive panel/modal toggling, global image viewing navigation, and user management status controls.
+* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, enforces target audience restrictions, loads detailed class roster screens, controls attendance state toggling/submission, triggers auto-saves for student info, manages manual student overrides, builds specialized UI strings, and generates print-ready roster exports.
 * **`js/app.js`:** The master orchestrator that imports and initializes all modules.
 
 ### 2. Backend API (Cloudflare Workers)
-* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments (including specific Course Roster API mappings, Seat and Group assignments, Manual Overrides), Batch Attendance inserting (with performance points), and Password modification logic.
+* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments (including specific Course Roster API mappings, Seat and Group assignments, Manual Overrides), Batch Attendance inserting (with performance points), Password modification logic, and global User Status updates.
 
 ### 3. Database Layer (Cloudflare D1 - Serverless SQLite)
 The database uses Universally Unique Identifiers (UUIDs) for all primary keys, generated on the edge via `crypto.randomUUID()`. 
@@ -42,6 +42,11 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Export Roster for Print:** Added a dedicated utility to generate a print-ready, letter-size HTML roster complete with 1x1 student profile pictures, seat numbers, group names, and contact details.
+* **Global Manage Users Interface:** Implemented a new modal accessible from the lecturer profile panel to search, filter, and dynamically modify the active status of any registered user across the system.
+* **Enhanced Image Viewer:** Upgraded the global image overlay to include next and previous navigation controls, seamlessly displaying the specific user's name, course, year, and section details below the image.
+* **Password Visibility Toggle:** Integrated an interactive eye icon toggle on the login screen to allow users to securely view their inputted password.
+* **Target Audience Badge:** Displayed the specific enrollment restriction parameters directly within the Class Roster header for immediate visibility.
 * **Lecturer Manual Student Enrollment:** Added a modal utility within the Class Roster screen allowing lecturers to search and manually assign active students into their courses, overriding existing strict target audience gating parameters. Added a backend endpoint mapping unenrolled students for explicit assignment routing. 
 * **Student Organization & Performance Tracking:** Added inline editable fields for `Seat` and `Group` in the Class Roster, mapped securely to the enrollments table via an auto-save blur event mapping. Included a numeric `Pts (+/-)` input alongside the attendance toggles to record merit or demerit points concurrently.
 * **Interactive Attendance Tracking:** Appended attendance toggles into the Class Roster screen. Included a bulk selection utility ("Mark All Present"), Date selection, and error handling for missing inputs. 
