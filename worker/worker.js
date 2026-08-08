@@ -174,8 +174,16 @@ export default {
             }
 
             // ==========================================
-            // USER STATUS UPDATE
+            // USER MANAGEMENT
             // ==========================================
+            if (request.method === "GET" && url.pathname === "/api/users") {
+                const users = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role 
+                     FROM Users ORDER BY Name ASC`
+                ).all();
+                return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && url.pathname === "/api/update-user-status") {
                 const body = await request.json();
                 if (!body.studentId || !body.status) {
@@ -342,7 +350,7 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name 
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name 
                      FROM Enrollments e 
                      JOIN Users u ON e.Student_ID = u.User_ID 
                      WHERE e.Course_ID = ?`
@@ -436,26 +444,6 @@ export default {
                 }
 
                 return new Response(JSON.stringify({ success: true, message: "Attendance saved" }), { status: 201, headers: corsHeaders });
-            }
-            
-            // Individual Attendance Saving Logic
-            if (request.method === "POST" && url.pathname === "/api/attendance/individual") {
-                const body = await request.json();
-                const { courseId, studentId, date, status, points } = body;
-
-                if (!courseId || !studentId || !date || !status) {
-                    return new Response(JSON.stringify({ error: "Invalid payload for individual attendance" }), { status: 400, headers: corsHeaders });
-                }
-
-                // Delete existing record for this specific student and date to allow overwriting
-                await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?").bind(courseId, studentId, date).run();
-
-                const attId = crypto.randomUUID();
-                await env.DB.prepare(
-                    "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
-                ).bind(attId, courseId, studentId, date, status, points).run();
-
-                return new Response(JSON.stringify({ success: true, message: "Individual attendance saved" }), { status: 201, headers: corsHeaders });
             }
 
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
