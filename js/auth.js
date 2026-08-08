@@ -411,8 +411,7 @@ export const AuthModule = {
                 body: JSON.stringify(payload)
             });
 
-            localStorage.setItem('professionalPortalUser', JSON.stringify(data.user));
-            AppState.user = data.user;
+            AppState.setUser(data.user);
             window.location.hash = '#dashboard';
         } catch (error) {
             errorDiv.textContent = error.message;
@@ -531,8 +530,7 @@ export const AuthModule = {
     },
 
     logout: () => {
-        localStorage.removeItem('professionalPortalUser');
-        AppState.user = null;
+        AppState.setUser(null);
         window.location.hash = '#login';
     }
 };
