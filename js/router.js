@@ -1,7 +1,8 @@
 // js/router.js
 import { Components } from './components.js';
 import { AppState } from './globals.js';
-import { CourseModule } from './course.js';
+import { CourseClass } from './course-class.js';
+import { CourseDashboard } from './course-dashboard.js';
 import { AuthModule } from './auth.js';
 
 export const AppRouter = {
@@ -28,7 +29,7 @@ export const AppRouter = {
         // Dynamic routing for Class Screens
         if (hash.startsWith('#class-')) {
             const courseId = hash.replace('#class-', '');
-            await CourseModule.loadClassScreen(courseId);
+            await CourseClass.loadClassScreen(courseId);
             return;
         }
 
@@ -42,7 +43,7 @@ export const AppRouter = {
                 break;
             case '#dashboard':
                 root.innerHTML = Components.renderDashboard(AppState.user);
-                await CourseModule.loadDashboardData();
+                await CourseDashboard.loadDashboardData();
                 break;
             default:
                 root.innerHTML = Components.renderLogin();
