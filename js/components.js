@@ -29,7 +29,12 @@ export const Components = {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Password</label>
-                        <input type="password" id="loginPassword" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="relative">
+                            <input type="password" id="loginPassword" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
+                            <button type="button" id="toggleLoginPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600 mt-1 focus:outline-none">
+                                <i class="fa-solid fa-eye" id="loginPasswordEye"></i>
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         Sign In
@@ -167,7 +172,7 @@ export const Components = {
     renderDashboard: (user) => {
         const avatarSrc = getLoadableAvatarSrc(user.Avatar);
         const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
-        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
+        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
         
         let displayCourse = 'N/A';
         if (user.course) {
@@ -433,7 +438,7 @@ export const Components = {
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" alt="${s.Name}">` 
+                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" role="button" tabindex="0" alt="${s.Name}">` 
                 : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
             
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
@@ -512,6 +517,11 @@ export const Components = {
 
         const emptyState = `<div class="p-8 text-center text-gray-500 bg-white rounded-b-xl border-dashed border-gray-300">No students enrolled yet.</div>`;
 
+        const targetDisplay = [course.Target_Course, course.Target_Year, course.Target_Section].filter(Boolean).join(' ');
+        const audienceBadge = targetDisplay 
+            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-blue-200 uppercase align-middle ml-2 sm:ml-3">${targetDisplay} Only</span>` 
+            : `<span class="inline-block bg-gray-100 text-gray-600 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-gray-200 uppercase align-middle ml-2 sm:ml-3">All Students</span>`;
+
         return `
         <!-- Top Header Bar -->
         <header class="bg-blue-700 shadow-md fixed top-0 w-full z-40">
@@ -533,8 +543,10 @@ export const Components = {
             <!-- Action Header -->
             <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 mt-2 sm:mt-4 gap-4 px-2 sm:px-0">
                 <div>
-                    <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight">Class Roster & Attendance</h2>
-                    <p class="text-xs sm:text-sm text-gray-500 mt-1"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
+                    <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
+                        Class Roster & Attendance ${audienceBadge}
+                    </h2>
+                    <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
                 </div>
                 
                 <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
