@@ -3,6 +3,8 @@ import { apiFetch, AppState } from './globals.js';
 import { Components, getLoadableAvatarSrc } from './components.js'; 
 
 export const CourseModule = {
+    currentSummaryData: null,
+    
     init: () => {
         document.addEventListener('submit', CourseModule.handleForms);
         document.addEventListener('click', CourseModule.handleClicks);
@@ -75,6 +77,18 @@ export const CourseModule = {
     },
 
     handleChanges: async (e) => {
+        if (e.target.id === 'noClassToggle') {
+            const isNoClass = e.target.checked;
+            const container = document.getElementById('rosterListContainer');
+            if (container) {
+                if (isNoClass) {
+                    container.classList.add('opacity-50', 'pointer-events-none');
+                } else {
+                    container.classList.remove('opacity-50', 'pointer-events-none');
+                }
+            }
+        }
+        
         if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput' || e.target.id === 'manageTopicInput') {
             const studentId = document.getElementById('manageStudentId').value;
             const seatNumber = document.getElementById('manageSeatInput').value.trim();
@@ -226,46 +240,48 @@ export const CourseModule = {
             
             document.getElementById('summaryStudentName').textContent = name;
             document.getElementById('summaryModal').classList.remove('hidden');
+            document.getElementById('summaryLoading').classList.remove('hidden');
+            document.getElementById('summaryContent').classList.add('hidden');
+            document.getElementById('summaryError').classList.add('hidden');
             
-            document.getElementById('summaryPresent').textContent = '...';
-            document.getElementById('summaryLate').textContent = '...';
-            document.getElementById('summaryAbsent').textContent = '...';
-            document.getElementById('summaryTotalPoints').textContent = '...';
-            document.getElementById('summaryTableBody').innerHTML = '<tr><td colspan="3" class="text-center py-2"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
-            
+            CourseModule.currentSummaryData = null;
+
             try {
                 const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}`);
-                if (data.summary) {
-                    document.getElementById('summaryPresent').textContent = data.summary.present;
-                    document.getElementById('summaryLate').textContent = data.summary.late;
-                    document.getElementById('summaryAbsent').textContent = data.summary.absent;
-                    document.getElementById('summaryTotalPoints').textContent = data.summary.totalPoints;
-                    
-                    let rows = '';
-                    if (data.records && data.records.length > 0) {
-                        rows = data.records.map(r => {
-                            const statusColor = r.Status === 'Present' ? 'text-green-600 font-bold' : r.Status === 'Late' ? 'text-yellow-600 font-bold' : 'text-red-600 font-bold';
-                            return `
-                                <tr>
-                                    <td class="px-2 py-1.5 whitespace-nowrap">${r.Date}</td>
-                                    <td class="px-2 py-1.5 text-center ${statusColor}">${r.Status}</td>
-                                    <td class="px-2 py-1.5 text-center font-mono">${r.Performance_Points || 0}</td>
-                                </tr>
-                            `;
-                        }).join('');
-                    } else {
-                        rows = '<tr><td colspan="3" class="text-center py-2 text-gray-500">No attendance records found.</td></tr>';
-                    }
-                    document.getElementById('summaryTableBody').innerHTML = rows;
-                }
+                CourseModule.currentSummaryData = data;
+                
+                CourseModule.renderTermMetrics('midterm', data);
+                CourseModule.renderTermMetrics('finalterm', data);
+
+                document.getElementById('summaryLoading').classList.add('hidden');
+                document.getElementById('summaryContent').classList.remove('hidden');
             } catch(err) {
                 console.error("Failed to load summary", err);
-                document.getElementById('summaryTableBody').innerHTML = `<tr><td colspan="3" class="text-center py-2 text-red-500">Error loading data</td></tr>`;
+                const errDiv = document.getElementById('summaryError');
+                errDiv.textContent = err.message;
+                errDiv.classList.remove('hidden');
+                document.getElementById('summaryLoading').classList.add('hidden');
             }
         }
         
         if (e.target.closest('#closeSummaryModalBtn') || e.target.id === 'closeSummaryModalBg') {
             document.getElementById('summaryModal').classList.add('hidden');
+        }
+
+        // Details Modal Logic (From Summary Cards)
+        if (e.target.closest('.view-details-trigger')) {
+            const trigger = e.target.closest('.view-details-trigger');
+            const term = trigger.dataset.term;
+            const metric = trigger.dataset.metric;
+            
+            if (CourseModule.currentSummaryData) {
+                CourseModule.renderDetailsModal(term, metric, CourseModule.currentSummaryData);
+                document.getElementById('detailsModal').classList.remove('hidden');
+            }
+        }
+        
+        if (e.target.closest('#closeDetailsModalBtn') || e.target.id === 'closeDetailsModalBg') {
+            document.getElementById('detailsModal').classList.add('hidden');
         }
 
         if (e.target.closest('#manageResetPwdBtn')) {
@@ -373,7 +389,7 @@ export const CourseModule = {
             const buttons = row.querySelectorAll('.attendance-btn');
             
             buttons.forEach(btn => {
-                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400');
+                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
                 btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
                 btn.removeAttribute('data-selected');
             });
@@ -393,6 +409,10 @@ export const CourseModule = {
                 e.target.classList.replace('bg-gray-50', 'bg-red-100');
                 e.target.classList.replace('text-gray-600', 'text-red-800');
                 e.target.classList.replace('border-gray-200', 'border-red-400');
+            } else if(status === 'Excused') {
+                e.target.classList.replace('bg-gray-50', 'bg-purple-100');
+                e.target.classList.replace('text-gray-600', 'text-purple-800');
+                e.target.classList.replace('border-gray-200', 'border-purple-400');
             }
 
             const courseId = window.location.hash.replace('#class-', '');
@@ -423,6 +443,7 @@ export const CourseModule = {
             const dateVal = document.getElementById('attendanceDate').value;
             const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
             const pointsInput = row.querySelector('.points-input');
+            const isNoClass = document.getElementById('noClassToggle').checked;
             
             if (!dateVal) {
                 alert("Please select a date first to save attendance.");
@@ -439,7 +460,7 @@ export const CourseModule = {
             try {
                 await apiFetch('/api/attendance/single', {
                     method: 'POST',
-                    body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
+                    body: JSON.stringify({ courseId, studentId, date: dateVal, status, points, isNoClass })
                 });
                 
                 CourseModule.saveDraft(courseId, dateVal);
@@ -460,6 +481,134 @@ export const CourseModule = {
                 btn.innerHTML = originalHtml;
             }
         }
+    },
+
+    renderTermMetrics: (term, data) => {
+        let termStart = '';
+        let termEnd = '';
+        
+        if (term === 'midterm') {
+            termStart = data.course.Midterm_Start;
+            termEnd = data.course.Midterm_End;
+        } else if (term === 'finalterm') {
+            termStart = data.course.Final_Start;
+            termEnd = data.course.Final_End;
+        }
+        
+        let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
+        let termTotalDays = 0;
+        let studentReqDays = 0;
+        let pct = 0;
+
+        if (termStart && termEnd) {
+            const tStart = new Date(termStart);
+            const tEnd = new Date(termEnd);
+            
+            const termSessions = data.sessions.filter(s => {
+                const sDate = new Date(s.Date);
+                return sDate >= tStart && sDate <= tEnd && s.Is_No_Class === 0;
+            });
+            termTotalDays = termSessions.length;
+
+            const termRecords = data.records.filter(r => {
+                const rDate = new Date(r.Date);
+                return rDate >= tStart && rDate <= tEnd;
+            });
+
+            termRecords.forEach(r => {
+                if (r.Status === 'Present') present++;
+                else if (r.Status === 'Late') late++;
+                else if (r.Status === 'Excused') excused++;
+                else if (r.Status === 'Absent') absent++;
+                
+                totalParticipationPts += (r.Performance_Points || 0);
+            });
+
+            studentReqDays = termTotalDays - excused;
+            if (studentReqDays < 0) studentReqDays = 0;
+
+            const attendanceScore = (present * 1) + (late * 0.5);
+            if (studentReqDays > 0) {
+                pct = ((attendanceScore / studentReqDays) * 100).toFixed(1);
+            }
+        }
+
+        document.getElementById(`${term}Present`).textContent = present;
+        document.getElementById(`${term}Late`).textContent = late;
+        document.getElementById(`${term}Excused`).textContent = excused;
+        document.getElementById(`${term}Absent`).textContent = absent;
+        document.getElementById(`${term}TotalDays`).textContent = studentReqDays;
+        document.getElementById(`${term}AttendancePct`).textContent = pct;
+        document.getElementById(`${term}ParticipationScore`).textContent = totalParticipationPts;
+    },
+
+    renderDetailsModal: (term, metric, data) => {
+        let termStart = '';
+        let termEnd = '';
+        let titleTerm = '';
+        
+        if (term === 'midterm') {
+            termStart = data.course.Midterm_Start;
+            termEnd = data.course.Midterm_End;
+            titleTerm = 'Mid Term';
+        } else {
+            termStart = data.course.Final_Start;
+            termEnd = data.course.Final_End;
+            titleTerm = 'Final Term';
+        }
+        
+        const titleMetric = metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown';
+        document.getElementById('detailsModalTitle').textContent = `${titleTerm} - ${titleMetric}`;
+        
+        const scoreHeader = document.getElementById('detailsScoreHeader');
+        if (metric === 'attendance') {
+            scoreHeader.textContent = "Attendance Score";
+        } else {
+            scoreHeader.textContent = "Points";
+        }
+
+        const tbody = document.getElementById('detailsTableBody');
+        tbody.innerHTML = '';
+
+        if (!termStart || !termEnd) {
+            tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">Term dates are not set for this course.</td></tr>`;
+            return;
+        }
+
+        const tStart = new Date(termStart);
+        const tEnd = new Date(termEnd);
+        
+        const termRecords = data.records.filter(r => {
+            const rDate = new Date(r.Date);
+            return rDate >= tStart && rDate <= tEnd;
+        });
+
+        if (termRecords.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">No records found for this period.</td></tr>`;
+            return;
+        }
+
+        const rowsHtml = termRecords.map(r => {
+            let statusColor = 'text-gray-600';
+            let attScore = 0;
+            
+            if (r.Status === 'Present') { statusColor = 'text-green-600 font-bold'; attScore = 1; }
+            else if (r.Status === 'Late') { statusColor = 'text-yellow-600 font-bold'; attScore = 0.5; }
+            else if (r.Status === 'Excused') { statusColor = 'text-purple-600 font-bold'; attScore = 0; }
+            else if (r.Status === 'Absent') { statusColor = 'text-red-600 font-bold'; attScore = 0; }
+            
+            const displayScore = metric === 'attendance' ? attScore : (r.Performance_Points || 0);
+
+            return `
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${r.Date}</td>
+                    <td class="px-3 py-2 text-center ${statusColor}">${r.Status || '--'}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${displayScore}</td>
+                </tr>
+            `;
+        }).join('');
+
+        tbody.innerHTML = rowsHtml;
     },
 
     exportRoster: async (courseId) => {
@@ -640,6 +789,7 @@ export const CourseModule = {
         const btn = document.getElementById('saveAttendanceBtn');
         const alertBox = document.getElementById('attendanceAlert');
         const dateVal = document.getElementById('attendanceDate').value;
+        const isNoClass = document.getElementById('noClassToggle').checked;
         const courseId = window.location.hash.replace('#class-', '');
         
         if (!dateVal) {
@@ -652,32 +802,34 @@ export const CourseModule = {
         const attendanceData = [];
         let missingCount = 0;
 
-        rows.forEach(row => {
-            const studentId = row.dataset.studentId;
-            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-            const pointsInput = row.querySelector('.points-input');
-            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-            
-            if (selectedBtn) {
-                attendanceData.push({
-                    studentId: studentId,
-                    status: selectedBtn.dataset.status,
-                    points: points
-                });
-            } else {
-                missingCount++;
+        if (!isNoClass) {
+            rows.forEach(row => {
+                const studentId = row.dataset.studentId;
+                const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+                const pointsInput = row.querySelector('.points-input');
+                const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
+                
+                if (selectedBtn) {
+                    attendanceData.push({
+                        studentId: studentId,
+                        status: selectedBtn.dataset.status,
+                        points: points
+                    });
+                } else {
+                    missingCount++;
+                }
+            });
+
+            if (missingCount > 0) {
+                const confirmProceed = window.confirm(`${missingCount} student(s) have no attendance marked. Do you want to proceed anyway? Unmarked students will not be saved.`);
+                if (!confirmProceed) return;
             }
-        });
 
-        if (missingCount > 0) {
-            const confirmProceed = window.confirm(`${missingCount} student(s) have no attendance marked. Do you want to proceed anyway? Unmarked students will not be saved.`);
-            if (!confirmProceed) return;
-        }
-
-        if (attendanceData.length === 0) {
-             alertBox.textContent = "No attendance data to save.";
-             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
-             return;
+            if (attendanceData.length === 0) {
+                 alertBox.textContent = "No attendance data to save.";
+                 alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
+                 return;
+            }
         }
 
         btn.disabled = true;
@@ -687,6 +839,7 @@ export const CourseModule = {
             const payload = {
                 courseId: courseId,
                 date: dateVal,
+                isNoClass: isNoClass,
                 records: attendanceData
             };
 
@@ -710,10 +863,22 @@ export const CourseModule = {
         try {
             const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}`);
             
+            const noClassToggle = document.getElementById('noClassToggle');
+            const container = document.getElementById('rosterListContainer');
+            
+            if (noClassToggle) {
+                noClassToggle.checked = data.isNoClass === true;
+                if (data.isNoClass === true) {
+                    container.classList.add('opacity-50', 'pointer-events-none');
+                } else {
+                    container.classList.remove('opacity-50', 'pointer-events-none');
+                }
+            }
+
             document.querySelectorAll('.student-row').forEach(row => {
                 const buttons = row.querySelectorAll('.attendance-btn');
                 buttons.forEach(btn => {
-                    btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400');
+                    btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
                     btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
                     btn.removeAttribute('data-selected');
                 });
@@ -721,7 +886,7 @@ export const CourseModule = {
                 if (pointsInput) pointsInput.value = '0';
                 
                 const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
-                if (presentBtn) {
+                if (presentBtn && !data.isNoClass) {
                     presentBtn.setAttribute('data-selected', 'true');
                     presentBtn.classList.replace('bg-gray-50', 'bg-green-100');
                     presentBtn.classList.replace('text-gray-600', 'text-green-800');
@@ -729,7 +894,7 @@ export const CourseModule = {
                 }
             });
 
-            if (data.records && data.records.length > 0) {
+            if (data.records && data.records.length > 0 && !data.isNoClass) {
                 document.querySelectorAll('.student-row').forEach(row => {
                      const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
                      if(presentBtn) {
@@ -752,6 +917,8 @@ export const CourseModule = {
                                 btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
                             } else if (record.Status === 'Absent') {
                                 btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
+                            } else if (record.Status === 'Excused') {
+                                btn.classList.add('bg-purple-100', 'text-purple-800', 'border-purple-400');
                             }
                         }
                         const pointsInput = row.querySelector('.points-input');
@@ -761,7 +928,7 @@ export const CourseModule = {
             }
 
             const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${date}`);
-            if (draftStr) {
+            if (draftStr && !data.isNoClass) {
                 try {
                     const draft = JSON.parse(draftStr);
                     let hasDraftChanges = false;
@@ -774,7 +941,7 @@ export const CourseModule = {
                             const r = draft[studentId];
                             const buttons = row.querySelectorAll('.attendance-btn');
                             buttons.forEach(btn => {
-                                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400');
+                                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
                                 btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
                                 btn.removeAttribute('data-selected');
                             });
@@ -790,6 +957,8 @@ export const CourseModule = {
                                         btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
                                     } else if (r.status === 'Absent') {
                                         btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
+                                    } else if (r.status === 'Excused') {
+                                        btn.classList.add('bg-purple-100', 'text-purple-800', 'border-purple-400');
                                     }
                                 }
                             }
