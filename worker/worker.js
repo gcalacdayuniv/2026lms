@@ -437,6 +437,50 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Attendance saved" }), { status: 201, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && url.pathname === "/api/attendance/single") {
+                const body = await request.json();
+                const { courseId, studentId, date, status, points } = body;
+                
+                if (!courseId || !studentId || !date) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?").bind(courseId, studentId, date).run();
+
+                if (status) {
+                    const attId = crypto.randomUUID();
+                    await env.DB.prepare(
+                        "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
+                    ).bind(attId, courseId, studentId, date, status, points || 0).run();
+                }
+                
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && url.pathname === "/api/student-summary") {
+                const courseId = url.searchParams.get("courseId");
+                const studentId = url.searchParams.get("studentId");
+                
+                if (!courseId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const records = await env.DB.prepare(
+                    "SELECT Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ?"
+                ).bind(courseId, studentId).all();
+
+                let present = 0, late = 0, absent = 0, totalPoints = 0;
+                
+                records.results.forEach(r => {
+                    if (r.Status === 'Present') present++;
+                    else if (r.Status === 'Late') late++;
+                    else if (r.Status === 'Absent') absent++;
+                    totalPoints += (r.Performance_Points || 0);
+                });
+
+                return new Response(JSON.stringify({ success: true, summary: { present, late, absent, totalPoints } }), { status: 200, headers: corsHeaders });
+            }
+
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
 
         } catch (err) {
