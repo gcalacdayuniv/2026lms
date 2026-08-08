@@ -1,1342 +1,937 @@
-// js/course.js
-import { apiFetch, AppState } from './globals.js';
-import { Components, getLoadableAvatarSrc } from './components.js'; 
+// js/components.js
 
-export const CourseModule = {
-    currentSummaryData: null,
-    
-    init: () => {
-        document.addEventListener('submit', CourseModule.handleForms);
-        document.addEventListener('click', CourseModule.handleClicks);
-        document.addEventListener('change', CourseModule.handleChanges);
-        document.addEventListener('input', CourseModule.handleInput);
-    },
-
-    // --- Utility Methods ---
-    
-    getDraftKey: (courseId, date) => `attendance_draft_${courseId}_${date}`,
-    
-    saveDraft: (courseId, date) => {
-        const draft = {};
-        document.querySelectorAll('.student-row').forEach(row => {
-            const studentId = row.dataset.studentId;
-            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-            const pointsInput = row.querySelector('.points-input');
-            
-            draft[studentId] = {
-                status: selectedBtn ? selectedBtn.dataset.status : null,
-                points: pointsInput ? (pointsInput.value || '0') : '0'
-            };
-        });
-        localStorage.setItem(CourseModule.getDraftKey(courseId, date), JSON.stringify(draft));
-    },
-    
-    clearDraft: (courseId, date) => {
-        localStorage.removeItem(CourseModule.getDraftKey(courseId, date));
-    },
-
-    updateManageStatusColor: (selectEl) => {
-        const status = selectEl.value;
-        selectEl.className = `w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition ${
-            status === 'Active' ? 'text-green-600 border-green-300 bg-green-50 focus:ring-green-500' : 
-            status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' :
-            status === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50 focus:ring-orange-500' :
-            status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' :
-            status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50'
-        }`;
-    },
-
-    getCourseIdFromHash: () => window.location.hash.replace('#class-', ''),
-
-    // --- Event Delegators ---
-
-    handleForms: async (e) => {
-        if (e.target.id === 'addCourseForm') {
-            e.preventDefault();
-            await CourseModule.createCourse();
-        } else if (e.target.id === 'addProgramForm') {
-            e.preventDefault();
-            await CourseModule.createProgram();
+// Helper function to bypass Google Drive's hotlinking block for legacy accounts
+export const getLoadableAvatarSrc = (src) => {
+    if (!src) return null;
+    if (src.includes('drive.google.com/uc')) {
+        const match = src.match(/[?&]id=([^&]+)/);
+        if (match && match[1]) {
+            return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
         }
-    },
+    }
+    return src;
+};
 
-    handleInput: async (e) => {
-        if (e.target.id === 'studentSearchInput') {
-            CourseModule.filterStudentList(e.target.value.toLowerCase());
-        } else if (e.target.classList.contains('points-input')) {
-            const courseId = CourseModule.getCourseIdFromHash();
-            const dateVal = document.getElementById('attendanceDate')?.value;
-            if (courseId && dateVal) CourseModule.saveDraft(courseId, dateVal);
-        }
-    },
+// --- Sub-components for Dashboard ---
 
-    handleChanges: async (e) => {
-        const courseId = CourseModule.getCourseIdFromHash();
+const DashboardUI = {
+    renderHeader: (user, headerAvatar) => `
+        <header class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
+            <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight"><i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard</h1>
+                    </div>
+                    <div class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200" id="profileToggleBtn">
+                        <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${user.Name}</span>
+                        ${headerAvatar}
+                    </div>
+                </div>
+            </div>
+        </header>
+    `,
 
-        if (['manageSeatInput', 'manageGroupInput', 'manageTopicInput'].includes(e.target.id)) {
-            await CourseModule.updateStudentInfo(courseId);
-        } else if (e.target.id === 'manageStatusSelect') {
-            await CourseModule.updateUserStatus(e.target);
-        } else if (['filterCourse', 'filterYear', 'filterSection', 'filterStatus'].includes(e.target.id)) {
-            await CourseModule.loadUnenrolledStudents(courseId);
-        } else if (e.target.id === 'attendanceDate') {
-            const date = e.target.value;
-            if (courseId && date) {
-                await CourseModule.loadAttendanceData(courseId, date);
-            }
-        }
-    },
+    renderProfilePanel: (user, panelAvatar, displayCourse, lecturerBtns) => `
+        <div id="profilePanelOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+        <div id="profilePanel" class="fixed inset-y-0 right-0 w-4/5 sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto flex flex-col">
+            <div class="p-6 bg-gradient-to-b from-blue-50 to-white flex-grow relative">
+                <button id="closeProfilePanel" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+                
+                <div class="text-center mt-6">
+                    ${panelAvatar}
+                    <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
+                </div>
+                
+                <div class="mt-8 px-2 space-y-4">
+                    <div class="flex justify-between items-start border-b border-gray-200 pb-4">
+                        <div class="flex-1 pr-1">
+                            <span class="block text-xs sm:text-sm font-bold text-blue-600">${user.role || 'N/A'}</span>
+                        </div>
+                        <div class="flex-1 text-center border-x border-gray-200 px-1">
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Student_Number || 'N/A'}</span>
+                        </div>
+                        <div class="flex-1 text-right pl-1">
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${displayCourse}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row justify-between items-start space-y-2 sm:space-y-0">
+                        <div class="flex-1 pr-2 w-full">
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Email || 'N/A'}</span>
+                        </div>
+                        <div class="flex-1 text-left sm:text-right sm:border-l border-gray-200 sm:pl-2 w-full">
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${user.Contact_Number || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
 
-    handleClicks: async (e) => {
-        // Enrollment Actions
-        if (e.target.classList.contains('enroll-btn')) await CourseModule.onStudentEnrollClick(e.target);
-        if (e.target.closest('.lecturer-enroll-btn')) await CourseModule.onLecturerEnrollClick(e.target.closest('.lecturer-enroll-btn'));
-        
-        // Course Menu
-        if (e.target.closest('#openCourseMenuBtn')) document.getElementById('courseMenuModal').classList.remove('hidden');
-        if (e.target.closest('#closeCourseMenuBtn') || e.target.id === 'closeCourseMenuBg') document.getElementById('courseMenuModal').classList.add('hidden');
-        if (e.target.closest('#saveCourseTermsBtn')) await CourseModule.saveCourseTerms(e.target.closest('#saveCourseTermsBtn'));
-        if (e.target.closest('#exportRosterBtn')) await CourseModule.onExportRosterClick(e.target.closest('#exportRosterBtn'));
+                ${lecturerBtns}
 
-        // No Class Management
-        if (e.target.closest('#openNoClassModalBtn')) await CourseModule.openNoClassModal();
-        if (e.target.closest('#closeNoClassModalBtn') || e.target.id === 'closeNoClassModalBg') await CourseModule.closeNoClassModal();
-        if (e.target.closest('#addNoClassBtn')) await CourseModule.addNoClassDate(e.target.closest('#addNoClassBtn'));
-        if (e.target.closest('.remove-no-class-btn')) await CourseModule.removeNoClassDate(e.target.closest('.remove-no-class-btn'));
-
-        // Student Management
-        if (e.target.closest('.manage-student-btn')) CourseModule.openManageStudentModal(e.target.closest('.manage-student-btn'));
-        if (e.target.closest('#closeManageStudentModalBtn') || e.target.id === 'closeManageStudentModalBg') await CourseModule.closeManageStudentModal();
-        if (e.target.closest('#manageResetPwdBtn')) await CourseModule.resetStudentPassword(e.target.closest('#manageResetPwdBtn'));
-        if (e.target.closest('#manageRemoveBtn')) await CourseModule.removeStudentFromCourse(e.target.closest('#manageRemoveBtn'));
-        if (e.target.closest('#openAddStudentModalBtn')) await CourseModule.openAddStudentModal();
-        if (e.target.closest('#closeAddStudentModalBtn') || e.target.id === 'closeAddStudentModalBg') CourseModule.closeAddStudentModal();
-
-        // Summary & Details
-        if (e.target.closest('.view-summary-trigger')) await CourseModule.openSummaryModal(e.target.closest('.view-summary-trigger'));
-        if (e.target.closest('#closeSummaryModalBtn') || e.target.id === 'closeSummaryModalBg') document.getElementById('summaryModal').classList.add('hidden');
-        if (e.target.closest('.view-details-trigger')) CourseModule.openDetailsModal(e.target.closest('.view-details-trigger'));
-        if (e.target.closest('#closeDetailsModalBtn') || e.target.id === 'closeDetailsModalBg') document.getElementById('detailsModal').classList.add('hidden');
-
-        // Attendance
-        if (e.target.classList.contains('attendance-btn')) CourseModule.toggleAttendanceStatus(e.target);
-        if (e.target.id === 'markAllPresent') CourseModule.markAllPresent();
-        if (e.target.closest('#saveAttendanceBtn')) await CourseModule.saveAttendance();
-        if (e.target.closest('.save-single-attendance-btn')) await CourseModule.saveSingleAttendance(e.target.closest('.save-single-attendance-btn'));
-    },
-
-    // --- Specific Action Handlers ---
-
-    filterStudentList: (searchTerm) => {
-        const items = document.querySelectorAll('.student-enroll-item');
-        items.forEach(item => {
-            const text = item.innerText.toLowerCase();
-            item.style.display = text.includes(searchTerm) ? 'flex' : 'none';
-        });
-    },
-
-    updateStudentInfo: async (courseId) => {
-        const studentId = document.getElementById('manageStudentId').value;
-        const seatNumber = document.getElementById('manageSeatInput').value.trim();
-        const groupName = document.getElementById('manageGroupInput').value.trim();
-        const assignedTopic = document.getElementById('manageTopicInput').value.trim();
-        
-        try {
-            await apiFetch('/api/update-student-info', {
-                method: 'POST',
-                body: JSON.stringify({ courseId, studentId, seatNumber, groupName, assignedTopic })
-            });
-        } catch (err) {
-            console.error('Failed to update student info:', err);
-        }
-    },
-
-    updateUserStatus: async (selectEl) => {
-        const studentId = document.getElementById('manageStudentId').value;
-        const status = selectEl.value;
-        CourseModule.updateManageStatusColor(selectEl);
-        
-        try {
-            await apiFetch('/api/update-user-status', {
-                method: 'POST',
-                body: JSON.stringify({ studentId, status })
-            });
-        } catch (err) {
-            console.error('Failed to update user status:', err);
-            alert('Failed to update student status.');
-        }
-    },
-
-    onStudentEnrollClick: async (btn) => {
-        const confirmation = window.confirm("Are you sure you want to enroll in this Course? This action cannot be undone.");
-        if (!confirmation) return;
-        
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        await CourseModule.enrollCourse(btn.dataset.id);
-    },
-
-    onLecturerEnrollClick: async (btn) => {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        const courseId = CourseModule.getCourseIdFromHash();
-        const studentId = btn.dataset.studentId;
-        
-        try {
-            await apiFetch('/api/enroll', { 
-                method: 'POST', 
-                body: JSON.stringify({ courseId, studentId }) 
-            });
-            await CourseModule.loadClassScreen(courseId, true);
-        } catch (err) {
-            alert(err.message);
-            btn.disabled = false;
-            btn.innerHTML = 'Enroll';
-        }
-    },
-
-    saveCourseTerms: async (btn) => {
-        const alertBox = document.getElementById('courseMenuAlert');
-        const courseId = CourseModule.getCourseIdFromHash();
-        const payload = {
-            courseId: courseId,
-            midtermStart: document.getElementById('midtermStart').value,
-            midtermEnd: document.getElementById('midtermEnd').value,
-            finalStart: document.getElementById('finalStart').value,
-            finalEnd: document.getElementById('finalEnd').value
-        };
-
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
-
-        try {
-            await apiFetch('/api/update-course-terms', { method: 'POST', body: JSON.stringify(payload) });
-            alertBox.textContent = "Term periods saved securely.";
-            alertBox.className = "mb-3 p-2 rounded text-xs font-bold bg-green-100 text-green-800 block fade-in";
-        } catch (err) {
-            alertBox.textContent = "Failed to save: " + err.message;
-            alertBox.className = "mb-3 p-2 rounded text-xs font-bold bg-red-100 text-red-800 block fade-in";
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-            setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
-        }
-    },
-
-    onExportRosterClick: async (btn) => {
-        const courseId = btn.dataset.courseId;
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
-        await CourseModule.exportRoster(courseId);
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-    },
-
-    openNoClassModal: async () => {
-        document.getElementById('courseMenuModal').classList.add('hidden');
-        document.getElementById('noClassModal').classList.remove('hidden');
-        await CourseModule.loadNoClassDays(CourseModule.getCourseIdFromHash());
-    },
-
-    closeNoClassModal: async () => {
-        document.getElementById('noClassModal').classList.add('hidden');
-        const courseId = CourseModule.getCourseIdFromHash();
-        const dateInput = document.getElementById('attendanceDate');
-        if (dateInput && dateInput.value) {
-            await CourseModule.loadAttendanceData(courseId, dateInput.value);
-        }
-    },
-
-    addNoClassDate: async (btn) => {
-        const dateInput = document.getElementById('addNoClassDate');
-        if (!dateInput.value) return;
-        const courseId = CourseModule.getCourseIdFromHash();
-        const originalHtml = btn.innerHTML;
-        
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        try {
-            await apiFetch('/api/no-class', {
-                method: 'POST',
-                body: JSON.stringify({ courseId, date: dateInput.value })
-            });
-            dateInput.value = '';
-            await CourseModule.loadNoClassDays(courseId);
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
-    },
-
-    removeNoClassDate: async (btn) => {
-        const date = btn.dataset.date;
-        const courseId = CourseModule.getCourseIdFromHash();
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        try {
-            await apiFetch('/api/no-class', {
-                method: 'DELETE',
-                body: JSON.stringify({ courseId, date })
-            });
-            await CourseModule.loadNoClassDays(courseId);
-        } catch (err) {
-            alert(err.message);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
-        }
-    },
-
-    openManageStudentModal: (btn) => {
-        document.getElementById('manageStudentName').textContent = btn.dataset.name;
-        document.getElementById('manageStudentId').value = btn.dataset.studentId;
-        document.getElementById('manageSeatInput').value = btn.dataset.seat;
-        document.getElementById('manageGroupInput').value = btn.dataset.group;
-        document.getElementById('manageTopicInput').value = btn.dataset.topic;
-        
-        const statusSelect = document.getElementById('manageStatusSelect');
-        statusSelect.value = btn.dataset.status;
-        CourseModule.updateManageStatusColor(statusSelect);
-        document.getElementById('manageStudentModal').classList.remove('hidden');
-    },
-
-    closeManageStudentModal: async () => {
-        document.getElementById('manageStudentModal').classList.add('hidden');
-        await CourseModule.loadClassScreen(CourseModule.getCourseIdFromHash(), true); 
-    },
-
-    resetStudentPassword: async (btn) => {
-        const studentId = document.getElementById('manageStudentId').value;
-        if (!window.confirm("Are you sure you want to reset this student's password to '123456'?")) return;
-        
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        
-        try {
-            await apiFetch('/api/reset-student-password', { method: 'POST', body: JSON.stringify({ studentId }) });
-            alert("Password successfully reset to 123456.");
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
-    },
-
-    removeStudentFromCourse: async (btn) => {
-        const studentId = document.getElementById('manageStudentId').value;
-        const courseId = CourseModule.getCourseIdFromHash();
-        
-        if (!window.confirm("Are you sure you want to remove this student from the course?")) return;
-        
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        
-        try {
-            await apiFetch('/api/unenroll', { method: 'POST', body: JSON.stringify({ courseId, studentId }) });
-            document.getElementById('manageStudentModal').classList.add('hidden');
-            await CourseModule.loadClassScreen(courseId, true);
-        } catch (err) {
-            alert(err.message);
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
-    },
-
-    openAddStudentModal: async () => {
-        document.getElementById('courseMenuModal').classList.add('hidden');
-        document.getElementById('addStudentModal').classList.remove('hidden');
-        const courseId = CourseModule.getCourseIdFromHash();
-        
-        const filterCourse = document.getElementById('filterCourse');
-        if (filterCourse && filterCourse.options.length <= 1) {
-            try {
-                const programsData = await apiFetch('/api/programs');
-                if (programsData.programs) {
-                    filterCourse.innerHTML = '<option value="">Course (All)</option>' + 
-                        programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-                }
-            } catch(err) {}
-        }
-        await CourseModule.loadUnenrolledStudents(courseId);
-    },
-
-    closeAddStudentModal: () => {
-        document.getElementById('addStudentModal').classList.add('hidden');
-        document.getElementById('studentSearchInput').value = '';
-        document.getElementById('filterStatus').value = 'Active';
-        document.getElementById('filterCourse').value = '';
-        document.getElementById('filterYear').value = '';
-        document.getElementById('filterSection').value = '';
-    },
-
-    openSummaryModal: async (trigger) => {
-        const name = trigger.dataset.name;
-        if (!window.confirm(`Load performance summary for ${name}?`)) return;
-
-        const studentId = trigger.closest('.student-row').dataset.studentId;
-        const courseId = CourseModule.getCourseIdFromHash();
-        
-        document.getElementById('summaryStudentName').textContent = name;
-        document.getElementById('summaryModal').classList.remove('hidden');
-        document.getElementById('summaryLoading').classList.remove('hidden');
-        document.getElementById('summaryContent').classList.add('hidden');
-        document.getElementById('summaryError').classList.add('hidden');
-        
-        CourseModule.currentSummaryData = null;
-
-        try {
-            const ts = new Date().getTime();
-            const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}&_t=${ts}`);
-            CourseModule.currentSummaryData = data;
-            
-            CourseModule.renderTermMetrics('midterm', data);
-            CourseModule.renderTermMetrics('finalterm', data);
-
-            document.getElementById('summaryLoading').classList.add('hidden');
-            document.getElementById('summaryContent').classList.remove('hidden');
-        } catch(err) {
-            console.error("Failed to load summary", err);
-            const errDiv = document.getElementById('summaryError');
-            errDiv.textContent = err.message || "Failed to load summary records.";
-            errDiv.classList.remove('hidden');
-            document.getElementById('summaryLoading').classList.add('hidden');
-        }
-    },
-
-    openDetailsModal: (trigger) => {
-        if (CourseModule.currentSummaryData) {
-            CourseModule.renderDetailsModal(trigger.dataset.term, trigger.dataset.metric, CourseModule.currentSummaryData);
-            document.getElementById('detailsModal').classList.remove('hidden');
-        }
-    },
-
-    toggleAttendanceStatus: (btn) => {
-        const row = btn.closest('.student-row');
-        const buttons = row.querySelectorAll('.attendance-btn');
-        
-        buttons.forEach(b => {
-            b.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
-            b.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-            b.removeAttribute('data-selected');
-        });
-        
-        const status = btn.dataset.status;
-        btn.setAttribute('data-selected', 'true');
-        
-        if (status === 'Present') {
-            btn.classList.replace('bg-gray-50', 'bg-green-100');
-            btn.classList.replace('text-gray-600', 'text-green-800');
-            btn.classList.replace('border-gray-200', 'border-green-400');
-        } else if (status === 'Late') {
-            btn.classList.replace('bg-gray-50', 'bg-yellow-100');
-            btn.classList.replace('text-gray-600', 'text-yellow-800');
-            btn.classList.replace('border-gray-200', 'border-yellow-400');
-        } else if (status === 'Absent') {
-            btn.classList.replace('bg-gray-50', 'bg-red-100');
-            btn.classList.replace('text-gray-600', 'text-red-800');
-            btn.classList.replace('border-gray-200', 'border-red-400');
-        } else if (status === 'Excused') {
-            btn.classList.replace('bg-gray-50', 'bg-purple-100');
-            btn.classList.replace('text-gray-600', 'text-purple-800');
-            btn.classList.replace('border-gray-200', 'border-purple-400');
-        }
-
-        const courseId = CourseModule.getCourseIdFromHash();
-        const dateVal = document.getElementById('attendanceDate')?.value;
-        if (courseId && dateVal) CourseModule.saveDraft(courseId, dateVal);
-    },
-
-    markAllPresent: () => {
-        document.querySelectorAll('.student-row').forEach(row => {
-            const presentBtn = row.querySelector('[data-status="Present"]');
-            if (presentBtn) presentBtn.click();
-        });
-        const courseId = CourseModule.getCourseIdFromHash();
-        const dateVal = document.getElementById('attendanceDate')?.value;
-        if (courseId && dateVal) CourseModule.saveDraft(courseId, dateVal);
-    },
-
-    saveSingleAttendance: async (btn) => {
-        const row = btn.closest('.student-row');
-        const studentId = row.dataset.studentId;
-        const courseId = CourseModule.getCourseIdFromHash();
-        const dateVal = document.getElementById('attendanceDate').value;
-        const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-        const pointsInput = row.querySelector('.points-input');
-        const banner = document.getElementById('noClassBanner');
-        
-        if (!dateVal) return alert("Please select a date first to save attendance.");
-        if (banner && !banner.classList.contains('hidden')) return alert("This date is marked as NO CLASS. Adjust it in the Course Actions menu.");
-        
-        const status = selectedBtn ? selectedBtn.dataset.status : null;
-        const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-        
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        
-        try {
-            await apiFetch('/api/attendance/single', {
-                method: 'POST',
-                body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
-            });
-            
-            CourseModule.saveDraft(courseId, dateVal);
-
-            btn.classList.replace('text-blue-600', 'text-green-600');
-            btn.classList.replace('bg-blue-50', 'bg-green-50');
-            btn.classList.replace('border-blue-200', 'border-green-200');
-            
-            setTimeout(() => {
-                btn.classList.replace('text-green-600', 'text-blue-600');
-                btn.classList.replace('bg-green-50', 'bg-blue-50');
-                btn.classList.replace('border-green-200', 'border-blue-200');
-            }, 2000);
-        } catch (err) {
-            alert("Failed to save individually: " + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
-    },
-
-    // --- Complex Domain Logic ---
-
-    loadNoClassDays: async (courseId) => {
-        const list = document.getElementById('noClassList');
-        if (!list) return;
-        
-        list.innerHTML = '<div class="text-center py-4 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading...</div>';
-        
-        try {
-            const ts = new Date().getTime();
-            const data = await apiFetch(`/api/no-class?courseId=${courseId}&_t=${ts}`);
-            
-            if (!data.dates || data.dates.length === 0) {
-                list.innerHTML = '<div class="text-center py-4 text-xs font-medium text-gray-500 italic">No dates currently set.</div>';
-                return;
-            }
-            
-            list.innerHTML = data.dates.map(d => `
-                <div class="flex justify-between items-center bg-white p-2 border border-gray-200 rounded">
-                    <span class="font-bold text-sm text-gray-700"><i class="fa-regular fa-calendar text-gray-400 mr-2"></i> ${d.Date}</span>
-                    <button type="button" class="remove-no-class-btn text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition focus:outline-none" data-date="${d.Date}">
-                        <i class="fa-solid fa-trash"></i>
+                <div class="mt-6">
+                    <button id="openCpModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-lock text-gray-400 mr-2 mt-0.5"></i> Change Password
                     </button>
                 </div>
-            `).join('');
+            </div>
             
-        } catch (err) {
-            list.innerHTML = `<div class="text-red-500 text-xs font-bold text-center py-2">${err.message}</div>`;
-        }
-    },
+            <div class="p-4 border-t border-gray-200 bg-white">
+                <button id="logoutBtn" class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none transition-colors">
+                    <i class="fa-solid fa-power-off mr-2"></i> Log Out
+                </button>
+            </div>
+        </div>
+    `,
 
-    renderTermMetrics: (term, data) => {
-        const course = data.course || {};
-        const sessions = data.sessions || [];
-        const records = data.records || [];
-        
-        let termStart = term === 'midterm' ? (course.Midterm_Start || '') : (course.Final_Start || '');
-        let termEnd = term === 'midterm' ? (course.Midterm_End || '') : (course.Final_End || '');
-        
-        const parseLocalDate = (dateStr) => {
-            if (!dateStr) return null;
-            if (dateStr.includes('-')) {
-                const [y, m, d] = dateStr.split('-');
-                return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
-            }
-            const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? null : d;
-        };
-        
-        let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
-        let classDays = 0;
-        let pct = 0;
-
-        if (termStart && termEnd) {
-            const tStart = parseLocalDate(termStart);
-            const tEnd = parseLocalDate(termEnd);
-            
-            const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
-            const dayStr = (course.ScheduleDay || '').trim().toLowerCase();
-            const targetDay = dayMap[dayStr];
-
-            let theoreticalDays = 0;
-            
-            if (targetDay !== undefined && tStart && tEnd) {
-                let currentDate = new Date(tStart.getFullYear(), tStart.getMonth(), tStart.getDate());
-                let endDate = new Date(tEnd.getFullYear(), tEnd.getMonth(), tEnd.getDate());
+    renderManageUsersModal: () => `
+        <div id="muModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-2 sm:p-4">
+            <div id="muModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users-gear text-green-600 mr-2"></i>Manage Users</h3>
+                    <button id="closeMuModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
                 
-                while (currentDate <= endDate) {
-                    if (currentDate.getDay() === targetDay) theoreticalDays++;
-                    currentDate.setDate(currentDate.getDate() + 1);
-                }
-            }
+                <div class="mb-4 flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="muSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                    <select id="muFilterStatus" class="w-full sm:w-40 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                        <option value="">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Suspended">Suspended</option>
+                        <option value="UD">UD</option>
+                        <option value="Dropped">Dropped</option>
+                    </select>
+                </div>
 
-            let noClassDaysCount = 0;
-            sessions.forEach(s => {
-                if (s.Is_No_Class === 1) {
-                    const sDate = parseLocalDate(s.Date);
-                    if (sDate && tStart && tEnd && sDate >= tStart && sDate <= tEnd && sDate.getDay() === targetDay) {
-                        noClassDaysCount++;
-                    }
-                }
-            });
+                <div id="manageUsersList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    `,
 
-            const baseClassDays = theoreticalDays - noClassDaysCount;
+    renderChangePasswordModal: () => `
+        <div id="cpModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
+            <div id="cpModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-shield-halved text-blue-600 mr-2"></i>Change Password</h3>
+                    <button id="closeCpModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="changePasswordForm" class="space-y-4">
+                    <div id="cpError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    <div id="cpSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Current Password</label>
+                        <input type="password" id="cpCurrent" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">New Password</label>
+                        <input type="password" id="cpNew" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Repeat New Password</label>
+                        <input type="password" id="cpRepeat" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    
+                    <button type="submit" id="cpSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
+                        Update Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    `,
 
-            const termRecords = records.filter(r => {
-                const rDate = parseLocalDate(r.Date);
-                if (!rDate || !tStart || !tEnd) return false;
-                return rDate >= tStart && rDate <= tEnd;
-            });
+    renderCreateCourseModal: () => `
+        <div id="ccModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
+            <div id="ccModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-folder-plus text-blue-600 mr-2"></i>Create Course</h3>
+                    <button id="closeCcModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="addCourseForm" class="space-y-4">
+                    <div id="courseError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course Code</label>
+                        <input type="text" id="courseCode" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. CS101">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course Title</label>
+                        <input type="text" id="courseTitle" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. Introduction to Programming">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Schedule Day</label>
+                            <select id="scheduleDay" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                                <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+                                <option>Thursday</option><option>Friday</option><option>Saturday</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Time Period</label>
+                            <input type="text" id="timePeriod" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="9:00 AM - 12:00 PM">
+                        </div>
+                    </div>
 
-            termRecords.forEach(r => {
-                if (r.Status === 'Present') present++;
-                else if (r.Status === 'Late') late++;
-                else if (r.Status === 'Excused') excused++;
-                else if (r.Status === 'Absent') absent++;
-                totalParticipationPts += (r.Performance_Points || 0);
-            });
+                    <div class="border-t border-gray-200 pt-4 mt-4">
+                        <p class="text-xs font-bold text-gray-800 mb-2 uppercase">Target Audience (Restriction)</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Course</label>
+                                <select id="targetCourse" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                                    <option value="">All Courses</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Year</label>
+                                <input type="text" id="targetYear" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. 1">
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Section</label>
+                            <input type="text" id="targetSection" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. A">
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-1 italic">*Leave blank to make it available to all students.</p>
+                    </div>
+                    
+                    <button type="submit" id="addCourseBtn" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors mt-4">
+                        Create Course
+                    </button>
+                </form>
+            </div>
+        </div>
+    `,
 
-            classDays = baseClassDays - excused;
-            if (classDays < 0) classDays = 0;
+    renderAddProgramModal: () => `
+        <div id="apModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
+            <div id="apModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-graduation-cap text-purple-600 mr-2"></i>Add Course (Program)</h3>
+                    <button id="closeApModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="addProgramForm" class="space-y-4">
+                    <div id="programError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    <div id="programSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course / Program Code</label>
+                        <input type="text" id="programCode" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 text-sm uppercase" placeholder="e.g. BSCS">
+                    </div>
+                    
+                    <button type="submit" id="addProgramBtn" class="w-full bg-purple-600 text-white py-2.5 px-4 rounded-md hover:bg-purple-700 shadow-sm font-bold transition-colors mt-4">
+                        Add to Registration List
+                    </button>
+                </form>
+            </div>
+        </div>
+    `
+};
 
-            const attendanceScore = (present * 1) + (late * 0.5);
-            if (classDays > 0) {
-                pct = ((attendanceScore / classDays) * 100).toFixed(1);
-            }
+// --- Sub-components for Class Screen ---
+
+const ClassUI = {
+    renderCourseMenuModal: (course) => `
+        <div id="courseMenuModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
+            <div id="closeCourseMenuBg" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-layer-group text-blue-600 mr-2"></i>Course Actions</h3>
+                    <button id="closeCourseMenuBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-3 mb-6">
+                    <button id="openAddStudentModalBtn" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
+                    </button>
+                    <button id="exportRosterBtn" data-course-id="${course.Course_ID}" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-print mr-2"></i> Print Roster
+                    </button>
+                    <button id="openNoClassModalBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-calendar-xmark mr-2"></i> Manage No Class Days
+                    </button>
+                </div>
+
+                <div class="border-t border-gray-200 pt-5">
+                    <h4 class="text-sm font-bold text-gray-800 mb-3"><i class="fa-regular fa-calendar-days text-purple-600 mr-2"></i>Term Period Settings</h4>
+                    <div id="courseMenuAlert" class="hidden text-xs mb-3 p-2 rounded"></div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Mid Term</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="date" id="midtermStart" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Midterm_Start || ''}">
+                                <span class="text-gray-400 text-xs font-bold">to</span>
+                                <input type="date" id="midtermEnd" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Midterm_End || ''}">
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Final Term</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="date" id="finalStart" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Final_Start || ''}">
+                                <span class="text-gray-400 text-xs font-bold">to</span>
+                                <input type="date" id="finalEnd" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Final_End || ''}">
+                            </div>
+                        </div>
+                        <button type="button" id="saveCourseTermsBtn" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                            Save Term Periods
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderNoClassModal: () => `
+        <div id="noClassModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeNoClassModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-xmark text-orange-600 mr-2"></i>No Class Days</h3>
+                    <button id="closeNoClassModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="flex gap-2 mb-4">
+                    <input type="date" id="addNoClassDate" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                    <button type="button" id="addNoClassBtn" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-bold transition">Add</button>
+                </div>
+                
+                <div id="noClassList" class="flex-1 overflow-y-auto space-y-2 bg-gray-50 p-2 rounded border border-gray-200 min-h-[150px] max-h-[300px]">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderManageStudentModal: () => `
+        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeManageStudentModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-gear text-blue-600 mr-2"></i>Manage Student</h3>
+                    <button id="closeManageStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="manageStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
+                <input type="hidden" id="manageStudentId">
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Seat</label>
+                            <input type="text" id="manageSeatInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Group</label>
+                            <input type="text" id="manageGroupInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Topic</label>
+                            <input type="text" id="manageTopicInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="Assigned">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
+                        <select id="manageStatusSelect" class="w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Suspended">Suspended</option>
+                            <option value="UD">UD</option>
+                            <option value="Dropped">Dropped</option>
+                        </select>
+                    </div>
+                    
+                    <div class="border-t border-gray-200 pt-4 mt-4 flex flex-col space-y-2">
+                        <button type="button" id="manageResetPwdBtn" class="w-full py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded text-sm font-bold border border-red-200 transition focus:outline-none">
+                            <i class="fa-solid fa-key mr-2"></i> Reset Password
+                        </button>
+                        <button type="button" id="manageRemoveBtn" class="w-full py-2 bg-white text-gray-500 hover:bg-red-600 hover:text-white rounded text-sm font-bold border border-gray-300 hover:border-red-600 transition focus:outline-none">
+                            <i class="fa-solid fa-trash mr-2"></i> Remove from Course
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderSummaryModal: () => `
+        <div id="summaryModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSummaryModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>Performance Summary</h3>
+                    <button id="closeSummaryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="summaryStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
+                
+                <div id="summaryLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+                <div id="summaryError" class="hidden text-center py-6 text-red-500 font-bold"></div>
+
+                <div id="summaryContent" class="hidden space-y-4">
+                    <!-- Mid Term -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
+                        
+                        <div class="space-y-2">
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="participation" title="Click to view participation details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
+                                        <span class="font-black text-blue-600 text-base block mt-0.5" id="midtermParticipationScore">...</span>
+                                    </div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="attendance" title="Click to view attendance details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
+                                        <span class="font-black text-blue-600 text-base block mt-0.5"><span id="midtermAttendancePct">...</span>%</span>
+                                        <div class="text-[8px] text-gray-500 mt-0.5"><span id="midtermPresent">0</span>P, <span id="midtermLate">0</span>L, <span id="midtermExcused">0</span>E, <span id="midtermAbsent">0</span>A</div>
+                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="midtermTotalDays">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-2 border rounded flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
+                                <span class="font-bold text-sm">...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Final Term -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star text-yellow-500 mr-2"></i>Final Term</h4>
+                        
+                        <div class="space-y-2">
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="participation" title="Click to view participation details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
+                                        <span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermParticipationScore">...</span>
+                                    </div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="attendance" title="Click to view attendance details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
+                                        <span class="font-black text-yellow-600 text-base block mt-0.5"><span id="finaltermAttendancePct">...</span>%</span>
+                                        <div class="text-[8px] text-gray-500 mt-0.5"><span id="finaltermPresent">0</span>P, <span id="finaltermLate">0</span>L, <span id="finaltermExcused">0</span>E, <span id="finaltermAbsent">0</span>A</div>
+                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="finaltermTotalDays">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-2 border rounded flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
+                                <span class="font-bold text-sm">...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderDetailsModal: () => `
+        <div id="detailsModal" class="hidden fixed inset-0 z-[90] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeDetailsModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800" id="detailsModalTitle">Details</h3>
+                    <button id="closeDetailsModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div class="overflow-y-auto flex-1 bg-gray-50 border border-gray-200 rounded-lg">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm">
+                            <tr>
+                                <th class="px-3 py-2">Date</th>
+                                <th class="px-3 py-2 text-center">Status / Info</th>
+                                <th class="px-3 py-2 text-center" id="detailsScoreHeader">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailsTableBody" class="divide-y divide-gray-200 bg-white">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderAddStudentModal: () => `
+        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-2 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm modal-backdrop" id="closeAddStudentModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
+                    <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-4 flex flex-col md:flex-row gap-2">
+                    <input type="text" id="studentSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <select id="filterStatus" class="w-full sm:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                            <option value="Active">Active Only</option>
+                            <option value="">All Statuses</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Suspended">Suspended</option>
+                            <option value="UD">UD</option>
+                            <option value="Dropped">Dropped</option>
+                        </select>
+                        <select id="filterCourse" class="w-full sm:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                            <option value="">Course (All)</option>
+                        </select>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <input type="text" id="filterYear" placeholder="Year" class="w-full sm:w-20 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                            <input type="text" id="filterSection" placeholder="Section" class="w-full sm:w-24 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="unenrolledStudentsList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
+                    <div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>
+                </div>
+            </div>
+        </div>
+    `
+};
+
+export const Components = {
+    renderLogin: () => `
+        <div class="flex flex-col justify-center items-center min-h-screen p-4">
+            <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in">
+                <div class="text-center mb-8">
+                    <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
+                    <p class="text-gray-500 text-sm">Please sign in to your account</p>
+                </div>
+                <form id="loginForm" class="space-y-4">
+                    <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Username, Email, Contact, or Student No.</label>
+                        <input type="text" id="loginIdentifier" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Password</label>
+                        <div class="relative">
+                            <input type="password" id="loginPassword" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
+                            <button type="button" id="toggleLoginPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600 mt-1 focus:outline-none">
+                                <i class="fa-solid fa-eye" id="loginPasswordEye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Sign In
+                    </button>
+                </form>
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-600">Don't have an account? <a href="#register" class="text-blue-600 font-medium hover:text-blue-500">Register here</a></p>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderRegister: () => `
+        <div class="flex flex-col justify-center items-center min-h-screen p-4">
+            <div class="w-full max-w-lg bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in my-8">
+                <div class="text-center mb-8">
+                    <i class="fa-solid fa-user-plus text-4xl text-green-600 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-800">Create Account</h2>
+                    <p class="text-gray-500 text-sm">Fill in your details to register</p>
+                </div>
+                <form id="registerForm" class="space-y-4">
+                    <div id="registerError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
+                    <div id="registerSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm">Registration successful! Redirecting to login...</div>
+                    
+                    <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-3">Profile Photo (Required)</label>
+                        <div class="flex justify-center mb-3">
+                            <img id="avatarPreview" class="hidden w-24 h-24 rounded-full object-cover aspect-square border-2 border-green-500 shadow-sm" />
+                        </div>
+                        <div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full">
+                            <button type="button" id="btnCamera" class="w-full sm:w-auto px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
+                                <i class="fa-solid fa-camera mr-2"></i> Camera
+                            </button>
+                            <button type="button" id="btnFile" class="w-full sm:w-auto px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none">
+                                <i class="fa-solid fa-upload mr-2"></i> File
+                            </button>
+                        </div>
+                        <input type="file" id="regCameraInput" accept="image/*" capture="camera" class="hidden" />
+                        <input type="file" id="regFileInput" accept="image/*" class="hidden" />
+                        <input type="hidden" id="regAvatarBase64" />
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Given Name</label>
+                            <input type="text" id="regGivenName" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Last Name</label>
+                            <input type="text" id="regLastName" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Suffix</label>
+                            <input type="text" id="regSuffix" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. Jr. (Optional)">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Username</label>
+                            <input type="text" id="regUsername" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" id="regEmail" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Student Number</label>
+                            <input type="text" id="regStudentNo" required placeholder="00-0000" maxlength="7" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Contact Number</label>
+                            <input type="text" id="regContact" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="regPassword" required minlength="6" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Course</label>
+                            <select id="regCourse" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="" disabled selected>Loading courses...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Year</label>
+                            <select id="regYear" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="" disabled selected>Select Year</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Section</label>
+                            <select id="regSection" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="" disabled selected>Select Section</option>
+                                ${Array.from({length: 30}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Eye Condition</label>
+                            <select id="regEyeCondition" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="" disabled selected>Select Condition</option>
+                                <option value="No Eye Condition">No Eye Condition</option>
+                                <option value="Near Sighted">Near Sighted</option>
+                                <option value="Far Sighted">Far Sighted</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
+                        Create Account
+                    </button>
+                </form>
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-600">Already have an account? <a href="#login" class="text-green-600 font-medium hover:text-green-500">Sign in here</a></p>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderDashboard: (user) => {
+        const avatarSrc = getLoadableAvatarSrc(user.Avatar);
+        const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
+        
+        let displayCourse = 'N/A';
+        if (user.course) {
+            displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
+        }
+        
+        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${user.Name}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
+
+        let lecturerBtns = '';
+        if (user.role.toLowerCase() === 'lecturer') {
+            lecturerBtns = `
+                <div class="mt-6">
+                    <button id="openCreateCourseModalBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <button id="openApModalBtn" class="w-full flex justify-center py-2 px-4 border border-purple-300 rounded-md shadow-sm text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-graduation-cap mr-2 mt-0.5"></i> Add Registration Course List
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <button id="openMuModalBtn" class="w-full flex justify-center py-2 px-4 border border-green-300 rounded-md shadow-sm text-sm font-bold text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-users-gear mr-2 mt-0.5"></i> Manage Users
+                    </button>
+                </div>
+            `;
         }
 
-        document.getElementById(`${term}Present`).textContent = present;
-        document.getElementById(`${term}Late`).textContent = late;
-        document.getElementById(`${term}Excused`).textContent = excused;
-        document.getElementById(`${term}Absent`).textContent = absent;
-        document.getElementById(`${term}TotalDays`).textContent = classDays;
-        document.getElementById(`${term}AttendancePct`).textContent = pct;
-        document.getElementById(`${term}ParticipationScore`).textContent = totalParticipationPts;
+        return `
+            ${DashboardUI.renderHeader(user, headerAvatar)}
+
+            <main class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full fade-in">
+                <div id="courseContainer" class="w-full"></div>
+            </main>
+
+            ${DashboardUI.renderProfilePanel(user, panelAvatar, displayCourse, lecturerBtns)}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderManageUsersModal() : ''}
+            ${DashboardUI.renderChangePasswordModal()}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderCreateCourseModal() : ''}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAddProgramModal() : ''}
+        `;
     },
 
-    renderDetailsModal: (term, metric, data) => {
-        const course = data.course || {};
-        const records = data.records || [];
+    renderClassScreen: (course, students) => {
+        const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
         
-        let termStart = term === 'midterm' ? (course.Midterm_Start || '') : (course.Final_Start || '');
-        let termEnd = term === 'midterm' ? (course.Midterm_End || '') : (course.Final_End || '');
-        let titleTerm = term === 'midterm' ? 'Mid Term' : 'Final Term';
+        students.sort((a, b) => {
+            const seatAStr = (a.Seat_Number || '').toString().trim();
+            const seatBStr = (b.Seat_Number || '').toString().trim();
+            const hasSeatA = seatAStr !== '';
+            const hasSeatB = seatBStr !== '';
 
-        const parseLocalDate = (dateStr) => {
-            if (!dateStr) return null;
-            if (dateStr.includes('-')) {
-                const [y, m, d] = dateStr.split('-');
-                return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+            if (hasSeatA && !hasSeatB) return -1;
+            if (!hasSeatA && hasSeatB) return 1;
+
+            if (hasSeatA && hasSeatB) {
+                const numA = parseFloat(seatAStr);
+                const numB = parseFloat(seatBStr);
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    if (numA !== numB) return numA - numB;
+                } else {
+                    if (seatAStr !== seatBStr) return seatAStr.localeCompare(seatBStr);
+                }
             }
-            const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? null : d;
-        };
-        
-        const titleMetric = metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown';
-        document.getElementById('detailsModalTitle').textContent = `${titleTerm} - ${titleMetric}`;
-        
-        const scoreHeader = document.getElementById('detailsScoreHeader');
-        scoreHeader.textContent = metric === 'attendance' ? "Attendance Score" : "Points";
 
-        const tbody = document.getElementById('detailsTableBody');
-        tbody.innerHTML = '';
+            const eyeA = eyeOrder[a.eye_condition] || 4;
+            const eyeB = eyeOrder[b.eye_condition] || 4;
+            if (eyeA !== eyeB) return eyeA - eyeB;
 
-        if (!termStart || !termEnd) {
-            tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">Term dates are not set for this course.</td></tr>`;
-            return;
-        }
-
-        const tStart = parseLocalDate(termStart);
-        const tEnd = parseLocalDate(termEnd);
-        
-        const termRecords = records.filter(r => {
-            const rDate = parseLocalDate(r.Date);
-            if (!rDate || !tStart || !tEnd) return false;
-            return rDate >= tStart && rDate <= tEnd;
+            const nameA = a.Name || '';
+            const nameB = b.Name || '';
+            return nameA.localeCompare(nameB);
         });
 
-        if (termRecords.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">No records found for this period.</td></tr>`;
-            return;
-        }
+        const studentList = students.map((s, index) => {
+            const avatarSrc = getLoadableAvatarSrc(s.Avatar);
+            const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
 
-        const rowsHtml = termRecords.map(r => {
-            let statusColor = 'text-gray-600';
-            let attScore = 0;
+            const avatarImg = avatarSrc 
+                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" alt="${s.Name}">` 
+                : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
             
-            if (r.Status === 'Present') { statusColor = 'text-green-600 font-bold'; attScore = 1; }
-            else if (r.Status === 'Late') { statusColor = 'text-yellow-600 font-bold'; attScore = 0.5; }
-            else if (r.Status === 'Excused') { statusColor = 'text-purple-600 font-bold'; attScore = 0; }
-            else if (r.Status === 'Absent') { statusColor = 'text-red-600 font-bold'; attScore = 0; }
-            
-            const displayScore = metric === 'attendance' ? attScore : (r.Performance_Points || 0);
+            const eyeConditionBadge = s.eye_condition 
+                ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
+                : '';
 
             return `
-                <tr class="hover:bg-gray-50 transition">
-                    <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${r.Date}</td>
-                    <td class="px-3 py-2 text-center ${statusColor}">${r.Status || '--'}</td>
-                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${displayScore}</td>
-                </tr>
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}">
+                    
+                    <div class="flex items-start justify-between w-full lg:w-1/2">
+                        <div class="flex items-center space-x-3 p-1.5 -ml-1.5 rounded-lg transition">
+                            <span class="text-xs font-bold text-gray-400 w-5 text-center">${index + 1}</span>
+                            <div class="flex-shrink-0">
+                                ${avatarImg}
+                            </div>
+                            <div>
+                                <div class="font-bold text-blue-600 text-sm sm:text-base cursor-pointer view-summary-trigger hover:underline hover:text-blue-800 transition inline-block" data-name="${s.Name}" title="View Performance Summary">${s.Name}</div>
+                                <div class="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
+                                    <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
+                                </div>
+                                <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
+                                    Seat: <span class="text-gray-800">${s.Seat_Number || '--'}</span>
+                                    &nbsp;|&nbsp; Group: <span class="text-gray-800">${s.Group_Name || '--'}</span>
+                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || '--'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="lg:hidden">
+                            <button type="button" class="manage-student-btn px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm" 
+                                data-student-id="${s.User_ID}" 
+                                data-name="${s.Name}" 
+                                data-seat="${s.Seat_Number || ''}" 
+                                data-group="${s.Group_Name || ''}" 
+                                data-topic="${s.Assigned_Topic || ''}"
+                                data-status="${s.account_status || 'Inactive'}">
+                                <i class="fa-solid fa-gear"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="hidden lg:flex items-center justify-center w-auto px-2">
+                        <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm" 
+                            data-student-id="${s.User_ID}" 
+                            data-name="${s.Name}" 
+                            data-seat="${s.Seat_Number || ''}" 
+                            data-group="${s.Group_Name || ''}" 
+                            data-topic="${s.Assigned_Topic || ''}"
+                            data-status="${s.account_status || 'Inactive'}">
+                            <i class="fa-solid fa-gear mr-1"></i> Manage
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto">
+                        <div class="flex items-center lg:items-start lg:flex-col gap-2 lg:gap-0">
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider lg:mb-0.5 text-center">Pts</label>
+                            <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono" value="0">
+                        </div>
+                        <div class="flex space-x-1 flex-1 lg:flex-initial justify-end items-center min-w-max">
+                            <button type="button" data-status="Present" data-selected="true" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 transition text-center">
+                                Present
+                            </button>
+                            <button type="button" data-status="Late" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 transition text-center">
+                                Late
+                            </button>
+                            <button type="button" data-status="Excused" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-purple-50 hover:text-purple-700 transition text-center">
+                                Excused
+                            </button>
+                            <button type="button" data-status="Absent" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
+                                Absent
+                            </button>
+                            
+                            <button type="button" class="save-single-attendance-btn ml-1 px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition shadow-sm" title="Save Individual Attendance">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             `;
         }).join('');
 
-        tbody.innerHTML = rowsHtml;
-    },
+        const emptyState = `<div class="p-8 text-center text-gray-500 bg-white rounded-b-xl border-dashed border-gray-300">No students enrolled yet.</div>`;
 
-    exportRoster: async (courseId) => {
-        try {
-            const ts = new Date().getTime();
-            const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
-            const students = data.students;
+        const targetDisplay = [course.Target_Course, course.Target_Year, course.Target_Section].filter(Boolean).join(' ');
+        const audienceBadge = targetDisplay 
+            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-blue-200 uppercase align-middle ml-2 sm:ml-3">${targetDisplay} Only</span>` 
+            : `<span class="inline-block bg-gray-100 text-gray-600 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-gray-200 uppercase align-middle ml-2 sm:ml-3">All Students</span>`;
 
-            const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
-            students.sort((a, b) => {
-                const seatAStr = (a.Seat_Number || '').toString().trim();
-                const seatBStr = (b.Seat_Number || '').toString().trim();
-                const hasSeatA = seatAStr !== '';
-                const hasSeatB = seatBStr !== '';
-                
-                if (hasSeatA && !hasSeatB) return -1;
-                if (!hasSeatA && hasSeatB) return 1;
-                
-                if (hasSeatA && hasSeatB) {
-                    const numA = parseFloat(seatAStr);
-                    const numB = parseFloat(seatBStr);
-                    if (!isNaN(numA) && !isNaN(numB)) {
-                        if (numA !== numB) return numA - numB;
-                    } else {
-                        if (seatAStr !== seatBStr) return seatAStr.localeCompare(seatBStr);
-                    }
-                }
-                const eyeA = eyeOrder[a.eye_condition] || 4;
-                const eyeB = eyeOrder[b.eye_condition] || 4;
-                if (eyeA !== eyeB) return eyeA - eyeB;
-                
-                const nameA = a.Name || '';
-                const nameB = b.Name || '';
-                return nameA.localeCompare(nameB);
-            });
-
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                alert("Please allow pop-ups to print the roster.");
-                return;
-            }
-
-            const html = `
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>Class Roster - ${data.course.CourseCode}</title>
-                    <style>
-                        @page { size: letter; margin: 0.5in; }
-                        body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #333; margin: 0; padding: 0; }
-                        .header { text-align: center; margin-bottom: 20px; }
-                        h1 { font-size: 18pt; margin: 0 0 5px 0; color: #000; }
-                        h3 { font-size: 12pt; margin: 0; color: #555; font-weight: normal; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                        th, td { border: 1px solid #000; padding: 6px; text-align: left; vertical-align: middle; }
-                        th { background-color: #f0f0f0; font-weight: bold; font-size: 10pt; }
-                        td { font-size: 9.5pt; }
-                        .photo-cell { width: 1in; text-align: center; }
-                        .photo { width: 1in; height: 1in; object-fit: cover; border: 1px solid #ccc; display: block; margin: 0 auto; }
-                        .center { text-align: center; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1>${data.course.CourseCode} - ${data.course.CourseTitle}</h1>
-                        <h3>Schedule: ${data.course.ScheduleDay} | ${data.course.TimePeriod}</h3>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Photo</th>
-                                <th class="center">Seat No.</th>
-                                <th>Student No.</th>
-                                <th>Name</th>
-                                <th>Group Name</th>
-                                <th>Assigned Topic</th>
-                                <th>Contact</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${students.map(s => {
-                                const avatarSrc = getLoadableAvatarSrc(s.Avatar);
-                                const imgTag = avatarSrc ? `<img src="${avatarSrc}" class="photo" alt="Photo">` : `<div style="width:1in; height:1in; line-height:1in; text-align:center; background:#eee; font-size:8pt; color:#999; margin:0 auto;">No Photo</div>`;
-                                return `
-                                <tr>
-                                    <td class="photo-cell">${imgTag}</td>
-                                    <td class="center"><strong>${s.Seat_Number || ''}</strong></td>
-                                    <td>${s.Student_Number || ''}</td>
-                                    <td><strong>${s.Name}</strong></td>
-                                    <td>${s.Group_Name || ''}</td>
-                                    <td>${s.Assigned_Topic || ''}</td>
-                                    <td>${s.Contact_Number || ''}</td>
-                                </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                    <script>
-                        window.onload = function() {
-                            setTimeout(function() {
-                                window.print();
-                            }, 500);
-                        };
-                    </script>
-                </body>
-                </html>
-            `;
-
-            printWindow.document.write(html);
-            printWindow.document.close();
-
-        } catch (err) {
-            alert('Failed to generate export: ' + err.message);
-        }
-    },
-
-    loadUnenrolledStudents: async (courseId) => {
-        const listContainer = document.getElementById('unenrolledStudentsList');
-        if (!listContainer) return;
-        
-        const filterStatus = document.getElementById('filterStatus')?.value ?? 'Active';
-        const filterCourse = document.getElementById('filterCourse')?.value || '';
-        const filterYear = document.getElementById('filterYear')?.value || '';
-        const filterSection = document.getElementById('filterSection')?.value || '';
-
-        listContainer.innerHTML = '<div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>';
-        
-        try {
-            let url = `/api/unenrolled-students?courseId=${courseId}`;
-            if (filterStatus) url += `&statusFilter=${encodeURIComponent(filterStatus)}`;
-            if (filterCourse) url += `&courseFilter=${encodeURIComponent(filterCourse)}`;
-            if (filterYear) url += `&yearFilter=${encodeURIComponent(filterYear)}`;
-            if (filterSection) url += `&sectionFilter=${encodeURIComponent(filterSection)}`;
-            
-            const ts = new Date().getTime();
-            const data = await apiFetch(`${url}&_t=${ts}`);
-            
-            if (!data.students || data.students.length === 0) {
-                listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded-md shadow-sm">No new students available to enroll matching criteria.</div>';
-                return;
-            }
-
-            const html = data.students.map(s => {
-                const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
-                const statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                    s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' : 
-                    s.account_status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
-                    s.account_status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
-                    s.account_status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
-                    s.account_status === 'Dropped' ? 'text-red-700 border-red-300 bg-red-100' : 'text-gray-500 border-gray-200 bg-gray-50'
-                }">${s.account_status || 'Inactive'}</span>`;
-
-                return `
-                    <div class="student-enroll-item flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md shadow-sm hover:border-blue-300 transition">
-                        <div>
-                            <div class="font-bold text-gray-800 text-sm flex items-center gap-2">
-                                ${s.Name} ${statusBadge}
-                            </div>
-                            <div class="text-[11px] text-gray-500 mt-0.5">
-                                <span class="font-bold text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
-                            </div>
+        return `
+            <header class="bg-blue-700 shadow-md fixed top-0 w-full z-40">
+                <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
+                    <div class="flex items-center h-16">
+                        <a href="#dashboard" class="text-white hover:text-blue-200 transition mr-2 sm:mr-4 p-2 -ml-2">
+                            <i class="fa-solid fa-arrow-left text-xl"></i>
+                        </a>
+                        <div class="overflow-hidden">
+                            <h1 class="text-base sm:text-lg font-bold text-white truncate">${course.CourseCode}</h1>
+                            <p class="text-[11px] sm:text-xs text-blue-200 truncate">${course.CourseTitle}</p>
                         </div>
-                        <button type="button" data-student-id="${s.User_ID}" class="lecturer-enroll-btn bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition">
-                            Enroll
+                    </div>
+                </div>
+            </header>
+
+            <main class="pt-20 pb-12 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 mt-2 sm:mt-4 gap-4 px-2 sm:px-0">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
+                            Class Roster & Attendance ${audienceBadge}
+                        </h2>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
+                        <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
+                        
+                        <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
+                            <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
+                        </button>
+                        <button id="openCourseMenuBtn" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
+                            <i class="fa-solid fa-bars mr-2"></i> Menu
                         </button>
                     </div>
-                `;
-            }).join('');
-
-            listContainer.innerHTML = html;
-            
-            const searchInput = document.getElementById('studentSearchInput');
-            if (searchInput && searchInput.value) {
-                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            
-        } catch (err) {
-            listContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-sm font-medium border border-red-200 text-center">${err.message}</div>`;
-        }
-    },
-
-    saveAttendance: async () => {
-        const btn = document.getElementById('saveAttendanceBtn');
-        const alertBox = document.getElementById('attendanceAlert');
-        const dateVal = document.getElementById('attendanceDate').value;
-        const banner = document.getElementById('noClassBanner');
-        const courseId = CourseModule.getCourseIdFromHash();
-        
-        if (!dateVal) {
-            alertBox.textContent = "Please select a date.";
-            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
-            return;
-        }
-
-        if (banner && !banner.classList.contains('hidden')) {
-            alertBox.textContent = "Cannot save attendance on a designated No Class day.";
-            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
-            return;
-        }
-
-        const rows = document.querySelectorAll('.student-row');
-        const attendanceData = [];
-        let missingCount = 0;
-
-        rows.forEach(row => {
-            const studentId = row.dataset.studentId;
-            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-            const pointsInput = row.querySelector('.points-input');
-            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-            
-            if (selectedBtn) {
-                attendanceData.push({
-                    studentId: studentId,
-                    status: selectedBtn.dataset.status,
-                    points: points
-                });
-            } else {
-                missingCount++;
-            }
-        });
-
-        if (missingCount > 0 && !window.confirm(`${missingCount} student(s) have no attendance marked. Do you want to proceed anyway? Unmarked students will not be saved.`)) return;
-
-        if (attendanceData.length === 0) {
-             alertBox.textContent = "No attendance data to save.";
-             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
-             return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
-
-        try {
-            await apiFetch('/api/attendance', { method: 'POST', body: JSON.stringify({ courseId, date: dateVal, records: attendanceData }) });
-            CourseModule.clearDraft(courseId, dateVal);
-            alertBox.textContent = "All Attendance saved successfully!";
-            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
-        } catch (err) {
-            alertBox.textContent = err.message;
-            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save All';
-            setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
-        }
-    },
-
-    loadAttendanceData: async (courseId, date) => {
-        try {
-            const ts = new Date().getTime();
-            const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}&_t=${ts}`);
-            
-            const noClassBanner = document.getElementById('noClassBanner');
-            const container = document.getElementById('rosterListContainer');
-            const saveBtn = document.getElementById('saveAttendanceBtn');
-            const markAllBtn = document.getElementById('markAllPresent');
-            
-            if (data.isNoClass === true) {
-                if(noClassBanner) noClassBanner.classList.remove('hidden');
-                if(container) container.classList.add('opacity-50', 'pointer-events-none');
-                if(saveBtn) saveBtn.disabled = true;
-                if(markAllBtn) markAllBtn.disabled = true;
-            } else {
-                if(noClassBanner) noClassBanner.classList.add('hidden');
-                if(container) container.classList.remove('opacity-50', 'pointer-events-none');
-                if(saveBtn) saveBtn.disabled = false;
-                if(markAllBtn) markAllBtn.disabled = false;
-            }
-
-            document.querySelectorAll('.student-row').forEach(row => {
-                const buttons = row.querySelectorAll('.attendance-btn');
-                buttons.forEach(btn => {
-                    btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
-                    btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                    btn.removeAttribute('data-selected');
-                });
-                const pointsInput = row.querySelector('.points-input');
-                if (pointsInput) pointsInput.value = '0';
-                
-                const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
-                if (presentBtn && !data.isNoClass) {
-                    presentBtn.setAttribute('data-selected', 'true');
-                    presentBtn.classList.replace('bg-gray-50', 'bg-green-100');
-                    presentBtn.classList.replace('text-gray-600', 'text-green-800');
-                    presentBtn.classList.replace('border-gray-200', 'border-green-400');
-                }
-            });
-
-            if (data.records && data.records.length > 0 && !data.isNoClass) {
-                document.querySelectorAll('.student-row').forEach(row => {
-                     const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
-                     if(presentBtn) {
-                         presentBtn.removeAttribute('data-selected');
-                         presentBtn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400');
-                         presentBtn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                     }
-                });
-
-                data.records.forEach(record => {
-                    const row = document.querySelector(`.student-row[data-student-id="${record.Student_ID}"]`);
-                    if (row) {
-                        const btn = row.querySelector(`.attendance-btn[data-status="${record.Status}"]`);
-                        if (btn) {
-                            btn.setAttribute('data-selected', 'true');
-                            btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                            if (record.Status === 'Present') btn.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
-                            else if (record.Status === 'Late') btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
-                            else if (record.Status === 'Absent') btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
-                            else if (record.Status === 'Excused') btn.classList.add('bg-purple-100', 'text-purple-800', 'border-purple-400');
-                        }
-                        const pointsInput = row.querySelector('.points-input');
-                        if (pointsInput) pointsInput.value = record.Performance_Points || '0';
-                    }
-                });
-            }
-
-            const draftStr = localStorage.getItem(CourseModule.getDraftKey(courseId, date));
-            if (draftStr && !data.isNoClass) {
-                try {
-                    const draft = JSON.parse(draftStr);
-                    let hasDraftChanges = false;
-                    
-                    document.querySelectorAll('.student-row').forEach(row => {
-                        const studentId = row.dataset.studentId;
-                        if (draft[studentId]) {
-                            hasDraftChanges = true;
-                            const r = draft[studentId];
-                            const buttons = row.querySelectorAll('.attendance-btn');
-                            buttons.forEach(btn => {
-                                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
-                                btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                                btn.removeAttribute('data-selected');
-                            });
-                            
-                            if (r.status) {
-                                const btn = row.querySelector(`.attendance-btn[data-status="${r.status}"]`);
-                                if (btn) {
-                                    btn.setAttribute('data-selected', 'true');
-                                    btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                                    if (r.status === 'Present') btn.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
-                                    else if (r.status === 'Late') btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
-                                    else if (r.status === 'Absent') btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
-                                    else if (r.status === 'Excused') btn.classList.add('bg-purple-100', 'text-purple-800', 'border-purple-400');
-                                }
-                            }
-                            
-                            const pointsInput = row.querySelector('.points-input');
-                            if (pointsInput) pointsInput.value = r.points || '0';
-                        }
-                    });
-                    
-                    if (hasDraftChanges) {
-                        const alertBox = document.getElementById('attendanceAlert');
-                        if (alertBox) {
-                            alertBox.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-2"></i> Unsaved changes restored from local cache.';
-                            alertBox.className = "mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium bg-blue-100 text-blue-800 block fade-in";
-                            alertBox.classList.remove('hidden');
-                        }
-                    }
-                } catch(e) {}
-            }
-
-        } catch (err) {
-            console.error("Failed to load attendance:", err);
-        }
-    },
-
-    loadDashboardData: async () => {
-        const container = document.getElementById('courseContainer');
-        if (!container || !AppState.user) return;
-        
-        container.innerHTML = '<div class="text-center py-12"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i><p class="mt-4 text-gray-500 font-medium">Loading Courses...</p></div>';
-        
-        if (AppState.user.role.toLowerCase() === 'lecturer') {
-            await CourseModule.renderLecturerDashboard(container);
-        } else {
-            await CourseModule.renderStudentDashboard(container);
-        }
-    },
-
-    loadClassScreen: async (courseId, skipSpinner = false) => {
-        const root = document.getElementById('app-root');
-        if (!root || !AppState.user) return;
-        
-        let modalWasOpen = false;
-        let searchVal = '', statusVal = 'Active', courseVal = '', yearVal = '', sectionVal = '';
-        
-        const modal = document.getElementById('addStudentModal');
-        if (modal && !modal.classList.contains('hidden')) {
-            modalWasOpen = true;
-            searchVal = document.getElementById('studentSearchInput')?.value || '';
-            statusVal = document.getElementById('filterStatus')?.value || 'Active';
-            courseVal = document.getElementById('filterCourse')?.value || '';
-            yearVal = document.getElementById('filterYear')?.value || '';
-            sectionVal = document.getElementById('filterSection')?.value || '';
-        }
-        
-        if (!skipSpinner) {
-            root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
-        }
-        
-        try {
-            const ts = new Date().getTime();
-            const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
-            
-            root.innerHTML = Components.renderClassScreen(data.course, data.students);
-            
-            const dateInput = document.getElementById('attendanceDate');
-            if (dateInput) await CourseModule.loadAttendanceData(courseId, dateInput.value);
-            
-            if (modalWasOpen) {
-                document.getElementById('addStudentModal').classList.remove('hidden');
-                const filterCourseSelect = document.getElementById('filterCourse');
-                if (filterCourseSelect) {
-                    try {
-                        const programsData = await apiFetch(`/api/programs?_t=${ts}`);
-                        if (programsData.programs) {
-                            filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' + 
-                                programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-                        }
-                    } catch(e) {}
-                }
-                
-                if (document.getElementById('studentSearchInput')) document.getElementById('studentSearchInput').value = searchVal;
-                if (document.getElementById('filterStatus')) document.getElementById('filterStatus').value = statusVal;
-                if (document.getElementById('filterCourse')) document.getElementById('filterCourse').value = courseVal;
-                if (document.getElementById('filterYear')) document.getElementById('filterYear').value = yearVal;
-                if (document.getElementById('filterSection')) document.getElementById('filterSection').value = sectionVal;
-                
-                CourseModule.loadUnenrolledStudents(courseId);
-            }
-        } catch (err) {
-            root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
-        }
-    },
-
-    createProgram: async () => {
-        const btn = document.getElementById('addProgramBtn');
-        const errorDiv = document.getElementById('programError');
-        const successDiv = document.getElementById('programSuccess');
-        errorDiv.classList.add('hidden');
-        successDiv.classList.add('hidden');
-        btn.disabled = true;
-        btn.innerHTML = 'Saving...';
-        
-        const payload = { programCode: document.getElementById('programCode').value.trim() };
-        
-        try {
-            await apiFetch('/api/programs', { method: 'POST', body: JSON.stringify(payload) });
-            successDiv.textContent = "Added to Registration List successfully!";
-            successDiv.classList.remove('hidden');
-            document.getElementById('addProgramForm').reset();
-            
-            const ts = new Date().getTime();
-            const programsData = await apiFetch(`/api/programs?_t=${ts}`);
-            const targetCourseSelect = document.getElementById('targetCourse');
-            if (targetCourseSelect && programsData.programs) {
-                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
-                    programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-            }
-
-            setTimeout(() => {
-                successDiv.classList.add('hidden');
-                document.getElementById('apModal').classList.add('hidden');
-            }, 1500);
-        } catch (err) {
-            errorDiv.textContent = err.message;
-            errorDiv.classList.remove('hidden');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = 'Add to Registration List';
-        }
-    },
-
-    createCourse: async () => {
-        const btn = document.getElementById('addCourseBtn');
-        const errorDiv = document.getElementById('courseError');
-        errorDiv.classList.add('hidden');
-        btn.disabled = true;
-        btn.innerHTML = 'Saving...';
-        
-        const payload = {
-            courseCode: document.getElementById('courseCode').value.trim(),
-            courseTitle: document.getElementById('courseTitle').value.trim(),
-            scheduleDay: document.getElementById('scheduleDay').value,
-            timePeriod: document.getElementById('timePeriod').value.trim(),
-            targetCourse: document.getElementById('targetCourse').value.trim(),
-            targetYear: document.getElementById('targetYear').value.trim(),
-            targetSection: document.getElementById('targetSection').value.trim(),
-            lecturerId: AppState.user.User_ID
-        };
-        
-        try {
-            await apiFetch('/api/courses', { method: 'POST', body: JSON.stringify(payload) });
-            document.getElementById('addCourseForm').reset();
-            document.getElementById('ccModal').classList.add('hidden');
-            await CourseModule.loadDashboardData();
-        } catch (err) {
-            errorDiv.textContent = err.message;
-            errorDiv.classList.remove('hidden');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = 'Create Course';
-        }
-    },
-
-    enrollCourse: async (courseId) => {
-        try {
-            await apiFetch('/api/enroll', { 
-                method: 'POST', 
-                body: JSON.stringify({ courseId: courseId, studentId: AppState.user.User_ID }) 
-            });
-            await CourseModule.loadDashboardData();
-        } catch (err) {
-            alert(err.message);
-            await CourseModule.loadDashboardData();
-        }
-    },
-
-    renderLecturerDashboard: async (container) => {
-        try {
-            const ts = new Date().getTime();
-            const programsData = await apiFetch(`/api/programs?_t=${ts}`);
-            const targetCourseSelect = document.getElementById('targetCourse');
-            if (targetCourseSelect && programsData.programs) {
-                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
-                    programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-            }
-
-            const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&_t=${ts}`);
-            
-            const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
-            const parseTime = (timeStr) => {
-                if (!timeStr) return 0;
-                const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                if (!match) return 0;
-                let [ , h, m, period ] = match;
-                h = parseInt(h);
-                if (period.toUpperCase() === 'PM' && h !== 12) h += 12;
-                if (period.toUpperCase() === 'AM' && h === 12) h = 0;
-                return h * 60 + parseInt(m);
-            };
-
-            data.courses.sort((a, b) => {
-                const dayDiff = (dayMap[a.ScheduleDay] || 8) - (dayMap[b.ScheduleDay] || 8);
-                if (dayDiff !== 0) return dayDiff;
-                return parseTime(a.TimePeriod) - parseTime(b.TimePeriod);
-            });
-            
-            let coursesHtml = data.courses.map(c => `
-                <a href="#class-${c.Course_ID}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
-                    <div class="flex justify-between items-start mb-1">
-                        <div class="font-bold text-xl text-blue-700">${c.CourseCode}</div>
-                        ${(c.Target_Course || c.Target_Year || c.Target_Section) ? 
-                            `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
-                                ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
-                            </span>` : 
-                            `<span class="bg-blue-50 text-blue-500 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
-                        }
-                    </div>
-                    <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
-                    <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
-                        <i class="fa-regular fa-calendar mr-1"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${c.TimePeriod}
-                    </div>
-                </a>
-            `).join('');
-            
-            if (!coursesHtml) {
-                coursesHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No courses created yet. Open the profile panel to create one.</div>';
-            }
-            
-            container.innerHTML = `
-                <div class="fade-in max-w-5xl mx-auto">
-                    <h2 class="text-xl font-bold mb-6 text-gray-800 flex items-center"><div class="bg-gray-200 p-2 rounded-lg mr-3"><i class="fa-solid fa-chalkboard-user text-gray-600"></i></div>My Created Courses</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        ${coursesHtml}
-                    </div>
                 </div>
-            `;
-        } catch (err) {
-            container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${err.message}</div>`;
-        }
-    },
-
-    renderStudentDashboard: async (container) => {
-        try {
-            const ts = new Date().getTime();
-            const [myCoursesRes, allCoursesRes] = await Promise.all([
-                apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=student&_t=${ts}`),
-                apiFetch(`/api/courses?studentId=${AppState.user.User_ID}&_t=${ts}`)
-            ]);
-            
-            const enrolledIds = myCoursesRes.courses.map(c => c.Course_ID);
-            
-            let enrolledHtml = myCoursesRes.courses.map(c => `
-                <div class="p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md">
-                    <div class="absolute top-0 right-0 bg-green-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold shadow-sm tracking-widest uppercase">Enrolled</div>
-                    <div class="font-black text-xl text-green-800 pr-16">${c.CourseCode}</div>
-                    <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
-                    <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${c.LecturerName}</div>
-                    <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${c.TimePeriod}</div>
+                
+                <div id="noClassBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-bold bg-orange-100 text-orange-800 border border-orange-200 uppercase tracking-wider flex items-center justify-center">
+                    <i class="fa-solid fa-triangle-exclamation mr-2 text-lg"></i> This date is marked as No Class
                 </div>
-            `).join('');
-            
-            if (!enrolledHtml) {
-                enrolledHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">You are not enrolled in any courses yet.</div>';
-            }
-            
-            const availableCourses = allCoursesRes.courses.filter(c => !enrolledIds.includes(c.Course_ID));
-            let availableHtml = availableCourses.map(c => `
-                <div class="p-5 border rounded-xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start md:items-center transition hover:border-blue-300 gap-4">
-                    <div>
-                        <div class="font-black text-xl text-blue-700">${c.CourseCode}</div>
-                        <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
-                        <div class="text-sm text-gray-600 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${c.LecturerName}</div>
-                        <div class="text-sm text-gray-600 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${c.TimePeriod}</div>
-                    </div>
-                    <button data-id="${c.Course_ID}" class="enroll-btn w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-bold transition-colors">
-                        Enroll Now
-                    </button>
-                </div>
-            `).join('');
-            
-            if (!availableHtml) {
-                availableHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No new courses available for enrollment.</div>';
-            }
+                <div id="attendanceAlert" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium"></div>
 
-            container.innerHTML = `
-                <div class="space-y-12 fade-in">
-                    <section>
-                        <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            ${enrolledHtml}
+                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mx-0 sm:mx-0">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                        <span class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            ${students.length} Enrolled Students
+                        </span>
+                        <div class="space-x-2">
+                            <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
                         </div>
-                    </section>
-                    
-                    <section>
-                        <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center pt-8 border-t border-gray-200"><div class="bg-blue-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-book-open text-blue-600"></i></div>Available Courses</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            ${availableHtml}
-                        </div>
-                    </section>
+                    </div>
+                    <div id="rosterListContainer">
+                        ${students.length > 0 ? studentList : emptyState}
+                    </div>
                 </div>
-            `;
-        } catch (err) {
-            container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${err.message}</div>`;
-        }
+            </main>
+
+            ${ClassUI.renderCourseMenuModal(course)}
+            ${ClassUI.renderNoClassModal()}
+            ${ClassUI.renderManageStudentModal()}
+            ${ClassUI.renderSummaryModal()}
+            ${ClassUI.renderDetailsModal()}
+            ${ClassUI.renderAddStudentModal()}
+        `;
     }
 };
