@@ -84,6 +84,14 @@ export const CourseModule = {
             const courseId = window.location.hash.replace('#class-', '');
             await CourseModule.loadUnenrolledStudents(courseId);
         }
+
+        if (e.target.id === 'attendanceDate') {
+            const courseId = window.location.hash.replace('#class-', '');
+            const date = e.target.value;
+            if (courseId && date) {
+                await CourseModule.loadAttendanceData(courseId, date);
+            }
+        }
     },
 
     handleClicks: async (e) => {
@@ -99,7 +107,6 @@ export const CourseModule = {
             await CourseModule.enrollCourse(btn.dataset.id);
         }
 
-        // Export Roster Button
         if (e.target.closest('#exportRosterBtn')) {
             const btn = e.target.closest('#exportRosterBtn');
             const courseId = btn.dataset.courseId;
@@ -113,7 +120,6 @@ export const CourseModule = {
             btn.innerHTML = originalHtml;
         }
 
-        // Manage Student Modal Logic
         if (e.target.closest('.manage-student-btn')) {
             const btn = e.target.closest('.manage-student-btn');
             document.getElementById('manageStudentName').textContent = btn.dataset.name;
@@ -185,7 +191,6 @@ export const CourseModule = {
             }
         }
 
-        // Add Student Modal Logic
         if (e.target.closest('#openAddStudentModalBtn')) {
             document.getElementById('addStudentModal').classList.remove('hidden');
             const courseId = window.location.hash.replace('#class-', '');
@@ -234,7 +239,6 @@ export const CourseModule = {
             }
         }
 
-        // Attendance Toggle Logic
         if (e.target.classList.contains('attendance-btn')) {
             const row = e.target.closest('.student-row');
             const buttons = row.querySelectorAll('.attendance-btn');
@@ -517,6 +521,64 @@ export const CourseModule = {
         }
     },
 
+    loadAttendanceData: async (courseId, date) => {
+        try {
+            const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}`);
+            
+            document.querySelectorAll('.student-row').forEach(row => {
+                const buttons = row.querySelectorAll('.attendance-btn');
+                buttons.forEach(btn => {
+                    btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400');
+                    btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                    btn.removeAttribute('data-selected');
+                });
+                const pointsInput = row.querySelector('.points-input');
+                if (pointsInput) pointsInput.value = '0';
+                
+                const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
+                if (presentBtn) {
+                    presentBtn.setAttribute('data-selected', 'true');
+                    presentBtn.classList.replace('bg-gray-50', 'bg-green-100');
+                    presentBtn.classList.replace('text-gray-600', 'text-green-800');
+                    presentBtn.classList.replace('border-gray-200', 'border-green-400');
+                }
+            });
+
+            if (data.records && data.records.length > 0) {
+                document.querySelectorAll('.student-row').forEach(row => {
+                     const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
+                     if(presentBtn) {
+                         presentBtn.removeAttribute('data-selected');
+                         presentBtn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400');
+                         presentBtn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                     }
+                });
+
+                data.records.forEach(record => {
+                    const row = document.querySelector(`.student-row[data-student-id="${record.Student_ID}"]`);
+                    if (row) {
+                        const btn = row.querySelector(`.attendance-btn[data-status="${record.Status}"]`);
+                        if (btn) {
+                            btn.setAttribute('data-selected', 'true');
+                            btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                            if (record.Status === 'Present') {
+                                btn.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
+                            } else if (record.Status === 'Late') {
+                                btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
+                            } else if (record.Status === 'Absent') {
+                                btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
+                            }
+                        }
+                        const pointsInput = row.querySelector('.points-input');
+                        if (pointsInput) pointsInput.value = record.Performance_Points || '0';
+                    }
+                });
+            }
+        } catch (err) {
+            console.error("Failed to load attendance:", err);
+        }
+    },
+
     loadDashboardData: async () => {
         const container = document.getElementById('courseContainer');
         if (!container || !AppState.user) return;
@@ -551,7 +613,7 @@ export const CourseModule = {
             sectionVal = document.getElementById('filterSection')?.value || '';
         }
         
-        if(!skipSpinner) {
+        if (!skipSpinner) {
             root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
         }
         
@@ -559,6 +621,11 @@ export const CourseModule = {
             const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
             
             root.innerHTML = Components.renderClassScreen(data.course, data.students);
+            
+            const dateInput = document.getElementById('attendanceDate');
+            if (dateInput) {
+                await CourseModule.loadAttendanceData(courseId, dateInput.value);
+            }
             
             if (modalWasOpen) {
                 document.getElementById('addStudentModal').classList.remove('hidden');
@@ -684,13 +751,13 @@ export const CourseModule = {
             
             const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
             const parseTime = (timeStr) => {
-                if(!timeStr) return 0;
+                if (!timeStr) return 0;
                 const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                if(!match) return 0;
+                if (!match) return 0;
                 let [ , h, m, period ] = match;
                 h = parseInt(h);
-                if(period.toUpperCase() === 'PM' && h !== 12) h += 12;
-                if(period.toUpperCase() === 'AM' && h === 12) h = 0;
+                if (period.toUpperCase() === 'PM' && h !== 12) h += 12;
+                if (period.toUpperCase() === 'AM' && h === 12) h = 0;
                 return h * 60 + parseInt(m);
             };
 
@@ -718,7 +785,7 @@ export const CourseModule = {
                 </a>
             `).join('');
             
-            if(!coursesHtml) {
+            if (!coursesHtml) {
                 coursesHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No courses created yet. Open the profile panel to create one.</div>';
             }
             
@@ -754,7 +821,7 @@ export const CourseModule = {
                 </div>
             `).join('');
             
-            if(!enrolledHtml) {
+            if (!enrolledHtml) {
                 enrolledHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">You are not enrolled in any courses yet.</div>';
             }
             
@@ -773,7 +840,7 @@ export const CourseModule = {
                 </div>
             `).join('');
             
-            if(!availableHtml) {
+            if (!availableHtml) {
                 availableHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No new courses available for enrollment.</div>';
             }
 
