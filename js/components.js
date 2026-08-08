@@ -503,6 +503,8 @@ export const Components = {
                                 </div>
                                 <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
                                     Seat: <span class="text-gray-800">${s.Seat_Number || '--'}</span>
+                                    &nbsp;|&nbsp; Group: <span class="text-gray-800">${s.Group_Name || '--'}</span>
+                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || '--'}</span>
                                 </div>
                             </div>
                         </div>
@@ -514,6 +516,7 @@ export const Components = {
                                 data-name="${s.Name}" 
                                 data-seat="${s.Seat_Number || ''}" 
                                 data-group="${s.Group_Name || ''}" 
+                                data-topic="${s.Assigned_Topic || ''}"
                                 data-status="${s.account_status || 'Inactive'}">
                                 <i class="fa-solid fa-gear"></i>
                             </button>
@@ -527,6 +530,7 @@ export const Components = {
                             data-name="${s.Name}" 
                             data-seat="${s.Seat_Number || ''}" 
                             data-group="${s.Group_Name || ''}" 
+                            data-topic="${s.Assigned_Topic || ''}"
                             data-status="${s.account_status || 'Inactive'}">
                             <i class="fa-solid fa-gear mr-1"></i> Manage
                         </button>
@@ -594,15 +598,12 @@ export const Components = {
                 </div>
                 
                 <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
-                    <button id="exportRosterBtn" data-course-id="${course.Course_ID}" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                        <i class="fa-solid fa-print mr-2"></i> Print Roster
-                    </button>
-                    <button id="openAddStudentModalBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                        <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
-                    </button>
                     <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
                     <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save All Attendance
+                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
+                    </button>
+                    <button id="openCourseMenuBtn" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
+                        <i class="fa-solid fa-bars mr-2"></i> Menu
                     </button>
                 </div>
             </div>
@@ -625,6 +626,55 @@ export const Components = {
             </div>
         </main>
 
+        <!-- Course Actions Menu Modal -->
+        <div id="courseMenuModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
+            <div id="closeCourseMenuBg" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-layer-group text-blue-600 mr-2"></i>Course Actions</h3>
+                    <button id="closeCourseMenuBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-3 mb-6">
+                    <button id="openAddStudentModalBtn" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
+                    </button>
+                    <button id="exportRosterBtn" data-course-id="${course.Course_ID}" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-print mr-2"></i> Print Roster
+                    </button>
+                </div>
+
+                <div class="border-t border-gray-200 pt-5">
+                    <h4 class="text-sm font-bold text-gray-800 mb-3"><i class="fa-regular fa-calendar-days text-purple-600 mr-2"></i>Term Period Settings</h4>
+                    <div id="courseMenuAlert" class="hidden text-xs mb-3 p-2 rounded"></div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Mid Term</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="date" id="midtermStart" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Midterm_Start || ''}">
+                                <span class="text-gray-400 text-xs font-bold">to</span>
+                                <input type="date" id="midtermEnd" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Midterm_End || ''}">
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Final Term</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="date" id="finalStart" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Final_Start || ''}">
+                                <span class="text-gray-400 text-xs font-bold">to</span>
+                                <input type="date" id="finalEnd" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" value="${course.Final_End || ''}">
+                            </div>
+                        </div>
+                        <button type="button" id="saveCourseTermsBtn" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                            Save Term Periods
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Manage Student Modal -->
         <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeManageStudentModalBg"></div>
@@ -639,14 +689,18 @@ export const Components = {
                 <input type="hidden" id="manageStudentId">
                 
                 <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Seat</label>
-                            <input type="text" id="manageSeatInput" class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
+                            <input type="text" id="manageSeatInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Group</label>
-                            <input type="text" id="manageGroupInput" class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
+                            <input type="text" id="manageGroupInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Topic</label>
+                            <input type="text" id="manageTopicInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="Assigned">
                         </div>
                     </div>
                     
@@ -676,7 +730,7 @@ export const Components = {
         <!-- Student Summary Modal -->
         <div id="summaryModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center fade-in p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSummaryModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>Performance Summary</h3>
                     <button id="closeSummaryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -700,12 +754,12 @@ export const Components = {
                     </div>
                 </div>
                 
-                <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center mb-4">
+                <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center mb-4">
                     <div class="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-1">Grand Total Pts</div>
-                    <div id="summaryTotalPoints" class="text-3xl font-black text-blue-800">...</div>
+                    <div id="summaryTotalPoints" class="text-2xl font-black text-blue-800">...</div>
                 </div>
                 
-                <div class="max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50">
+                <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 mb-6">
                     <table class="w-full text-xs text-left">
                         <thead class="bg-gray-200 text-gray-700 sticky top-0">
                             <tr>
@@ -718,6 +772,70 @@ export const Components = {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Academic Terms Metrics Placeholders -->
+                <div class="space-y-4 border-t border-gray-200 pt-4">
+                    <!-- Mid Term -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
+                        
+                        <div class="space-y-2">
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Participation</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Attendance</div><span class="font-bold">...</span></div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-2 border rounded flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
+                                <span class="font-bold text-sm">...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Final Term -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star text-yellow-500 mr-2"></i>Final Term</h4>
+                        
+                        <div class="space-y-2">
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
+                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Participation</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Attendance</div><span class="font-bold">...</span></div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-2 border rounded flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
+                                <span class="font-bold text-sm">...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
