@@ -1,10 +1,13 @@
 // js/auth.js
 import { apiFetch, AppState } from './globals.js';
+import { getLoadableAvatarSrc } from './components.js';
+
+let currentImageIndex = -1;
+let imageElements = [];
 
 export const AuthModule = {
-    currentImageIndex: -1,
-    currentImageList: [],
-
+    allUsersData: [],
+    
     init: () => {
         document.addEventListener('submit', AuthModule.handleForms);
         document.addEventListener('click', AuthModule.handleClicks);
@@ -49,6 +52,23 @@ export const AuthModule = {
         }
         if (e.target.closest('#btnFile')) {
             document.getElementById('regFileInput').click();
+        }
+        
+        // Login Password Toggle
+        if (e.target.closest('#toggleLoginPassword')) {
+            const pwdInput = document.getElementById('loginPassword');
+            const eyeIcon = document.getElementById('loginPasswordEye');
+            if (pwdInput && eyeIcon) {
+                if (pwdInput.type === 'password') {
+                    pwdInput.type = 'text';
+                    eyeIcon.classList.remove('fa-eye');
+                    eyeIcon.classList.add('fa-eye-slash');
+                } else {
+                    pwdInput.type = 'password';
+                    eyeIcon.classList.remove('fa-eye-slash');
+                    eyeIcon.classList.add('fa-eye');
+                }
+            }
         }
         
         // Sliding Panel Toggle Logic
@@ -104,7 +124,7 @@ export const AuthModule = {
             if(courseErr) courseErr.classList.add('hidden');
         }
 
-        // Add Program Modal Toggle Logic (For Lecturers)
+        // Add Program Modal Toggle Logic
         if (e.target.closest('#openApModalBtn')) {
             document.getElementById('apModal').classList.remove('hidden');
             const panel = document.getElementById('profilePanel');
@@ -123,80 +143,198 @@ export const AuthModule = {
             if(succ) succ.classList.add('hidden');
         }
 
+        // Manage Users Modal Logic
+        if (e.target.closest('#openMuModalBtn')) {
+            document.getElementById('muModal').classList.remove('hidden');
+            const panel = document.getElementById('profilePanel');
+            const overlay = document.getElementById('profilePanelOverlay');
+            if (panel && overlay) {
+                panel.classList.add('translate-x-full');
+                overlay.classList.add('hidden');
+            }
+            AuthModule.loadUsersList();
+        }
+        if (e.target.closest('#closeMuModalBtn') || e.target.id === 'muModalOverlay') {
+            document.getElementById('muModal').classList.add('hidden');
+            document.getElementById('muSearchInput').value = '';
+            document.getElementById('muFilterStatus').value = '';
+        }
+
         // Global Image Viewer Logic
         if (e.target.closest('.view-avatar-btn')) {
             const btn = e.target.closest('.view-avatar-btn');
-            const modal = document.getElementById('globalImageModal');
-            const img = document.getElementById('globalImageSrc');
-            const nameEl = document.getElementById('globalImageName');
-            const controls = document.getElementById('globalImageControls');
+            imageElements = Array.from(document.querySelectorAll('.view-avatar-btn'));
+            currentImageIndex = imageElements.indexOf(btn);
             
-            if (modal && img) {
-                AuthModule.currentImageList = Array.from(document.querySelectorAll('.view-avatar-btn'));
-                AuthModule.currentImageIndex = AuthModule.currentImageList.indexOf(btn);
-                
-                const src = btn.dataset.src;
-                const name = btn.dataset.name || btn.alt || 'Unknown';
-                
-                img.src = src;
-                if (nameEl) nameEl.textContent = name;
-                
-                if (AuthModule.currentImageList.length > 1) {
-                    controls.classList.remove('hidden');
-                } else {
-                    controls.classList.add('hidden');
-                }
-                
-                modal.classList.remove('hidden');
-            }
+            AuthModule.updateGlobalImageModal();
+            document.getElementById('globalImageModal').classList.remove('hidden');
         }
-
+        
         if (e.target.closest('#prevGlobalImageBtn')) {
-            if (AuthModule.currentImageList.length > 0) {
-                AuthModule.currentImageIndex = (AuthModule.currentImageIndex > 0) 
-                    ? AuthModule.currentImageIndex - 1 
-                    : AuthModule.currentImageList.length - 1;
-                AuthModule.updateGlobalImage();
+            if (currentImageIndex > 0) {
+                currentImageIndex--;
+                AuthModule.updateGlobalImageModal();
             }
         }
-
+        
         if (e.target.closest('#nextGlobalImageBtn')) {
-            if (AuthModule.currentImageList.length > 0) {
-                AuthModule.currentImageIndex = (AuthModule.currentImageIndex < AuthModule.currentImageList.length - 1) 
-                    ? AuthModule.currentImageIndex + 1 
-                    : 0;
-                AuthModule.updateGlobalImage();
+            if (currentImageIndex < imageElements.length - 1) {
+                currentImageIndex++;
+                AuthModule.updateGlobalImageModal();
             }
         }
-
+        
         if (e.target.closest('#closeGlobalImageBtn') || e.target.id === 'closeGlobalImageBg') {
             const modal = document.getElementById('globalImageModal');
             const img = document.getElementById('globalImageSrc');
             if (modal && img) {
                 modal.classList.add('hidden');
                 img.src = '';
-                AuthModule.currentImageList = [];
-                AuthModule.currentImageIndex = -1;
+                document.getElementById('globalImageDetails').classList.add('hidden');
             }
         }
     },
 
-    updateGlobalImage: () => {
-        if (AuthModule.currentImageIndex >= 0 && AuthModule.currentImageIndex < AuthModule.currentImageList.length) {
-            const btn = AuthModule.currentImageList[AuthModule.currentImageIndex];
-            const img = document.getElementById('globalImageSrc');
-            const nameEl = document.getElementById('globalImageName');
+    updateGlobalImageModal: () => {
+        const imgEl = imageElements[currentImageIndex];
+        if (!imgEl) return;
+        
+        const src = imgEl.dataset.src || imgEl.getAttribute('src');
+        const name = imgEl.dataset.name;
+        const info = imgEl.dataset.info;
+        
+        document.getElementById('globalImageSrc').src = src;
+        
+        const detailsDiv = document.getElementById('globalImageDetails');
+        if (name || info) {
+            detailsDiv.classList.remove('hidden');
+            document.getElementById('giName').textContent = name || '';
+            document.getElementById('giInfo').textContent = info || '';
+        } else {
+            detailsDiv.classList.add('hidden');
+        }
+        
+        const prevBtn = document.getElementById('prevGlobalImageBtn');
+        const nextBtn = document.getElementById('nextGlobalImageBtn');
+        
+        if (imageElements.length > 1) {
+            prevBtn.classList.toggle('hidden', currentImageIndex === 0);
+            nextBtn.classList.toggle('hidden', currentImageIndex === imageElements.length - 1);
+        } else {
+            prevBtn.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+        }
+    },
+
+    loadUsersList: async () => {
+        const listContainer = document.getElementById('manageUsersList');
+        if(!listContainer) return;
+        
+        listContainer.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br><span class="text-gray-500">Loading users...</span></div>';
+        
+        try {
+            const data = await apiFetch('/api/users');
+            AuthModule.allUsersData = data.users;
+            AuthModule.renderUsersList();
+        } catch(e) {
+             listContainer.innerHTML = `<div class="p-4 text-red-500 border border-red-200 bg-red-50 rounded text-center font-medium">${e.message}</div>`;
+        }
+    },
+
+    renderUsersList: () => {
+        const search = (document.getElementById('muSearchInput')?.value || '').toLowerCase();
+        const status = document.getElementById('muFilterStatus')?.value || '';
+        const listContainer = document.getElementById('manageUsersList');
+        
+        if (!AuthModule.allUsersData) return;
+
+        let filtered = AuthModule.allUsersData.filter(u => {
+            const matchName = u.Name.toLowerCase().includes(search) || (u.Student_Number||'').toLowerCase().includes(search);
+            const matchStatus = status ? u.account_status === status : true;
+            return matchName && matchStatus;
+        });
+
+        if (filtered.length === 0) {
+            listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded shadow-sm">No users found matching filters.</div>';
+            return;
+        }
+
+        const html = filtered.map(u => {
+            const displayCourse = `${u.course || ''} ${u.year || ''} ${u.section ? '- ' + u.section : ''}`.trim();
+            const avatarSrc = getLoadableAvatarSrc(u.Avatar);
+            const avatarImg = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover border border-gray-200">` : `<i class="fa-solid fa-circle-user text-[40px] text-gray-300"></i>`;
             
-            if (img && btn) {
-                img.src = btn.dataset.src;
-                if (nameEl) nameEl.textContent = btn.dataset.name || btn.alt || 'Unknown';
-            }
-        }
+            const getStatusColor = (st) => {
+                return st === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
+                       st === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
+                       st === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
+                       st === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
+                       st === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50';
+            };
+
+            return `
+                <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded shadow-sm hover:border-blue-300 transition">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">${avatarImg}</div>
+                        <div>
+                            <div class="font-bold text-gray-800 text-sm flex items-center gap-2">
+                                ${u.Name} 
+                                <span class="text-[10px] bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">${u.role}</span>
+                            </div>
+                            <div class="text-[11px] text-gray-500 mt-0.5">
+                                <span class="font-bold text-gray-700">${u.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-32">
+                        <select data-user-id="${u.User_ID}" class="mu-status-select w-full px-2 py-1.5 text-xs border rounded outline-none font-bold cursor-pointer transition ${getStatusColor(u.account_status)}">
+                            <option value="Active" ${u.account_status === 'Active' ? 'selected' : ''}>Active</option>
+                            <option value="Inactive" ${u.account_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                            <option value="Suspended" ${u.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                            <option value="UD" ${u.account_status === 'UD' ? 'selected' : ''}>UD</option>
+                            <option value="Dropped" ${u.account_status === 'Dropped' ? 'selected' : ''}>Dropped</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        listContainer.innerHTML = html;
     },
 
-    handleChanges: (e) => {
+    handleChanges: async (e) => {
         if (e.target.id === 'regCameraInput' || e.target.id === 'regFileInput') {
             AuthModule.processImageUpload(e.target.files[0]);
+        }
+        
+        if (e.target.classList.contains('mu-status-select')) {
+            const studentId = e.target.dataset.userId;
+            const status = e.target.value;
+            
+            const getStatusColor = (st) => {
+                return st === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
+                       st === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
+                       st === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
+                       st === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
+                       st === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50';
+            };
+            
+            e.target.className = `mu-status-select w-full px-2 py-1.5 text-xs border rounded outline-none font-bold cursor-pointer transition ${getStatusColor(status)}`;
+            
+            try {
+                await apiFetch('/api/update-user-status', {
+                    method: 'POST',
+                    body: JSON.stringify({ studentId, status })
+                });
+                
+                // Update internal array
+                const userObj = AuthModule.allUsersData.find(u => u.User_ID === studentId);
+                if (userObj) userObj.account_status = status;
+                
+            } catch (err) {
+                console.error('Failed to update user status:', err);
+                alert('Failed to update status.');
+            }
         }
     },
 
@@ -210,6 +348,10 @@ export const AuthModule = {
             } else {
                 e.target.value = val;
             }
+        }
+        
+        if (e.target.id === 'muSearchInput' || e.target.id === 'muFilterStatus') {
+            AuthModule.renderUsersList();
         }
     },
 
