@@ -10,7 +10,7 @@ async function hashPassword(password) {
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
-        const path = url.pathname.replace(/\/$/, ''); // Normalize trailing slashes
+        const path = url.pathname.replace(/\/$/, ''); 
         const requestOrigin = request.headers.get("Origin");
         
         let allowedOrigin = env.ALLOWED_ORIGIN || "*";
@@ -542,6 +542,24 @@ export default {
                     sessions: sessions.results,
                     records: records.results
                 }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/recitation-pool") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const pool = await env.DB.prepare(`
+                    SELECT u.User_ID, u.Name, u.Avatar, COALESCE(SUM(a.Performance_Points), 0) as Total_Points
+                    FROM Enrollments e
+                    JOIN Users u ON e.Student_ID = u.User_ID
+                    LEFT JOIN Attendance a ON e.Student_ID = a.Student_ID AND e.Course_ID = a.Course_ID
+                    WHERE e.Course_ID = ?
+                    GROUP BY u.User_ID, u.Name, u.Avatar
+                `).bind(courseId).all();
+
+                return new Response(JSON.stringify({ success: true, students: pool.results }), { status: 200, headers: corsHeaders });
             }
 
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
