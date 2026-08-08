@@ -231,6 +231,22 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && url.pathname === "/api/update-course-terms") {
+                const body = await request.json();
+                
+                await env.DB.prepare(
+                    `UPDATE Courses SET Midterm_Start = ?, Midterm_End = ?, Final_Start = ?, Final_End = ? WHERE Course_ID = ?`
+                ).bind(
+                    body.midtermStart || null, 
+                    body.midtermEnd || null, 
+                    body.finalStart || null, 
+                    body.finalEnd || null, 
+                    body.courseId
+                ).run();
+                
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "GET" && url.pathname === "/api/courses") {
                 const studentId = url.searchParams.get("studentId");
                 
@@ -336,7 +352,7 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name 
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name, e.Assigned_Topic 
                      FROM Enrollments e 
                      JOIN Users u ON e.Student_ID = u.User_ID 
                      WHERE e.Course_ID = ?`
@@ -389,8 +405,8 @@ export default {
                 const body = await request.json();
                 
                 await env.DB.prepare(
-                    `UPDATE Enrollments SET Seat_Number = ?, Group_Name = ? WHERE Course_ID = ? AND Student_ID = ?`
-                ).bind(body.seatNumber, body.groupName, body.courseId, body.studentId).run();
+                    `UPDATE Enrollments SET Seat_Number = ?, Group_Name = ?, Assigned_Topic = ? WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.seatNumber, body.groupName, body.assignedTopic, body.courseId, body.studentId).run();
                 
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
