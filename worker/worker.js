@@ -12,7 +12,6 @@ export default {
         const url = new URL(request.url);
         const requestOrigin = request.headers.get("Origin");
         
-        // Default to environment variable, but dynamically allow both www and non-www
         let allowedOrigin = env.ALLOWED_ORIGIN || "*";
         if (requestOrigin === "https://plv.workers.dev" || requestOrigin === "https://www.plv.workers.dev") {
             allowedOrigin = requestOrigin;
@@ -29,9 +28,6 @@ export default {
         }
 
         try {
-            // ==========================================
-            // AUTHENTICATION & REGISTRATION ENDPOINTS
-            // ==========================================
             if (request.method === "POST" && url.pathname === "/api/register") {
                 const body = await request.json();
                 
@@ -173,9 +169,6 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Password reset successfully" }), { status: 200, headers: corsHeaders });
             }
 
-            // ==========================================
-            // USER MANAGEMENT
-            // ==========================================
             if (request.method === "GET" && url.pathname === "/api/users") {
                 const users = await env.DB.prepare(
                     `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role 
@@ -195,9 +188,6 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
-            // ==========================================
-            // PROGRAMS (REGISTRATION COURSE LIST)
-            // ==========================================
             if (request.method === "POST" && url.pathname === "/api/programs") {
                 const body = await request.json();
                 const code = body.programCode ? body.programCode.trim().toUpperCase() : "";
@@ -206,7 +196,6 @@ export default {
                     return new Response(JSON.stringify({ error: "Program code is required" }), { status: 400, headers: corsHeaders });
                 }
                 
-                // Avoid duplication
                 const existing = await env.DB.prepare("SELECT Program_ID FROM Programs WHERE ProgramCode = ?").bind(code).first();
                 if (existing) {
                     return new Response(JSON.stringify({ error: "Course (Program) already exists in the list." }), { status: 400, headers: corsHeaders });
@@ -227,9 +216,6 @@ export default {
                 }
             }
 
-            // ==========================================
-            // COURSE MANAGEMENT ENDPOINTS
-            // ==========================================
             if (request.method === "POST" && url.pathname === "/api/courses") {
                 const body = await request.json();
                 const courseId = crypto.randomUUID();
@@ -359,9 +345,6 @@ export default {
                 return new Response(JSON.stringify({ success: true, course: course, students: students.results }), { status: 200, headers: corsHeaders });
             }
 
-            // ==========================================
-            // LECTURER MANUAL ENROLL (UNENROLLED STUDENTS LIST)
-            // ==========================================
             if (request.method === "GET" && url.pathname === "/api/unenrolled-students") {
                 const courseId = url.searchParams.get("courseId");
                 const courseFilter = url.searchParams.get("courseFilter");
@@ -402,9 +385,6 @@ export default {
                 return new Response(JSON.stringify({ success: true, students: students.results }), { status: 200, headers: corsHeaders });
             }
 
-            // ==========================================
-            // STUDENT INFO UPDATES (SEAT/GROUP)
-            // ==========================================
             if (request.method === "POST" && url.pathname === "/api/update-student-info") {
                 const body = await request.json();
                 
@@ -415,9 +395,21 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
-            // ==========================================
-            // ATTENDANCE ENDPOINTS
-            // ==========================================
+            if (request.method === "GET" && url.pathname === "/api/attendance") {
+                const courseId = url.searchParams.get("courseId");
+                const date = url.searchParams.get("date");
+                
+                if (!courseId || !date) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const records = await env.DB.prepare(
+                    "SELECT Student_ID, Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Date = ?"
+                ).bind(courseId, date).all();
+
+                return new Response(JSON.stringify({ success: true, records: records.results }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && url.pathname === "/api/attendance") {
                 const body = await request.json();
                 const { courseId, date, records } = body;
@@ -426,7 +418,6 @@ export default {
                     return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: corsHeaders });
                 }
 
-                // Delete existing records for this course and date to allow overwriting
                 await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
 
                 if (records.length > 0) {
