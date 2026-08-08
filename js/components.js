@@ -12,8 +12,6 @@ export const getLoadableAvatarSrc = (src) => {
     return src;
 };
 
-// --- Sub-components for Dashboard ---
-
 const DashboardUI = {
     renderHeader: (user, headerAvatar) => `
         <header class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
@@ -246,8 +244,6 @@ const DashboardUI = {
     `
 };
 
-// --- Sub-components for Class Screen ---
-
 const ClassUI = {
     renderCourseMenuModal: (course) => `
         <div id="courseMenuModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
@@ -394,7 +390,6 @@ const ClassUI = {
                 <div id="summaryError" class="hidden text-center py-6 text-red-500 font-bold"></div>
 
                 <div id="summaryContent" class="hidden space-y-4">
-                    <!-- Mid Term -->
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
                         <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
                         
@@ -432,7 +427,6 @@ const ClassUI = {
                         </div>
                     </div>
 
-                    <!-- Final Term -->
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
                         <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star text-yellow-500 mr-2"></i>Final Term</h4>
                         
@@ -535,6 +529,37 @@ const ClassUI = {
 
                 <div id="unenrolledStudentsList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
                     <div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderRecitationModal: () => `
+        <div id="recitationModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-4">
+            <div id="recitationModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm cursor-pointer"></div>
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 scale-up flex flex-col items-center">
+                <div class="w-full flex justify-between items-center mb-6 border-b pb-3">
+                    <h3 class="text-lg font-black text-gray-800"><i class="fa-solid fa-dharmachakra text-purple-600 mr-2"></i>Recitation Picker</h3>
+                    <button id="closeRecitationModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="relative w-64 h-64 mb-6">
+                    <div class="absolute top-[-15px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-600 z-20 filter drop-shadow-md"></div>
+                    <div id="recitationWheel" class="w-full h-full rounded-full border-4 border-gray-700 shadow-inner overflow-hidden relative">
+                    </div>
+                </div>
+                
+                <button id="spinWheelBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-lg shadow-md transition transform active:scale-95 focus:outline-none">
+                    SPIN WHEEL
+                </button>
+                
+                <div id="recitationResult" class="hidden w-full mt-6 text-center fade-in bg-purple-50 p-4 rounded-xl border border-purple-200">
+                    <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Selected Student</p>
+                    <div id="recitationResultAvatar" class="mb-3"></div>
+                    <h4 id="recitationResultName" class="text-xl font-black text-gray-900"></h4>
+                    <p id="recitationResultPoints" class="text-sm font-bold text-gray-500 mt-1"></p>
                 </div>
             </div>
         </div>
@@ -803,9 +828,9 @@ export const Components = {
                                     <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
                                 </div>
                                 <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
-                                    Seat: <span class="text-gray-800">${s.Seat_Number || '--'}</span>
-                                    &nbsp;|&nbsp; Group: <span class="text-gray-800">${s.Group_Name || '--'}</span>
-                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || '--'}</span>
+                                    Seat: <span class="text-gray-800">${s.Seat_Number || '-'}</span>
+                                    &nbsp;|&nbsp; Group: <span class="text-gray-800">${s.Group_Name || '-'}</span>
+                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || '-'}</span>
                                 </div>
                             </div>
                         </div>
@@ -885,7 +910,7 @@ export const Components = {
                 </div>
             </header>
 
-            <main class="pt-20 pb-12 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in">
+            <main class="pt-20 pb-12 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in relative">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 mt-2 sm:mt-4 gap-4 px-2 sm:px-0">
                     <div>
                         <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
@@ -924,6 +949,10 @@ export const Components = {
                         ${students.length > 0 ? studentList : emptyState}
                     </div>
                 </div>
+
+                <button id="openRecitationBtn" class="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition flex justify-center items-center z-50 focus:outline-none" title="Random Recitation">
+                    <i class="fa-solid fa-dharmachakra text-2xl"></i>
+                </button>
             </main>
 
             ${ClassUI.renderCourseMenuModal(course)}
@@ -932,6 +961,7 @@ export const Components = {
             ${ClassUI.renderSummaryModal()}
             ${ClassUI.renderDetailsModal()}
             ${ClassUI.renderAddStudentModal()}
+            ${ClassUI.renderRecitationModal()}
         `;
     }
 };
