@@ -1,6 +1,5 @@
 // js/globals.js
 export const CONFIG = {
-    // Updated to the new API URL without the "www" to ensure uniform requests
     API_URL: "https://2026-api.plv.workers.dev" 
 };
 
