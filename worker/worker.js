@@ -174,8 +174,16 @@ export default {
             }
 
             // ==========================================
-            // USER STATUS UPDATE
+            // USER MANAGEMENT
             // ==========================================
+            if (request.method === "GET" && url.pathname === "/api/users") {
+                const users = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role 
+                     FROM Users ORDER BY Name ASC`
+                ).all();
+                return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && url.pathname === "/api/update-user-status") {
                 const body = await request.json();
                 if (!body.studentId || !body.status) {
@@ -342,7 +350,7 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name 
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name 
                      FROM Enrollments e 
                      JOIN Users u ON e.Student_ID = u.User_ID 
                      WHERE e.Course_ID = ?`
