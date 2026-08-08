@@ -48,6 +48,23 @@ export const AuthModule = {
             document.getElementById('regFileInput').click();
         }
         
+        // Login Password Toggle
+        if (e.target.closest('#toggleLoginPassword')) {
+            const pwdInput = document.getElementById('loginPassword');
+            const eyeIcon = document.getElementById('loginPasswordEye');
+            if (pwdInput && eyeIcon) {
+                if (pwdInput.type === 'password') {
+                    pwdInput.type = 'text';
+                    eyeIcon.classList.remove('fa-eye');
+                    eyeIcon.classList.add('fa-eye-slash');
+                } else {
+                    pwdInput.type = 'password';
+                    eyeIcon.classList.remove('fa-eye-slash');
+                    eyeIcon.classList.add('fa-eye');
+                }
+            }
+        }
+        
         // Sliding Panel Toggle Logic
         if (e.target.closest('#profileToggleBtn')) {
             const panel = document.getElementById('profilePanel');
@@ -123,7 +140,7 @@ export const AuthModule = {
         // Global Image Viewer Logic
         if (e.target.closest('.view-avatar-btn')) {
             const btn = e.target.closest('.view-avatar-btn');
-            const src = btn.dataset.src;
+            const src = btn.dataset.src || btn.getAttribute('src');
             const modal = document.getElementById('globalImageModal');
             const img = document.getElementById('globalImageSrc');
             
