@@ -10,6 +10,7 @@ async function hashPassword(password) {
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
+        const path = url.pathname.replace(/\/$/, ''); // Normalize trailing slashes
         const requestOrigin = request.headers.get("Origin");
         
         let allowedOrigin = env.ALLOWED_ORIGIN || "*";
@@ -28,7 +29,7 @@ export default {
         }
 
         try {
-            if (request.method === "POST" && url.pathname === "/api/register") {
+            if (request.method === "POST" && path === "/api/register") {
                 const body = await request.json();
                 
                 const studentNoFormat = /^\d{2}-\d{4}$/;
@@ -113,7 +114,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/login") {
+            if (request.method === "POST" && path === "/api/login") {
                 const body = await request.json();
                 const hashedPassword = await hashPassword(body.password);
                 const id = body.identifier;
@@ -138,7 +139,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/change-password") {
+            if (request.method === "POST" && path === "/api/change-password") {
                 const body = await request.json();
                 const { userId, currentPassword, newPassword } = body;
                 
@@ -155,7 +156,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Password updated successfully" }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/reset-student-password") {
+            if (request.method === "POST" && path === "/api/reset-student-password") {
                 const body = await request.json();
                 const { studentId } = body;
                 
@@ -169,7 +170,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Password reset successfully" }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "GET" && url.pathname === "/api/users") {
+            if (request.method === "GET" && path === "/api/users") {
                 const users = await env.DB.prepare(
                     `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role 
                      FROM Users ORDER BY Name ASC`
@@ -177,7 +178,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/update-user-status") {
+            if (request.method === "POST" && path === "/api/update-user-status") {
                 const body = await request.json();
                 if (!body.studentId || !body.status) {
                     return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400, headers: corsHeaders });
@@ -188,7 +189,7 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/programs") {
+            if (request.method === "POST" && path === "/api/programs") {
                 const body = await request.json();
                 const code = body.programCode ? body.programCode.trim().toUpperCase() : "";
                 
@@ -207,7 +208,7 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
             }
 
-            if (request.method === "GET" && url.pathname === "/api/programs") {
+            if (request.method === "GET" && path === "/api/programs") {
                 try {
                     const programs = await env.DB.prepare("SELECT * FROM Programs ORDER BY ProgramCode ASC").all();
                     return new Response(JSON.stringify({ success: true, programs: programs.results }), { status: 200, headers: corsHeaders });
@@ -216,7 +217,7 @@ export default {
                 }
             }
 
-            if (request.method === "POST" && url.pathname === "/api/courses") {
+            if (request.method === "POST" && path === "/api/courses") {
                 const body = await request.json();
                 const courseId = crypto.randomUUID();
                 
@@ -231,7 +232,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/update-course-terms") {
+            if (request.method === "POST" && path === "/api/update-course-terms") {
                 const body = await request.json();
                 
                 await env.DB.prepare(
@@ -247,7 +248,7 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "GET" && url.pathname === "/api/courses") {
+            if (request.method === "GET" && path === "/api/courses") {
                 const studentId = url.searchParams.get("studentId");
                 
                 let courses;
@@ -282,7 +283,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, courses: courses.results }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/enroll") {
+            if (request.method === "POST" && path === "/api/enroll") {
                 const body = await request.json();
                 
                 const existing = await env.DB.prepare(
@@ -301,7 +302,7 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/unenroll") {
+            if (request.method === "POST" && path === "/api/unenroll") {
                 const body = await request.json();
                 
                 if (!body.courseId || !body.studentId) {
@@ -319,7 +320,7 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "GET" && url.pathname === "/api/my-courses") {
+            if (request.method === "GET" && path === "/api/my-courses") {
                 const userId = url.searchParams.get("userId");
                 const role = url.searchParams.get("role");
                 
@@ -340,7 +341,7 @@ export default {
                 }
             }
 
-            if (request.method === "GET" && url.pathname === "/api/course-details") {
+            if (request.method === "GET" && path === "/api/course-details") {
                 const courseId = url.searchParams.get("courseId");
                 if (!courseId) {
                     return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
@@ -361,7 +362,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, course: course, students: students.results }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "GET" && url.pathname === "/api/unenrolled-students") {
+            if (request.method === "GET" && path === "/api/unenrolled-students") {
                 const courseId = url.searchParams.get("courseId");
                 const courseFilter = url.searchParams.get("courseFilter");
                 const yearFilter = url.searchParams.get("yearFilter");
@@ -401,7 +402,7 @@ export default {
                 return new Response(JSON.stringify({ success: true, students: students.results }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/update-student-info") {
+            if (request.method === "POST" && path === "/api/update-student-info") {
                 const body = await request.json();
                 
                 await env.DB.prepare(
@@ -411,7 +412,43 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "GET" && url.pathname === "/api/attendance") {
+            if (request.method === "GET" && path === "/api/no-class") {
+                const courseId = url.searchParams.get("courseId");
+                const sessions = await env.DB.prepare(
+                    "SELECT Date FROM Course_Sessions WHERE Course_ID = ? AND Is_No_Class = 1 ORDER BY Date DESC"
+                ).bind(courseId).all();
+                return new Response(JSON.stringify({ success: true, dates: sessions.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/no-class") {
+                const body = await request.json();
+                const { courseId, date } = body;
+
+                if (!courseId || !date) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare("SELECT Session_ID FROM Course_Sessions WHERE Course_ID = ? AND Date = ?").bind(courseId, date).first();
+                if (!existing) {
+                    const sessionId = crypto.randomUUID();
+                    await env.DB.prepare("INSERT INTO Course_Sessions (Session_ID, Course_ID, Date, Is_No_Class) VALUES (?, ?, ?, 1)").bind(sessionId, courseId, date).run();
+                    
+                    await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+                }
+
+                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "DELETE" && path === "/api/no-class") {
+                const body = await request.json();
+                const { courseId, date } = body;
+                
+                await env.DB.prepare("DELETE FROM Course_Sessions WHERE Course_ID = ? AND Date = ? AND Is_No_Class = 1").bind(courseId, date).run();
+                
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/attendance") {
                 const courseId = url.searchParams.get("courseId");
                 const date = url.searchParams.get("date");
                 
@@ -432,22 +469,15 @@ export default {
                 return new Response(JSON.stringify({ success: true, records: records.results, isNoClass: isNoClass }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/attendance") {
+            if (request.method === "POST" && path === "/api/attendance") {
                 const body = await request.json();
-                const { courseId, date, records, isNoClass } = body;
+                const { courseId, date, records } = body;
 
                 if (!courseId || !date) {
                     return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: corsHeaders });
                 }
 
-                await env.DB.prepare("DELETE FROM Course_Sessions WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
-                
-                const sessionId = crypto.randomUUID();
-                await env.DB.prepare("INSERT INTO Course_Sessions (Session_ID, Course_ID, Date, Is_No_Class) VALUES (?, ?, ?, ?)").bind(sessionId, courseId, date, isNoClass ? 1 : 0).run();
-
-                if (isNoClass) {
-                    await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
-                } else if (records && Array.isArray(records)) {
+                if (records && Array.isArray(records)) {
                     await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
 
                     if (records.length > 0) {
@@ -460,7 +490,6 @@ export default {
                                 ).bind(attId, courseId, record.studentId, date, record.status, record.points)
                             );
                         }
-                        
                         await env.DB.batch(statements);
                     }
                 }
@@ -468,21 +497,17 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Attendance saved" }), { status: 201, headers: corsHeaders });
             }
 
-            if (request.method === "POST" && url.pathname === "/api/attendance/single") {
+            if (request.method === "POST" && path === "/api/attendance/single") {
                 const body = await request.json();
-                const { courseId, studentId, date, status, points, isNoClass } = body;
+                const { courseId, studentId, date, status, points } = body;
                 
                 if (!courseId || !studentId || !date) {
                     return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
                 }
 
-                await env.DB.prepare("DELETE FROM Course_Sessions WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
-                const sessionId = crypto.randomUUID();
-                await env.DB.prepare("INSERT INTO Course_Sessions (Session_ID, Course_ID, Date, Is_No_Class) VALUES (?, ?, ?, ?)").bind(sessionId, courseId, date, isNoClass ? 1 : 0).run();
-
                 await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?").bind(courseId, studentId, date).run();
 
-                if (status && !isNoClass) {
+                if (status) {
                     const attId = crypto.randomUUID();
                     await env.DB.prepare(
                         "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
@@ -492,7 +517,7 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
-            if (request.method === "GET" && url.pathname === "/api/student-summary") {
+            if (request.method === "GET" && path === "/api/student-summary") {
                 const courseId = url.searchParams.get("courseId");
                 const studentId = url.searchParams.get("studentId");
                 
@@ -500,7 +525,7 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
                 }
 
-                const course = await env.DB.prepare("SELECT Midterm_Start, Midterm_End, Final_Start, Final_End FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                const course = await env.DB.prepare("SELECT Midterm_Start, Midterm_End, Final_Start, Final_End, ScheduleDay FROM Courses WHERE Course_ID = ?").bind(courseId).first();
                 if (!course) {
                     return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
                 }
