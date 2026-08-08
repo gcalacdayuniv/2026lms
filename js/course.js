@@ -44,6 +44,35 @@ export const CourseModule = {
         }`;
     },
 
+    loadNoClassDays: async (courseId) => {
+        const list = document.getElementById('noClassList');
+        if (!list) return;
+        
+        list.innerHTML = '<div class="text-center py-4 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading...</div>';
+        
+        try {
+            const ts = new Date().getTime();
+            const data = await apiFetch(`/api/no-class?courseId=${courseId}&_t=${ts}`);
+            
+            if (!data.dates || data.dates.length === 0) {
+                list.innerHTML = '<div class="text-center py-4 text-xs font-medium text-gray-500 italic">No dates currently set.</div>';
+                return;
+            }
+            
+            list.innerHTML = data.dates.map(d => `
+                <div class="flex justify-between items-center bg-white p-2 border border-gray-200 rounded">
+                    <span class="font-bold text-sm text-gray-700"><i class="fa-regular fa-calendar text-gray-400 mr-2"></i> ${d.Date}</span>
+                    <button type="button" class="remove-no-class-btn text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition focus:outline-none" data-date="${d.Date}">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+            
+        } catch (err) {
+            list.innerHTML = `<div class="text-red-500 text-xs font-bold text-center py-2">${err.message}</div>`;
+        }
+    },
+
     handleForms: async (e) => {
         if (e.target.id === 'addCourseForm') {
             e.preventDefault();
@@ -77,18 +106,6 @@ export const CourseModule = {
     },
 
     handleChanges: async (e) => {
-        if (e.target.id === 'noClassToggle') {
-            const isNoClass = e.target.checked;
-            const container = document.getElementById('rosterListContainer');
-            if (container) {
-                if (isNoClass) {
-                    container.classList.add('opacity-50', 'pointer-events-none');
-                } else {
-                    container.classList.remove('opacity-50', 'pointer-events-none');
-                }
-            }
-        }
-        
         if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput' || e.target.id === 'manageTopicInput') {
             const studentId = document.getElementById('manageStudentId').value;
             const seatNumber = document.getElementById('manageSeatInput').value.trim();
@@ -156,6 +173,67 @@ export const CourseModule = {
 
         if (e.target.closest('#closeCourseMenuBtn') || e.target.id === 'closeCourseMenuBg') {
             document.getElementById('courseMenuModal').classList.add('hidden');
+        }
+
+        // Manage No Class Days Logic
+        if (e.target.closest('#openNoClassModalBtn')) {
+            document.getElementById('courseMenuModal').classList.add('hidden');
+            document.getElementById('noClassModal').classList.remove('hidden');
+            const courseId = window.location.hash.replace('#class-', '');
+            await CourseModule.loadNoClassDays(courseId);
+        }
+        
+        if (e.target.closest('#closeNoClassModalBtn') || e.target.id === 'closeNoClassModalBg') {
+            document.getElementById('noClassModal').classList.add('hidden');
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateInput = document.getElementById('attendanceDate');
+            if (dateInput && dateInput.value) {
+                await CourseModule.loadAttendanceData(courseId, dateInput.value);
+            }
+        }
+        
+        if (e.target.closest('#addNoClassBtn')) {
+            const dateInput = document.getElementById('addNoClassDate');
+            if (!dateInput.value) return;
+            const courseId = window.location.hash.replace('#class-', '');
+            const btn = e.target.closest('#addNoClassBtn');
+            const originalHtml = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                await apiFetch('/api/no-class', {
+                    method: 'POST',
+                    body: JSON.stringify({ courseId, date: dateInput.value })
+                });
+                dateInput.value = '';
+                await CourseModule.loadNoClassDays(courseId);
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+        
+        if (e.target.closest('.remove-no-class-btn')) {
+            const btn = e.target.closest('.remove-no-class-btn');
+            const date = btn.dataset.date;
+            const courseId = window.location.hash.replace('#class-', '');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                await apiFetch('/api/no-class', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ courseId, date })
+                });
+                await CourseModule.loadNoClassDays(courseId);
+            } catch (err) {
+                alert(err.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            }
         }
 
         // Save Course Terms Logic
@@ -444,10 +522,14 @@ export const CourseModule = {
             const dateVal = document.getElementById('attendanceDate').value;
             const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
             const pointsInput = row.querySelector('.points-input');
-            const isNoClass = document.getElementById('noClassToggle').checked;
+            const banner = document.getElementById('noClassBanner');
             
             if (!dateVal) {
                 alert("Please select a date first to save attendance.");
+                return;
+            }
+            if (banner && !banner.classList.contains('hidden')) {
+                alert("This date is marked as NO CLASS. Adjust it in the Course Actions menu.");
                 return;
             }
             
@@ -461,7 +543,7 @@ export const CourseModule = {
             try {
                 await apiFetch('/api/attendance/single', {
                     method: 'POST',
-                    body: JSON.stringify({ courseId, studentId, date: dateVal, status, points, isNoClass })
+                    body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
                 });
                 
                 CourseModule.saveDraft(courseId, dateVal);
@@ -519,7 +601,7 @@ export const CourseModule = {
             const tEnd = parseLocalDate(termEnd);
             
             const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
-            const targetDay = dayMap[course.ScheduleDay];
+            const targetDay = dayMap[(course.ScheduleDay || '').trim()];
 
             let theoreticalDays = 0;
             if (targetDay !== undefined) {
@@ -839,7 +921,7 @@ export const CourseModule = {
         const btn = document.getElementById('saveAttendanceBtn');
         const alertBox = document.getElementById('attendanceAlert');
         const dateVal = document.getElementById('attendanceDate').value;
-        const isNoClass = document.getElementById('noClassToggle').checked;
+        const banner = document.getElementById('noClassBanner');
         const courseId = window.location.hash.replace('#class-', '');
         
         if (!dateVal) {
@@ -848,38 +930,42 @@ export const CourseModule = {
             return;
         }
 
+        if (banner && !banner.classList.contains('hidden')) {
+            alertBox.textContent = "Cannot save attendance on a designated No Class day.";
+            alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
+            return;
+        }
+
         const rows = document.querySelectorAll('.student-row');
         const attendanceData = [];
         let missingCount = 0;
 
-        if (!isNoClass) {
-            rows.forEach(row => {
-                const studentId = row.dataset.studentId;
-                const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-                const pointsInput = row.querySelector('.points-input');
-                const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-                
-                if (selectedBtn) {
-                    attendanceData.push({
-                        studentId: studentId,
-                        status: selectedBtn.dataset.status,
-                        points: points
-                    });
-                } else {
-                    missingCount++;
-                }
-            });
-
-            if (missingCount > 0) {
-                const confirmProceed = window.confirm(`${missingCount} student(s) have no attendance marked. Do you want to proceed anyway? Unmarked students will not be saved.`);
-                if (!confirmProceed) return;
+        rows.forEach(row => {
+            const studentId = row.dataset.studentId;
+            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+            const pointsInput = row.querySelector('.points-input');
+            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
+            
+            if (selectedBtn) {
+                attendanceData.push({
+                    studentId: studentId,
+                    status: selectedBtn.dataset.status,
+                    points: points
+                });
+            } else {
+                missingCount++;
             }
+        });
 
-            if (attendanceData.length === 0) {
-                 alertBox.textContent = "No attendance data to save.";
-                 alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
-                 return;
-            }
+        if (missingCount > 0) {
+            const confirmProceed = window.confirm(`${missingCount} student(s) have no attendance marked. Do you want to proceed anyway? Unmarked students will not be saved.`);
+            if (!confirmProceed) return;
+        }
+
+        if (attendanceData.length === 0) {
+             alertBox.textContent = "No attendance data to save.";
+             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
+             return;
         }
 
         btn.disabled = true;
@@ -889,7 +975,6 @@ export const CourseModule = {
             const payload = {
                 courseId: courseId,
                 date: dateVal,
-                isNoClass: isNoClass,
                 records: attendanceData
             };
 
@@ -914,16 +999,21 @@ export const CourseModule = {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}&_t=${ts}`);
             
-            const noClassToggle = document.getElementById('noClassToggle');
+            const noClassBanner = document.getElementById('noClassBanner');
             const container = document.getElementById('rosterListContainer');
+            const saveBtn = document.getElementById('saveAttendanceBtn');
+            const markAllBtn = document.getElementById('markAllPresent');
             
-            if (noClassToggle) {
-                noClassToggle.checked = data.isNoClass === true;
-                if (data.isNoClass === true) {
-                    container.classList.add('opacity-50', 'pointer-events-none');
-                } else {
-                    container.classList.remove('opacity-50', 'pointer-events-none');
-                }
+            if (data.isNoClass === true) {
+                if(noClassBanner) noClassBanner.classList.remove('hidden');
+                if(container) container.classList.add('opacity-50', 'pointer-events-none');
+                if(saveBtn) saveBtn.disabled = true;
+                if(markAllBtn) markAllBtn.disabled = true;
+            } else {
+                if(noClassBanner) noClassBanner.classList.add('hidden');
+                if(container) container.classList.remove('opacity-50', 'pointer-events-none');
+                if(saveBtn) saveBtn.disabled = false;
+                if(markAllBtn) markAllBtn.disabled = false;
             }
 
             document.querySelectorAll('.student-row').forEach(row => {
@@ -1024,6 +1114,7 @@ export const CourseModule = {
                         if (alertBox) {
                             alertBox.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-2"></i> Unsaved changes restored from local cache.';
                             alertBox.className = "mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium bg-blue-100 text-blue-800 block fade-in";
+                            alertBox.classList.remove('hidden');
                         }
                     }
                 } catch(e) {}
