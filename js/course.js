@@ -501,8 +501,7 @@ export const CourseModule = {
         }
         
         let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
-        let termTotalDays = 0;
-        let studentReqDays = 0;
+        let classDays = 0;
         let pct = 0;
 
         if (termStart && termEnd) {
@@ -536,8 +535,7 @@ export const CourseModule = {
                 }
             });
 
-            termTotalDays = theoreticalDays - noClassDaysCount;
-            if (termTotalDays < 0) termTotalDays = 0;
+            const baseClassDays = theoreticalDays - noClassDaysCount;
 
             const termRecords = records.filter(r => {
                 const rDate = new Date(r.Date);
@@ -554,12 +552,12 @@ export const CourseModule = {
                 totalParticipationPts += (r.Performance_Points || 0);
             });
 
-            studentReqDays = termTotalDays - excused;
-            if (studentReqDays < 0) studentReqDays = 0;
+            classDays = baseClassDays - excused;
+            if (classDays < 0) classDays = 0;
 
             const attendanceScore = (present * 1) + (late * 0.5);
-            if (studentReqDays > 0) {
-                pct = ((attendanceScore / studentReqDays) * 100).toFixed(1);
+            if (classDays > 0) {
+                pct = ((attendanceScore / classDays) * 100).toFixed(1);
             }
         }
 
@@ -567,7 +565,7 @@ export const CourseModule = {
         document.getElementById(`${term}Late`).textContent = late;
         document.getElementById(`${term}Excused`).textContent = excused;
         document.getElementById(`${term}Absent`).textContent = absent;
-        document.getElementById(`${term}TotalDays`).textContent = studentReqDays;
+        document.getElementById(`${term}TotalDays`).textContent = classDays;
         document.getElementById(`${term}AttendancePct`).textContent = pct;
         document.getElementById(`${term}ParticipationScore`).textContent = totalParticipationPts;
     },
