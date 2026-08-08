@@ -42,6 +42,7 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Performance Summary Optimization:** Separated the performance summary modal trigger from the avatar image viewer, now accessible by clicking the student's name. Added a native confirmation prompt prior to fetching data to conserve edge compute resources, and integrated a chronological tabular view of historical attendance and points within the summary modal.
 * **Export Roster for Print:** Added a dedicated utility to generate a print-ready, letter-size HTML roster complete with 1x1 student profile pictures, seat numbers, group names, and contact details.
 * **Global Manage Users Interface:** Implemented a new modal accessible from the lecturer profile panel to search, filter, and dynamically modify the active status of any registered user across the system.
 * **Enhanced Image Viewer:** Upgraded the global image overlay to include next and previous navigation controls, seamlessly displaying the specific user's name, course, year, and section details below the image.
