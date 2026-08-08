@@ -75,16 +75,17 @@ export const CourseModule = {
     },
 
     handleChanges: async (e) => {
-        if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput') {
+        if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput' || e.target.id === 'manageTopicInput') {
             const studentId = document.getElementById('manageStudentId').value;
             const seatNumber = document.getElementById('manageSeatInput').value.trim();
             const groupName = document.getElementById('manageGroupInput').value.trim();
+            const assignedTopic = document.getElementById('manageTopicInput').value.trim();
             const courseId = window.location.hash.replace('#class-', '');
             
             try {
                 await apiFetch('/api/update-student-info', {
                     method: 'POST',
-                    body: JSON.stringify({ courseId, studentId, seatNumber, groupName })
+                    body: JSON.stringify({ courseId, studentId, seatNumber, groupName, assignedTopic })
                 });
             } catch (err) {
                 console.error('Failed to update student info:', err);
@@ -134,6 +135,50 @@ export const CourseModule = {
             await CourseModule.enrollCourse(btn.dataset.id);
         }
 
+        // Hamburger Menu Logic
+        if (e.target.closest('#openCourseMenuBtn')) {
+            document.getElementById('courseMenuModal').classList.remove('hidden');
+        }
+
+        if (e.target.closest('#closeCourseMenuBtn') || e.target.id === 'closeCourseMenuBg') {
+            document.getElementById('courseMenuModal').classList.add('hidden');
+        }
+
+        // Save Course Terms Logic
+        if (e.target.closest('#saveCourseTermsBtn')) {
+            const btn = e.target.closest('#saveCourseTermsBtn');
+            const alertBox = document.getElementById('courseMenuAlert');
+            const courseId = window.location.hash.replace('#class-', '');
+            
+            const payload = {
+                courseId: courseId,
+                midtermStart: document.getElementById('midtermStart').value,
+                midtermEnd: document.getElementById('midtermEnd').value,
+                finalStart: document.getElementById('finalStart').value,
+                finalEnd: document.getElementById('finalEnd').value
+            };
+
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
+
+            try {
+                await apiFetch('/api/update-course-terms', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                alertBox.textContent = "Term periods saved securely.";
+                alertBox.className = "mb-3 p-2 rounded text-xs font-bold bg-green-100 text-green-800 block fade-in";
+            } catch (err) {
+                alertBox.textContent = "Failed to save: " + err.message;
+                alertBox.className = "mb-3 p-2 rounded text-xs font-bold bg-red-100 text-red-800 block fade-in";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
+            }
+        }
+
         if (e.target.closest('#exportRosterBtn')) {
             const btn = e.target.closest('#exportRosterBtn');
             const courseId = btn.dataset.courseId;
@@ -153,6 +198,7 @@ export const CourseModule = {
             document.getElementById('manageStudentId').value = btn.dataset.studentId;
             document.getElementById('manageSeatInput').value = btn.dataset.seat;
             document.getElementById('manageGroupInput').value = btn.dataset.group;
+            document.getElementById('manageTopicInput').value = btn.dataset.topic;
             
             const statusSelect = document.getElementById('manageStatusSelect');
             statusSelect.value = btn.dataset.status;
@@ -274,6 +320,7 @@ export const CourseModule = {
         }
 
         if (e.target.closest('#openAddStudentModalBtn')) {
+            document.getElementById('courseMenuModal').classList.add('hidden');
             document.getElementById('addStudentModal').classList.remove('hidden');
             const courseId = window.location.hash.replace('#class-', '');
             
@@ -485,8 +532,8 @@ export const CourseModule = {
                                 <th>Student No.</th>
                                 <th>Name</th>
                                 <th>Group Name</th>
+                                <th>Assigned Topic</th>
                                 <th>Contact</th>
-                                <th>Email</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -500,8 +547,8 @@ export const CourseModule = {
                                     <td>${s.Student_Number || ''}</td>
                                     <td><strong>${s.Name}</strong></td>
                                     <td>${s.Group_Name || ''}</td>
+                                    <td>${s.Assigned_Topic || ''}</td>
                                     <td>${s.Contact_Number || ''}</td>
-                                    <td>${s.Email || ''}</td>
                                 </tr>
                                 `;
                             }).join('')}
@@ -654,7 +701,7 @@ export const CourseModule = {
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save All Attendance';
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save All';
             setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
         }
     },
