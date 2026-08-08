@@ -16,182 +16,190 @@ export const AuthModule = {
         document.addEventListener('keydown', AuthModule.handleKeydown);
     },
 
-    loadPrograms: async () => {
-        const select = document.getElementById('regCourse');
-        if (!select) return;
-        try {
-            const data = await apiFetch('/api/programs');
-            select.innerHTML = '<option value="" disabled selected>Select Course</option>' + 
-                data.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-        } catch (e) {
-            select.innerHTML = '<option value="" disabled>Error loading courses</option>';
-        }
-    },
+    // --- Event Routers ---
 
     handleForms: async (e) => {
         if (e.target.id === 'loginForm') {
             e.preventDefault();
             await AuthModule.login();
-        }
-        if (e.target.id === 'registerForm') {
+        } else if (e.target.id === 'registerForm') {
             e.preventDefault();
             await AuthModule.register();
-        }
-        if (e.target.id === 'changePasswordForm') {
+        } else if (e.target.id === 'changePasswordForm') {
             e.preventDefault();
             await AuthModule.changePassword();
         }
     },
 
     handleClicks: (e) => {
-        if (e.target.closest('#logoutBtn')) {
-            AuthModule.logout();
-        }
-        if (e.target.closest('#btnCamera')) {
-            document.getElementById('regCameraInput').click();
-        }
-        if (e.target.closest('#btnFile')) {
-            document.getElementById('regFileInput').click();
-        }
+        // Authentication & Media Actions
+        if (e.target.closest('#logoutBtn')) AuthModule.logout();
+        if (e.target.closest('#btnCamera')) document.getElementById('regCameraInput').click();
+        if (e.target.closest('#btnFile')) document.getElementById('regFileInput').click();
+        if (e.target.closest('#toggleLoginPassword')) AuthModule.toggleLoginPassword();
         
-        // Login Password Toggle
-        if (e.target.closest('#toggleLoginPassword')) {
-            const pwdInput = document.getElementById('loginPassword');
-            const eyeIcon = document.getElementById('loginPasswordEye');
-            if (pwdInput && eyeIcon) {
-                if (pwdInput.type === 'password') {
-                    pwdInput.type = 'text';
-                    eyeIcon.classList.remove('fa-eye');
-                    eyeIcon.classList.add('fa-eye-slash');
-                } else {
-                    pwdInput.type = 'password';
-                    eyeIcon.classList.remove('fa-eye-slash');
-                    eyeIcon.classList.add('fa-eye');
-                }
-            }
-        }
-        
-        // Sliding Panel Toggle Logic
-        if (e.target.closest('#profileToggleBtn')) {
-            const panel = document.getElementById('profilePanel');
-            const overlay = document.getElementById('profilePanelOverlay');
-            if (panel && overlay) {
-                panel.classList.remove('translate-x-full');
-                overlay.classList.remove('hidden');
-            }
-        }
-        
-        if (e.target.closest('#closeProfilePanel') || e.target.id === 'profilePanelOverlay') {
-            const panel = document.getElementById('profilePanel');
-            const overlay = document.getElementById('profilePanelOverlay');
-            if (panel && overlay) {
-                panel.classList.add('translate-x-full');
-                overlay.classList.add('hidden');
-            }
-        }
+        // Profile Panel Toggles
+        if (e.target.closest('#profileToggleBtn')) AuthModule.openProfilePanel();
+        if (e.target.closest('#closeProfilePanel') || e.target.id === 'profilePanelOverlay') AuthModule.closeProfilePanel();
 
-        // Change Password Modal Toggle Logic
-        if (e.target.closest('#openCpModalBtn')) {
-            document.getElementById('cpModal').classList.remove('hidden');
-            const panel = document.getElementById('profilePanel');
-            const overlay = document.getElementById('profilePanelOverlay');
-            if (panel && overlay) {
-                panel.classList.add('translate-x-full');
-                overlay.classList.add('hidden');
+        // Modals
+        if (e.target.closest('#openCpModalBtn')) AuthModule.openCpModal();
+        if (e.target.closest('#closeCpModalBtn') || e.target.id === 'cpModalOverlay') AuthModule.closeCpModal();
+
+        if (e.target.closest('#openCreateCourseModalBtn')) AuthModule.openCcModal();
+        if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') AuthModule.closeCcModal();
+
+        if (e.target.closest('#openApModalBtn')) AuthModule.openApModal();
+        if (e.target.closest('#closeApModalBtn') || e.target.id === 'apModalOverlay') AuthModule.closeApModal();
+
+        if (e.target.closest('#openMuModalBtn')) AuthModule.openMuModal();
+        if (e.target.closest('#closeMuModalBtn') || e.target.id === 'muModalOverlay') AuthModule.closeMuModal();
+
+        // Global Image Viewer
+        if (e.target.closest('.view-avatar-btn')) AuthModule.openGlobalImageViewer(e.target.closest('.view-avatar-btn'));
+        if (e.target.closest('#prevGlobalImageBtn')) AuthModule.prevGlobalImage();
+        if (e.target.closest('#nextGlobalImageBtn')) AuthModule.nextGlobalImage();
+        if (e.target.closest('#closeGlobalImageBtn') || e.target.id === 'closeGlobalImageBg') AuthModule.closeGlobalImageViewer();
+    },
+
+    handleChanges: async (e) => {
+        if (e.target.id === 'regCameraInput' || e.target.id === 'regFileInput') {
+            AuthModule.processImageUpload(e.target.files[0]);
+        } else if (e.target.classList.contains('mu-status-select')) {
+            await AuthModule.updateUserStatus(e.target);
+        }
+    },
+
+    handleInput: (e) => {
+        if (e.target.id === 'regStudentNo') {
+            AuthModule.maskStudentNumber(e.target);
+        } else if (e.target.id === 'muSearchInput' || e.target.id === 'muFilterStatus') {
+            AuthModule.renderUsersList();
+        }
+    },
+
+    handleKeydown: (e) => {
+        if (e.target.id === 'regStudentNo' && e.key === 'Backspace') {
+            const input = e.target;
+            if (input.value.length === 3 && input.value.endsWith('-')) {
+                input.value = input.value.substring(0, 1);
+                e.preventDefault();
             }
         }
-        if (e.target.closest('#closeCpModalBtn') || e.target.id === 'cpModalOverlay') {
-            document.getElementById('cpModal').classList.add('hidden');
-            document.getElementById('changePasswordForm').reset();
-            document.getElementById('cpError').classList.add('hidden');
-            document.getElementById('cpSuccess').classList.add('hidden');
-        }
+    },
 
-        // Create Course Modal Toggle Logic
-        if (e.target.closest('#openCreateCourseModalBtn')) {
-            document.getElementById('ccModal').classList.remove('hidden');
-            const panel = document.getElementById('profilePanel');
-            const overlay = document.getElementById('profilePanelOverlay');
-            if (panel && overlay) {
-                panel.classList.add('translate-x-full');
-                overlay.classList.add('hidden');
+    // --- UI & Modal Handlers ---
+
+    toggleLoginPassword: () => {
+        const pwdInput = document.getElementById('loginPassword');
+        const eyeIcon = document.getElementById('loginPasswordEye');
+        if (pwdInput && eyeIcon) {
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                eyeIcon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                pwdInput.type = 'password';
+                eyeIcon.classList.replace('fa-eye-slash', 'fa-eye');
             }
         }
-        if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') {
-            document.getElementById('ccModal').classList.add('hidden');
-            document.getElementById('addCourseForm').reset();
-            const courseErr = document.getElementById('courseError');
-            if(courseErr) courseErr.classList.add('hidden');
-        }
+    },
 
-        // Add Program Modal Toggle Logic
-        if (e.target.closest('#openApModalBtn')) {
-            document.getElementById('apModal').classList.remove('hidden');
-            const panel = document.getElementById('profilePanel');
-            const overlay = document.getElementById('profilePanelOverlay');
-            if (panel && overlay) {
-                panel.classList.add('translate-x-full');
-                overlay.classList.add('hidden');
-            }
+    openProfilePanel: () => {
+        const panel = document.getElementById('profilePanel');
+        const overlay = document.getElementById('profilePanelOverlay');
+        if (panel && overlay) {
+            panel.classList.remove('translate-x-full');
+            overlay.classList.remove('hidden');
         }
-        if (e.target.closest('#closeApModalBtn') || e.target.id === 'apModalOverlay') {
-            document.getElementById('apModal').classList.add('hidden');
-            document.getElementById('addProgramForm').reset();
-            const err = document.getElementById('programError');
-            const succ = document.getElementById('programSuccess');
-            if(err) err.classList.add('hidden');
-            if(succ) succ.classList.add('hidden');
-        }
+    },
 
-        // Manage Users Modal Logic
-        if (e.target.closest('#openMuModalBtn')) {
-            document.getElementById('muModal').classList.remove('hidden');
-            const panel = document.getElementById('profilePanel');
-            const overlay = document.getElementById('profilePanelOverlay');
-            if (panel && overlay) {
-                panel.classList.add('translate-x-full');
-                overlay.classList.add('hidden');
-            }
-            AuthModule.loadUsersList();
+    closeProfilePanel: () => {
+        const panel = document.getElementById('profilePanel');
+        const overlay = document.getElementById('profilePanelOverlay');
+        if (panel && overlay) {
+            panel.classList.add('translate-x-full');
+            overlay.classList.add('hidden');
         }
-        if (e.target.closest('#closeMuModalBtn') || e.target.id === 'muModalOverlay') {
-            document.getElementById('muModal').classList.add('hidden');
-            document.getElementById('muSearchInput').value = '';
-            document.getElementById('muFilterStatus').value = '';
-        }
+    },
 
-        // Global Image Viewer Logic
-        if (e.target.closest('.view-avatar-btn')) {
-            const btn = e.target.closest('.view-avatar-btn');
-            imageElements = Array.from(document.querySelectorAll('.view-avatar-btn'));
-            currentImageIndex = imageElements.indexOf(btn);
-            
+    openCpModal: () => {
+        document.getElementById('cpModal').classList.remove('hidden');
+        AuthModule.closeProfilePanel();
+    },
+
+    closeCpModal: () => {
+        document.getElementById('cpModal').classList.add('hidden');
+        document.getElementById('changePasswordForm').reset();
+        document.getElementById('cpError').classList.add('hidden');
+        document.getElementById('cpSuccess').classList.add('hidden');
+    },
+
+    openCcModal: () => {
+        document.getElementById('ccModal').classList.remove('hidden');
+        AuthModule.closeProfilePanel();
+    },
+
+    closeCcModal: () => {
+        document.getElementById('ccModal').classList.add('hidden');
+        document.getElementById('addCourseForm').reset();
+        const courseErr = document.getElementById('courseError');
+        if (courseErr) courseErr.classList.add('hidden');
+    },
+
+    openApModal: () => {
+        document.getElementById('apModal').classList.remove('hidden');
+        AuthModule.closeProfilePanel();
+    },
+
+    closeApModal: () => {
+        document.getElementById('apModal').classList.add('hidden');
+        document.getElementById('addProgramForm').reset();
+        const err = document.getElementById('programError');
+        const succ = document.getElementById('programSuccess');
+        if (err) err.classList.add('hidden');
+        if (succ) succ.classList.add('hidden');
+    },
+
+    openMuModal: () => {
+        document.getElementById('muModal').classList.remove('hidden');
+        AuthModule.closeProfilePanel();
+        AuthModule.loadUsersList();
+    },
+
+    closeMuModal: () => {
+        document.getElementById('muModal').classList.add('hidden');
+        document.getElementById('muSearchInput').value = '';
+        document.getElementById('muFilterStatus').value = '';
+    },
+
+    openGlobalImageViewer: (btn) => {
+        imageElements = Array.from(document.querySelectorAll('.view-avatar-btn'));
+        currentImageIndex = imageElements.indexOf(btn);
+        AuthModule.updateGlobalImageModal();
+        document.getElementById('globalImageModal').classList.remove('hidden');
+    },
+
+    closeGlobalImageViewer: () => {
+        const modal = document.getElementById('globalImageModal');
+        const img = document.getElementById('globalImageSrc');
+        if (modal && img) {
+            modal.classList.add('hidden');
+            img.src = '';
+            document.getElementById('globalImageDetails').classList.add('hidden');
+        }
+    },
+
+    prevGlobalImage: () => {
+        if (currentImageIndex > 0) {
+            currentImageIndex--;
             AuthModule.updateGlobalImageModal();
-            document.getElementById('globalImageModal').classList.remove('hidden');
         }
-        
-        if (e.target.closest('#prevGlobalImageBtn')) {
-            if (currentImageIndex > 0) {
-                currentImageIndex--;
-                AuthModule.updateGlobalImageModal();
-            }
-        }
-        
-        if (e.target.closest('#nextGlobalImageBtn')) {
-            if (currentImageIndex < imageElements.length - 1) {
-                currentImageIndex++;
-                AuthModule.updateGlobalImageModal();
-            }
-        }
-        
-        if (e.target.closest('#closeGlobalImageBtn') || e.target.id === 'closeGlobalImageBg') {
-            const modal = document.getElementById('globalImageModal');
-            const img = document.getElementById('globalImageSrc');
-            if (modal && img) {
-                modal.classList.add('hidden');
-                img.src = '';
-                document.getElementById('globalImageDetails').classList.add('hidden');
-            }
+    },
+
+    nextGlobalImage: () => {
+        if (currentImageIndex < imageElements.length - 1) {
+            currentImageIndex++;
+            AuthModule.updateGlobalImageModal();
         }
     },
 
@@ -226,9 +234,34 @@ export const AuthModule = {
         }
     },
 
+    maskStudentNumber: (inputElement) => {
+        let val = inputElement.value.replace(/\D/g, '');
+        if (val.length > 6) val = val.substring(0, 6);
+
+        if (val.length >= 3) {
+            inputElement.value = val.substring(0, 2) + '-' + val.substring(2);
+        } else {
+            inputElement.value = val;
+        }
+    },
+
+    // --- Core Data & API Logic ---
+
+    loadPrograms: async () => {
+        const select = document.getElementById('regCourse');
+        if (!select) return;
+        try {
+            const data = await apiFetch('/api/programs');
+            select.innerHTML = '<option value="" disabled selected>Select Course</option>' + 
+                data.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+        } catch (e) {
+            select.innerHTML = '<option value="" disabled>Error loading courses</option>';
+        }
+    },
+
     loadUsersList: async () => {
         const listContainer = document.getElementById('manageUsersList');
-        if(!listContainer) return;
+        if (!listContainer) return;
         
         listContainer.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br><span class="text-gray-500">Loading users...</span></div>';
         
@@ -236,7 +269,7 @@ export const AuthModule = {
             const data = await apiFetch('/api/users');
             AuthModule.allUsersData = data.users;
             AuthModule.renderUsersList();
-        } catch(e) {
+        } catch (e) {
              listContainer.innerHTML = `<div class="p-4 text-red-500 border border-red-200 bg-red-50 rounded text-center font-medium">${e.message}</div>`;
         }
     },
@@ -249,7 +282,7 @@ export const AuthModule = {
         if (!AuthModule.allUsersData) return;
 
         let filtered = AuthModule.allUsersData.filter(u => {
-            const matchName = u.Name.toLowerCase().includes(search) || (u.Student_Number||'').toLowerCase().includes(search);
+            const matchName = u.Name.toLowerCase().includes(search) || (u.Student_Number || '').toLowerCase().includes(search);
             const matchStatus = status ? u.account_status === status : true;
             return matchName && matchStatus;
         });
@@ -302,66 +335,32 @@ export const AuthModule = {
         listContainer.innerHTML = html;
     },
 
-    handleChanges: async (e) => {
-        if (e.target.id === 'regCameraInput' || e.target.id === 'regFileInput') {
-            AuthModule.processImageUpload(e.target.files[0]);
-        }
+    updateUserStatus: async (selectEl) => {
+        const studentId = selectEl.dataset.userId;
+        const status = selectEl.value;
         
-        if (e.target.classList.contains('mu-status-select')) {
-            const studentId = e.target.dataset.userId;
-            const status = e.target.value;
-            
-            const getStatusColor = (st) => {
-                return st === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
-                       st === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
-                       st === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
-                       st === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
-                       st === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50';
-            };
-            
-            e.target.className = `mu-status-select w-full px-2 py-1.5 text-xs border rounded outline-none font-bold cursor-pointer transition ${getStatusColor(status)}`;
-            
-            try {
-                await apiFetch('/api/update-user-status', {
-                    method: 'POST',
-                    body: JSON.stringify({ studentId, status })
-                });
-                
-                // Update internal array
-                const userObj = AuthModule.allUsersData.find(u => u.User_ID === studentId);
-                if (userObj) userObj.account_status = status;
-                
-            } catch (err) {
-                console.error('Failed to update user status:', err);
-                alert('Failed to update status.');
-            }
-        }
-    },
-
-    handleInput: (e) => {
-        if (e.target.id === 'regStudentNo') {
-            let val = e.target.value.replace(/\D/g, '');
-            if (val.length > 6) val = val.substring(0, 6);
-
-            if (val.length >= 3) {
-                e.target.value = val.substring(0, 2) + '-' + val.substring(2);
-            } else {
-                e.target.value = val;
-            }
-        }
+        const getStatusColor = (st) => {
+            return st === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
+                   st === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
+                   st === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
+                   st === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
+                   st === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50';
+        };
         
-        if (e.target.id === 'muSearchInput' || e.target.id === 'muFilterStatus') {
-            AuthModule.renderUsersList();
-        }
-    },
-
-    handleKeydown: (e) => {
-        if (e.target.id === 'regStudentNo' && e.key === 'Backspace') {
-            const input = e.target;
-            if (input.value.length === 3 && input.value.endsWith('-')) {
-                input.value = input.value.substring(0, 1);
-                e.preventDefault();
-            }
+        selectEl.className = `mu-status-select w-full px-2 py-1.5 text-xs border rounded outline-none font-bold cursor-pointer transition ${getStatusColor(status)}`;
+        
+        try {
+            await apiFetch('/api/update-user-status', {
+                method: 'POST',
+                body: JSON.stringify({ studentId, status })
+            });
+            
+            const userObj = AuthModule.allUsersData.find(u => u.User_ID === studentId);
+            if (userObj) userObj.account_status = status;
+            
+        } catch (err) {
+            console.error('Failed to update user status:', err);
+            alert('Failed to update status.');
         }
     },
 
