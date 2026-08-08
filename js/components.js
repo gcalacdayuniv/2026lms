@@ -601,11 +601,6 @@ export const Components = {
                 </div>
                 
                 <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
-                    <div class="flex items-center space-x-2 mr-2 bg-gray-50 p-2 rounded border border-gray-200">
-                        <input type="checkbox" id="noClassToggle" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 w-4 h-4 cursor-pointer">
-                        <label for="noClassToggle" class="text-xs font-bold text-gray-700 cursor-pointer uppercase tracking-wider">No Class Today</label>
-                    </div>
-                    
                     <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
                     
                     <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
@@ -617,6 +612,9 @@ export const Components = {
                 </div>
             </div>
             
+            <div id="noClassBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-bold bg-orange-100 text-orange-800 border border-orange-200 uppercase tracking-wider flex items-center justify-center">
+                <i class="fa-solid fa-triangle-exclamation mr-2 text-lg"></i> This date is marked as No Class
+            </div>
             <div id="attendanceAlert" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium"></div>
 
             <!-- Student List Container -->
@@ -653,6 +651,9 @@ export const Components = {
                     <button id="exportRosterBtn" data-course-id="${course.Course_ID}" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-print mr-2"></i> Print Roster
                     </button>
+                    <button id="openNoClassModalBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-calendar-xmark mr-2"></i> Manage No Class Days
+                    </button>
                 </div>
 
                 <div class="border-t border-gray-200 pt-5">
@@ -680,6 +681,28 @@ export const Components = {
                             Save Term Periods
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- No Class Days Modal -->
+        <div id="noClassModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeNoClassModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-xmark text-orange-600 mr-2"></i>No Class Days</h3>
+                    <button id="closeNoClassModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="flex gap-2 mb-4">
+                    <input type="date" id="addNoClassDate" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                    <button type="button" id="addNoClassBtn" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-bold transition">Add</button>
+                </div>
+                
+                <div id="noClassList" class="flex-1 overflow-y-auto space-y-2 bg-gray-50 p-2 rounded border border-gray-200 min-h-[150px] max-h-[300px]">
+                    <!-- Dynamically populated -->
                 </div>
             </div>
         </div>
