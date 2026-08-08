@@ -1,7 +1,7 @@
 // js/components.js
 
 // Helper function to bypass Google Drive's hotlinking block for legacy accounts
-const getLoadableAvatarSrc = (src) => {
+export const getLoadableAvatarSrc = (src) => {
     if (!src) return null;
     if (src.includes('drive.google.com/uc')) {
         const match = src.match(/[?&]id=([^&]+)/);
@@ -172,13 +172,14 @@ export const Components = {
     renderDashboard: (user) => {
         const avatarSrc = getLoadableAvatarSrc(user.Avatar);
         const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
-        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
         
         let displayCourse = 'N/A';
         if (user.course) {
             displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
         }
         
+        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${user.Name}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
+
         const createCourseBtn = user.role.toLowerCase() === 'lecturer' ? `
             <div class="mt-6">
                 <button id="openCreateCourseModalBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
@@ -191,6 +192,14 @@ export const Components = {
             <div class="mt-3">
                 <button id="openApModalBtn" class="w-full flex justify-center py-2 px-4 border border-purple-300 rounded-md shadow-sm text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none transition-colors">
                     <i class="fa-solid fa-graduation-cap mr-2 mt-0.5"></i> Add Registration Course List
+                </button>
+            </div>
+        ` : '';
+
+        const manageUsersBtn = user.role.toLowerCase() === 'lecturer' ? `
+            <div class="mt-3">
+                <button id="openMuModalBtn" class="w-full flex justify-center py-2 px-4 border border-green-300 rounded-md shadow-sm text-sm font-bold text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none transition-colors">
+                    <i class="fa-solid fa-users-gear mr-2 mt-0.5"></i> Manage Users
                 </button>
             </div>
         ` : '';
@@ -259,6 +268,7 @@ export const Components = {
 
                 ${createCourseBtn}
                 ${createProgramBtn}
+                ${manageUsersBtn}
 
                 <div class="mt-6">
                     <button id="openCpModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
@@ -274,7 +284,37 @@ export const Components = {
             </div>
         </div>
 
+        <!-- Manage Users Modal (Lecturer Only) -->
+        <div id="muModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-2 sm:p-4">
+            <div id="muModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users-gear text-green-600 mr-2"></i>Manage Users</h3>
+                    <button id="closeMuModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-4 flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="muSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                    <select id="muFilterStatus" class="w-full sm:w-40 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                        <option value="">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Suspended">Suspended</option>
+                        <option value="UD">UD</option>
+                        <option value="Dropped">Dropped</option>
+                    </select>
+                </div>
+
+                <div id="manageUsersList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+
         <!-- Change Password Pop-Up Modal -->
+        <!-- ... (Rest of dashboard modals: cpModal, ccModal, apModal) ... -->
         <div id="cpModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
             <div id="cpModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
             <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
@@ -437,11 +477,11 @@ export const Components = {
 
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
-            const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" role="button" tabindex="0" alt="${s.Name}">` 
-                : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
-            
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
+
+            const avatarImg = avatarSrc 
+                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" role="button" tabindex="0" alt="${s.Name}">` 
+                : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
             
             const eyeConditionBadge = s.eye_condition 
                 ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
@@ -550,6 +590,9 @@ export const Components = {
                 </div>
                 
                 <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
+                    <button id="exportRosterBtn" data-course-id="${course.Course_ID}" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
+                        <i class="fa-solid fa-print mr-2"></i> Print Roster
+                    </button>
                     <button id="openAddStudentModalBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
                         <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
                     </button>
