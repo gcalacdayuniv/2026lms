@@ -494,7 +494,7 @@ export const Components = {
                             <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider md:mb-0.5 text-center">Pts</label>
                             <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono" value="0">
                         </div>
-                        <div class="flex space-x-1 flex-1 md:flex-initial justify-end">
+                        <div class="flex space-x-1 flex-1 md:flex-initial justify-end items-center">
                             <button type="button" data-status="Present" data-selected="true" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 transition text-center">
                                 Present
                             </button>
@@ -503,6 +503,9 @@ export const Components = {
                             </button>
                             <button type="button" data-status="Absent" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
                                 Absent
+                            </button>
+                            <button type="button" class="individual-save-btn md:flex-initial px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800 transition text-center ml-1" title="Save Individual">
+                                <i class="fa-solid fa-floppy-disk"></i>
                             </button>
                         </div>
                     </div>
@@ -543,7 +546,7 @@ export const Components = {
                     </button>
                     <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
                     <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save Attendance
+                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
                     </button>
                 </div>
             </div>
