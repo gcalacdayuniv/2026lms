@@ -1,13 +1,13 @@
 # Online Portal - System Architecture & Developer Guidelines
 
 ## Role & Persona
-You are a Senior Full-Stack Developer acting as the primary maintainer for the "Online Portal." You write clean, robust, secure, and scalable code following a Decoupled Modular Architecture. You understand how to physically separate concerns by domain while keeping the deployment and execution context unified.
+You are a Senior Full-Stack Developer acting as the primary maintainer for the "Online Portal." You write clean, robust, secure, and scalable code following a Modular Monolith Architecture. You understand how to physically separate concerns by domain while keeping the deployment and execution context unified.
 
 ## Repository & Version Control
 This project utilizes **GitHub** as its central repository for version control. We use GitHub to manage all source code and leverage it to streamline our automated deployments for both the frontend (Cloudflare Pages) and the backend API (Cloudflare Workers).
 
 ## Architecture & Tech Stack
-The project relies on a highly modular, decoupled stack running entirely on Cloudflare's edge network, integrated with Google Workspace for file storage.
+The project relies on a modular monolith stack running entirely on Cloudflare's edge network, integrated with Google Workspace for file storage.
 
 ### 1. Frontend (Cloudflare Pages)
 The client-side is a static Single-Page Application (SPA) using Vanilla JavaScript, TailwindCSS (via CDN), and FontAwesome. JavaScript is strictly modularized into native ES Modules residing inside a `js/` directory.
@@ -29,11 +29,10 @@ The database uses Universally Unique Identifiers (UUIDs) for all primary keys, g
 **Note: Ensure the following tables are created and updated for the system to function correctly:**
 * **`Programs`:** Program_ID (UUID), ProgramCode (e.g., BSCS, BSIT).
 * **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role (Default: 'Student').
-* **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section.
-  * **Requires Update:** `Midterm_Start`, `Midterm_End`, `Final_Start`, `Final_End` columns must be added. 
-* **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name.
-  * **Requires Update:** `Assigned_Topic` column must be added. 
-* **`Attendance`:** Attendance_ID (UUID), Course_ID (FK mapped to Courses.Course_ID), Student_ID (FK mapped to Users.User_ID), Date, Status (Present, Late, Absent), Performance_Points (Integer).
+* **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section, Midterm_Start, Midterm_End, Final_Start, Final_End.
+* **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name, Assigned_Topic.
+* **`Course_Sessions`:** Session_ID (UUID), Course_ID (FK), Date (TEXT), Is_No_Class (INTEGER).
+* **`Attendance`:** Attendance_ID (UUID), Course_ID (FK mapped to Courses.Course_ID), Student_ID (FK mapped to Users.User_ID), Date, Status (Present, Late, Absent, Excused), Performance_Points (Integer).
 
 ### 4. External Integrations (Google Apps Script)
 * **`gas/Code.gs`:** A deployed Web App webhook that catches payloads from the Cloudflare Worker, decodes Base64 image data, dynamically creates or traverses nested folder structures, and saves files directly to a designated root Google Drive folder.
@@ -44,19 +43,18 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Advanced Attendance Metrics:** Removed global attendance totals in favor of term specific calculations. Reconfigured attendance scoring to assign 1 point for Present and 0.5 points for Late. Implemented an "Excused" status that automatically deducts from the individual student's total required days, dynamically adjusting their term attendance percentage. Added a "No Class" toggle enabling lecturers to declare nullified calendar days that universally deduct from the term's total day count via the new `Course_Sessions` database table.
+* **Interactive Performance Drilldowns:** Refactored the Performance Summary modal to render detailed academic term metric cards. Integrated click event listeners onto the Attendance and Participation cards that launch an overlaying list modal displaying a chronological breakdown of recorded statuses and performance points. 
 * **Assigned Topic Integration:** Appended an "Assigned Topic" text input to the Manage Student modal, persisting natively to the Enrollments table alongside Seat and Group values. Updated the course roster to render the topics statically inline.
 * **Term Period Architecture:** Introduced a new Hamburger Menu containing course actions. Within this menu, lecturers can define specific 'Mid Term' and 'Final Term' start and end dates which map structurally back to the D1 database.
-* **Performance Placeholders:** Updated the Performance Summary modal to dynamically segregate metric placeholders into 'Mid Term' and 'Final Term' headers. Included fields for Written Output (Quizzes, Narrative Report, Individual Report), Performance Output (Report Score, Participation Score, Attendance), and Major Exam results.
 * **Browser Caching Protocol:** Configured a local JSON caching system executing on `localStorage` tied directly to the attendance and points inputs to securely intercept accidental window reloads. The data is wiped exclusively upon an authenticated network save response.
 * **Session Persistence Debugging:** Realigned the native browser `localStorage` key pointers between `globals.js` and `auth.js` to ensure the session initializes consistently over navigation events.
-* **Performance Summary Optimization:** Separated the performance summary modal trigger from the avatar image viewer, now accessible by clicking the student's name. Added a native confirmation prompt prior to fetching data to conserve edge compute resources, and integrated a chronological tabular view of historical attendance and points within the summary modal.
 * **Export Roster for Print:** Added a dedicated utility to generate a print-ready, letter-size HTML roster complete with 1x1 student profile pictures, seat numbers, group names, assigned topics, and contact details.
 * **Global Manage Users Interface:** Implemented a new modal accessible from the lecturer profile panel to search, filter, and dynamically modify the active status of any registered user across the system.
 * **Enhanced Image Viewer:** Upgraded the global image overlay to include next and previous navigation controls, seamlessly displaying the specific user's name, course, year, and section details below the image.
 * **Password Visibility Toggle:** Integrated an interactive eye icon toggle on the login screen to allow users to securely view their inputted password.
 * **Target Audience Badge:** Displayed the specific enrollment restriction parameters directly within the Class Roster header for immediate visibility.
 * **Lecturer Manual Student Enrollment:** Added a modal utility within the Class Roster screen allowing lecturers to search and manually assign active students into their courses, overriding existing strict target audience gating parameters. Added a backend endpoint mapping unenrolled students for explicit assignment routing. 
-* **Student Organization & Performance Tracking:** Added inline editable fields for `Seat`, `Group` and `Assigned Topic` mapped securely to the enrollments table via an auto-save blur event mapping. Included a numeric `Pts (+/-)` input alongside the attendance toggles to record merit or demerit points concurrently.
 * **Interactive Attendance Tracking:** Appended attendance toggles into the Class Roster screen. Included a bulk selection utility ("Mark All Present"), Date selection, and error handling for missing inputs. 
 * **Batch SQL Inserts for Attendance Data:** Implemented the `/api/attendance` endpoint. The logic clears existing records for a specific date and course, then efficiently utilizes D1's `env.DB.batch()` technique to execute the array of new attendance status values simultaneously.
 * **Lecturer Class Screen & Roster Mapping:** Created a dynamic route mapping system allowing lecturers to click their created modules to view a dedicated detailed class screen. Added a backend endpoint returning an alphabetically sorted array combining users and enrollments table data (Avatar, Name, Info) to facilitate upcoming attendance modules.
