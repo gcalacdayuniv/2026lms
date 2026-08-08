@@ -1,6 +1,6 @@
 // js/course.js
 import { apiFetch, AppState } from './globals.js';
-import { Components } from './components.js'; 
+import { Components, getLoadableAvatarSrc } from './components.js'; 
 
 export const CourseModule = {
     init: () => {
@@ -97,6 +97,20 @@ export const CourseModule = {
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             await CourseModule.enrollCourse(btn.dataset.id);
+        }
+
+        // Export Roster Button
+        if (e.target.closest('#exportRosterBtn')) {
+            const btn = e.target.closest('#exportRosterBtn');
+            const courseId = btn.dataset.courseId;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
+            
+            await CourseModule.exportRoster(courseId);
+            
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
         }
 
         // Manage Student Modal Logic
@@ -258,6 +272,117 @@ export const CourseModule = {
 
         if (e.target.closest('#saveAttendanceBtn')) {
             await CourseModule.saveAttendance();
+        }
+    },
+
+    exportRoster: async (courseId) => {
+        try {
+            const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
+            const students = data.students;
+
+            const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
+            students.sort((a, b) => {
+                const seatAStr = (a.Seat_Number || '').toString().trim();
+                const seatBStr = (b.Seat_Number || '').toString().trim();
+                const hasSeatA = seatAStr !== '';
+                const hasSeatB = seatBStr !== '';
+                if (hasSeatA && !hasSeatB) return -1;
+                if (!hasSeatA && hasSeatB) return 1;
+                if (hasSeatA && hasSeatB) {
+                    const numA = parseFloat(seatAStr);
+                    const numB = parseFloat(seatBStr);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        if (numA !== numB) return numA - numB;
+                    } else {
+                        if (seatAStr !== seatBStr) return seatAStr.localeCompare(seatBStr);
+                    }
+                }
+                const eyeA = eyeOrder[a.eye_condition] || 4;
+                const eyeB = eyeOrder[b.eye_condition] || 4;
+                if (eyeA !== eyeB) return eyeA - eyeB;
+                const nameA = a.Name || '';
+                const nameB = b.Name || '';
+                return nameA.localeCompare(nameB);
+            });
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("Please allow pop-ups to print the roster.");
+                return;
+            }
+
+            const html = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Class Roster - ${data.course.CourseCode}</title>
+                    <style>
+                        @page { size: letter; margin: 0.5in; }
+                        body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #333; margin: 0; padding: 0; }
+                        .header { text-align: center; margin-bottom: 20px; }
+                        h1 { font-size: 18pt; margin: 0 0 5px 0; color: #000; }
+                        h3 { font-size: 12pt; margin: 0; color: #555; font-weight: normal; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { border: 1px solid #000; padding: 6px; text-align: left; vertical-align: middle; }
+                        th { background-color: #f0f0f0; font-weight: bold; font-size: 10pt; }
+                        td { font-size: 9.5pt; }
+                        .photo-cell { width: 1in; text-align: center; }
+                        .photo { width: 1in; height: 1in; object-fit: cover; border: 1px solid #ccc; display: block; margin: 0 auto; }
+                        .center { text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>${data.course.CourseCode} - ${data.course.CourseTitle}</h1>
+                        <h3>Schedule: ${data.course.ScheduleDay} | ${data.course.TimePeriod}</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Photo</th>
+                                <th class="center">Seat No.</th>
+                                <th>Student No.</th>
+                                <th>Name</th>
+                                <th>Group Name</th>
+                                <th>Contact</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${students.map(s => {
+                                const avatarSrc = getLoadableAvatarSrc(s.Avatar);
+                                const imgTag = avatarSrc ? `<img src="${avatarSrc}" class="photo" alt="Photo">` : `<div style="width:1in; height:1in; line-height:1in; text-align:center; background:#eee; font-size:8pt; color:#999; margin:0 auto;">No Photo</div>`;
+                                return `
+                                <tr>
+                                    <td class="photo-cell">${imgTag}</td>
+                                    <td class="center"><strong>${s.Seat_Number || ''}</strong></td>
+                                    <td>${s.Student_Number || ''}</td>
+                                    <td><strong>${s.Name}</strong></td>
+                                    <td>${s.Group_Name || ''}</td>
+                                    <td>${s.Contact_Number || ''}</td>
+                                    <td>${s.Email || ''}</td>
+                                </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    <script>
+                        window.onload = function() {
+                            setTimeout(function() {
+                                window.print();
+                            }, 500);
+                        };
+                    </script>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(html);
+            printWindow.document.close();
+
+        } catch (err) {
+            alert('Failed to generate export: ' + err.message);
         }
     },
 
