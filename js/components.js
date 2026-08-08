@@ -778,7 +778,7 @@ export const Components = {
                                         <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
                                         <span class="font-black text-blue-600 text-base block mt-0.5"><span id="midtermAttendancePct">...</span>%</span>
                                         <div class="text-[8px] text-gray-500 mt-0.5"><span id="midtermPresent">0</span>P, <span id="midtermLate">0</span>L, <span id="midtermExcused">0</span>E, <span id="midtermAbsent">0</span>A</div>
-                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Req Days: <span id="midtermTotalDays">0</span></div>
+                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="midtermTotalDays">0</span></div>
                                     </div>
                                 </div>
                             </div>
@@ -816,7 +816,7 @@ export const Components = {
                                         <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
                                         <span class="font-black text-yellow-600 text-base block mt-0.5"><span id="finaltermAttendancePct">...</span>%</span>
                                         <div class="text-[8px] text-gray-500 mt-0.5"><span id="finaltermPresent">0</span>P, <span id="finaltermLate">0</span>L, <span id="finaltermExcused">0</span>E, <span id="finaltermAbsent">0</span>A</div>
-                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Req Days: <span id="finaltermTotalDays">0</span></div>
+                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="finaltermTotalDays">0</span></div>
                                     </div>
                                 </div>
                             </div>
