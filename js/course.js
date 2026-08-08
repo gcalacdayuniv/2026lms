@@ -3,6 +3,7 @@ import { apiFetch, AppState } from './globals.js';
 import { CourseDashboard } from './course-dashboard.js';
 import { CourseClass } from './course-class.js';
 import { CourseAttendance } from './course-attendance.js';
+import { CourseRecitation } from './course-recitation.js';
 
 export const CourseModule = {
     init: () => {
@@ -496,6 +497,19 @@ export const CourseModule = {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
             }
+        }
+
+        if (e.target.closest('#openRecitationBtn')) {
+            const courseId = window.location.hash.replace('#class-', '');
+            await CourseRecitation.openModal(courseId);
+        }
+
+        if (e.target.closest('#closeRecitationModalBtn') || e.target.id === 'recitationModalOverlay') {
+            CourseRecitation.closeModal();
+        }
+
+        if (e.target.closest('#spinWheelBtn')) {
+            CourseRecitation.spin();
         }
     }
 };
