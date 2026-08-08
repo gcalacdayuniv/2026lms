@@ -582,14 +582,15 @@ export const CourseModule = {
             termEnd = course.Final_End || '';
         }
         
-        // Parse dates safely to local time to prevent unexpected UTC offsets
+        // Strict boundary parser bypassing exact timezone interference
         const parseLocalDate = (dateStr) => {
             if (!dateStr) return null;
             if (dateStr.includes('-')) {
                 const [y, m, d] = dateStr.split('-');
-                return new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
             }
-            return new Date(dateStr);
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
         };
         
         let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
@@ -600,13 +601,18 @@ export const CourseModule = {
             const tStart = parseLocalDate(termStart);
             const tEnd = parseLocalDate(termEnd);
             
-            const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
-            const targetDay = dayMap[(course.ScheduleDay || '').trim()];
+            const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
+            const dayStr = (course.ScheduleDay || '').trim().toLowerCase();
+            const targetDay = dayMap[dayStr];
 
             let theoreticalDays = 0;
-            if (targetDay !== undefined) {
-                let currentDate = new Date(tStart);
-                while (currentDate <= tEnd) {
+            
+            if (targetDay !== undefined && tStart && tEnd) {
+                // Ensure independent cloning of the date boundaries for robust increment looping
+                let currentDate = new Date(tStart.getFullYear(), tStart.getMonth(), tStart.getDate());
+                let endDate = new Date(tEnd.getFullYear(), tEnd.getMonth(), tEnd.getDate());
+                
+                while (currentDate <= endDate) {
                     if (currentDate.getDay() === targetDay) {
                         theoreticalDays++;
                     }
@@ -618,7 +624,7 @@ export const CourseModule = {
             sessions.forEach(s => {
                 if (s.Is_No_Class === 1) {
                     const sDate = parseLocalDate(s.Date);
-                    if (sDate >= tStart && sDate <= tEnd && sDate.getDay() === targetDay) {
+                    if (sDate && tStart && tEnd && sDate >= tStart && sDate <= tEnd && sDate.getDay() === targetDay) {
                         noClassDaysCount++;
                     }
                 }
@@ -628,6 +634,7 @@ export const CourseModule = {
 
             const termRecords = records.filter(r => {
                 const rDate = parseLocalDate(r.Date);
+                if (!rDate || !tStart || !tEnd) return false;
                 return rDate >= tStart && rDate <= tEnd;
             });
 
@@ -676,14 +683,14 @@ export const CourseModule = {
             titleTerm = 'Final Term';
         }
 
-        // Parse dates safely to local time to prevent unexpected UTC offsets
         const parseLocalDate = (dateStr) => {
             if (!dateStr) return null;
             if (dateStr.includes('-')) {
                 const [y, m, d] = dateStr.split('-');
-                return new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
             }
-            return new Date(dateStr);
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
         };
         
         const titleMetric = metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown';
@@ -709,6 +716,7 @@ export const CourseModule = {
         
         const termRecords = records.filter(r => {
             const rDate = parseLocalDate(r.Date);
+            if (!rDate || !tStart || !tEnd) return false;
             return rDate >= tStart && rDate <= tEnd;
         });
 
