@@ -30,7 +30,9 @@ The database uses Universally Unique Identifiers (UUIDs) for all primary keys, g
 * **`Programs`:** Program_ID (UUID), ProgramCode (e.g., BSCS, BSIT).
 * **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role (Default: 'Student').
 * **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section.
+  * **Requires Update:** `Midterm_Start`, `Midterm_End`, `Final_Start`, `Final_End` columns must be added. 
 * **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name.
+  * **Requires Update:** `Assigned_Topic` column must be added. 
 * **`Attendance`:** Attendance_ID (UUID), Course_ID (FK mapped to Courses.Course_ID), Student_ID (FK mapped to Users.User_ID), Date, Status (Present, Late, Absent), Performance_Points (Integer).
 
 ### 4. External Integrations (Google Apps Script)
@@ -42,14 +44,19 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Assigned Topic Integration:** Appended an "Assigned Topic" text input to the Manage Student modal, persisting natively to the Enrollments table alongside Seat and Group values. Updated the course roster to render the topics statically inline.
+* **Term Period Architecture:** Introduced a new Hamburger Menu containing course actions. Within this menu, lecturers can define specific 'Mid Term' and 'Final Term' start and end dates which map structurally back to the D1 database.
+* **Performance Placeholders:** Updated the Performance Summary modal to dynamically segregate metric placeholders into 'Mid Term' and 'Final Term' headers. Included fields for Written Output (Quizzes, Narrative Report, Individual Report), Performance Output (Report Score, Participation Score, Attendance), and Major Exam results.
+* **Browser Caching Protocol:** Configured a local JSON caching system executing on `localStorage` tied directly to the attendance and points inputs to securely intercept accidental window reloads. The data is wiped exclusively upon an authenticated network save response.
+* **Session Persistence Debugging:** Realigned the native browser `localStorage` key pointers between `globals.js` and `auth.js` to ensure the session initializes consistently over navigation events.
 * **Performance Summary Optimization:** Separated the performance summary modal trigger from the avatar image viewer, now accessible by clicking the student's name. Added a native confirmation prompt prior to fetching data to conserve edge compute resources, and integrated a chronological tabular view of historical attendance and points within the summary modal.
-* **Export Roster for Print:** Added a dedicated utility to generate a print-ready, letter-size HTML roster complete with 1x1 student profile pictures, seat numbers, group names, and contact details.
+* **Export Roster for Print:** Added a dedicated utility to generate a print-ready, letter-size HTML roster complete with 1x1 student profile pictures, seat numbers, group names, assigned topics, and contact details.
 * **Global Manage Users Interface:** Implemented a new modal accessible from the lecturer profile panel to search, filter, and dynamically modify the active status of any registered user across the system.
 * **Enhanced Image Viewer:** Upgraded the global image overlay to include next and previous navigation controls, seamlessly displaying the specific user's name, course, year, and section details below the image.
 * **Password Visibility Toggle:** Integrated an interactive eye icon toggle on the login screen to allow users to securely view their inputted password.
 * **Target Audience Badge:** Displayed the specific enrollment restriction parameters directly within the Class Roster header for immediate visibility.
 * **Lecturer Manual Student Enrollment:** Added a modal utility within the Class Roster screen allowing lecturers to search and manually assign active students into their courses, overriding existing strict target audience gating parameters. Added a backend endpoint mapping unenrolled students for explicit assignment routing. 
-* **Student Organization & Performance Tracking:** Added inline editable fields for `Seat` and `Group` in the Class Roster, mapped securely to the enrollments table via an auto-save blur event mapping. Included a numeric `Pts (+/-)` input alongside the attendance toggles to record merit or demerit points concurrently.
+* **Student Organization & Performance Tracking:** Added inline editable fields for `Seat`, `Group` and `Assigned Topic` mapped securely to the enrollments table via an auto-save blur event mapping. Included a numeric `Pts (+/-)` input alongside the attendance toggles to record merit or demerit points concurrently.
 * **Interactive Attendance Tracking:** Appended attendance toggles into the Class Roster screen. Included a bulk selection utility ("Mark All Present"), Date selection, and error handling for missing inputs. 
 * **Batch SQL Inserts for Attendance Data:** Implemented the `/api/attendance` endpoint. The logic clears existing records for a specific date and course, then efficiently utilizes D1's `env.DB.batch()` technique to execute the array of new attendance status values simultaneously.
 * **Lecturer Class Screen & Roster Mapping:** Created a dynamic route mapping system allowing lecturers to click their created modules to view a dedicated detailed class screen. Added a backend endpoint returning an alphabetically sorted array combining users and enrollments table data (Avatar, Name, Info) to facilitate upcoming attendance modules.
