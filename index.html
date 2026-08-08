@@ -20,20 +20,12 @@
         <button id="closeGlobalImageBtn" class="absolute top-4 right-4 text-white hover:text-gray-300 z-10 p-2 focus:outline-none">
             <i class="fa-solid fa-xmark text-3xl"></i>
         </button>
-        
-        <button id="prevGlobalImageBtn" class="absolute left-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10 p-4 focus:outline-none hidden">
-            <i class="fa-solid fa-chevron-left text-4xl sm:text-5xl drop-shadow-md"></i>
-        </button>
-        
-        <button id="nextGlobalImageBtn" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10 p-4 focus:outline-none hidden">
-            <i class="fa-solid fa-chevron-right text-4xl sm:text-5xl drop-shadow-md"></i>
-        </button>
-
-        <div class="relative z-10 flex flex-col items-center max-w-[90%] max-h-[90vh]">
-            <img id="globalImageSrc" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl scale-up" src="" alt="Full Screen Preview">
-            <div id="globalImageDetails" class="mt-4 text-center text-white hidden bg-black bg-opacity-50 px-6 py-3 rounded-lg backdrop-blur-md fade-in">
-                <h3 id="giName" class="text-xl sm:text-2xl font-bold tracking-tight"></h3>
-                <p id="giInfo" class="text-sm sm:text-base text-gray-200 mt-1 font-medium"></p>
+        <div class="relative z-10 flex flex-col items-center justify-center w-full h-full p-4 pointer-events-none">
+            <img id="globalImageSrc" class="max-w-[90%] max-h-[80vh] object-contain rounded-lg shadow-2xl scale-up pointer-events-auto" src="" alt="Full Screen Preview">
+            <div id="globalImageControls" class="mt-6 flex items-center justify-center space-x-6 hidden pointer-events-auto">
+                <button id="prevGlobalImageBtn" class="text-white hover:text-blue-400 focus:outline-none text-3xl transition"><i class="fa-solid fa-circle-chevron-left"></i></button>
+                <span id="globalImageName" class="text-white text-xl font-bold tracking-wide"></span>
+                <button id="nextGlobalImageBtn" class="text-white hover:text-blue-400 focus:outline-none text-3xl transition"><i class="fa-solid fa-circle-chevron-right"></i></button>
             </div>
         </div>
     </div>
