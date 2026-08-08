@@ -487,10 +487,10 @@ export const Components = {
                 : '';
 
             return `
-                <div class="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 md:gap-2" data-student-id="${s.User_ID}">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}">
                     
                     <!-- Profile Info & Manage Button (Mobile Stack) -->
-                    <div class="flex items-start justify-between w-full md:w-1/2">
+                    <div class="flex items-start justify-between w-full lg:w-1/2">
                         <div class="flex items-center space-x-3 p-1.5 -ml-1.5 rounded-lg transition">
                             <span class="text-xs font-bold text-gray-400 w-5 text-center">${index + 1}</span>
                             <div class="flex-shrink-0">
@@ -509,7 +509,7 @@ export const Components = {
                             </div>
                         </div>
                         
-                        <div class="md:hidden">
+                        <div class="lg:hidden">
                             <!-- Mobile Manage Button -->
                             <button type="button" class="manage-student-btn px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm" 
                                 data-student-id="${s.User_ID}" 
@@ -524,7 +524,7 @@ export const Components = {
                     </div>
 
                     <!-- Manage Actions (Desktop) -->
-                    <div class="hidden md:flex items-center justify-center w-auto px-2">
+                    <div class="hidden lg:flex items-center justify-center w-auto px-2">
                         <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm" 
                             data-student-id="${s.User_ID}" 
                             data-name="${s.Name}" 
@@ -537,19 +537,22 @@ export const Components = {
                     </div>
                     
                     <!-- Attendance Action Toggles & Points -->
-                    <div class="flex items-end justify-between md:justify-end w-full md:w-auto space-x-2 border-t md:border-t-0 border-gray-100 pt-3 md:pt-0 mt-1 md:mt-0">
-                        <div class="flex items-center md:items-start md:flex-col gap-2 md:gap-0">
-                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider md:mb-0.5 text-center">Pts</label>
+                    <div class="flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto">
+                        <div class="flex items-center lg:items-start lg:flex-col gap-2 lg:gap-0">
+                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider lg:mb-0.5 text-center">Pts</label>
                             <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono" value="0">
                         </div>
-                        <div class="flex space-x-1 flex-1 md:flex-initial justify-end items-center">
-                            <button type="button" data-status="Present" data-selected="true" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 transition text-center">
+                        <div class="flex space-x-1 flex-1 lg:flex-initial justify-end items-center min-w-max">
+                            <button type="button" data-status="Present" data-selected="true" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 transition text-center">
                                 Present
                             </button>
-                            <button type="button" data-status="Late" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 transition text-center">
+                            <button type="button" data-status="Late" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-yellow-50 hover:text-yellow-700 transition text-center">
                                 Late
                             </button>
-                            <button type="button" data-status="Absent" class="attendance-btn flex-1 md:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
+                            <button type="button" data-status="Excused" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-purple-50 hover:text-purple-700 transition text-center">
+                                Excused
+                            </button>
+                            <button type="button" data-status="Absent" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
                                 Absent
                             </button>
                             
@@ -598,7 +601,13 @@ export const Components = {
                 </div>
                 
                 <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
+                    <div class="flex items-center space-x-2 mr-2 bg-gray-50 p-2 rounded border border-gray-200">
+                        <input type="checkbox" id="noClassToggle" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 w-4 h-4 cursor-pointer">
+                        <label for="noClassToggle" class="text-xs font-bold text-gray-700 cursor-pointer uppercase tracking-wider">No Class Today</label>
+                    </div>
+                    
                     <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
+                    
                     <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
                         <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
                     </button>
@@ -620,7 +629,7 @@ export const Components = {
                         <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
                     </div>
                 </div>
-                <div>
+                <div id="rosterListContainer">
                     ${students.length > 0 ? studentList : emptyState}
                 </div>
             </div>
@@ -739,42 +748,10 @@ export const Components = {
                 </div>
                 <div id="summaryStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
                 
-                <div class="grid grid-cols-3 gap-2 text-center mb-4">
-                    <div class="bg-green-50 border border-green-200 p-2 rounded-lg">
-                        <div class="text-[10px] sm:text-xs font-bold text-green-600 uppercase">Present</div>
-                        <div id="summaryPresent" class="text-xl font-black text-green-800">...</div>
-                    </div>
-                    <div class="bg-yellow-50 border border-yellow-200 p-2 rounded-lg">
-                        <div class="text-[10px] sm:text-xs font-bold text-yellow-600 uppercase">Late</div>
-                        <div id="summaryLate" class="text-xl font-black text-yellow-800">...</div>
-                    </div>
-                    <div class="bg-red-50 border border-red-200 p-2 rounded-lg">
-                        <div class="text-[10px] sm:text-xs font-bold text-red-600 uppercase">Absent</div>
-                        <div id="summaryAbsent" class="text-xl font-black text-red-800">...</div>
-                    </div>
-                </div>
-                
-                <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center mb-4">
-                    <div class="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-1">Grand Total Pts</div>
-                    <div id="summaryTotalPoints" class="text-2xl font-black text-blue-800">...</div>
-                </div>
-                
-                <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 mb-6">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-gray-200 text-gray-700 sticky top-0">
-                            <tr>
-                                <th class="px-2 py-1.5">Date</th>
-                                <th class="px-2 py-1.5 text-center">Status</th>
-                                <th class="px-2 py-1.5 text-center">Pts</th>
-                            </tr>
-                        </thead>
-                        <tbody id="summaryTableBody" class="divide-y divide-gray-200 bg-white">
-                        </tbody>
-                    </table>
-                </div>
+                <div id="summaryLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+                <div id="summaryError" class="hidden text-center py-6 text-red-500 font-bold"></div>
 
-                <!-- Academic Terms Metrics Placeholders -->
-                <div class="space-y-4 border-t border-gray-200 pt-4">
+                <div id="summaryContent" class="hidden space-y-4">
                     <!-- Mid Term -->
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
                         <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
@@ -793,8 +770,16 @@ export const Components = {
                                 <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Participation</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Attendance</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="participation" title="Click to view participation details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
+                                        <span class="font-black text-blue-600 text-base block mt-0.5" id="midtermParticipationScore">...</span>
+                                    </div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="attendance" title="Click to view attendance details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
+                                        <span class="font-black text-blue-600 text-base block mt-0.5"><span id="midtermAttendancePct">...</span>%</span>
+                                        <div class="text-[8px] text-gray-500 mt-0.5"><span id="midtermPresent">0</span>P, <span id="midtermLate">0</span>L, <span id="midtermExcused">0</span>E, <span id="midtermAbsent">0</span>A</div>
+                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Req Days: <span id="midtermTotalDays">0</span></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -823,8 +808,16 @@ export const Components = {
                                 <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Participation</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Attendance</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="participation" title="Click to view participation details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
+                                        <span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermParticipationScore">...</span>
+                                    </div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="attendance" title="Click to view attendance details">
+                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
+                                        <span class="font-black text-yellow-600 text-base block mt-0.5"><span id="finaltermAttendancePct">...</span>%</span>
+                                        <div class="text-[8px] text-gray-500 mt-0.5"><span id="finaltermPresent">0</span>P, <span id="finaltermLate">0</span>L, <span id="finaltermExcused">0</span>E, <span id="finaltermAbsent">0</span>A</div>
+                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Req Days: <span id="finaltermTotalDays">0</span></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -835,7 +828,32 @@ export const Components = {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
+        <!-- Details List Modal (For Attendance/Participation) -->
+        <div id="detailsModal" class="hidden fixed inset-0 z-[90] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeDetailsModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800" id="detailsModalTitle">Details</h3>
+                    <button id="closeDetailsModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div class="overflow-y-auto flex-1 bg-gray-50 border border-gray-200 rounded-lg">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm">
+                            <tr>
+                                <th class="px-3 py-2">Date</th>
+                                <th class="px-3 py-2 text-center">Status / Info</th>
+                                <th class="px-3 py-2 text-center" id="detailsScoreHeader">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailsTableBody" class="divide-y divide-gray-200 bg-white">
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
