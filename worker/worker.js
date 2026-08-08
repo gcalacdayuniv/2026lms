@@ -419,35 +419,50 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
                 }
 
+                const session = await env.DB.prepare(
+                    "SELECT Is_No_Class FROM Course_Sessions WHERE Course_ID = ? AND Date = ?"
+                ).bind(courseId, date).first();
+                
+                const isNoClass = session ? session.Is_No_Class === 1 : false;
+
                 const records = await env.DB.prepare(
                     "SELECT Student_ID, Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Date = ?"
                 ).bind(courseId, date).all();
 
-                return new Response(JSON.stringify({ success: true, records: records.results }), { status: 200, headers: corsHeaders });
+                return new Response(JSON.stringify({ success: true, records: records.results, isNoClass: isNoClass }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "POST" && url.pathname === "/api/attendance") {
                 const body = await request.json();
-                const { courseId, date, records } = body;
+                const { courseId, date, records, isNoClass } = body;
 
-                if (!courseId || !date || !records || !Array.isArray(records)) {
+                if (!courseId || !date) {
                     return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: corsHeaders });
                 }
 
-                await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+                await env.DB.prepare("DELETE FROM Course_Sessions WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+                
+                const sessionId = crypto.randomUUID();
+                await env.DB.prepare("INSERT INTO Course_Sessions (Session_ID, Course_ID, Date, Is_No_Class) VALUES (?, ?, ?, ?)").bind(sessionId, courseId, date, isNoClass ? 1 : 0).run();
 
-                if (records.length > 0) {
-                    const statements = [];
-                    for (const record of records) {
-                        const attId = crypto.randomUUID();
-                        statements.push(
-                            env.DB.prepare(
-                                "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
-                            ).bind(attId, courseId, record.studentId, date, record.status, record.points)
-                        );
+                if (isNoClass) {
+                    await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+                } else if (records && Array.isArray(records)) {
+                    await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+
+                    if (records.length > 0) {
+                        const statements = [];
+                        for (const record of records) {
+                            const attId = crypto.randomUUID();
+                            statements.push(
+                                env.DB.prepare(
+                                    "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
+                                ).bind(attId, courseId, record.studentId, date, record.status, record.points)
+                            );
+                        }
+                        
+                        await env.DB.batch(statements);
                     }
-                    
-                    await env.DB.batch(statements);
                 }
 
                 return new Response(JSON.stringify({ success: true, message: "Attendance saved" }), { status: 201, headers: corsHeaders });
@@ -455,15 +470,19 @@ export default {
 
             if (request.method === "POST" && url.pathname === "/api/attendance/single") {
                 const body = await request.json();
-                const { courseId, studentId, date, status, points } = body;
+                const { courseId, studentId, date, status, points, isNoClass } = body;
                 
                 if (!courseId || !studentId || !date) {
                     return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
                 }
 
+                await env.DB.prepare("DELETE FROM Course_Sessions WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+                const sessionId = crypto.randomUUID();
+                await env.DB.prepare("INSERT INTO Course_Sessions (Session_ID, Course_ID, Date, Is_No_Class) VALUES (?, ?, ?, ?)").bind(sessionId, courseId, date, isNoClass ? 1 : 0).run();
+
                 await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?").bind(courseId, studentId, date).run();
 
-                if (status) {
+                if (status && !isNoClass) {
                     const attId = crypto.randomUUID();
                     await env.DB.prepare(
                         "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
@@ -481,22 +500,21 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
                 }
 
+                const course = await env.DB.prepare("SELECT Midterm_Start, Midterm_End, Final_Start, Final_End FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+
+                const sessions = await env.DB.prepare("SELECT Date, Is_No_Class FROM Course_Sessions WHERE Course_ID = ?").bind(courseId).all();
+
                 const records = await env.DB.prepare(
                     "SELECT Date, Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ? ORDER BY Date ASC"
                 ).bind(courseId, studentId).all();
 
-                let present = 0, late = 0, absent = 0, totalPoints = 0;
-                
-                records.results.forEach(r => {
-                    if (r.Status === 'Present') present++;
-                    else if (r.Status === 'Late') late++;
-                    else if (r.Status === 'Absent') absent++;
-                    totalPoints += (r.Performance_Points || 0);
-                });
-
                 return new Response(JSON.stringify({ 
                     success: true, 
-                    summary: { present, late, absent, totalPoints },
+                    course: course,
+                    sessions: sessions.results,
                     records: records.results
                 }), { status: 200, headers: corsHeaders });
             }
