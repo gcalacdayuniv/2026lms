@@ -28,7 +28,7 @@ The database uses Universally Unique Identifiers (UUIDs) for all primary keys, g
 
 **Note: Ensure the following tables are created and updated for the system to function correctly:**
 * **`Programs`:** Program_ID (UUID), ProgramCode (e.g., BSCS, BSIT).
-* **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role (Default: 'Student').
+* **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role (Default: 'Student').
 * **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section, Midterm_Start, Midterm_End, Final_Start, Final_End.
 * **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name, Assigned_Topic.
 * **`Course_Sessions`:** Session_ID (UUID), Course_ID (FK), Date (TEXT), Is_No_Class (INTEGER).
