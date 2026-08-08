@@ -143,8 +143,12 @@ export const CourseModule = {
         // Summary Modal Logic
         if (e.target.closest('.view-summary-trigger')) {
             const trigger = e.target.closest('.view-summary-trigger');
-            const studentId = trigger.closest('.student-row').dataset.studentId;
             const name = trigger.dataset.name;
+            
+            const confirmation = window.confirm(`Load performance summary for ${name}?`);
+            if (!confirmation) return;
+
+            const studentId = trigger.closest('.student-row').dataset.studentId;
             const courseId = window.location.hash.replace('#class-', '');
             
             document.getElementById('summaryStudentName').textContent = name;
@@ -154,6 +158,7 @@ export const CourseModule = {
             document.getElementById('summaryLate').textContent = '...';
             document.getElementById('summaryAbsent').textContent = '...';
             document.getElementById('summaryTotalPoints').textContent = '...';
+            document.getElementById('summaryTableBody').innerHTML = '<tr><td colspan="3" class="text-center py-2"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
             
             try {
                 const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}`);
@@ -162,9 +167,27 @@ export const CourseModule = {
                     document.getElementById('summaryLate').textContent = data.summary.late;
                     document.getElementById('summaryAbsent').textContent = data.summary.absent;
                     document.getElementById('summaryTotalPoints').textContent = data.summary.totalPoints;
+                    
+                    let rows = '';
+                    if (data.records && data.records.length > 0) {
+                        rows = data.records.map(r => {
+                            const statusColor = r.Status === 'Present' ? 'text-green-600 font-bold' : r.Status === 'Late' ? 'text-yellow-600 font-bold' : 'text-red-600 font-bold';
+                            return `
+                                <tr>
+                                    <td class="px-2 py-1.5 whitespace-nowrap">${r.Date}</td>
+                                    <td class="px-2 py-1.5 text-center ${statusColor}">${r.Status}</td>
+                                    <td class="px-2 py-1.5 text-center font-mono">${r.Performance_Points || 0}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                    } else {
+                        rows = '<tr><td colspan="3" class="text-center py-2 text-gray-500">No attendance records found.</td></tr>';
+                    }
+                    document.getElementById('summaryTableBody').innerHTML = rows;
                 }
             } catch(err) {
                 console.error("Failed to load summary", err);
+                document.getElementById('summaryTableBody').innerHTML = `<tr><td colspan="3" class="text-center py-2 text-red-500">Error loading data</td></tr>`;
             }
         }
         
