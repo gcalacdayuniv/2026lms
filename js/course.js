@@ -500,15 +500,23 @@ export const CourseModule = {
             termEnd = course.Final_End || '';
         }
         
+        // Parse dates safely to local time to prevent unexpected UTC offsets
+        const parseLocalDate = (dateStr) => {
+            if (!dateStr) return null;
+            if (dateStr.includes('-')) {
+                const [y, m, d] = dateStr.split('-');
+                return new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+            }
+            return new Date(dateStr);
+        };
+        
         let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
         let classDays = 0;
         let pct = 0;
 
         if (termStart && termEnd) {
-            const tStart = new Date(termStart);
-            tStart.setHours(0, 0, 0, 0);
-            const tEnd = new Date(termEnd);
-            tEnd.setHours(0, 0, 0, 0);
+            const tStart = parseLocalDate(termStart);
+            const tEnd = parseLocalDate(termEnd);
             
             const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
             const targetDay = dayMap[course.ScheduleDay];
@@ -527,8 +535,7 @@ export const CourseModule = {
             let noClassDaysCount = 0;
             sessions.forEach(s => {
                 if (s.Is_No_Class === 1) {
-                    const sDate = new Date(s.Date);
-                    sDate.setHours(0, 0, 0, 0);
+                    const sDate = parseLocalDate(s.Date);
                     if (sDate >= tStart && sDate <= tEnd && sDate.getDay() === targetDay) {
                         noClassDaysCount++;
                     }
@@ -538,8 +545,7 @@ export const CourseModule = {
             const baseClassDays = theoreticalDays - noClassDaysCount;
 
             const termRecords = records.filter(r => {
-                const rDate = new Date(r.Date);
-                rDate.setHours(0, 0, 0, 0);
+                const rDate = parseLocalDate(r.Date);
                 return rDate >= tStart && rDate <= tEnd;
             });
 
@@ -587,6 +593,16 @@ export const CourseModule = {
             termEnd = course.Final_End || '';
             titleTerm = 'Final Term';
         }
+
+        // Parse dates safely to local time to prevent unexpected UTC offsets
+        const parseLocalDate = (dateStr) => {
+            if (!dateStr) return null;
+            if (dateStr.includes('-')) {
+                const [y, m, d] = dateStr.split('-');
+                return new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+            }
+            return new Date(dateStr);
+        };
         
         const titleMetric = metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown';
         document.getElementById('detailsModalTitle').textContent = `${titleTerm} - ${titleMetric}`;
@@ -606,14 +622,11 @@ export const CourseModule = {
             return;
         }
 
-        const tStart = new Date(termStart);
-        tStart.setHours(0, 0, 0, 0);
-        const tEnd = new Date(termEnd);
-        tEnd.setHours(0, 0, 0, 0);
+        const tStart = parseLocalDate(termStart);
+        const tEnd = parseLocalDate(termEnd);
         
         const termRecords = records.filter(r => {
-            const rDate = new Date(r.Date);
-            rDate.setHours(0, 0, 0, 0);
+            const rDate = parseLocalDate(r.Date);
             return rDate >= tStart && rDate <= tEnd;
         });
 
