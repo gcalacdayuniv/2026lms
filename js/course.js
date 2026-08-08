@@ -10,6 +10,27 @@ export const CourseModule = {
         document.addEventListener('input', CourseModule.handleInput);
     },
 
+    getDraftKey: (courseId, date) => `attendance_draft_${courseId}_${date}`,
+    
+    saveDraft: (courseId, date) => {
+        const draft = {};
+        document.querySelectorAll('.student-row').forEach(row => {
+            const studentId = row.dataset.studentId;
+            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+            const pointsInput = row.querySelector('.points-input');
+            
+            draft[studentId] = {
+                status: selectedBtn ? selectedBtn.dataset.status : null,
+                points: pointsInput ? (pointsInput.value || '0') : '0'
+            };
+        });
+        localStorage.setItem(`attendance_draft_${courseId}_${date}`, JSON.stringify(draft));
+    },
+    
+    clearDraft: (courseId, date) => {
+        localStorage.removeItem(`attendance_draft_${courseId}_${date}`);
+    },
+
     updateManageStatusColor: (selectEl) => {
         const status = selectEl.value;
         selectEl.className = `w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition ${
@@ -44,6 +65,12 @@ export const CourseModule = {
                     item.style.display = 'none';
                 }
             });
+        }
+
+        if (e.target.classList.contains('points-input')) {
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateVal = document.getElementById('attendanceDate')?.value;
+            if (courseId && dateVal) CourseModule.saveDraft(courseId, dateVal);
         }
     },
 
@@ -320,6 +347,10 @@ export const CourseModule = {
                 e.target.classList.replace('text-gray-600', 'text-red-800');
                 e.target.classList.replace('border-gray-200', 'border-red-400');
             }
+
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateVal = document.getElementById('attendanceDate')?.value;
+            if (courseId && dateVal) CourseModule.saveDraft(courseId, dateVal);
         }
 
         if (e.target.id === 'markAllPresent') {
@@ -327,6 +358,9 @@ export const CourseModule = {
                 const presentBtn = row.querySelector('[data-status="Present"]');
                 if (presentBtn) presentBtn.click();
             });
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateVal = document.getElementById('attendanceDate')?.value;
+            if (courseId && dateVal) CourseModule.saveDraft(courseId, dateVal);
         }
 
         if (e.target.closest('#saveAttendanceBtn')) {
@@ -361,6 +395,8 @@ export const CourseModule = {
                     body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
                 });
                 
+                CourseModule.saveDraft(courseId, dateVal);
+
                 btn.classList.replace('text-blue-600', 'text-green-600');
                 btn.classList.replace('bg-blue-50', 'bg-green-50');
                 btn.classList.replace('border-blue-200', 'border-green-200');
@@ -609,6 +645,8 @@ export const CourseModule = {
 
             await apiFetch('/api/attendance', { method: 'POST', body: JSON.stringify(payload) });
             
+            CourseModule.clearDraft(courseId, dateVal);
+
             alertBox.textContent = "All Attendance saved successfully!";
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
         } catch (err) {
@@ -674,6 +712,56 @@ export const CourseModule = {
                     }
                 });
             }
+
+            const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${date}`);
+            if (draftStr) {
+                try {
+                    const draft = JSON.parse(draftStr);
+                    let hasDraftChanges = false;
+                    
+                    document.querySelectorAll('.student-row').forEach(row => {
+                        const studentId = row.dataset.studentId;
+                        if (draft[studentId]) {
+                            hasDraftChanges = true;
+                            
+                            const r = draft[studentId];
+                            const buttons = row.querySelectorAll('.attendance-btn');
+                            buttons.forEach(btn => {
+                                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400');
+                                btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                                btn.removeAttribute('data-selected');
+                            });
+                            
+                            if (r.status) {
+                                const btn = row.querySelector(`.attendance-btn[data-status="${r.status}"]`);
+                                if (btn) {
+                                    btn.setAttribute('data-selected', 'true');
+                                    btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                                    if (r.status === 'Present') {
+                                        btn.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
+                                    } else if (r.status === 'Late') {
+                                        btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
+                                    } else if (r.status === 'Absent') {
+                                        btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
+                                    }
+                                }
+                            }
+                            
+                            const pointsInput = row.querySelector('.points-input');
+                            if (pointsInput) pointsInput.value = r.points || '0';
+                        }
+                    });
+                    
+                    if (hasDraftChanges) {
+                        const alertBox = document.getElementById('attendanceAlert');
+                        if (alertBox) {
+                            alertBox.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-2"></i> Unsaved changes restored from local cache.';
+                            alertBox.className = "mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium bg-blue-100 text-blue-800 block fade-in";
+                        }
+                    }
+                } catch(e) {}
+            }
+
         } catch (err) {
             console.error("Failed to load attendance:", err);
         }
