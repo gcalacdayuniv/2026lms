@@ -479,7 +479,7 @@ export const Components = {
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
 
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200" alt="${s.Name}">` 
+                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" alt="${s.Name}">` 
                 : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
             
             const eyeConditionBadge = s.eye_condition 
@@ -491,13 +491,13 @@ export const Components = {
                     
                     <!-- Profile Info & Manage Button (Mobile Stack) -->
                     <div class="flex items-start justify-between w-full md:w-1/2">
-                        <div class="flex items-center space-x-3 cursor-pointer view-summary-trigger hover:bg-gray-100 p-1.5 -ml-1.5 rounded-lg transition" data-name="${s.Name}" title="View Performance Summary">
+                        <div class="flex items-center space-x-3 p-1.5 -ml-1.5 rounded-lg transition">
                             <span class="text-xs font-bold text-gray-400 w-5 text-center">${index + 1}</span>
                             <div class="flex-shrink-0">
                                 ${avatarImg}
                             </div>
                             <div>
-                                <div class="font-bold text-gray-800 text-sm sm:text-base">${s.Name}</div>
+                                <div class="font-bold text-blue-600 text-sm sm:text-base cursor-pointer view-summary-trigger hover:underline hover:text-blue-800 transition inline-block" data-name="${s.Name}" title="View Performance Summary">${s.Name}</div>
                                 <div class="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
                                     <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
                                 </div>
@@ -700,9 +700,23 @@ export const Components = {
                     </div>
                 </div>
                 
-                <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center">
+                <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center mb-4">
                     <div class="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-1">Grand Total Pts</div>
                     <div id="summaryTotalPoints" class="text-3xl font-black text-blue-800">...</div>
+                </div>
+                
+                <div class="max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-200 text-gray-700 sticky top-0">
+                            <tr>
+                                <th class="px-2 py-1.5">Date</th>
+                                <th class="px-2 py-1.5 text-center">Status</th>
+                                <th class="px-2 py-1.5 text-center">Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryTableBody" class="divide-y divide-gray-200 bg-white">
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
