@@ -247,7 +247,8 @@ export const CourseModule = {
             CourseModule.currentSummaryData = null;
 
             try {
-                const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}`);
+                const ts = new Date().getTime(); // Cache buster to bypass outdated Cloudflare responses
+                const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}&_t=${ts}`);
                 CourseModule.currentSummaryData = data;
                 
                 CourseModule.renderTermMetrics('midterm', data);
@@ -258,7 +259,7 @@ export const CourseModule = {
             } catch(err) {
                 console.error("Failed to load summary", err);
                 const errDiv = document.getElementById('summaryError');
-                errDiv.textContent = err.message;
+                errDiv.textContent = err.message || "Failed to load summary records.";
                 errDiv.classList.remove('hidden');
                 document.getElementById('summaryLoading').classList.add('hidden');
             }
@@ -484,15 +485,19 @@ export const CourseModule = {
     },
 
     renderTermMetrics: (term, data) => {
+        const course = data.course || {};
+        const sessions = data.sessions || [];
+        const records = data.records || [];
+        
         let termStart = '';
         let termEnd = '';
         
         if (term === 'midterm') {
-            termStart = data.course.Midterm_Start;
-            termEnd = data.course.Midterm_End;
+            termStart = course.Midterm_Start || '';
+            termEnd = course.Midterm_End || '';
         } else if (term === 'finalterm') {
-            termStart = data.course.Final_Start;
-            termEnd = data.course.Final_End;
+            termStart = course.Final_Start || '';
+            termEnd = course.Final_End || '';
         }
         
         let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
@@ -504,13 +509,13 @@ export const CourseModule = {
             const tStart = new Date(termStart);
             const tEnd = new Date(termEnd);
             
-            const termSessions = data.sessions.filter(s => {
+            const termSessions = sessions.filter(s => {
                 const sDate = new Date(s.Date);
                 return sDate >= tStart && sDate <= tEnd && s.Is_No_Class === 0;
             });
             termTotalDays = termSessions.length;
 
-            const termRecords = data.records.filter(r => {
+            const termRecords = records.filter(r => {
                 const rDate = new Date(r.Date);
                 return rDate >= tStart && rDate <= tEnd;
             });
@@ -543,17 +548,20 @@ export const CourseModule = {
     },
 
     renderDetailsModal: (term, metric, data) => {
+        const course = data.course || {};
+        const records = data.records || [];
+        
         let termStart = '';
         let termEnd = '';
         let titleTerm = '';
         
         if (term === 'midterm') {
-            termStart = data.course.Midterm_Start;
-            termEnd = data.course.Midterm_End;
+            termStart = course.Midterm_Start || '';
+            termEnd = course.Midterm_End || '';
             titleTerm = 'Mid Term';
         } else {
-            termStart = data.course.Final_Start;
-            termEnd = data.course.Final_End;
+            termStart = course.Final_Start || '';
+            termEnd = course.Final_End || '';
             titleTerm = 'Final Term';
         }
         
@@ -578,7 +586,7 @@ export const CourseModule = {
         const tStart = new Date(termStart);
         const tEnd = new Date(termEnd);
         
-        const termRecords = data.records.filter(r => {
+        const termRecords = records.filter(r => {
             const rDate = new Date(r.Date);
             return rDate >= tStart && rDate <= tEnd;
         });
@@ -613,7 +621,8 @@ export const CourseModule = {
 
     exportRoster: async (courseId) => {
         try {
-            const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
+            const ts = new Date().getTime();
+            const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
             const students = data.students;
 
             const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
@@ -740,7 +749,9 @@ export const CourseModule = {
             if (filterYear) url += `&yearFilter=${encodeURIComponent(filterYear)}`;
             if (filterSection) url += `&sectionFilter=${encodeURIComponent(filterSection)}`;
             
-            const data = await apiFetch(url);
+            const ts = new Date().getTime();
+            const data = await apiFetch(`${url}&_t=${ts}`);
+            
             if (!data.students || data.students.length === 0) {
                 listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded-md shadow-sm">No new students available to enroll matching criteria.</div>';
                 return;
@@ -861,7 +872,8 @@ export const CourseModule = {
 
     loadAttendanceData: async (courseId, date) => {
         try {
-            const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}`);
+            const ts = new Date().getTime();
+            const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}&_t=${ts}`);
             
             const noClassToggle = document.getElementById('noClassToggle');
             const container = document.getElementById('rosterListContainer');
@@ -1022,7 +1034,8 @@ export const CourseModule = {
         }
         
         try {
-            const data = await apiFetch(`/api/course-details?courseId=${courseId}`);
+            const ts = new Date().getTime();
+            const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
             
             root.innerHTML = Components.renderClassScreen(data.course, data.students);
             
@@ -1037,7 +1050,7 @@ export const CourseModule = {
                 const filterCourseSelect = document.getElementById('filterCourse');
                 if (filterCourseSelect) {
                     try {
-                        const programsData = await apiFetch('/api/programs');
+                        const programsData = await apiFetch(`/api/programs?_t=${ts}`);
                         if (programsData.programs) {
                             filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' + 
                                 programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
@@ -1077,7 +1090,8 @@ export const CourseModule = {
             successDiv.classList.remove('hidden');
             document.getElementById('addProgramForm').reset();
             
-            const programsData = await apiFetch('/api/programs');
+            const ts = new Date().getTime();
+            const programsData = await apiFetch(`/api/programs?_t=${ts}`);
             const targetCourseSelect = document.getElementById('targetCourse');
             if (targetCourseSelect && programsData.programs) {
                 targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
@@ -1144,14 +1158,15 @@ export const CourseModule = {
 
     renderLecturerDashboard: async (container) => {
         try {
-            const programsData = await apiFetch('/api/programs');
+            const ts = new Date().getTime();
+            const programsData = await apiFetch(`/api/programs?_t=${ts}`);
             const targetCourseSelect = document.getElementById('targetCourse');
             if (targetCourseSelect && programsData.programs) {
                 targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
                     programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
             }
 
-            const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer`);
+            const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&_t=${ts}`);
             
             const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
             const parseTime = (timeStr) => {
@@ -1208,9 +1223,10 @@ export const CourseModule = {
 
     renderStudentDashboard: async (container) => {
         try {
+            const ts = new Date().getTime();
             const [myCoursesRes, allCoursesRes] = await Promise.all([
-                apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=student`),
-                apiFetch(`/api/courses?studentId=${AppState.user.User_ID}`)
+                apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=student&_t=${ts}`),
+                apiFetch(`/api/courses?studentId=${AppState.user.User_ID}&_t=${ts}`)
             ]);
             
             const enrolledIds = myCoursesRes.courses.map(c => c.Course_ID);
