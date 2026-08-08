@@ -247,7 +247,7 @@ export const CourseModule = {
             CourseModule.currentSummaryData = null;
 
             try {
-                const ts = new Date().getTime(); // Cache buster to bypass outdated Cloudflare responses
+                const ts = new Date().getTime();
                 const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}&_t=${ts}`);
                 CourseModule.currentSummaryData = data;
                 
@@ -269,7 +269,7 @@ export const CourseModule = {
             document.getElementById('summaryModal').classList.add('hidden');
         }
 
-        // Details Modal Logic (From Summary Cards)
+        // Details Modal Logic
         if (e.target.closest('.view-details-trigger')) {
             const trigger = e.target.closest('.view-details-trigger');
             const term = trigger.dataset.term;
@@ -507,16 +507,41 @@ export const CourseModule = {
 
         if (termStart && termEnd) {
             const tStart = new Date(termStart);
+            tStart.setHours(0, 0, 0, 0);
             const tEnd = new Date(termEnd);
+            tEnd.setHours(0, 0, 0, 0);
             
-            const termSessions = sessions.filter(s => {
-                const sDate = new Date(s.Date);
-                return sDate >= tStart && sDate <= tEnd && s.Is_No_Class === 0;
+            const dayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+            const targetDay = dayMap[course.ScheduleDay];
+
+            let theoreticalDays = 0;
+            if (targetDay !== undefined) {
+                let currentDate = new Date(tStart);
+                while (currentDate <= tEnd) {
+                    if (currentDate.getDay() === targetDay) {
+                        theoreticalDays++;
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+
+            let noClassDaysCount = 0;
+            sessions.forEach(s => {
+                if (s.Is_No_Class === 1) {
+                    const sDate = new Date(s.Date);
+                    sDate.setHours(0, 0, 0, 0);
+                    if (sDate >= tStart && sDate <= tEnd && sDate.getDay() === targetDay) {
+                        noClassDaysCount++;
+                    }
+                }
             });
-            termTotalDays = termSessions.length;
+
+            termTotalDays = theoreticalDays - noClassDaysCount;
+            if (termTotalDays < 0) termTotalDays = 0;
 
             const termRecords = records.filter(r => {
                 const rDate = new Date(r.Date);
+                rDate.setHours(0, 0, 0, 0);
                 return rDate >= tStart && rDate <= tEnd;
             });
 
@@ -584,10 +609,13 @@ export const CourseModule = {
         }
 
         const tStart = new Date(termStart);
+        tStart.setHours(0, 0, 0, 0);
         const tEnd = new Date(termEnd);
+        tEnd.setHours(0, 0, 0, 0);
         
         const termRecords = records.filter(r => {
             const rDate = new Date(r.Date);
+            rDate.setHours(0, 0, 0, 0);
             return rDate >= tStart && rDate <= tEnd;
         });
 
