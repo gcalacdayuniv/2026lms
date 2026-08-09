@@ -14,14 +14,18 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 
 * **`index.html` & `styles.css`:** Main entry point, the static layout shell, and custom animations.
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
-* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, Program Management, User Management, and Manual Student Enrollment.
+* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, Program Management, User Management, Manual Student Enrollment, and the Random Recitation Picker wheel interface.
 * **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously, including dynamic route parsing mapping to specific Class IDs.
 * **`js/auth.js`:** Handles login (with password visibility toggling), registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, interactive panel/modal toggling, global image viewing navigation, and user management status controls.
-* **`js/course.js`:** Encapsulates the complete lifecycle for Course Management. Handles event bindings, prompt-based enrollment confirmations, fetches API course data, enforces target audience restrictions, loads detailed class roster screens, controls attendance state toggling/submission, triggers auto-saves for student info, manages manual student overrides, builds specialized UI strings, and generates print-ready roster exports.
+* **`js/course.js`:** Encapsulates the complete event binding lifecycle for Course Management, serving as the master orchestrator for actions, forms, inputs, and routing clicks across modular domain files.
+* **`js/course-dashboard.js`:** Manages lecturer and student dashboard rendering views, course creation validation, and program creation routines.
+* **`js/course-class.js`:** Handles detailed class screen rendering, student sorting algorithms, data population for roster elements, print-ready roster exports, and enrollment management overrides.
+* **`js/course-attendance.js`:** Controls core attendance metrics, term period calculation rules, no-class day mapping, draft caching storage, and individual/batch persistence.
+* **`js/course-recitation.js`:** Manages the random recitation picker wheel logic, weighted probability distribution favoring students with minimal or zero participation scores, and smooth canvas rotations.
 * **`js/app.js`:** The master orchestrator that imports and initializes all modules.
 
 ### 2. Backend API (Cloudflare Workers)
-* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments (including specific Course Roster API mappings, Seat and Group assignments, Manual Overrides), Batch Attendance inserting (with performance points), Password modification logic, and global User Status updates.
+* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain using environment variables. It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments (including specific Course Roster API mappings, Seat and Group assignments, Manual Overrides), Batch Attendance inserting (with performance points), Password modification logic, global User Status updates, and weighted Recitation Pool queries.
 
 ### 3. Database Layer (Cloudflare D1 - Serverless SQLite)
 The database uses Universally Unique Identifiers (UUIDs) for all primary keys, generated on the edge via `crypto.randomUUID()`. 
@@ -43,6 +47,8 @@ We use the following environment variables strictly within the API (`worker/work
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Weighted Random Recitation Picker:** Added a floating action button (FAB) on class screens launching an interactive spinning wheel modal. The picker queries student performance points via a new `/api/recitation-pool` endpoint and computes weighted probabilities, dynamically increasing selection chances for students with minimal or zero term participation scores.
+* **Modularization of Course Logic:** Refactored the monolithic `js/course.js` file into smaller, domain-specific modules (`course-dashboard.js`, `course-class.js`, `course-attendance.js`, and `course-recitation.js`) to improve maintainability and performance while retaining a single orchestrator file.
 * **Advanced Attendance Metrics:** Removed global attendance totals in favor of term specific calculations. Reconfigured attendance scoring to assign 1 point for Present and 0.5 points for Late. Implemented an "Excused" status that automatically deducts from the individual student's total required days, dynamically adjusting their term attendance percentage. Added a "No Class" toggle enabling lecturers to declare nullified calendar days that universally deduct from the term's total day count via the new `Course_Sessions` database table.
 * **Interactive Performance Drilldowns:** Refactored the Performance Summary modal to render detailed academic term metric cards. Integrated click event listeners onto the Attendance and Participation cards that launch an overlaying list modal displaying a chronological breakdown of recorded statuses and performance points. 
 * **Assigned Topic Integration:** Appended an "Assigned Topic" text input to the Manage Student modal, persisting natively to the Enrollments table alongside Seat and Group values. Updated the course roster to render the topics statically inline.
@@ -69,7 +75,7 @@ We use the following environment variables strictly within the API (`worker/work
 ## Development Directives
 When asked to add features, debug, or refactor, you must strictly adhere to the following rules:
 
-1. **Enforce the Architecture via File Separation:** Group logic into its specific domain file inside the `js/` directory. Use internal namespace objects.
+1. **Enforce the Architecture via File Separation:** Group logic into its specific domain file inside the `js/` directory (e.g., `course-dashboard.js`, `course-class.js`, `course-attendance.js`, `course-recitation.js`). Use internal namespace objects.
 2. **No Build Step / Native ES Modules:** Do not suggest npm packages, Webpack, or JS frameworks (React/Vue). Rely exclusively on native browser Web APIs and ES Modules (`import`/`export`).
 3. **Strict Static Deployment Constraints:** The frontend is deployed via Cloudflare Pages via GitHub, which ONLY allows `.html`, `.css`, and `.js` files. Never suggest creating `.json` files for the frontend.
 4. **Database & Security Integrity:** All new database records MUST utilize `crypto.randomUUID()` for primary keys. The backend API must NEVER require an `api_secret` from the frontend (security is handled via strict CORS origins). D1 batch operations (`env.DB.batch`) should be used for multiple insertions. 
