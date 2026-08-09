@@ -9,6 +9,8 @@ export const CourseRecitation = {
     openModal: async (courseId) => {
         document.getElementById('recitationModal').classList.remove('hidden');
         document.getElementById('recitationResult').classList.add('hidden');
+        document.getElementById('wheelContainer').classList.remove('hidden');
+        document.getElementById('spinWheelBtn').classList.remove('hidden');
         document.getElementById('spinWheelBtn').disabled = false;
         
         const wheel = document.getElementById('recitationWheel');
@@ -28,15 +30,43 @@ export const CourseRecitation = {
         if (CourseRecitation.isSpinning) return;
         document.getElementById('recitationModal').classList.add('hidden');
         document.getElementById('recitationResult').classList.add('hidden');
+        document.getElementById('wheelContainer').classList.remove('hidden');
+        document.getElementById('spinWheelBtn').classList.remove('hidden');
+    },
+
+    resetToWheel: () => {
+        document.getElementById('recitationResult').classList.add('hidden');
+        document.getElementById('wheelContainer').classList.remove('hidden');
+        document.getElementById('spinWheelBtn').classList.remove('hidden');
+        CourseRecitation.drawWheel();
     },
 
     drawWheel: () => {
         const wheel = document.getElementById('recitationWheel');
-        const total = CourseRecitation.students.length;
+        
+        const mode = document.querySelector('input[name="callerMode"]:checked').value;
+        const courseId = window.location.hash.replace('#class-', '');
+        const today = new Date().toISOString().split('T')[0];
+        const calledKey = `student_caller_${courseId}_${today}`;
+        
+        let calledToday = [];
+        try {
+            calledToday = JSON.parse(localStorage.getItem(calledKey)) || [];
+        } catch(e) {}
+        
+        let availableStudents = CourseRecitation.students;
+        if (mode === '2') {
+            availableStudents = CourseRecitation.students.filter(s => !calledToday.includes(s.User_ID));
+        }
+
+        const total = availableStudents.length;
         if (total === 0) {
-            wheel.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-500 font-bold">No students found</div>';
+            wheel.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-500 font-bold text-center px-4">All students called for today.</div>';
+            document.getElementById('spinWheelBtn').disabled = true;
             return;
         }
+        
+        document.getElementById('spinWheelBtn').disabled = false;
 
         let conicString = '';
         const angle = 360 / total;
@@ -54,36 +84,55 @@ export const CourseRecitation = {
     },
 
     spin: () => {
-        if (CourseRecitation.isSpinning || CourseRecitation.students.length === 0) return;
+        const mode = document.querySelector('input[name="callerMode"]:checked').value;
+        const courseId = window.location.hash.replace('#class-', '');
+        const today = new Date().toISOString().split('T')[0];
+        const calledKey = `student_caller_${courseId}_${today}`;
+        
+        let calledToday = [];
+        if (mode === '2') {
+            try { calledToday = JSON.parse(localStorage.getItem(calledKey)) || []; } catch(e) {}
+        }
+
+        let availableStudents = CourseRecitation.students;
+        if (mode === '2') {
+            availableStudents = CourseRecitation.students.filter(s => !calledToday.includes(s.User_ID));
+        }
+
+        if (CourseRecitation.isSpinning || availableStudents.length === 0) return;
         CourseRecitation.isSpinning = true;
         
         document.getElementById('recitationResult').classList.add('hidden');
         document.getElementById('spinWheelBtn').disabled = true;
 
-        const students = CourseRecitation.students;
-        let maxPoints = 0;
-        students.forEach(s => { if(s.Total_Points > maxPoints) maxPoints = s.Total_Points; });
-        
-        let totalWeight = 0;
-        const weightedStudents = students.map(s => {
-            const weight = (maxPoints - s.Total_Points) + 1;
-            totalWeight += weight;
-            return { ...s, weight };
-        });
-
-        let randomVal = Math.random() * totalWeight;
         let selectedIndex = 0;
         
-        for(let i = 0; i < weightedStudents.length; i++) {
-            randomVal -= weightedStudents[i].weight;
-            if(randomVal <= 0) {
-                selectedIndex = i;
-                break;
+        if (mode === '1') {
+            let maxPoints = 0;
+            availableStudents.forEach(s => { if(s.Total_Points > maxPoints) maxPoints = s.Total_Points; });
+            
+            let totalWeight = 0;
+            const weightedStudents = availableStudents.map(s => {
+                const weight = (maxPoints - s.Total_Points) + 1;
+                totalWeight += weight;
+                return { ...s, weight };
+            });
+
+            let randomVal = Math.random() * totalWeight;
+            
+            for(let i = 0; i < weightedStudents.length; i++) {
+                randomVal -= weightedStudents[i].weight;
+                if(randomVal <= 0) {
+                    selectedIndex = i;
+                    break;
+                }
             }
+        } else {
+            selectedIndex = Math.floor(Math.random() * availableStudents.length);
         }
 
-        const selectedStudent = students[selectedIndex];
-        const totalSlices = students.length;
+        const selectedStudent = availableStudents[selectedIndex];
+        const totalSlices = availableStudents.length;
         const sliceAngle = 360 / totalSlices;
         
         const sliceCenter = (selectedIndex * sliceAngle) + (sliceAngle / 2);
@@ -103,15 +152,21 @@ export const CourseRecitation = {
             CourseRecitation.isSpinning = false;
             document.getElementById('spinWheelBtn').disabled = false;
             
+            if (mode === '2') {
+                calledToday.push(selectedStudent.User_ID);
+                localStorage.setItem(calledKey, JSON.stringify(calledToday));
+            }
+            
             const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-24 h-24 rounded-full object-cover border-4 border-purple-500 mx-auto shadow-md">` 
-                : `<i class="fa-solid fa-circle-user text-[96px] text-gray-300"></i>`;
+                ? `<img src="${avatarSrc}" class="w-32 h-32 rounded-full object-cover border-4 border-purple-500 mx-auto shadow-md">` 
+                : `<i class="fa-solid fa-circle-user text-[128px] text-gray-300"></i>`;
             
             document.getElementById('recitationResultAvatar').innerHTML = avatarImg;
             document.getElementById('recitationResultName').textContent = selectedStudent.Name;
-            document.getElementById('recitationResultPoints').textContent = `Total Points: ${selectedStudent.Total_Points}`;
             
+            document.getElementById('wheelContainer').classList.add('hidden');
+            document.getElementById('spinWheelBtn').classList.add('hidden');
             document.getElementById('recitationResult').classList.remove('hidden');
             
             wheel.style.transition = 'none';
