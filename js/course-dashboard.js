@@ -163,7 +163,7 @@ export const CourseDashboard = {
             const enrolledIds = myCoursesRes.courses.map(c => c.Course_ID);
             
             let enrolledHtml = myCoursesRes.courses.map(c => `
-                <div class="p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md">
+                <div class="cursor-pointer student-active-course p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md hover:border-green-400 transform hover:-translate-y-1" data-course-id="${c.Course_ID}" data-course-title="${c.CourseCode} | ${c.CourseTitle}">
                     <div class="absolute top-0 right-0 bg-green-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold shadow-sm tracking-widest uppercase">Enrolled</div>
                     <div class="font-black text-xl text-green-800 pr-16">${c.CourseCode}</div>
                     <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
