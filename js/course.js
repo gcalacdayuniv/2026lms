@@ -93,11 +93,89 @@ export const CourseModule = {
         }
         
         if (e.target.name === 'callerMode') {
+            const toggleBtn = document.getElementById('toggleCalledListBtn');
+            const calledContainer = document.getElementById('calledListContainer');
+            if (e.target.value === '2') {
+                toggleBtn.classList.remove('hidden');
+            } else {
+                toggleBtn.classList.add('hidden');
+                calledContainer.classList.add('hidden');
+                toggleBtn.textContent = "View Called List";
+            }
             CourseRecitation.drawWheel();
         }
     },
 
     handleClicks: async (e) => {
+        if (e.target.closest('#toggleCalledListBtn')) {
+            const container = document.getElementById('calledListContainer');
+            const btn = document.getElementById('toggleCalledListBtn');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                btn.textContent = "Hide Called List";
+            } else {
+                container.classList.add('hidden');
+                btn.textContent = "View Called List";
+            }
+        }
+
+        if (e.target.closest('.remove-called-student')) {
+            const btn = e.target.closest('.remove-called-student');
+            CourseRecitation.removeCalledStudent(btn.dataset.userId);
+        }
+
+        if (e.target.closest('#resetCalledListBtn')) {
+            const confirmation = window.confirm("Are you sure you want to reset all called students for today?");
+            if (confirmation) {
+                CourseRecitation.resetCalledList();
+            }
+        }
+
+        if (e.target.closest('.student-active-course')) {
+            const card = e.target.closest('.student-active-course');
+            const courseId = card.dataset.courseId;
+            const courseTitle = card.dataset.courseTitle;
+            
+            document.getElementById('ssCourseTitle').textContent = courseTitle;
+            document.getElementById('ssEnrollmentInfo').classList.add('hidden');
+            
+            document.getElementById('studentSummaryModal').classList.remove('hidden');
+            document.getElementById('summaryLoading').classList.remove('hidden');
+            document.getElementById('summaryContent').classList.add('hidden');
+            document.getElementById('summaryError').classList.add('hidden');
+            
+            CourseClass.currentSummaryData = null;
+
+            try {
+                const ts = new Date().getTime();
+                const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${AppState.user.User_ID}&_t=${ts}`);
+                CourseClass.currentSummaryData = data;
+                
+                CourseAttendance.renderTermMetrics('midterm', data);
+                CourseAttendance.renderTermMetrics('finalterm', data);
+                
+                if (data.enrollment) {
+                    document.getElementById('ssSeat').textContent = data.enrollment.Seat_Number || 'N/A';
+                    document.getElementById('ssGroup').textContent = data.enrollment.Group_Name || 'N/A';
+                    document.getElementById('ssTopic').textContent = data.enrollment.Assigned_Topic || 'N/A';
+                    document.getElementById('ssEnrollmentInfo').classList.remove('hidden');
+                }
+
+                document.getElementById('summaryLoading').classList.add('hidden');
+                document.getElementById('summaryContent').classList.remove('hidden');
+            } catch(err) {
+                console.error("Failed to load summary", err);
+                const errDiv = document.getElementById('summaryError');
+                errDiv.textContent = err.message || "Failed to load summary records.";
+                errDiv.classList.remove('hidden');
+                document.getElementById('summaryLoading').classList.add('hidden');
+            }
+        }
+        
+        if (e.target.closest('#closeStudentSummaryModalBtn') || e.target.id === 'closeStudentSummaryModalBg') {
+            document.getElementById('studentSummaryModal').classList.add('hidden');
+        }
+
         if (e.target.closest('.enroll-btn')) {
             const confirmation = window.confirm("Are you sure you want to enroll in this Course? This action cannot be undone.");
             if (!confirmation) {
