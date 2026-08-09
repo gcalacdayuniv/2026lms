@@ -295,28 +295,43 @@ const ClassUI = {
         <div id="recitationModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-4">
             <div id="recitationModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm cursor-pointer"></div>
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 scale-up flex flex-col items-center">
-                <div class="w-full flex justify-between items-center mb-6 border-b pb-3">
-                    <h3 class="text-lg font-black text-gray-800"><i class="fa-solid fa-dharmachakra text-purple-600 mr-2"></i>Recitation Picker</h3>
+                <div class="w-full flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-black text-gray-800"><i class="fa-solid fa-bullhorn text-purple-600 mr-2"></i>Student Caller</h3>
                     <button id="closeRecitationModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
                 
-                <div class="relative w-64 h-64 mb-6">
-                    <div class="absolute top-[-15px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-600 z-20 filter drop-shadow-md"></div>
-                    <div id="recitationWheel" class="w-full h-full rounded-full border-4 border-gray-700 shadow-inner overflow-hidden relative">
+                <div class="w-full flex justify-center mb-6 space-x-4">
+                    <label class="flex items-center space-x-2 text-sm font-bold text-gray-700 cursor-pointer">
+                        <input type="radio" name="callerMode" value="1" checked class="form-radio text-purple-600 focus:ring-purple-500">
+                        <span>Mode 1 (Weighted)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-sm font-bold text-gray-700 cursor-pointer">
+                        <input type="radio" name="callerMode" value="2" class="form-radio text-purple-600 focus:ring-purple-500">
+                        <span>Mode 2 (Unique Daily)</span>
+                    </label>
+                </div>
+                
+                <div id="wheelContainer" class="w-full flex flex-col items-center">
+                    <div class="relative w-64 h-64 mb-6">
+                        <div class="absolute top-[-15px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-600 z-20 filter drop-shadow-md"></div>
+                        <div id="recitationWheel" class="w-full h-full rounded-full border-4 border-gray-700 shadow-inner overflow-hidden relative">
+                        </div>
                     </div>
                 </div>
                 
                 <button id="spinWheelBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-lg shadow-md transition transform active:scale-95 focus:outline-none">
-                    SPIN WHEEL
+                    CALL STUDENT
                 </button>
                 
-                <div id="recitationResult" class="hidden w-full mt-6 text-center fade-in bg-purple-50 p-4 rounded-xl border border-purple-200">
-                    <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Selected Student</p>
-                    <div id="recitationResultAvatar" class="mb-3"></div>
-                    <h4 id="recitationResultName" class="text-xl font-black text-gray-900"></h4>
-                    <p id="recitationResultPoints" class="text-sm font-bold text-gray-500 mt-1"></p>
+                <div id="recitationResult" class="hidden w-full text-center fade-in bg-purple-50 p-6 rounded-xl border border-purple-200">
+                    <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-4">Selected Student</p>
+                    <div id="recitationResultAvatar" class="mb-4"></div>
+                    <h4 id="recitationResultName" class="text-2xl font-black text-gray-900 mb-6"></h4>
+                    <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
+                        Next Student
+                    </button>
                 </div>
             </div>
         </div>
@@ -382,9 +397,9 @@ export const ClassComponents = {
                                     <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
                                 </div>
                                 <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
-                                    Seat: <span class="text-gray-800">${s.Seat_Number || '-'}</span>
-                                    &nbsp;|&nbsp; Group: <span class="text-gray-800">${s.Group_Name || '-'}</span>
-                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || '-'}</span>
+                                    Seat: <span class="text-gray-800">${s.Seat_Number || ''}</span>
+                                    &nbsp;|&nbsp; Group: <span class="text-gray-800">${s.Group_Name || ''}</span>
+                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || ''}</span>
                                 </div>
                             </div>
                         </div>
@@ -504,8 +519,8 @@ export const ClassComponents = {
                     </div>
                 </div>
 
-                <button id="openRecitationBtn" class="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition flex justify-center items-center z-50 focus:outline-none" title="Random Recitation">
-                    <i class="fa-solid fa-dharmachakra text-2xl"></i>
+                <button id="openRecitationBtn" class="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 flex justify-center items-center z-50 focus:outline-none" title="Student Caller" style="transition: opacity 0.3s, background-color 0.15s, transform 0.15s;">
+                    <i class="fa-solid fa-bullhorn text-2xl"></i>
                 </button>
             </main>
 
