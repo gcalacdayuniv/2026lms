@@ -13,6 +13,16 @@ export const CourseRecitation = {
         document.getElementById('spinWheelBtn').classList.remove('hidden');
         document.getElementById('spinWheelBtn').disabled = false;
         
+        const mode = document.querySelector('input[name="callerMode"]:checked').value;
+        const toggleBtn = document.getElementById('toggleCalledListBtn');
+        if (mode === '2') {
+            toggleBtn.classList.remove('hidden');
+        } else {
+            toggleBtn.classList.add('hidden');
+            document.getElementById('calledListContainer').classList.add('hidden');
+            toggleBtn.textContent = "View Called List";
+        }
+        
         const wheel = document.getElementById('recitationWheel');
         wheel.style.transform = `rotate(0deg)`;
         wheel.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-500 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl"></i></div>';
@@ -21,6 +31,7 @@ export const CourseRecitation = {
             const data = await apiFetch(`/api/recitation-pool?courseId=${courseId}`);
             CourseRecitation.students = data.students || [];
             CourseRecitation.drawWheel();
+            CourseRecitation.updateCalledListUI();
         } catch(err) {
             wheel.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-500 font-bold text-xs text-center p-4">${err.message}</div>`;
         }
@@ -32,12 +43,72 @@ export const CourseRecitation = {
         document.getElementById('recitationResult').classList.add('hidden');
         document.getElementById('wheelContainer').classList.remove('hidden');
         document.getElementById('spinWheelBtn').classList.remove('hidden');
+        document.getElementById('calledListContainer').classList.add('hidden');
     },
 
     resetToWheel: () => {
         document.getElementById('recitationResult').classList.add('hidden');
         document.getElementById('wheelContainer').classList.remove('hidden');
         document.getElementById('spinWheelBtn').classList.remove('hidden');
+        CourseRecitation.drawWheel();
+    },
+
+    updateCalledListUI: () => {
+        const courseId = window.location.hash.replace('#class-', '');
+        const today = new Date().toISOString().split('T')[0];
+        const calledKey = `student_caller_${courseId}_${today}`;
+        
+        let calledToday = [];
+        try {
+            calledToday = JSON.parse(localStorage.getItem(calledKey)) || [];
+        } catch(e) {}
+        
+        const contentContainer = document.getElementById('calledStudentsListContent');
+        if (!contentContainer) return;
+        
+        if (calledToday.length === 0) {
+            contentContainer.innerHTML = '<div class="text-xs text-gray-500 italic text-center py-2">No students called yet today.</div>';
+            return;
+        }
+
+        contentContainer.innerHTML = calledToday.map(userId => {
+            const student = CourseRecitation.students.find(s => s.User_ID === userId);
+            if (!student) return '';
+            return `
+                <div class="flex justify-between items-center bg-white p-2 border border-gray-200 rounded shadow-sm">
+                    <span class="text-xs font-bold text-gray-800">${student.Name}</span>
+                    <button type="button" class="remove-called-student text-red-500 hover:text-red-700 text-xs font-bold px-1.5 py-0.5 bg-red-50 hover:bg-red-100 rounded transition" data-user-id="${student.User_ID}">
+                        <i class="fa-solid fa-xmark"></i> Remove
+                    </button>
+                </div>
+            `;
+        }).join('');
+    },
+
+    removeCalledStudent: (userId) => {
+        const courseId = window.location.hash.replace('#class-', '');
+        const today = new Date().toISOString().split('T')[0];
+        const calledKey = `student_caller_${courseId}_${today}`;
+        
+        let calledToday = [];
+        try {
+            calledToday = JSON.parse(localStorage.getItem(calledKey)) || [];
+        } catch(e) {}
+        
+        calledToday = calledToday.filter(id => id !== userId);
+        localStorage.setItem(calledKey, JSON.stringify(calledToday));
+        
+        CourseRecitation.updateCalledListUI();
+        CourseRecitation.drawWheel();
+    },
+
+    resetCalledList: () => {
+        const courseId = window.location.hash.replace('#class-', '');
+        const today = new Date().toISOString().split('T')[0];
+        const calledKey = `student_caller_${courseId}_${today}`;
+        
+        localStorage.removeItem(calledKey);
+        CourseRecitation.updateCalledListUI();
         CourseRecitation.drawWheel();
     },
 
@@ -155,6 +226,7 @@ export const CourseRecitation = {
             if (mode === '2') {
                 calledToday.push(selectedStudent.User_ID);
                 localStorage.setItem(calledKey, JSON.stringify(calledToday));
+                CourseRecitation.updateCalledListUI();
             }
             
             const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
