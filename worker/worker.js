@@ -536,11 +536,16 @@ export default {
                     "SELECT Date, Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ? ORDER BY Date ASC"
                 ).bind(courseId, studentId).all();
 
+                const enrollment = await env.DB.prepare(
+                    "SELECT Seat_Number, Group_Name, Assigned_Topic FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?"
+                ).bind(courseId, studentId).first();
+
                 return new Response(JSON.stringify({ 
                     success: true, 
                     course: course,
                     sessions: sessions.results,
-                    records: records.results
+                    records: records.results,
+                    enrollment: enrollment || {}
                 }), { status: 200, headers: corsHeaders });
             }
 
