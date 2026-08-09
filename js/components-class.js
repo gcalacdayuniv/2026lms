@@ -302,15 +302,30 @@ const ClassUI = {
                     </button>
                 </div>
                 
-                <div class="w-full flex justify-center mb-6 space-x-4">
-                    <label class="flex items-center space-x-2 text-sm font-bold text-gray-700 cursor-pointer">
-                        <input type="radio" name="callerMode" value="1" checked class="form-radio text-purple-600 focus:ring-purple-500">
-                        <span>Mode 1 (Weighted)</span>
-                    </label>
-                    <label class="flex items-center space-x-2 text-sm font-bold text-gray-700 cursor-pointer">
-                        <input type="radio" name="callerMode" value="2" class="form-radio text-purple-600 focus:ring-purple-500">
-                        <span>Mode 2 (Unique Daily)</span>
-                    </label>
+                <div class="w-full flex justify-between items-center mb-4">
+                    <div class="flex space-x-3">
+                        <label class="flex items-center space-x-1.5 text-xs font-bold text-gray-700 cursor-pointer">
+                            <input type="radio" name="callerMode" value="1" checked class="form-radio text-purple-600 focus:ring-purple-500">
+                            <span>Mode 1</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 text-xs font-bold text-gray-700 cursor-pointer">
+                            <input type="radio" name="callerMode" value="2" class="form-radio text-purple-600 focus:ring-purple-500">
+                            <span>Mode 2 (Unique)</span>
+                        </label>
+                    </div>
+                    <button type="button" id="toggleCalledListBtn" class="hidden text-xs font-bold text-purple-600 hover:text-purple-800 underline focus:outline-none">
+                        View Called List
+                    </button>
+                </div>
+
+                <div id="calledListContainer" class="hidden w-full mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200 max-h-48 overflow-y-auto">
+                    <div class="flex justify-between items-center mb-2 pb-1 border-b border-gray-200">
+                        <span class="text-xs font-bold text-gray-700">Called Today</span>
+                        <button type="button" id="resetCalledListBtn" class="text-[10px] font-bold text-red-600 hover:text-red-800 uppercase">Reset All</button>
+                    </div>
+                    <div id="calledStudentsListContent" class="space-y-1.5">
+                        <!-- Populated dynamically -->
+                    </div>
                 </div>
                 
                 <div id="wheelContainer" class="w-full flex flex-col items-center">
