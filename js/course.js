@@ -91,16 +91,20 @@ export const CourseModule = {
                 await CourseAttendance.loadAttendanceData(courseId, date);
             }
         }
+        
+        if (e.target.name === 'callerMode') {
+            CourseRecitation.drawWheel();
+        }
     },
 
     handleClicks: async (e) => {
-        if (e.target.classList.contains('enroll-btn')) {
+        if (e.target.closest('.enroll-btn')) {
             const confirmation = window.confirm("Are you sure you want to enroll in this Course? This action cannot be undone.");
             if (!confirmation) {
                 return;
             }
             
-            const btn = e.target;
+            const btn = e.target.closest('.enroll-btn');
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             await CourseDashboard.enrollCourse(btn.dataset.id);
@@ -510,6 +514,10 @@ export const CourseModule = {
 
         if (e.target.closest('#spinWheelBtn')) {
             CourseRecitation.spin();
+        }
+        
+        if (e.target.closest('#nextStudentBtn')) {
+            CourseRecitation.resetToWheel();
         }
     }
 };
