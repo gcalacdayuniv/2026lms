@@ -5,6 +5,8 @@ import { CourseAttendance } from './course-attendance.js';
 
 export const CourseClass = {
     currentSummaryData: null,
+    fabIdleTimer: null,
+    resetFabOpacity: null,
 
     updateManageStatusColor: (selectEl) => {
         const status = selectEl.value;
@@ -46,7 +48,7 @@ export const CourseClass = {
         };
         
         const titleMetric = metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown';
-        document.getElementById('detailsModalTitle').textContent = `${titleTerm} - ${titleMetric}`;
+        document.getElementById('detailsModalTitle').textContent = `${titleTerm} | ${titleMetric}`;
         
         const scoreHeader = document.getElementById('detailsScoreHeader');
         if (metric === 'attendance') {
@@ -91,7 +93,7 @@ export const CourseClass = {
             return `
                 <tr class="hover:bg-gray-50 transition">
                     <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${r.Date}</td>
-                    <td class="px-3 py-2 text-center ${statusColor}">${r.Status || '--'}</td>
+                    <td class="px-3 py-2 text-center ${statusColor}">${r.Status || 'N/A'}</td>
                     <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${displayScore}</td>
                 </tr>
             `;
@@ -142,7 +144,7 @@ export const CourseClass = {
                 <html lang="en">
                 <head>
                     <meta charset="UTF-8">
-                    <title>Class Roster - ${data.course.CourseCode}</title>
+                    <title>Class Roster | ${data.course.CourseCode}</title>
                     <style>
                         @page { size: letter; margin: 0.5in; }
                         body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #333; margin: 0; padding: 0; }
@@ -160,7 +162,7 @@ export const CourseClass = {
                 </head>
                 <body>
                     <div class="header">
-                        <h1>${data.course.CourseCode} - ${data.course.CourseTitle}</h1>
+                        <h1>${data.course.CourseCode} | ${data.course.CourseTitle}</h1>
                         <h3>Schedule: ${data.course.ScheduleDay} | ${data.course.TimePeriod}</h3>
                     </div>
                     <table>
@@ -335,6 +337,35 @@ export const CourseClass = {
                 
                 CourseClass.loadUnenrolledStudents(courseId);
             }
+
+            const fab = document.getElementById('openRecitationBtn');
+            if (fab) {
+                if (CourseClass.fabIdleTimer) clearTimeout(CourseClass.fabIdleTimer);
+                if (CourseClass.resetFabOpacity) {
+                    document.removeEventListener('mousemove', CourseClass.resetFabOpacity);
+                    document.removeEventListener('keydown', CourseClass.resetFabOpacity);
+                    document.removeEventListener('touchstart', CourseClass.resetFabOpacity);
+                }
+                
+                CourseClass.resetFabOpacity = () => {
+                    const currentFab = document.getElementById('openRecitationBtn');
+                    if (currentFab) {
+                        currentFab.style.opacity = '1';
+                        clearTimeout(CourseClass.fabIdleTimer);
+                        CourseClass.fabIdleTimer = setTimeout(() => {
+                            if (document.getElementById('openRecitationBtn')) {
+                                document.getElementById('openRecitationBtn').style.opacity = '0.5';
+                            }
+                        }, 10000);
+                    }
+                };
+                
+                document.addEventListener('mousemove', CourseClass.resetFabOpacity);
+                document.addEventListener('keydown', CourseClass.resetFabOpacity);
+                document.addEventListener('touchstart', CourseClass.resetFabOpacity);
+                CourseClass.resetFabOpacity();
+            }
+
         } catch (err) {
             root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
         }
