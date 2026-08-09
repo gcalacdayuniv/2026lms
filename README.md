@@ -14,7 +14,11 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 
 * **`index.html` & `styles.css`:** Main entry point, the static layout shell, and custom animations.
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
-* **`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, Program Management, User Management, Manual Student Enrollment, and the Random Recitation Picker wheel interface.
+* **`js/components-utils.js`:** Contains shared UI utility functions, such as avatar URL formatting to bypass Google Drive hotlinking blocks.
+* **`js/components-auth.js`:** Encapsulates authentication HTML component templates including the Login and Registration screens.
+* **`js/components-dashboard.js`:** Contains UI layouts for the fixed header, responsive profile sidebar, and modals for Change Password, Course Creation, Program Management, and User Management.
+* **`js/components-class.js`:** Manages Class Roster views, attendance controls, term settings, performance summaries, student management modals, and the Random Recitation Picker modal interface.
+* (original prior to modularization)**`js/components.js`:** Manages dynamic injection of HTML component strings. Includes a fixed top navigation Header, an 80% responsive sliding Profile Sidebar Panel, Course Roster list views, and backdrop-blurred modals for Change Password, Course Creation, Program Management, User Management, Manual Student Enrollment, and the Random Recitation Picker wheel interface.
 * **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously, including dynamic route parsing mapping to specific Class IDs.
 * **`js/auth.js`:** Handles login (with password visibility toggling), registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, interactive panel/modal toggling, global image viewing navigation, and user management status controls.
 * **`js/course.js`:** Encapsulates the complete event binding lifecycle for Course Management, serving as the master orchestrator for actions, forms, inputs, and routing clicks across modular domain files.
