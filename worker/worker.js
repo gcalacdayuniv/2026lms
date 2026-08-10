@@ -29,6 +29,42 @@ export default {
         }
 
         try {
+            if (request.method === "POST" && path === "/api/upload-submission") {
+                const body = await request.json();
+                
+                if (!env.GAS_WEBHOOK_URL) {
+                    return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing." }), { status: 500, headers: corsHeaders });
+                }
+
+                let gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(body),
+                    redirect: 'manual'
+                });
+
+                if (gasResponse.status === 302 || gasResponse.status === 303) {
+                    const redirectUrl = gasResponse.headers.get('Location');
+                    gasResponse = await fetch(redirectUrl);
+                }
+                
+                const gasText = await gasResponse.text();
+                let gasData;
+                try {
+                    gasData = JSON.parse(gasText);
+                } catch (parseError) {
+                    return new Response(JSON.stringify({ 
+                        error: `Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...` 
+                    }), { status: 500, headers: corsHeaders });
+                }
+
+                if (!gasData.success) {
+                    return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
+                }
+
+                return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && path === "/api/register") {
                 const body = await request.json();
                 
