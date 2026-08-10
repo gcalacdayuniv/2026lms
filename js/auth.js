@@ -122,10 +122,15 @@ export const AuthModule = {
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
             
+            const givenName = document.getElementById('udGivenName').value.trim();
+            const lastName = document.getElementById('udLastName').value.trim();
+            const suffix = document.getElementById('udSuffix').value.trim();
+            const formattedName = `${lastName}, ${givenName} ${suffix}`.trim();
+
             const payload = {
                 userId: AppState.user.User_ID,
                 password: document.getElementById('udPassword').value,
-                name: document.getElementById('udName').value.trim(),
+                name: formattedName,
                 username: document.getElementById('udUsername').value.trim(),
                 email: document.getElementById('udEmail').value.trim(),
                 contact: document.getElementById('udContact').value.trim(),
