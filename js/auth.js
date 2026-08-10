@@ -330,26 +330,6 @@ export const AuthModule = {
         }
     },
 
-    loadPrograms: async () => {
-        const courseSelect = document.getElementById('regCourse');
-        if (!courseSelect) return;
-        
-        try {
-            const ts = new Date().getTime();
-            const data = await apiFetch(`/api/programs?_t=${ts}`);
-            
-            if (data.programs && data.programs.length > 0) {
-                courseSelect.innerHTML = '<option value="" disabled selected>Select Course</option>' + 
-                    data.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-            } else {
-                courseSelect.innerHTML = '<option value="" disabled selected>No courses available</option>';
-            }
-        } catch (err) {
-            courseSelect.innerHTML = '<option value="" disabled selected>Error loading courses</option>';
-            console.error('Failed to load programs:', err);
-        }
-    },
-
     loadManageUsers: async () => {
         const list = document.getElementById('manageUsersList');
         if (!list) return;
