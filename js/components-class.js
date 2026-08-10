@@ -152,7 +152,7 @@ const ClassUI = {
                         
                         <div class="space-y-2">
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
@@ -161,7 +161,7 @@ const ClassUI = {
                             </div>
                             
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="participation" title="Click to view participation details">
@@ -178,7 +178,7 @@ const ClassUI = {
                             </div>
 
                             <div class="bg-white p-2 border rounded flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
                                 <span class="font-bold text-sm">...</span>
                             </div>
                         </div>
@@ -189,7 +189,7 @@ const ClassUI = {
                         
                         <div class="space-y-2">
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
@@ -198,7 +198,7 @@ const ClassUI = {
                             </div>
                             
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="participation" title="Click to view participation details">
@@ -215,9 +215,16 @@ const ClassUI = {
                             </div>
 
                             <div class="bg-white p-2 border rounded flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
+                                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
                                 <span class="font-bold text-sm">...</span>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-file-lines text-green-500 mr-2"></i>Submission History</h4>
+                        <div id="summarySubmissionsList" class="space-y-2 max-h-40 overflow-y-auto">
+                            <!-- Dynamic Content -->
                         </div>
                     </div>
                 </div>
