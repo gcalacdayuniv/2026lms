@@ -5,6 +5,7 @@ import { CourseAttendance } from './course-attendance.js';
 
 export const CourseClass = {
     currentSummaryData: null,
+    currentStudents: [],
     fabIdleTimer: null,
     resetFabOpacity: null,
 
@@ -17,6 +18,32 @@ export const CourseClass = {
             status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' :
             status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50'
         }`;
+    },
+
+    copyStudentEmails: async () => {
+        if (!CourseClass.currentStudents || CourseClass.currentStudents.length === 0) {
+            alert("No students enrolled to copy emails.");
+            return;
+        }
+        
+        const emails = CourseClass.currentStudents
+            .map(s => s.Email)
+            .filter(email => email && email.trim() !== '');
+
+        if (emails.length === 0) {
+            alert("No valid email addresses found for the enrolled students.");
+            return;
+        }
+
+        const emailString = emails.join(', ');
+        
+        try {
+            await navigator.clipboard.writeText(emailString);
+            alert(`Successfully copied ${emails.length} email address(es) to your clipboard! Ready to paste into Google Calendar.`);
+        } catch (err) {
+            alert("Failed to copy to clipboard. Please grant clipboard permissions or copy manually.");
+            console.error("Clipboard Error:", err);
+        }
     },
 
     renderSubmissionsHistory: (submissions, containerId) => {
@@ -193,6 +220,7 @@ export const CourseClass = {
                                 <th class="center">Seat No.</th>
                                 <th>Student No.</th>
                                 <th>Name</th>
+                                <th>Email Address</th>
                                 <th>Group Name</th>
                                 <th>Assigned Topic</th>
                                 <th>Contact</th>
@@ -208,6 +236,7 @@ export const CourseClass = {
                                     <td class="center"><strong>${s.Seat_Number || ''}</strong></td>
                                     <td>${s.Student_Number || ''}</td>
                                     <td><strong>${s.Name}</strong></td>
+                                    <td><a href="mailto:${s.Email || ''}" style="color: #000; text-decoration: none;">${s.Email || ''}</a></td>
                                     <td>${s.Group_Name || ''}</td>
                                     <td>${s.Assigned_Topic || ''}</td>
                                     <td>${s.Contact_Number || ''}</td>
@@ -329,6 +358,8 @@ export const CourseClass = {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
             
+            CourseClass.currentStudents = data.students; 
+
             root.innerHTML = Components.renderClassScreen(data.course, data.students);
             
             const dateInput = document.getElementById('attendanceDate');
