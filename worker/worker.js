@@ -144,8 +144,8 @@ export default {
                 const hashedPassword = await hashPassword(body.password);
 
                 await env.DB.prepare(
-                    `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                    `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, registration_timestamp) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
                 ).bind(
                     userId, body.username, hashedPassword, body.name, finalAvatarUrl, 
                     body.email, body.contact_number, body.student_number, 
@@ -213,7 +213,7 @@ export default {
 
             if (request.method === "GET" && path === "/api/users") {
                 const users = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role 
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, role, registration_timestamp 
                      FROM Users ORDER BY Name ASC`
                 ).all();
                 return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });
