@@ -62,6 +62,11 @@ export default {
                     return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
                 }
 
+                const subId = crypto.randomUUID();
+                await env.DB.prepare(
+                    `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+                ).bind(subId, body.courseId, body.studentId, body.term, body.title, body.description, body.type, gasData.fileUrl).run();
+
                 return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
             }
 
@@ -576,12 +581,17 @@ export default {
                     "SELECT Seat_Number, Group_Name, Assigned_Topic FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?"
                 ).bind(courseId, studentId).first();
 
+                const submissions = await env.DB.prepare(
+                    "SELECT * FROM Submissions WHERE Course_ID = ? AND Student_ID = ? ORDER BY Timestamp DESC"
+                ).bind(courseId, studentId).all();
+
                 return new Response(JSON.stringify({ 
                     success: true, 
                     course: course,
                     sessions: sessions.results,
                     records: records.results,
-                    enrollment: enrollment || {}
+                    enrollment: enrollment || {},
+                    submissions: submissions.results
                 }), { status: 200, headers: corsHeaders });
             }
 
