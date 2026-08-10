@@ -62,7 +62,7 @@ export const AuthModule = {
                 const payload = {
                     username: document.getElementById('regUsername').value.trim(),
                     password: pw,
-                    name: `${document.getElementById('regGivenName').value.trim()} ${document.getElementById('regLastName').value.trim()} ${document.getElementById('regSuffix').value.trim()}`.trim(),
+                    name: `${document.getElementById('regLastName').value.trim()}, ${document.getElementById('regGivenName').value.trim()} ${document.getElementById('regSuffix').value.trim()}`.trim(),
                     email: document.getElementById('regEmail').value.trim(),
                     contact_number: document.getElementById('regContact').value.trim(),
                     student_number: document.getElementById('regStudentNo').value.trim(),
