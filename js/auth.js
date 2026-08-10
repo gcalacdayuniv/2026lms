@@ -110,6 +110,61 @@ export const AuthModule = {
             }
         }
 
+        if (e.target.id === 'updateDetailsForm') {
+            e.preventDefault();
+            const btn = document.getElementById('udSubmitBtn');
+            const errorDiv = document.getElementById('udError');
+            const successDiv = document.getElementById('udSuccess');
+            
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            
+            const payload = {
+                userId: AppState.user.User_ID,
+                password: document.getElementById('udPassword').value,
+                name: document.getElementById('udName').value.trim(),
+                username: document.getElementById('udUsername').value.trim(),
+                email: document.getElementById('udEmail').value.trim(),
+                contact: document.getElementById('udContact').value.trim(),
+                studentNumber: document.getElementById('udStudentNumber').value.trim()
+            };
+
+            try {
+                await apiFetch('/api/update-details', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                
+                AppState.user.Name = payload.name;
+                AppState.user.Username = payload.username;
+                AppState.user.Email = payload.email;
+                AppState.user.Contact_Number = payload.contact;
+                AppState.user.Student_Number = payload.studentNumber;
+                
+                localStorage.setItem('user', JSON.stringify(AppState.user));
+                localStorage.setItem('portal_user', JSON.stringify(AppState.user));
+                
+                successDiv.textContent = "Details updated successfully.";
+                successDiv.classList.remove('hidden');
+                document.getElementById('udPassword').value = '';
+                
+                setTimeout(() => {
+                    successDiv.classList.add('hidden');
+                    document.getElementById('udModal').classList.add('hidden');
+                    window.dispatchEvent(new Event('hashchange'));
+                }, 1500);
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Save Details';
+            }
+        }
+
         if (e.target.id === 'changePasswordForm') {
             e.preventDefault();
             const btn = document.getElementById('cpSubmitBtn');
@@ -155,7 +210,7 @@ export const AuthModule = {
     },
 
     handleInputs: (e) => {
-        if (e.target.id === 'regStudentNo') {
+        if (e.target.id === 'regStudentNo' || e.target.id === 'udStudentNumber') {
             let val = e.target.value.replace(/\D/g, '');
             if (val.length > 2) {
                 val = val.substring(0, 2) + '-' + val.substring(2, 6);
@@ -277,6 +332,20 @@ export const AuthModule = {
             AppState.user = null;
             localStorage.removeItem('user');
             window.location.hash = 'login';
+        }
+
+        if (e.target.closest('#openUdModalBtn')) {
+            document.getElementById('profilePanelOverlay').classList.add('hidden');
+            document.getElementById('profilePanel').classList.add('translate-x-full');
+            document.getElementById('profilePanel').classList.remove('translate-x-0');
+            document.getElementById('udModal').classList.remove('hidden');
+        }
+
+        if (e.target.closest('#closeUdModalBtn') || e.target.id === 'udModalOverlay') {
+            document.getElementById('udModal').classList.add('hidden');
+            document.getElementById('updateDetailsForm').reset();
+            document.getElementById('udError').classList.add('hidden');
+            document.getElementById('udSuccess').classList.add('hidden');
         }
 
         if (e.target.closest('#openCpModalBtn')) {
