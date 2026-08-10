@@ -4,6 +4,8 @@ import { getLoadableAvatarSrc } from './components-utils.js';
 
 export const AuthModule = {
     usersList: [],
+    currentImageGallery: [],
+    currentImageIndex: 0,
 
     init: () => {
         document.addEventListener('submit', AuthModule.handleForms);
@@ -211,6 +213,31 @@ export const AuthModule = {
         }
     },
 
+    updateGlobalImageUI: () => {
+        const item = AuthModule.currentImageGallery[AuthModule.currentImageIndex];
+        if (!item) return;
+
+        document.getElementById('globalImageSrc').src = item.src;
+        document.getElementById('giName').textContent = item.name;
+        document.getElementById('giInfo').textContent = item.info;
+        
+        document.getElementById('globalImageDetails').classList.remove('hidden');
+        
+        const prevBtn = document.getElementById('prevGlobalImageBtn');
+        const nextBtn = document.getElementById('nextGlobalImageBtn');
+        
+        if (AuthModule.currentImageGallery.length > 1) {
+            if (AuthModule.currentImageIndex > 0) prevBtn.classList.remove('hidden');
+            else prevBtn.classList.add('hidden');
+            
+            if (AuthModule.currentImageIndex < AuthModule.currentImageGallery.length - 1) nextBtn.classList.remove('hidden');
+            else nextBtn.classList.add('hidden');
+        } else {
+            prevBtn.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+        }
+    },
+
     handleClicks: (e) => {
         if (e.target.closest('#toggleLoginPassword')) {
             const input = document.getElementById('loginPassword');
@@ -302,19 +329,42 @@ export const AuthModule = {
             document.getElementById('muFilterStatus').value = '';
         }
         
-        // Modal Trigger for Global Image Viewer
+        // Modal Trigger for Global Image Viewer with Array Collection
         if (e.target.closest('.view-avatar-btn')) {
-            const btn = e.target.closest('.view-avatar-btn');
-            const src = btn.dataset.src;
-            const name = btn.dataset.name || '';
-            const info = btn.dataset.info || '';
+            const clickedBtn = e.target.closest('.view-avatar-btn');
             
-            document.getElementById('globalImageSrc').src = src;
-            document.getElementById('giName').textContent = name;
-            document.getElementById('giInfo').textContent = info;
+            // Map all current viewable avatars into a sequence
+            const allAvatars = Array.from(document.querySelectorAll('.view-avatar-btn'));
+            AuthModule.currentImageGallery = allAvatars.map(a => ({
+                src: a.dataset.src,
+                name: a.dataset.name || '',
+                info: a.dataset.info || ''
+            }));
             
-            document.getElementById('globalImageDetails').classList.remove('hidden');
+            // Find the index of the clicked item
+            AuthModule.currentImageIndex = AuthModule.currentImageGallery.findIndex(item => item.src === clickedBtn.dataset.src);
+            
+            if (AuthModule.currentImageIndex === -1) {
+                AuthModule.currentImageIndex = 0; // Fallback
+            }
+
+            AuthModule.updateGlobalImageUI();
             document.getElementById('globalImageModal').classList.remove('hidden');
+        }
+
+        // Image Viewer Navigation Listeners
+        if (e.target.closest('#nextGlobalImageBtn')) {
+            if (AuthModule.currentImageIndex < AuthModule.currentImageGallery.length - 1) {
+                AuthModule.currentImageIndex++;
+                AuthModule.updateGlobalImageUI();
+            }
+        }
+
+        if (e.target.closest('#prevGlobalImageBtn')) {
+            if (AuthModule.currentImageIndex > 0) {
+                AuthModule.currentImageIndex--;
+                AuthModule.updateGlobalImageUI();
+            }
         }
 
         // Delegated listener to close the Global Image Viewer
@@ -323,6 +373,8 @@ export const AuthModule = {
             if (modal) {
                 modal.classList.add('hidden');
                 document.getElementById('globalImageSrc').src = '';
+                AuthModule.currentImageGallery = [];
+                AuthModule.currentImageIndex = 0;
             }
         }
     },
