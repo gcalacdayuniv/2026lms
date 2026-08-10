@@ -41,6 +41,7 @@ The database uses Universally Unique Identifiers (UUIDs) for all primary keys, g
 * **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name, Assigned_Topic.
 * **`Course_Sessions`:** Session_ID (UUID), Course_ID (FK), Date (TEXT), Is_No_Class (INTEGER).
 * **`Attendance`:** Attendance_ID (UUID), Course_ID (FK mapped to Courses.Course_ID), Student_ID (FK mapped to Users.User_ID), Date, Status (Present, Late, Absent, Excused), Performance_Points (Integer).
+* **`Submissions`:** Submission_ID (UUID), Course_ID (FK), Student_ID (FK), Term, Title, Description, Type, File_URL, Timestamp (DATETIME).
 
 ### 4. External Integrations (Google Apps Script)
 * **`gas/Code.gs`:** A deployed Web App webhook that catches payloads from the Cloudflare Worker, decodes Base64 image data, dynamically creates or traverses nested folder structures, and saves files directly to a designated root Google Drive folder.
@@ -51,6 +52,8 @@ We use the following environment variables strictly within the API (`worker/wran
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Submission History Module:** Configured the `Submissions` D1 table and updated backend endpoints to capture metadata for every file and URL link passed to Google Drive. Fully integrated history logs directly within the Student Performance Summary modals for bidirectional access by lecturers and students.
+* **Input Sanitization:** Embedded explicit logic preventing students from inserting slashes (`/`), dots (`.`), and standard path-breaking special characters inside submission titles.
 * **Student Document Submissions:** Added an upload utility within the Student Performance Summary modal allowing students to submit documents (slides, PDF, Word documents) or URL links by specifying the term, title, and description. Uploads feature a real-time progress indicator and route automatically to the designated Google Drive folder structure (`Root > Course Year and Section > Submitted > Term_YYYYMMDDHHSS_Student Number_Student Name_Title`).
 * **Student Caller (Recitation Picker) with Dual Modes:** Added a floating action button (FAB) on class screens launching an interactive spinning wheel modal. It includes Mode 1 for weighted probabilities (favoring students with lower points) and Mode 2 for unique random selections that cache called lists locally to prevent duplicate calls in a single day.
 * **Modularization of Component UI Logic:** Refactored component HTML string templates into domain-specific module files (`components-utils.js`, `components-auth.js`, `components-dashboard.js`, and `components-class.js`) while maintaining `js/components.js` as a barrel file export.
