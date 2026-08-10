@@ -55,7 +55,6 @@ export const AuthModule = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account...';
 
             const pw = document.getElementById('regPassword').value;
-            const pw2 = document.getElementById('regPassword').value; // Password validation check simplified for template inputs
 
             try {
                 const payload = {
@@ -303,50 +302,28 @@ export const AuthModule = {
             document.getElementById('muFilterStatus').value = '';
         }
         
+        // Modal Trigger for Global Image Viewer
         if (e.target.closest('.view-avatar-btn')) {
             const btn = e.target.closest('.view-avatar-btn');
             const src = btn.dataset.src;
             const name = btn.dataset.name || '';
             const info = btn.dataset.info || '';
             
-            let modal = document.getElementById('globalImageModal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'globalImageModal';
-                modal.className = 'fixed inset-0 z-[200] hidden flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm fade-in';
-                modal.innerHTML = `
-                    <button id="closeGlobalImageBtn" class="absolute top-4 right-4 text-white hover:text-gray-300 focus:outline-none transition-colors z-[210]">
-                        <i class="fa-solid fa-xmark text-3xl"></i>
-                    </button>
-                    <div class="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center p-4">
-                        <img id="globalImageFull" src="" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl scale-up border-2 border-gray-700 bg-gray-900">
-                        <div class="mt-4 text-center">
-                            <h4 id="globalImageName" class="text-white font-black text-xl tracking-wider"></h4>
-                            <p id="globalImageInfo" class="text-gray-400 text-sm font-medium mt-1"></p>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-            }
+            document.getElementById('globalImageSrc').src = src;
+            document.getElementById('giName').textContent = name;
+            document.getElementById('giInfo').textContent = info;
             
-            document.getElementById('globalImageFull').src = src;
-            document.getElementById('globalImageName').textContent = name;
-            document.getElementById('globalImageInfo').textContent = info;
-            
-            modal.classList.remove('hidden');
-            
-            const closeBtn = document.getElementById('closeGlobalImageBtn');
-            const closeHandler = () => {
+            document.getElementById('globalImageDetails').classList.remove('hidden');
+            document.getElementById('globalImageModal').classList.remove('hidden');
+        }
+
+        // Delegated listener to close the Global Image Viewer
+        if (e.target.closest('#closeGlobalImageBtn') || e.target.id === 'closeGlobalImageBg') {
+            const modal = document.getElementById('globalImageModal');
+            if (modal) {
                 modal.classList.add('hidden');
-                closeBtn.removeEventListener('click', closeHandler);
-                modal.removeEventListener('click', overlayHandler);
-            };
-            const overlayHandler = (ev) => {
-                if (ev.target === modal) closeHandler();
-            };
-            
-            closeBtn.addEventListener('click', closeHandler);
-            modal.addEventListener('click', overlayHandler);
+                document.getElementById('globalImageSrc').src = '';
+            }
         }
     },
 
