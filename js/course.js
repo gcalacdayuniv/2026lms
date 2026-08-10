@@ -131,6 +131,13 @@ export const CourseModule = {
         if (e.target.closest('#closeSubmitDocModalBtn') || e.target.id === 'closeSubmitDocModalBg') {
             document.getElementById('submitDocModal').classList.add('hidden');
         }
+        
+        if (e.target.closest('#openHistoryModalBtn')) {
+            document.getElementById('submissionHistoryModal').classList.remove('hidden');
+        }
+        if (e.target.closest('#closeSubmissionHistoryModalBtn') || e.target.id === 'closeSubmissionHistoryModalBg') {
+            document.getElementById('submissionHistoryModal').classList.add('hidden');
+        }
 
         if (e.target.closest('#toggleCalledListBtn')) {
             const container = document.getElementById('calledListContainer');
@@ -178,7 +185,7 @@ export const CourseModule = {
                 
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
-                CourseClass.renderSubmissionsHistory(data.submissions, 'studentSummarySubmissionsList');
+                CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
                 
                 if (data.enrollment) {
                     document.getElementById('ssSeat').textContent = data.enrollment.Seat_Number || 'N/A';
@@ -378,7 +385,7 @@ export const CourseModule = {
                 
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
-                CourseClass.renderSubmissionsHistory(data.submissions, 'summarySubmissionsList');
+                CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
 
                 document.getElementById('summaryLoading').classList.add('hidden');
                 document.getElementById('summaryContent').classList.remove('hidden');
