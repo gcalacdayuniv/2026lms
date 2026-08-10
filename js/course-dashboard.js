@@ -14,8 +14,17 @@ export const CourseDashboard = {
         btn.disabled = true;
 
         try {
+            const courseId = document.getElementById('openSubmitDocModalBtn').dataset.courseId;
+            if (!courseId) throw new Error("Could not identify the active course.");
+
             const term = document.getElementById('submitTerm').value;
-            const title = document.getElementById('submitTitle').value.trim();
+            const titleInput = document.getElementById('submitTitle').value.trim();
+            
+            if (/[.\/\\:*?"<>|]/.test(titleInput)) {
+                throw new Error("Title cannot contain special characters like dots (.) or slashes (/).");
+            }
+            
+            const title = titleInput;
             const desc = document.getElementById('submitDesc').value.trim();
             const type = document.getElementById('submissionType').value;
             
@@ -63,6 +72,12 @@ export const CourseDashboard = {
             }
             
             const payload = {
+                courseId: courseId,
+                studentId: user.User_ID,
+                term: term,
+                title: title,
+                description: desc,
+                type: type,
                 filename: finalFilename,
                 mimeType: mimeType,
                 base64: base64Data,
@@ -82,6 +97,12 @@ export const CourseDashboard = {
             setTimeout(() => {
                 document.getElementById('submitDocModal').classList.add('hidden');
                 successDiv.classList.add('hidden');
+                
+                const summaryModal = document.getElementById('studentSummaryModal');
+                if (summaryModal && !summaryModal.classList.contains('hidden')) {
+                    const activeCard = document.querySelector(`.student-active-course[data-course-id="${courseId}"]`);
+                    if (activeCard) activeCard.click();
+                }
             }, 2000);
         } catch (error) {
             progressDiv.classList.add('hidden');
