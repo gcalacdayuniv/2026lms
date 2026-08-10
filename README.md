@@ -52,7 +52,7 @@ We use the following environment variables strictly within the API (`worker/wran
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
-* **Update Details Modal:** Users can modify their personal details (Name, Username, Email, Contact Number, Student Number) directly from a new modal in the profile panel. This is secured by requiring their current password and implements edge validation to prevent duplicates across unique fields. The user's username is also explicitly displayed under their name in the profile panel.
+* **Update Details Modal:** Users can modify their personal details (Given Name, Last Name, Suffix, Username, Email, Contact Number, Student Number) directly from a new modal in the profile panel. The UI breaks the name down into individual inputs for precise editing and automatically formats the final output to "Last Name, Given Name Suffix". This is secured by requiring their current password and implements edge validation to prevent duplicates across unique fields. The user's username is also explicitly displayed under their name in the profile panel.
 * **Registration Timestamps:** Added a database migration assigning a default `CURRENT_TIMESTAMP` value into the `Users` table specifically for new registrants tracking purposes.
 * **Submission History Popup:** Abstracted the submission history visual layout out of the immediate summary view and into a dedicated popup modal preventing UI clutter.
 * **Input Sanitization:** Embedded explicit logic preventing students from inserting slashes (`/`), dots (`.`), and standard path-breaking special characters inside submission titles.
