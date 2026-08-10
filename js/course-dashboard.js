@@ -169,6 +169,7 @@ export const CourseDashboard = {
                     <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
                     <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${c.LecturerName}</div>
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${c.TimePeriod}</div>
+                    <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${c.Seat_Number || 'Unassigned'}</span></div>
                 </div>
             `).join('');
             
