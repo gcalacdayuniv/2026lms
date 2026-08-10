@@ -36,7 +36,7 @@ The database uses Universally Unique Identifiers (UUIDs) for all primary keys, g
 
 **Note: Ensure the following tables are created and updated for the system to function correctly:**
 * **`Programs`:** Program_ID (UUID), ProgramCode (e.g., BSCS, BSIT).
-* **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role (Default: 'Student').
+* **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role (Default: 'Student'), registration_timestamp (DATETIME).
 * **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section, Midterm_Start, Midterm_End, Final_Start, Final_End.
 * **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name, Assigned_Topic.
 * **`Course_Sessions`:** Session_ID (UUID), Course_ID (FK), Date (TEXT), Is_No_Class (INTEGER).
@@ -52,7 +52,8 @@ We use the following environment variables strictly within the API (`worker/wran
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
-* **Submission History Module:** Configured the `Submissions` D1 table and updated backend endpoints to capture metadata for every file and URL link passed to Google Drive. Fully integrated history logs directly within the Student Performance Summary modals for bidirectional access by lecturers and students.
+* **Registration Timestamps:** Added a database migration assigning a default `CURRENT_TIMESTAMP` value into the `Users` table specifically for new registrants tracking purposes.
+* **Submission History Popup:** Abstracted the submission history visual layout out of the immediate summary view and into a dedicated popup modal preventing UI clutter.
 * **Input Sanitization:** Embedded explicit logic preventing students from inserting slashes (`/`), dots (`.`), and standard path-breaking special characters inside submission titles.
 * **Student Document Submissions:** Added an upload utility within the Student Performance Summary modal allowing students to submit documents (slides, PDF, Word documents) or URL links by specifying the term, title, and description. Uploads feature a real-time progress indicator and route automatically to the designated Google Drive folder structure (`Root > Course Year and Section > Submitted > Term_YYYYMMDDHHSS_Student Number_Student Name_Title`).
 * **Student Caller (Recitation Picker) with Dual Modes:** Added a floating action button (FAB) on class screens launching an interactive spinning wheel modal. It includes Mode 1 for weighted probabilities (favoring students with lower points) and Mode 2 for unique random selections that cache called lists locally to prevent duplicate calls in a single day.
