@@ -2,6 +2,96 @@
 import { apiFetch, AppState } from './globals.js';
 
 export const CourseDashboard = {
+    submitDocument: async () => {
+        const btn = document.getElementById('submitDocBtn');
+        const errorDiv = document.getElementById('submitDocError');
+        const successDiv = document.getElementById('submitDocSuccess');
+        const progressDiv = document.getElementById('submitDocProgress');
+
+        errorDiv.classList.add('hidden');
+        successDiv.classList.add('hidden');
+        progressDiv.classList.remove('hidden');
+        btn.disabled = true;
+
+        try {
+            const term = document.getElementById('submitTerm').value;
+            const title = document.getElementById('submitTitle').value.trim();
+            const desc = document.getElementById('submitDesc').value.trim();
+            const type = document.getElementById('submissionType').value;
+            
+            const user = AppState.user;
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = `${yyyy}${mm}${dd}${hh}${ss}`;
+            
+            const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, ' ');
+            const studentName = user.Name.replace(/[^a-zA-Z0-9_-]/g, ' ');
+            const baseFilename = `${term}_${timestamp}_${user.Student_Number}_${studentName}_${safeTitle}`;
+            
+            const courseYearSection = [user.course, user.year, user.section].filter(Boolean).join(" ") || "General";
+            
+            let base64Data = "";
+            let mimeType = "";
+            let finalFilename = "";
+
+            if (type === 'file') {
+                const fileInput = document.getElementById('submitFileInput');
+                if (!fileInput.files || fileInput.files.length === 0) throw new Error("Please select a file.");
+                const file = fileInput.files[0];
+                mimeType = file.type;
+                const ext = file.name.split('.').pop();
+                finalFilename = `${baseFilename}.${ext}`;
+                
+                base64Data = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = error => reject(error);
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                const urlLink = document.getElementById('submitUrlInput').value.trim();
+                if (!urlLink) throw new Error("Please enter a URL link.");
+                
+                const content = `Title: ${title}\nTerm: ${term}\nDescription: ${desc}\nLink: ${urlLink}`;
+                base64Data = btoa(unescape(encodeURIComponent(content)));
+                mimeType = "text/plain";
+                finalFilename = `${baseFilename}.txt`;
+            }
+            
+            const payload = {
+                filename: finalFilename,
+                mimeType: mimeType,
+                base64: base64Data,
+                pathParts: [courseYearSection, "Submitted"]
+            };
+
+            await apiFetch('/api/upload-submission', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            
+            progressDiv.classList.add('hidden');
+            successDiv.textContent = "Submission uploaded successfully!";
+            successDiv.classList.remove('hidden');
+            document.getElementById('submitDocForm').reset();
+            
+            setTimeout(() => {
+                document.getElementById('submitDocModal').classList.add('hidden');
+                successDiv.classList.add('hidden');
+            }, 2000);
+        } catch (error) {
+            progressDiv.classList.add('hidden');
+            errorDiv.textContent = error.message;
+            errorDiv.classList.remove('hidden');
+        } finally {
+            btn.disabled = false;
+        }
+    },
+
     createProgram: async () => {
         const btn = document.getElementById('addProgramBtn');
         const errorDiv = document.getElementById('programError');
