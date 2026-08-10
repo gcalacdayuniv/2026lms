@@ -29,6 +29,7 @@ const DashboardUI = {
                 <div class="text-center mt-6">
                     ${panelAvatar}
                     <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
+                    <p class="text-sm font-medium text-gray-500">@${user.Username || 'N/A'}</p>
                 </div>
                 
                 <div class="mt-8 px-2 space-y-4">
@@ -56,7 +57,10 @@ const DashboardUI = {
 
                 ${lecturerBtns}
 
-                <div class="mt-6">
+                <div class="mt-6 space-y-3">
+                    <button id="openUdModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-user-pen text-gray-400 mr-2 mt-0.5"></i> Update Details
+                    </button>
                     <button id="openCpModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
                         <i class="fa-solid fa-lock text-gray-400 mr-2 mt-0.5"></i> Change Password
                     </button>
@@ -131,6 +135,59 @@ const DashboardUI = {
                     
                     <button type="submit" id="cpSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
                         Update Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    `,
+
+    renderUpdateDetailsModal: (user) => `
+        <div id="udModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
+            <div id="udModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-5 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-pen text-blue-600 mr-2"></i>Update Details</h3>
+                    <button id="closeUdModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="updateDetailsForm" class="space-y-4">
+                    <div id="udError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    <div id="udSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Name</label>
+                        <input type="text" id="udName" required value="${user.Name || ''}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Username</label>
+                            <input type="text" id="udUsername" required value="${user.Username || ''}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
+                            <input type="email" id="udEmail" required value="${user.Email || ''}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Number</label>
+                            <input type="text" id="udContact" value="${user.Contact_Number || ''}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Student Number</label>
+                            <input type="text" id="udStudentNumber" required value="${user.Student_Number || ''}" maxlength="7" placeholder="00-0000" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 mt-4 pt-4">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Verify Password</label>
+                        <input type="password" id="udPassword" required placeholder="Enter current password to save" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                    </div>
+                    
+                    <button type="submit" id="udSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
+                        Save Details
                     </button>
                 </form>
             </div>
@@ -498,6 +555,7 @@ export const DashboardComponents = {
             </main>
 
             ${DashboardUI.renderProfilePanel(user, panelAvatar, displayCourse, lecturerBtns)}
+            ${DashboardUI.renderUpdateDetailsModal(user)}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderManageUsersModal() : ''}
             ${DashboardUI.renderChangePasswordModal()}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderCreateCourseModal() : ''}
