@@ -178,6 +178,7 @@ export const CourseModule = {
                 
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
+                CourseClass.renderSubmissionsHistory(data.submissions, 'studentSummarySubmissionsList');
                 
                 if (data.enrollment) {
                     document.getElementById('ssSeat').textContent = data.enrollment.Seat_Number || 'N/A';
@@ -185,6 +186,9 @@ export const CourseModule = {
                     document.getElementById('ssTopic').textContent = data.enrollment.Assigned_Topic || 'N/A';
                     document.getElementById('ssEnrollmentInfo').classList.remove('hidden');
                 }
+                
+                const submitBtn = document.getElementById('openSubmitDocModalBtn');
+                if (submitBtn) submitBtn.dataset.courseId = courseId;
 
                 document.getElementById('summaryLoading').classList.add('hidden');
                 document.getElementById('summaryContent').classList.remove('hidden');
@@ -374,6 +378,7 @@ export const CourseModule = {
                 
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
+                CourseClass.renderSubmissionsHistory(data.submissions, 'summarySubmissionsList');
 
                 document.getElementById('summaryLoading').classList.add('hidden');
                 document.getElementById('summaryContent').classList.remove('hidden');
