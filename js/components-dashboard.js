@@ -232,6 +232,64 @@ const DashboardUI = {
         </div>
     `,
 
+    renderSubmitDocumentModal: () => `
+        <div id="submitDocModal" class="hidden fixed inset-0 z-[90] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmitDocModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-cloud-arrow-up text-blue-600 mr-2"></i>Submit Document</h3>
+                    <button id="closeSubmitDocModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <form id="submitDocForm" class="space-y-4">
+                    <div id="submitDocError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                    <div id="submitDocSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Term</label>
+                        <select id="submitTerm" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                            <option value="" disabled selected>Select Term</option>
+                            <option value="MidTerm">Mid Term</option>
+                            <option value="FinalTerm">Final Term</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Title</label>
+                        <input type="text" id="submitTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="Document Title">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Description</label>
+                        <textarea id="submitDesc" required rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="Brief description"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Submission Type</label>
+                        <select id="submissionType" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                            <option value="file">File Upload (PDF, Word, Slides)</option>
+                            <option value="url">URL Link</option>
+                        </select>
+                    </div>
+                    <div id="fileInputContainer">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload File</label>
+                        <input type="file" id="submitFileInput" required accept=".pdf,.doc,.docx,.ppt,.pptx" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                    </div>
+                    <div id="urlInputContainer" class="hidden">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Link URL</label>
+                        <input type="url" id="submitUrlInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="https://...">
+                    </div>
+                    
+                    <div id="submitDocProgress" class="hidden text-center text-blue-600 font-bold text-sm py-2">
+                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Uploading to Google Drive...
+                    </div>
+                    
+                    <button type="submit" id="submitDocBtn" class="w-full flex justify-center py-2.5 px-4 rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-4">
+                        Submit
+                    </button>
+                </form>
+            </div>
+        </div>
+    `,
+
     renderStudentSummaryModal: () => `
         <div id="studentSummaryModal" class="hidden fixed inset-0 z-[80] bg-gray-50 flex flex-col fade-in overflow-y-auto w-full h-full">
             <div class="bg-white shadow-sm sticky top-0 z-10 w-full">
@@ -340,6 +398,12 @@ const DashboardUI = {
                             </div>
                         </div>
                     </div>
+
+                    <div class="mt-8 flex justify-center border-t border-gray-200 pt-6">
+                        <button id="openSubmitDocModalBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition flex items-center">
+                            <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Upload Document Submission
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -419,6 +483,7 @@ export const DashboardComponents = {
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderCreateCourseModal() : ''}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAddProgramModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderStudentSummaryModal() : ''}
+            ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmitDocumentModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderDetailsModal() : ''}
         `;
     }
