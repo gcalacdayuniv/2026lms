@@ -256,7 +256,7 @@ const DashboardUI = {
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Title</label>
-                        <input type="text" id="submitTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="Document Title">
+                        <input type="text" id="submitTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="Document Title (No dots or slashes)">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Description</label>
@@ -396,6 +396,14 @@ const DashboardUI = {
                                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
                                 <span class="font-black text-lg">...</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Submission History -->
+                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm mt-6">
+                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="fa-solid fa-file-lines text-green-500 mr-2"></i>Submission History</h4>
+                        <div id="studentSummarySubmissionsList" class="space-y-2">
+                            <!-- Dynamic Content -->
                         </div>
                     </div>
 
