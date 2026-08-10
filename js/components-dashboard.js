@@ -233,107 +233,110 @@ const DashboardUI = {
     `,
 
     renderStudentSummaryModal: () => `
-        <div id="studentSummaryModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center fade-in p-4">
-            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeStudentSummaryModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>My Course Summary</h3>
+        <div id="studentSummaryModal" class="hidden fixed inset-0 z-[80] bg-gray-50 flex flex-col fade-in overflow-y-auto w-full h-full">
+            <div class="bg-white shadow-sm sticky top-0 z-10 w-full">
+                <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center border-b border-gray-200">
+                    <h3 class="text-xl sm:text-2xl font-black text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>My Course Summary</h3>
                     <button id="closeStudentSummaryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+                        <i class="fa-solid fa-xmark text-2xl"></i>
                     </button>
                 </div>
+            </div>
+            
+            <div class="max-w-4xl mx-auto w-full p-4 sm:p-6 flex-1">
+                <div id="ssCourseTitle" class="font-black text-blue-700 text-center mb-6 text-xl sm:text-2xl"></div>
                 
-                <div id="ssCourseTitle" class="font-black text-blue-700 text-center mb-3 text-base sm:text-lg"></div>
-                
-                <div id="ssEnrollmentInfo" class="hidden grid grid-cols-3 gap-2 mb-4 text-center border border-blue-200 bg-blue-50 p-2 rounded-lg">
+                <div id="ssEnrollmentInfo" class="hidden grid grid-cols-3 gap-4 mb-6 text-center border border-blue-200 bg-blue-50 p-4 rounded-xl shadow-sm">
                     <div>
-                        <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Seat</div>
-                        <div id="ssSeat" class="text-sm font-black text-blue-800">-</div>
+                        <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Seat</div>
+                        <div id="ssSeat" class="text-lg sm:text-xl font-black text-blue-800">-</div>
                     </div>
                     <div class="border-x border-blue-200">
-                        <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Group</div>
-                        <div id="ssGroup" class="text-sm font-black text-blue-800">-</div>
+                        <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Group</div>
+                        <div id="ssGroup" class="text-lg sm:text-xl font-black text-blue-800">-</div>
                     </div>
                     <div>
-                        <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Topic</div>
-                        <div id="ssTopic" class="text-sm font-black text-blue-800">-</div>
+                        <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Topic</div>
+                        <div id="ssTopic" class="text-lg sm:text-xl font-black text-blue-800">-</div>
                     </div>
                 </div>
 
-                <div id="summaryLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
-                <div id="summaryError" class="hidden text-center py-6 text-red-500 font-bold"></div>
+                <div id="summaryLoading" class="text-center py-12 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-4xl"></i></div>
+                <div id="summaryError" class="hidden text-center py-12 text-red-500 font-bold text-lg"></div>
                 
-                <div id="summaryContent" class="hidden space-y-4">
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
+                <div id="summaryContent" class="hidden space-y-6">
+                    <!-- Mid Term -->
+                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
                         
-                        <div class="space-y-2">
+                        <div class="space-y-4">
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
-                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
+                                <div class="grid grid-cols-3 gap-3 mt-2">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div><span class="font-black text-base">...</span></div>
                                 </div>
                             </div>
                             
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
-                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="participation" title="Click to view participation details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
-                                        <span class="font-black text-blue-600 text-base block mt-0.5" id="midtermParticipationScore">...</span>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
+                                <div class="grid grid-cols-3 gap-3 mt-2">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-blue-50 p-3 border border-blue-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="participation" title="Click to view participation details">
+                                        <div class="text-blue-400 text-[10px] uppercase font-bold mb-1">Participation</div>
+                                        <span class="font-black text-blue-700 text-xl block" id="midtermParticipationScore">...</span>
                                     </div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="attendance" title="Click to view attendance details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
-                                        <span class="font-black text-blue-600 text-base block mt-0.5"><span id="midtermAttendancePct">...</span>%</span>
-                                        <div class="text-[8px] text-gray-500 mt-0.5"><span id="midtermPresent">0</span>P, <span id="midtermLate">0</span>L, <span id="midtermExcused">0</span>E, <span id="midtermAbsent">0</span>A</div>
-                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="midtermTotalDays">0</span></div>
+                                    <div class="bg-blue-50 p-3 border border-blue-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="attendance" title="Click to view attendance details">
+                                        <div class="text-blue-400 text-[10px] uppercase font-bold mb-1">Attendance</div>
+                                        <span class="font-black text-blue-700 text-xl block mb-1"><span id="midtermAttendancePct">...</span>%</span>
+                                        <div class="text-[10px] text-gray-600 font-medium"><span id="midtermPresent">0</span>P, <span id="midtermLate">0</span>L, <span id="midtermExcused">0</span>E, <span id="midtermAbsent">0</span>A</div>
+                                        <div class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Class days: <span id="midtermTotalDays">0</span></div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="bg-white p-2 border rounded flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
-                                <span class="font-bold text-sm">...</span>
+                            <div class="bg-gray-50 p-4 border border-gray-100 rounded-lg flex justify-between items-center">
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
+                                <span class="font-black text-lg">...</span>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star text-yellow-500 mr-2"></i>Final Term</h4>
+                    <!-- Final Term -->
+                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="fa-solid fa-star text-yellow-500 mr-2"></i>Final Term</h4>
                         
-                        <div class="space-y-2">
+                        <div class="space-y-4">
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Written Output</span>
-                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
+                                <div class="grid grid-cols-3 gap-3 mt-2">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div><span class="font-black text-base">...</span></div>
                                 </div>
                             </div>
                             
                             <div>
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Performance Output</span>
-                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="participation" title="Click to view participation details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
-                                        <span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermParticipationScore">...</span>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
+                                <div class="grid grid-cols-3 gap-3 mt-2">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-yellow-50 p-3 border border-yellow-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="participation" title="Click to view participation details">
+                                        <div class="text-yellow-500 text-[10px] uppercase font-bold mb-1">Participation</div>
+                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermParticipationScore">...</span>
                                     </div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="attendance" title="Click to view attendance details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
-                                        <span class="font-black text-yellow-600 text-base block mt-0.5"><span id="finaltermAttendancePct">...</span>%</span>
-                                        <div class="text-[8px] text-gray-500 mt-0.5"><span id="finaltermPresent">0</span>P, <span id="finaltermLate">0</span>L, <span id="finaltermExcused">0</span>E, <span id="finaltermAbsent">0</span>A</div>
-                                        <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="finaltermTotalDays">0</span></div>
+                                    <div class="bg-yellow-50 p-3 border border-yellow-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="attendance" title="Click to view attendance details">
+                                        <div class="text-yellow-500 text-[10px] uppercase font-bold mb-1">Attendance</div>
+                                        <span class="font-black text-yellow-600 text-xl block mb-1"><span id="finaltermAttendancePct">...</span>%</span>
+                                        <div class="text-[10px] text-gray-600 font-medium"><span id="finaltermPresent">0</span>P, <span id="finaltermLate">0</span>L, <span id="finaltermExcused">0</span>E, <span id="finaltermAbsent">0</span>A</div>
+                                        <div class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Class days: <span id="finaltermTotalDays">0</span></div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="bg-white p-2 border rounded flex justify-between items-center">
-                                <span class="text-[10px] font-bold text-gray-500 uppercase">Major Exam</span>
-                                <span class="font-bold text-sm">...</span>
+                            <div class="bg-gray-50 p-4 border border-gray-100 rounded-lg flex justify-between items-center">
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
+                                <span class="font-black text-lg">...</span>
                             </div>
                         </div>
                     </div>
