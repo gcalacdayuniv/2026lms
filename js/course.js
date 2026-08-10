@@ -22,6 +22,10 @@ export const CourseModule = {
             e.preventDefault();
             await CourseDashboard.createProgram();
         }
+        if (e.target.id === 'submitDocForm') {
+            e.preventDefault();
+            await CourseDashboard.submitDocument();
+        }
     },
 
     handleInput: async (e) => {
@@ -46,6 +50,20 @@ export const CourseModule = {
     },
 
     handleChanges: async (e) => {
+        if (e.target.id === 'submissionType') {
+            if (e.target.value === 'url') {
+                document.getElementById('fileInputContainer').classList.add('hidden');
+                document.getElementById('urlInputContainer').classList.remove('hidden');
+                document.getElementById('submitFileInput').removeAttribute('required');
+                document.getElementById('submitUrlInput').setAttribute('required', 'true');
+            } else {
+                document.getElementById('urlInputContainer').classList.add('hidden');
+                document.getElementById('fileInputContainer').classList.remove('hidden');
+                document.getElementById('submitUrlInput').removeAttribute('required');
+                document.getElementById('submitFileInput').setAttribute('required', 'true');
+            }
+        }
+
         if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput' || e.target.id === 'manageTopicInput') {
             const studentId = document.getElementById('manageStudentId').value;
             const seatNumber = document.getElementById('manageSeatInput').value.trim();
@@ -107,6 +125,13 @@ export const CourseModule = {
     },
 
     handleClicks: async (e) => {
+        if (e.target.closest('#openSubmitDocModalBtn')) {
+            document.getElementById('submitDocModal').classList.remove('hidden');
+        }
+        if (e.target.closest('#closeSubmitDocModalBtn') || e.target.id === 'closeSubmitDocModalBg') {
+            document.getElementById('submitDocModal').classList.add('hidden');
+        }
+
         if (e.target.closest('#toggleCalledListBtn')) {
             const container = document.getElementById('calledListContainer');
             const btn = document.getElementById('toggleCalledListBtn');
