@@ -196,6 +196,42 @@ export default {
                 
                 return new Response(JSON.stringify({ success: true, message: "Password updated successfully" }), { status: 200, headers: corsHeaders });
             }
+            
+            if (request.method === "POST" && path === "/api/update-details") {
+                const body = await request.json();
+                const { userId, password, name, username, email, contact, studentNumber } = body;
+                
+                const studentNoFormat = /^\d{2}-\d{4}$/;
+                if (!studentNoFormat.test(studentNumber)) {
+                    return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+                }
+                
+                const currentHash = await hashPassword(password);
+                const user = await env.DB.prepare("SELECT Password FROM Users WHERE User_ID = ?").bind(userId).first();
+                
+                if (!user || user.Password !== currentHash) {
+                    return new Response(JSON.stringify({ error: "Incorrect password" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare(
+                    `SELECT User_ID FROM Users 
+                     WHERE (Username COLLATE NOCASE = ? 
+                     OR Student_Number COLLATE NOCASE = ? 
+                     OR Email COLLATE NOCASE = ? 
+                     OR Contact_Number = ?)
+                     AND User_ID != ?`
+                ).bind(username, studentNumber, email, contact, userId).first();
+                    
+                if (existing) {
+                    return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already used by another account." }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare(
+                    `UPDATE Users SET Name = ?, Username = ?, Email = ?, Contact_Number = ?, Student_Number = ? WHERE User_ID = ?`
+                ).bind(name, username, email, contact, studentNumber, userId).run();
+                
+                return new Response(JSON.stringify({ success: true, message: "Details updated successfully" }), { status: 200, headers: corsHeaders });
+            }
 
             if (request.method === "POST" && path === "/api/reset-student-password") {
                 const body = await request.json();
