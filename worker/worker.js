@@ -331,7 +331,7 @@ export default {
                     return new Response(JSON.stringify({ success: true, courses: myCourses.results }), { status: 200, headers: corsHeaders });
                 } else {
                     const enrolled = await env.DB.prepare(
-                        `SELECT c.*, u.Name as LecturerName 
+                        `SELECT c.*, u.Name as LecturerName, e.Seat_Number 
                          FROM Enrollments e 
                          JOIN Courses c ON e.Course_ID = c.Course_ID 
                          JOIN Users u ON c.Lecturer_ID = u.User_ID 
