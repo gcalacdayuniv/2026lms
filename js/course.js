@@ -339,6 +339,18 @@ export const CourseModule = {
             btn.innerHTML = originalHtml;
         }
 
+        if (e.target.closest('#copyEmailsBtn')) {
+            const btn = e.target.closest('#copyEmailsBtn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Copying...';
+            
+            await CourseClass.copyStudentEmails();
+            
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+
         if (e.target.closest('.manage-student-btn')) {
             const btn = e.target.closest('.manage-student-btn');
             document.getElementById('manageStudentName').textContent = btn.dataset.name;
@@ -385,7 +397,7 @@ export const CourseModule = {
                 
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
-                CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
+                CourseClass.renderSubmissionsHistory(data.submissions, 'summarySubmissionsList');
 
                 document.getElementById('summaryLoading').classList.add('hidden');
                 document.getElementById('summaryContent').classList.remove('hidden');
