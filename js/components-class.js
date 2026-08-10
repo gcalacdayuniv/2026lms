@@ -221,11 +221,10 @@ const ClassUI = {
                         </div>
                     </div>
                     
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                        <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-file-lines text-green-500 mr-2"></i>Submission History</h4>
-                        <div id="summarySubmissionsList" class="space-y-2 max-h-40 overflow-y-auto">
-                            <!-- Dynamic Content -->
-                        </div>
+                    <div class="mt-4 flex justify-center">
+                        <button id="openHistoryModalBtn" class="w-full bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center justify-center">
+                            <i class="fa-solid fa-file-lines mr-2"></i> View Submission History
+                        </button>
                     </div>
                 </div>
             </div>
@@ -254,6 +253,23 @@ const ClassUI = {
                         <tbody id="detailsTableBody" class="divide-y divide-gray-200 bg-white">
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    `,
+    
+    renderSubmissionHistoryModal: () => `
+        <div id="submissionHistoryModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmissionHistoryModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-clock-rotate-left text-green-600 mr-2"></i>Submission History</h3>
+                    <button id="closeSubmissionHistoryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="historySubmissionsList" class="flex-1 overflow-y-auto space-y-2 p-1">
+                    <!-- Dynamic Content -->
                 </div>
             </div>
         </div>
@@ -550,6 +566,7 @@ export const ClassComponents = {
             ${ClassUI.renderNoClassModal()}
             ${ClassUI.renderManageStudentModal()}
             ${ClassUI.renderSummaryModal()}
+            ${ClassUI.renderSubmissionHistoryModal()}
             ${ClassUI.renderDetailsModal()}
             ${ClassUI.renderAddStudentModal()}
             ${ClassUI.renderRecitationModal()}
