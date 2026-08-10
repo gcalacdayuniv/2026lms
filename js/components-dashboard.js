@@ -290,6 +290,23 @@ const DashboardUI = {
         </div>
     `,
 
+    renderSubmissionHistoryModal: () => `
+        <div id="submissionHistoryModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmissionHistoryModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-clock-rotate-left text-green-600 mr-2"></i>Submission History</h3>
+                    <button id="closeSubmissionHistoryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="historySubmissionsList" class="flex-1 overflow-y-auto space-y-2 p-1">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+        </div>
+    `,
+
     renderStudentSummaryModal: () => `
         <div id="studentSummaryModal" class="hidden fixed inset-0 z-[80] bg-gray-50 flex flex-col fade-in overflow-y-auto w-full h-full">
             <div class="bg-white shadow-sm sticky top-0 z-10 w-full">
@@ -399,17 +416,12 @@ const DashboardUI = {
                         </div>
                     </div>
 
-                    <!-- Submission History -->
-                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm mt-6">
-                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="fa-solid fa-file-lines text-green-500 mr-2"></i>Submission History</h4>
-                        <div id="studentSummarySubmissionsList" class="space-y-2">
-                            <!-- Dynamic Content -->
-                        </div>
-                    </div>
-
-                    <div class="mt-8 flex justify-center border-t border-gray-200 pt-6">
-                        <button id="openSubmitDocModalBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition flex items-center">
-                            <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Upload Document Submission
+                    <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3 border-t border-gray-200 pt-6">
+                        <button id="openHistoryModalBtn" class="bg-white border-2 border-green-500 text-green-600 hover:bg-green-50 font-bold py-3 px-6 rounded-lg shadow-sm transition flex items-center justify-center w-full sm:w-auto">
+                            <i class="fa-solid fa-clock-rotate-left mr-2"></i> View History
+                        </button>
+                        <button id="openSubmitDocModalBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition flex items-center justify-center w-full sm:w-auto">
+                            <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Upload Document
                         </button>
                     </div>
                 </div>
@@ -492,6 +504,7 @@ export const DashboardComponents = {
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAddProgramModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderStudentSummaryModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmitDocumentModal() : ''}
+            ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmissionHistoryModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderDetailsModal() : ''}
         `;
     }
