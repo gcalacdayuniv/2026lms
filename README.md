@@ -16,12 +16,12 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL` set to `https://2026-api.plv.workers.dev`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
 * **`js/components-utils.js`:** Contains shared UI utility functions, such as avatar URL formatting to bypass Google Drive hotlinking blocks.
 * **`js/components-auth.js`:** Encapsulates authentication HTML component templates including the Login and Registration screens.
-* **`js/components-dashboard.js`:** Contains UI layouts for the fixed header, responsive profile sidebar, and modals for Change Password, Course Creation, Program Management, and User Management.
+* **`js/components-dashboard.js`:** Contains UI layouts for the fixed header, responsive profile sidebar, modals for Change Password, Course Creation, Program Management, User Management, and the Student Document Submission modal.
 * **`js/components-class.js`:** Manages Class Roster views, attendance controls, term settings, performance summaries, student management modals, and the Student Caller (Recitation Picker) modal interface.
 * **`js/components.js`:** Acts as a barrel file to export shared utilities and UI components from the domain-specific component modules.
 * **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously, including dynamic route parsing mapping to specific Class IDs.
 * **`js/auth.js`:** Handles login (with password visibility toggling), registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, interactive panel/modal toggling, global image viewing navigation, and user management status controls.
-* **`js/course.js`:** Encapsulates the complete event binding lifecycle for Course Management, serving as the master orchestrator for actions, forms, inputs, and routing clicks across modular domain files.
+* **`js/course.js`:** Encapsulates the complete event binding lifecycle for Course Management, serving as the master orchestrator for actions, forms (including document upload processing and dynamic input toggling for files vs. URLs), inputs, and routing clicks across modular domain files.
 * **`js/course-dashboard.js`:** Manages lecturer and student dashboard rendering views, course creation validation, and program creation routines.
 * **`js/course-class.js`:** Handles detailed class screen rendering, student sorting algorithms, data population for roster elements, print-ready roster exports, and enrollment management overrides.
 * **`js/course-attendance.js`:** Controls core attendance metrics, term period calculation rules, no-class day mapping, draft caching storage, and individual/batch persistence.
@@ -51,6 +51,7 @@ We use the following environment variables strictly within the API (`worker/wran
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Student Document Submissions:** Added an upload utility within the Student Performance Summary modal allowing students to submit documents (slides, PDF, Word documents) or URL links by specifying the term, title, and description. Uploads feature a real-time progress indicator and route automatically to the designated Google Drive folder structure (`Root > Course Year and Section > Submitted > Term_YYYYMMDDHHSS_Student Number_Student Name_Title`).
 * **Student Caller (Recitation Picker) with Dual Modes:** Added a floating action button (FAB) on class screens launching an interactive spinning wheel modal. It includes Mode 1 for weighted probabilities (favoring students with lower points) and Mode 2 for unique random selections that cache called lists locally to prevent duplicate calls in a single day.
 * **Modularization of Component UI Logic:** Refactored component HTML string templates into domain-specific module files (`components-utils.js`, `components-auth.js`, `components-dashboard.js`, and `components-class.js`) while maintaining `js/components.js` as a barrel file export.
 * **Modularization of Course Logic:** Refactored the monolithic `js/course.js` file into smaller, domain-specific modules (`course-dashboard.js`, `course-class.js`, `course-attendance.js`, and `course-recitation.js`) to improve maintainability and performance.
