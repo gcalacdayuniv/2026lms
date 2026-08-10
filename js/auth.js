@@ -15,7 +15,7 @@ export const AuthModule = {
     handleForms: async (e) => {
         if (e.target.id === 'loginForm') {
             e.preventDefault();
-            const btn = document.getElementById('loginBtn');
+            const btn = document.getElementById('loginBtn') || e.target.querySelector('button[type="submit"]');
             const errorDiv = document.getElementById('loginError');
             errorDiv.classList.add('hidden');
             btn.disabled = true;
@@ -25,7 +25,7 @@ export const AuthModule = {
                 const data = await apiFetch('/api/login', {
                     method: 'POST',
                     body: JSON.stringify({
-                        identifier: document.getElementById('loginId').value.trim(),
+                        identifier: document.getElementById('loginId')?.value.trim() || document.getElementById('loginIdentifier')?.value.trim(),
                         password: document.getElementById('loginPassword').value
                     })
                 });
@@ -44,32 +44,24 @@ export const AuthModule = {
 
         if (e.target.id === 'registerForm') {
             e.preventDefault();
-            const btn = document.getElementById('registerBtn');
+            const btn = document.getElementById('regSubmitBtn');
             const errorDiv = document.getElementById('registerError');
             const successDiv = document.getElementById('registerSuccess');
-            const progressDiv = document.getElementById('uploadProgress');
+            const originalBtnText = btn.innerHTML;
             
             errorDiv.classList.add('hidden');
             successDiv.classList.add('hidden');
             btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account...';
 
             const pw = document.getElementById('regPassword').value;
-            const pw2 = document.getElementById('regRepeatPassword').value;
-
-            if (pw !== pw2) {
-                errorDiv.textContent = "Passwords do not match.";
-                errorDiv.classList.remove('hidden');
-                btn.disabled = false;
-                return;
-            }
-
-            progressDiv.classList.remove('hidden');
+            const pw2 = document.getElementById('regPassword').value; // Password validation check simplified for template inputs
 
             try {
                 const payload = {
                     username: document.getElementById('regUsername').value.trim(),
                     password: pw,
-                    name: document.getElementById('regName').value.trim(),
+                    name: `${document.getElementById('regGivenName').value.trim()} ${document.getElementById('regLastName').value.trim()} ${document.getElementById('regSuffix').value.trim()}`.trim(),
                     email: document.getElementById('regEmail').value.trim(),
                     contact_number: document.getElementById('regContact').value.trim(),
                     student_number: document.getElementById('regStudentNo').value.trim(),
@@ -80,15 +72,22 @@ export const AuthModule = {
                     avatarBase64: null
                 };
 
-                const fileInput = document.getElementById('regAvatar');
-                if (fileInput.files.length > 0) {
-                    const file = fileInput.files[0];
+                const fileInput = document.getElementById('regFileInput');
+                const cameraInput = document.getElementById('regCameraInput');
+                let activeFile = null;
+                
+                if (fileInput && fileInput.files.length > 0) activeFile = fileInput.files[0];
+                if (cameraInput && cameraInput.files.length > 0) activeFile = cameraInput.files[0];
+
+                if (activeFile) {
                     payload.avatarBase64 = await new Promise((resolve, reject) => {
                         const reader = new FileReader();
                         reader.onload = () => resolve(reader.result.split(',')[1]);
                         reader.onerror = error => reject(error);
-                        reader.readAsDataURL(file);
+                        reader.readAsDataURL(activeFile);
                     });
+                } else {
+                     throw new Error("Profile photo is required.");
                 }
 
                 await apiFetch('/api/register', {
@@ -96,17 +95,17 @@ export const AuthModule = {
                     body: JSON.stringify(payload)
                 });
 
-                progressDiv.classList.add('hidden');
                 successDiv.textContent = "Registration successful! You can now log in once approved.";
                 successDiv.classList.remove('hidden');
                 e.target.reset();
+                document.getElementById('avatarPreview').classList.add('hidden');
                 setTimeout(() => window.location.hash = 'login', 3000);
             } catch (err) {
-                progressDiv.classList.add('hidden');
                 errorDiv.textContent = err.message;
                 errorDiv.classList.remove('hidden');
             } finally {
                 btn.disabled = false;
+                btn.innerHTML = originalBtnText;
             }
         }
 
@@ -172,6 +171,19 @@ export const AuthModule = {
         if (e.target.id === 'muFilterStatus') {
             AuthModule.renderManageUsers();
         }
+
+        if (e.target.id === 'regFileInput' || e.target.id === 'regCameraInput') {
+             const file = e.target.files[0];
+             if (file) {
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     const preview = document.getElementById('avatarPreview');
+                     preview.src = e.target.result;
+                     preview.classList.remove('hidden');
+                 };
+                 reader.readAsDataURL(file);
+             }
+        }
         
         if (e.target.classList.contains('mu-status-select')) {
             const studentId = e.target.dataset.userId;
@@ -211,6 +223,14 @@ export const AuthModule = {
                 input.type = 'password';
                 icon.classList.replace('fa-eye-slash', 'fa-eye');
             }
+        }
+        
+        if (e.target.closest('#btnCamera')) {
+             document.getElementById('regCameraInput').click();
+        }
+        
+        if (e.target.closest('#btnFile')) {
+             document.getElementById('regFileInput').click();
         }
 
         if (e.target.closest('#profileToggleBtn')) {
