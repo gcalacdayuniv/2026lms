@@ -16,11 +16,11 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 * **`js/globals.js`:** Core configurations (points to the Worker API domain via `CONFIG.API_URL` set to `https://2026-api.plv.workers.dev`), shared state (`AppState`), and a centralized API wrapper (`apiFetch`).
 * **`js/components-utils.js`:** Contains shared UI utility functions, such as avatar URL formatting to bypass Google Drive hotlinking blocks.
 * **`js/components-auth.js`:** Encapsulates authentication HTML component templates including the Login and Registration screens.
-* **`js/components-dashboard.js`:** Contains UI layouts for the fixed header, responsive profile sidebar, modals for Change Password, Course Creation, Program Management, User Management, and the Student Document Submission modal.
+* **`js/components-dashboard.js`:** Contains UI layouts for the fixed header, responsive profile sidebar (displaying the user's name and username), modals for Update Details, Change Password, Course Creation, Program Management, User Management, and the Student Document Submission modal.
 * **`js/components-class.js`:** Manages Class Roster views, attendance controls, term settings, performance summaries, student management modals, and the Student Caller (Recitation Picker) modal interface.
 * **`js/components.js`:** Acts as a barrel file to export shared utilities and UI components from the domain-specific component modules.
 * **`js/router.js`:** Hash-based client-side router (`AppRouter`). Manages view toggling and triggers data loading routines asynchronously, including dynamic route parsing mapping to specific Class IDs.
-* **`js/auth.js`:** Handles login (with password visibility toggling), registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, password updating logic, interactive panel/modal toggling, global image viewing navigation, and user management status controls.
+* **`js/auth.js`:** Handles login (with password visibility toggling), registration (including dynamic program list loading), session management, DOM event delegation, dynamic form masking, user detail updates, password updating logic, interactive panel/modal toggling, global image viewing navigation, and user management status controls.
 * **`js/course.js`:** Encapsulates the complete event binding lifecycle for Course Management, serving as the master orchestrator for actions, forms (including document upload processing and dynamic input toggling for files vs. URLs), inputs, and routing clicks across modular domain files.
 * **`js/course-dashboard.js`:** Manages lecturer and student dashboard rendering views, course creation validation, and program creation routines.
 * **`js/course-class.js`:** Handles detailed class screen rendering, student sorting algorithms, data population for roster elements, print-ready roster exports, and enrollment management overrides.
@@ -29,7 +29,7 @@ The client-side is a static Single-Page Application (SPA) using Vanilla JavaScri
 * **`js/app.js`:** The master orchestrator that imports and initializes all modules.
 
 ### 2. Backend API (Cloudflare Workers)
-* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain (`https://plv.workers.dev` and its variants). It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments, Batch Attendance inserting (with performance points), Password modification logic, global User Status updates, and weighted Recitation Pool queries.
+* **`worker/worker.js`:** The centralized edge controller. It implements strict CORS headers locked to the frontend domain (`https://plv.workers.dev` and its variants). It acts as a secure proxy to Google Apps Script and directly manages the database relationships for User accounts, Course generation, Target Restrictions, Program Management, Student Enrollments, Batch Attendance inserting (with performance points), Profile detail updates, Password modification logic, global User Status updates, and weighted Recitation Pool queries.
 
 ### 3. Database Layer (Cloudflare D1 - Serverless SQLite)
 The database uses Universally Unique Identifiers (UUIDs) for all primary keys, generated on the edge via `crypto.randomUUID()`. 
@@ -52,6 +52,7 @@ We use the following environment variables strictly within the API (`worker/wran
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Update Details Modal:** Users can modify their personal details (Name, Username, Email, Contact Number, Student Number) directly from a new modal in the profile panel. This is secured by requiring their current password and implements edge validation to prevent duplicates across unique fields. The user's username is also explicitly displayed under their name in the profile panel.
 * **Registration Timestamps:** Added a database migration assigning a default `CURRENT_TIMESTAMP` value into the `Users` table specifically for new registrants tracking purposes.
 * **Submission History Popup:** Abstracted the submission history visual layout out of the immediate summary view and into a dedicated popup modal preventing UI clutter.
 * **Input Sanitization:** Embedded explicit logic preventing students from inserting slashes (`/`), dots (`.`), and standard path-breaking special characters inside submission titles.
@@ -70,7 +71,7 @@ We use the following environment variables strictly within the API (`worker/wran
 * **Target Audience Badge:** Displayed the specific enrollment restriction parameters directly within the Class Roster header for immediate visibility.
 * **Lecturer Manual Student Enrollment:** Added a modal utility within the Class Roster screen allowing lecturers to search and manually assign active students into their courses, overriding existing strict target audience gating parameters. 
 * **Dynamic Registration Course Lists:** Abstracted the textual string input for "Course" in the Student Registration block into a Dynamic Dropdown Select element populated by the `Programs` table.
-* **Security & Credential Management:** Introduced the `/api/change-password` endpoint. Users can now securely update their password directly from their profile sidebar, and lecturers can force reset student passwords from the roster panel.
+* **Security & Credential Management:** Introduced the `/api/change-password` and `/api/update-details` endpoints. Users can securely update their personal information and passwords, and lecturers can force reset student passwords from the roster panel.
 
 ## Development Directives
 When asked to add features, debug, or refactor, you must strictly adhere to the following rules:
