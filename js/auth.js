@@ -1,535 +1,409 @@
 // js/auth.js
 import { apiFetch, AppState } from './globals.js';
-import { getLoadableAvatarSrc } from './components.js';
-
-let currentImageIndex = -1;
-let imageElements = [];
+import { getLoadableAvatarSrc } from './components-utils.js';
 
 export const AuthModule = {
-    allUsersData: [],
-    
+    usersList: [],
+
     init: () => {
         document.addEventListener('submit', AuthModule.handleForms);
         document.addEventListener('click', AuthModule.handleClicks);
+        document.addEventListener('input', AuthModule.handleInputs);
         document.addEventListener('change', AuthModule.handleChanges);
-        document.addEventListener('input', AuthModule.handleInput);
-        document.addEventListener('keydown', AuthModule.handleKeydown);
     },
-
-    // --- Event Routers ---
 
     handleForms: async (e) => {
         if (e.target.id === 'loginForm') {
             e.preventDefault();
-            await AuthModule.login();
-        } else if (e.target.id === 'registerForm') {
+            const btn = document.getElementById('loginBtn');
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
+
+            try {
+                const data = await apiFetch('/api/login', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        identifier: document.getElementById('loginId').value.trim(),
+                        password: document.getElementById('loginPassword').value
+                    })
+                });
+                
+                AppState.user = data.user;
+                localStorage.setItem('user', JSON.stringify(data.user));
+                window.location.hash = 'dashboard';
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Sign In';
+            }
+        }
+
+        if (e.target.id === 'registerForm') {
             e.preventDefault();
-            await AuthModule.register();
-        } else if (e.target.id === 'changePasswordForm') {
+            const btn = document.getElementById('registerBtn');
+            const errorDiv = document.getElementById('registerError');
+            const successDiv = document.getElementById('registerSuccess');
+            const progressDiv = document.getElementById('uploadProgress');
+            
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+            btn.disabled = true;
+
+            const pw = document.getElementById('regPassword').value;
+            const pw2 = document.getElementById('regRepeatPassword').value;
+
+            if (pw !== pw2) {
+                errorDiv.textContent = "Passwords do not match.";
+                errorDiv.classList.remove('hidden');
+                btn.disabled = false;
+                return;
+            }
+
+            progressDiv.classList.remove('hidden');
+
+            try {
+                const payload = {
+                    username: document.getElementById('regUsername').value.trim(),
+                    password: pw,
+                    name: document.getElementById('regName').value.trim(),
+                    email: document.getElementById('regEmail').value.trim(),
+                    contact_number: document.getElementById('regContact').value.trim(),
+                    student_number: document.getElementById('regStudentNo').value.trim(),
+                    course: document.getElementById('regCourse').value,
+                    year: document.getElementById('regYear').value,
+                    section: document.getElementById('regSection').value.trim().toUpperCase(),
+                    eye_condition: document.getElementById('regEyeCondition').value,
+                    avatarBase64: null
+                };
+
+                const fileInput = document.getElementById('regAvatar');
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    payload.avatarBase64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result.split(',')[1]);
+                        reader.onerror = error => reject(error);
+                        reader.readAsDataURL(file);
+                    });
+                }
+
+                await apiFetch('/api/register', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                progressDiv.classList.add('hidden');
+                successDiv.textContent = "Registration successful! You can now log in once approved.";
+                successDiv.classList.remove('hidden');
+                e.target.reset();
+                setTimeout(() => window.location.hash = 'login', 3000);
+            } catch (err) {
+                progressDiv.classList.add('hidden');
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        if (e.target.id === 'changePasswordForm') {
             e.preventDefault();
-            await AuthModule.changePassword();
+            const btn = document.getElementById('cpSubmitBtn');
+            const errorDiv = document.getElementById('cpError');
+            const successDiv = document.getElementById('cpSuccess');
+            
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+            
+            const current = document.getElementById('cpCurrent').value;
+            const newPw = document.getElementById('cpNew').value;
+            const repeatPw = document.getElementById('cpRepeat').value;
+            
+            if (newPw !== repeatPw) {
+                errorDiv.textContent = "New passwords do not match.";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            
+            try {
+                await apiFetch('/api/change-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: AppState.user.User_ID, currentPassword: current, newPassword: newPw })
+                });
+                successDiv.textContent = "Password updated securely.";
+                successDiv.classList.remove('hidden');
+                e.target.reset();
+                setTimeout(() => {
+                    successDiv.classList.add('hidden');
+                    document.getElementById('cpModal').classList.add('hidden');
+                }, 2000);
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Update Password';
+            }
+        }
+    },
+
+    handleInputs: (e) => {
+        if (e.target.id === 'regStudentNo') {
+            let val = e.target.value.replace(/\D/g, '');
+            if (val.length > 2) {
+                val = val.substring(0, 2) + '-' + val.substring(2, 6);
+            }
+            e.target.value = val.substring(0, 7);
+        }
+        
+        if (e.target.id === 'muSearchInput') {
+            AuthModule.renderManageUsers();
+        }
+    },
+
+    handleChanges: async (e) => {
+        if (e.target.id === 'muFilterStatus') {
+            AuthModule.renderManageUsers();
+        }
+        
+        if (e.target.classList.contains('mu-status-select')) {
+            const studentId = e.target.dataset.userId;
+            const status = e.target.value;
+            
+            e.target.className = `mu-status-select w-full sm:w-32 px-2 py-1.5 text-xs font-bold border rounded outline-none cursor-pointer transition ${
+                status === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
+                status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
+                status === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
+                status === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
+                status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50'
+            }`;
+
+            try {
+                await apiFetch('/api/update-user-status', {
+                    method: 'POST',
+                    body: JSON.stringify({ studentId, status })
+                });
+                
+                const user = AuthModule.usersList.find(u => u.User_ID === studentId);
+                if(user) user.account_status = status;
+                
+            } catch (err) {
+                alert('Failed to update status: ' + err.message);
+            }
         }
     },
 
     handleClicks: (e) => {
-        // Authentication & Media Actions
-        if (e.target.closest('#logoutBtn')) AuthModule.logout();
-        if (e.target.closest('#btnCamera')) document.getElementById('regCameraInput').click();
-        if (e.target.closest('#btnFile')) document.getElementById('regFileInput').click();
-        if (e.target.closest('#toggleLoginPassword')) AuthModule.toggleLoginPassword();
-        
-        // Profile Panel Toggles
-        if (e.target.closest('#profileToggleBtn')) AuthModule.openProfilePanel();
-        if (e.target.closest('#closeProfilePanel') || e.target.id === 'profilePanelOverlay') AuthModule.closeProfilePanel();
-
-        // Modals
-        if (e.target.closest('#openCpModalBtn')) AuthModule.openCpModal();
-        if (e.target.closest('#closeCpModalBtn') || e.target.id === 'cpModalOverlay') AuthModule.closeCpModal();
-
-        if (e.target.closest('#openCreateCourseModalBtn')) AuthModule.openCcModal();
-        if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') AuthModule.closeCcModal();
-
-        if (e.target.closest('#openApModalBtn')) AuthModule.openApModal();
-        if (e.target.closest('#closeApModalBtn') || e.target.id === 'apModalOverlay') AuthModule.closeApModal();
-
-        if (e.target.closest('#openMuModalBtn')) AuthModule.openMuModal();
-        if (e.target.closest('#closeMuModalBtn') || e.target.id === 'muModalOverlay') AuthModule.closeMuModal();
-
-        // Global Image Viewer
-        if (e.target.closest('.view-avatar-btn')) AuthModule.openGlobalImageViewer(e.target.closest('.view-avatar-btn'));
-        if (e.target.closest('#prevGlobalImageBtn')) AuthModule.prevGlobalImage();
-        if (e.target.closest('#nextGlobalImageBtn')) AuthModule.nextGlobalImage();
-        if (e.target.closest('#closeGlobalImageBtn') || e.target.id === 'closeGlobalImageBg') AuthModule.closeGlobalImageViewer();
-    },
-
-    handleChanges: async (e) => {
-        if (e.target.id === 'regCameraInput' || e.target.id === 'regFileInput') {
-            AuthModule.processImageUpload(e.target.files[0]);
-        } else if (e.target.classList.contains('mu-status-select')) {
-            await AuthModule.updateUserStatus(e.target);
-        }
-    },
-
-    handleInput: (e) => {
-        if (e.target.id === 'regStudentNo') {
-            AuthModule.maskStudentNumber(e.target);
-        } else if (e.target.id === 'muSearchInput' || e.target.id === 'muFilterStatus') {
-            AuthModule.renderUsersList();
-        }
-    },
-
-    handleKeydown: (e) => {
-        if (e.target.id === 'regStudentNo' && e.key === 'Backspace') {
-            const input = e.target;
-            if (input.value.length === 3 && input.value.endsWith('-')) {
-                input.value = input.value.substring(0, 1);
-                e.preventDefault();
-            }
-        }
-    },
-
-    // --- UI & Modal Handlers ---
-
-    toggleLoginPassword: () => {
-        const pwdInput = document.getElementById('loginPassword');
-        const eyeIcon = document.getElementById('loginPasswordEye');
-        if (pwdInput && eyeIcon) {
-            if (pwdInput.type === 'password') {
-                pwdInput.type = 'text';
-                eyeIcon.classList.replace('fa-eye', 'fa-eye-slash');
+        if (e.target.closest('#toggleLoginPassword')) {
+            const input = document.getElementById('loginPassword');
+            const icon = e.target.closest('#toggleLoginPassword').querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
             } else {
-                pwdInput.type = 'password';
-                eyeIcon.classList.replace('fa-eye-slash', 'fa-eye');
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
             }
         }
-    },
 
-    openProfilePanel: () => {
-        const panel = document.getElementById('profilePanel');
-        const overlay = document.getElementById('profilePanelOverlay');
-        if (panel && overlay) {
+        if (e.target.closest('#profileToggleBtn')) {
+            document.getElementById('profilePanelOverlay').classList.remove('hidden');
+            const panel = document.getElementById('profilePanel');
             panel.classList.remove('translate-x-full');
-            overlay.classList.remove('hidden');
+            panel.classList.add('translate-x-0');
         }
-    },
 
-    closeProfilePanel: () => {
-        const panel = document.getElementById('profilePanel');
-        const overlay = document.getElementById('profilePanelOverlay');
-        if (panel && overlay) {
+        if (e.target.closest('#closeProfilePanel') || e.target.id === 'profilePanelOverlay') {
+            document.getElementById('profilePanelOverlay').classList.add('hidden');
+            const panel = document.getElementById('profilePanel');
             panel.classList.add('translate-x-full');
-            overlay.classList.add('hidden');
+            panel.classList.remove('translate-x-0');
         }
-    },
 
-    openCpModal: () => {
-        document.getElementById('cpModal').classList.remove('hidden');
-        AuthModule.closeProfilePanel();
-    },
-
-    closeCpModal: () => {
-        document.getElementById('cpModal').classList.add('hidden');
-        document.getElementById('changePasswordForm').reset();
-        document.getElementById('cpError').classList.add('hidden');
-        document.getElementById('cpSuccess').classList.add('hidden');
-    },
-
-    openCcModal: () => {
-        document.getElementById('ccModal').classList.remove('hidden');
-        AuthModule.closeProfilePanel();
-    },
-
-    closeCcModal: () => {
-        document.getElementById('ccModal').classList.add('hidden');
-        document.getElementById('addCourseForm').reset();
-        const courseErr = document.getElementById('courseError');
-        if (courseErr) courseErr.classList.add('hidden');
-    },
-
-    openApModal: () => {
-        document.getElementById('apModal').classList.remove('hidden');
-        AuthModule.closeProfilePanel();
-    },
-
-    closeApModal: () => {
-        document.getElementById('apModal').classList.add('hidden');
-        document.getElementById('addProgramForm').reset();
-        const err = document.getElementById('programError');
-        const succ = document.getElementById('programSuccess');
-        if (err) err.classList.add('hidden');
-        if (succ) succ.classList.add('hidden');
-    },
-
-    openMuModal: () => {
-        document.getElementById('muModal').classList.remove('hidden');
-        AuthModule.closeProfilePanel();
-        AuthModule.loadUsersList();
-    },
-
-    closeMuModal: () => {
-        document.getElementById('muModal').classList.add('hidden');
-        document.getElementById('muSearchInput').value = '';
-        document.getElementById('muFilterStatus').value = '';
-    },
-
-    openGlobalImageViewer: (btn) => {
-        imageElements = Array.from(document.querySelectorAll('.view-avatar-btn'));
-        currentImageIndex = imageElements.indexOf(btn);
-        AuthModule.updateGlobalImageModal();
-        document.getElementById('globalImageModal').classList.remove('hidden');
-    },
-
-    closeGlobalImageViewer: () => {
-        const modal = document.getElementById('globalImageModal');
-        const img = document.getElementById('globalImageSrc');
-        if (modal && img) {
-            modal.classList.add('hidden');
-            img.src = '';
-            document.getElementById('globalImageDetails').classList.add('hidden');
+        if (e.target.closest('#logoutBtn')) {
+            AppState.user = null;
+            localStorage.removeItem('user');
+            window.location.hash = 'login';
         }
-    },
 
-    prevGlobalImage: () => {
-        if (currentImageIndex > 0) {
-            currentImageIndex--;
-            AuthModule.updateGlobalImageModal();
+        if (e.target.closest('#openCpModalBtn')) {
+            document.getElementById('profilePanelOverlay').classList.add('hidden');
+            document.getElementById('profilePanel').classList.add('translate-x-full');
+            document.getElementById('profilePanel').classList.remove('translate-x-0');
+            document.getElementById('cpModal').classList.remove('hidden');
         }
-    },
 
-    nextGlobalImage: () => {
-        if (currentImageIndex < imageElements.length - 1) {
-            currentImageIndex++;
-            AuthModule.updateGlobalImageModal();
-        }
-    },
-
-    updateGlobalImageModal: () => {
-        const imgEl = imageElements[currentImageIndex];
-        if (!imgEl) return;
-        
-        const src = imgEl.dataset.src || imgEl.getAttribute('src');
-        const name = imgEl.dataset.name;
-        const info = imgEl.dataset.info;
-        
-        document.getElementById('globalImageSrc').src = src;
-        
-        const detailsDiv = document.getElementById('globalImageDetails');
-        if (name || info) {
-            detailsDiv.classList.remove('hidden');
-            document.getElementById('giName').textContent = name || '';
-            document.getElementById('giInfo').textContent = info || '';
-        } else {
-            detailsDiv.classList.add('hidden');
+        if (e.target.closest('#closeCpModalBtn') || e.target.id === 'cpModalOverlay') {
+            document.getElementById('cpModal').classList.add('hidden');
+            document.getElementById('changePasswordForm').reset();
+            document.getElementById('cpError').classList.add('hidden');
+            document.getElementById('cpSuccess').classList.add('hidden');
         }
         
-        const prevBtn = document.getElementById('prevGlobalImageBtn');
-        const nextBtn = document.getElementById('nextGlobalImageBtn');
+        if (e.target.closest('#openCreateCourseModalBtn')) {
+            document.getElementById('profilePanelOverlay').classList.add('hidden');
+            document.getElementById('profilePanel').classList.add('translate-x-full');
+            document.getElementById('profilePanel').classList.remove('translate-x-0');
+            document.getElementById('ccModal').classList.remove('hidden');
+        }
+
+        if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') {
+            document.getElementById('ccModal').classList.add('hidden');
+        }
         
-        if (imageElements.length > 1) {
-            prevBtn.classList.toggle('hidden', currentImageIndex === 0);
-            nextBtn.classList.toggle('hidden', currentImageIndex === imageElements.length - 1);
-        } else {
-            prevBtn.classList.add('hidden');
-            nextBtn.classList.add('hidden');
+        if (e.target.closest('#openApModalBtn')) {
+            document.getElementById('profilePanelOverlay').classList.add('hidden');
+            document.getElementById('profilePanel').classList.add('translate-x-full');
+            document.getElementById('profilePanel').classList.remove('translate-x-0');
+            document.getElementById('apModal').classList.remove('hidden');
         }
-    },
 
-    maskStudentNumber: (inputElement) => {
-        let val = inputElement.value.replace(/\D/g, '');
-        if (val.length > 6) val = val.substring(0, 6);
-
-        if (val.length >= 3) {
-            inputElement.value = val.substring(0, 2) + '-' + val.substring(2);
-        } else {
-            inputElement.value = val;
+        if (e.target.closest('#closeApModalBtn') || e.target.id === 'apModalOverlay') {
+            document.getElementById('apModal').classList.add('hidden');
         }
-    },
 
-    // --- Core Data & API Logic ---
-
-    loadPrograms: async () => {
-        const select = document.getElementById('regCourse');
-        if (!select) return;
-        try {
-            const data = await apiFetch('/api/programs');
-            select.innerHTML = '<option value="" disabled selected>Select Course</option>' + 
-                data.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-        } catch (e) {
-            select.innerHTML = '<option value="" disabled>Error loading courses</option>';
+        if (e.target.closest('#openMuModalBtn')) {
+            document.getElementById('profilePanelOverlay').classList.add('hidden');
+            document.getElementById('profilePanel').classList.add('translate-x-full');
+            document.getElementById('profilePanel').classList.remove('translate-x-0');
+            document.getElementById('muModal').classList.remove('hidden');
+            AuthModule.loadManageUsers();
         }
-    },
 
-    loadUsersList: async () => {
-        const listContainer = document.getElementById('manageUsersList');
-        if (!listContainer) return;
+        if (e.target.closest('#closeMuModalBtn') || e.target.id === 'muModalOverlay') {
+            document.getElementById('muModal').classList.add('hidden');
+            document.getElementById('muSearchInput').value = '';
+            document.getElementById('muFilterStatus').value = '';
+        }
         
-        listContainer.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br><span class="text-gray-500">Loading users...</span></div>';
-        
-        try {
-            const data = await apiFetch('/api/users');
-            AuthModule.allUsersData = data.users;
-            AuthModule.renderUsersList();
-        } catch (e) {
-             listContainer.innerHTML = `<div class="p-4 text-red-500 border border-red-200 bg-red-50 rounded text-center font-medium">${e.message}</div>`;
-        }
-    },
-
-    renderUsersList: () => {
-        const search = (document.getElementById('muSearchInput')?.value || '').toLowerCase();
-        const status = document.getElementById('muFilterStatus')?.value || '';
-        const listContainer = document.getElementById('manageUsersList');
-        
-        if (!AuthModule.allUsersData) return;
-
-        let filtered = AuthModule.allUsersData.filter(u => {
-            const matchName = u.Name.toLowerCase().includes(search) || (u.Student_Number || '').toLowerCase().includes(search);
-            const matchStatus = status ? u.account_status === status : true;
-            return matchName && matchStatus;
-        });
-
-        if (filtered.length === 0) {
-            listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded shadow-sm">No users found matching filters.</div>';
-            return;
-        }
-
-        const html = filtered.map(u => {
-            const displayCourse = `${u.course || ''} ${u.year || ''} ${u.section ? '- ' + u.section : ''}`.trim();
-            const avatarSrc = getLoadableAvatarSrc(u.Avatar);
-            const avatarImg = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover border border-gray-200">` : `<i class="fa-solid fa-circle-user text-[40px] text-gray-300"></i>`;
+        if (e.target.closest('.view-avatar-btn')) {
+            const btn = e.target.closest('.view-avatar-btn');
+            const src = btn.dataset.src;
+            const name = btn.dataset.name || '';
+            const info = btn.dataset.info || '';
             
-            const getStatusColor = (st) => {
-                return st === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
-                       st === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
-                       st === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
-                       st === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
-                       st === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50';
-            };
-
-            return `
-                <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded shadow-sm hover:border-blue-300 transition">
-                    <div class="flex items-center space-x-3">
-                        <div class="flex-shrink-0">${avatarImg}</div>
-                        <div>
-                            <div class="font-bold text-gray-800 text-sm flex items-center gap-2">
-                                ${u.Name} 
-                                <span class="text-[10px] bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600">${u.role}</span>
-                            </div>
-                            <div class="text-[11px] text-gray-500 mt-0.5">
-                                <span class="font-bold text-gray-700">${u.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
-                            </div>
+            let modal = document.getElementById('globalImageModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'globalImageModal';
+                modal.className = 'fixed inset-0 z-[200] hidden flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm fade-in';
+                modal.innerHTML = `
+                    <button id="closeGlobalImageBtn" class="absolute top-4 right-4 text-white hover:text-gray-300 focus:outline-none transition-colors z-[210]">
+                        <i class="fa-solid fa-xmark text-3xl"></i>
+                    </button>
+                    <div class="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center p-4">
+                        <img id="globalImageFull" src="" class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl scale-up border-2 border-gray-700 bg-gray-900">
+                        <div class="mt-4 text-center">
+                            <h4 id="globalImageName" class="text-white font-black text-xl tracking-wider"></h4>
+                            <p id="globalImageInfo" class="text-gray-400 text-sm font-medium mt-1"></p>
                         </div>
                     </div>
-                    <div class="w-32">
-                        <select data-user-id="${u.User_ID}" class="mu-status-select w-full px-2 py-1.5 text-xs border rounded outline-none font-bold cursor-pointer transition ${getStatusColor(u.account_status)}">
-                            <option value="Active" ${u.account_status === 'Active' ? 'selected' : ''}>Active</option>
-                            <option value="Inactive" ${u.account_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                            <option value="Suspended" ${u.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
-                            <option value="UD" ${u.account_status === 'UD' ? 'selected' : ''}>UD</option>
-                            <option value="Dropped" ${u.account_status === 'Dropped' ? 'selected' : ''}>Dropped</option>
-                        </select>
+                `;
+                document.body.appendChild(modal);
+            }
+            
+            document.getElementById('globalImageFull').src = src;
+            document.getElementById('globalImageName').textContent = name;
+            document.getElementById('globalImageInfo').textContent = info;
+            
+            modal.classList.remove('hidden');
+            
+            const closeBtn = document.getElementById('closeGlobalImageBtn');
+            const closeHandler = () => {
+                modal.classList.add('hidden');
+                closeBtn.removeEventListener('click', closeHandler);
+                modal.removeEventListener('click', overlayHandler);
+            };
+            const overlayHandler = (ev) => {
+                if (ev.target === modal) closeHandler();
+            };
+            
+            closeBtn.addEventListener('click', closeHandler);
+            modal.addEventListener('click', overlayHandler);
+        }
+    },
+
+    loadManageUsers: async () => {
+        const list = document.getElementById('manageUsersList');
+        if (!list) return;
+        list.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-3xl"></i></div>';
+        try {
+            const ts = new Date().getTime();
+            const data = await apiFetch(`/api/users?_t=${ts}`);
+            AuthModule.usersList = data.users;
+            AuthModule.renderManageUsers();
+        } catch(err) {
+            list.innerHTML = `<div class="text-red-500 p-4 text-center font-bold bg-red-50 border border-red-200 rounded">${err.message}</div>`;
+        }
+    },
+
+    renderManageUsers: () => {
+        const list = document.getElementById('manageUsersList');
+        const search = document.getElementById('muSearchInput')?.value.toLowerCase() || '';
+        const filter = document.getElementById('muFilterStatus')?.value || '';
+        
+        const filtered = AuthModule.usersList.filter(u => {
+            const matchSearch = u.Name.toLowerCase().includes(search) || (u.Student_Number && u.Student_Number.toLowerCase().includes(search));
+            const matchFilter = filter === '' || u.account_status === filter;
+            return matchSearch && matchFilter;
+        });
+        
+        if(filtered.length === 0) {
+            list.innerHTML = '<div class="text-gray-500 p-8 text-center text-sm font-medium">No users found.</div>';
+            return;
+        }
+        
+        list.innerHTML = filtered.map(u => {
+            const avatarSrc = u.Avatar ? getLoadableAvatarSrc(u.Avatar) : null;
+            const avatarImg = avatarSrc 
+                ? `<img src="${avatarSrc}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${avatarSrc}" data-name="${u.Name}" data-info="${u.course || ''} ${u.year || ''} ${u.section || ''}">` 
+                : `<i class="fa-solid fa-circle-user text-[48px] sm:text-[56px] text-gray-300"></i>`;
+                
+            const regDate = u.registration_timestamp ? new Date(u.registration_timestamp + 'Z').toLocaleString() : 'N/A';
+            
+            return `
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition gap-4">
+                <div class="flex items-center gap-4 w-full sm:w-auto overflow-hidden">
+                    <div class="flex-shrink-0">
+                        ${avatarImg}
+                    </div>
+                    <div class="overflow-hidden min-w-0">
+                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${u.Name} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${u.role}</span></div>
+                        
+                        <div class="text-[11px] sm:text-xs text-gray-600 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span class="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">${u.Student_Number || 'N/A'}</span>
+                            <a href="mailto:${u.Email || ''}" class="text-blue-600 hover:underline truncate bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition inline-flex items-center" title="Send Email"><i class="fa-regular fa-envelope mr-1.5"></i>${u.Email || 'No Email Provided'}</a>
+                        </div>
+                        
+                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${u.course || 'N/A'} ${u.year || ''} ${u.section || ''}</div>
+                        <div class="text-[9px] sm:text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-wider"><i class="fa-regular fa-clock mr-1"></i>Reg: ${regDate}</div>
                     </div>
                 </div>
+                <div class="w-full sm:w-auto flex-shrink-0 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                    <label class="block sm:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
+                    <select class="mu-status-select w-full sm:w-36 px-3 py-2 text-xs sm:text-sm font-bold border rounded-md outline-none cursor-pointer transition shadow-sm ${
+                        u.account_status === 'Active' ? 'text-green-700 border-green-300 bg-green-50 focus:ring-green-500' : 
+                        u.account_status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' :
+                        u.account_status === 'Suspended' ? 'text-orange-700 border-orange-300 bg-orange-50 focus:ring-orange-500' :
+                        u.account_status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' :
+                        u.account_status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50'
+                    }" data-user-id="${u.User_ID}">
+                        <option value="Active" ${u.account_status === 'Active' ? 'selected' : ''}>Active</option>
+                        <option value="Inactive" ${u.account_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                        <option value="Suspended" ${u.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
+                        <option value="UD" ${u.account_status === 'UD' ? 'selected' : ''}>UD</option>
+                        <option value="Dropped" ${u.account_status === 'Dropped' ? 'selected' : ''}>Dropped</option>
+                    </select>
+                </div>
+            </div>
             `;
         }).join('');
-
-        listContainer.innerHTML = html;
-    },
-
-    updateUserStatus: async (selectEl) => {
-        const studentId = selectEl.dataset.userId;
-        const status = selectEl.value;
-        
-        const getStatusColor = (st) => {
-            return st === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
-                   st === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
-                   st === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
-                   st === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
-                   st === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50';
-        };
-        
-        selectEl.className = `mu-status-select w-full px-2 py-1.5 text-xs border rounded outline-none font-bold cursor-pointer transition ${getStatusColor(status)}`;
-        
-        try {
-            await apiFetch('/api/update-user-status', {
-                method: 'POST',
-                body: JSON.stringify({ studentId, status })
-            });
-            
-            const userObj = AuthModule.allUsersData.find(u => u.User_ID === studentId);
-            if (userObj) userObj.account_status = status;
-            
-        } catch (err) {
-            console.error('Failed to update user status:', err);
-            alert('Failed to update status.');
-        }
-    },
-
-    processImageUpload: (file) => {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 500;
-                let scaleSize = 1;
-                
-                if (img.width > MAX_WIDTH) {
-                    scaleSize = MAX_WIDTH / img.width;
-                }
-                
-                canvas.width = img.width * scaleSize;
-                canvas.height = img.height * scaleSize;
-                
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                const base64String = canvas.toDataURL('image/jpeg', 0.8);
-                
-                document.getElementById('avatarPreview').src = base64String;
-                document.getElementById('avatarPreview').classList.remove('hidden');
-                document.getElementById('regAvatarBase64').value = base64String;
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    },
-
-    login: async () => {
-        const errorDiv = document.getElementById('loginError');
-        errorDiv.classList.add('hidden');
-        
-        const payload = {
-            identifier: document.getElementById('loginIdentifier').value.trim(),
-            password: document.getElementById('loginPassword').value
-        };
-
-        try {
-            const data = await apiFetch('/api/login', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-
-            AppState.setUser(data.user);
-            window.location.hash = '#dashboard';
-        } catch (error) {
-            errorDiv.textContent = error.message;
-            errorDiv.classList.remove('hidden');
-        }
-    },
-
-    register: async () => {
-        const errorDiv = document.getElementById('registerError');
-        const successDiv = document.getElementById('registerSuccess');
-        const submitBtn = document.getElementById('regSubmitBtn');
-        const avatarBase64 = document.getElementById('regAvatarBase64').value;
-        
-        errorDiv.classList.add('hidden');
-        successDiv.classList.add('hidden');
-
-        if (!avatarBase64) {
-            errorDiv.textContent = "Profile photo is required. Please take a photo or upload a file.";
-            errorDiv.classList.remove('hidden');
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
-
-        const givenName = document.getElementById('regGivenName').value.trim();
-        const lastName = document.getElementById('regLastName').value.trim();
-        const suffix = document.getElementById('regSuffix').value.trim();
-        
-        let fullName = `${lastName}, ${givenName}`;
-        if (suffix) {
-            fullName += ` ${suffix}`;
-        }
-        fullName = fullName.trim().replace(/\s+/g, ' ');
-
-        const payload = {
-            username: document.getElementById('regUsername').value.trim(),
-            password: document.getElementById('regPassword').value,
-            name: fullName,
-            email: document.getElementById('regEmail').value.trim(),
-            student_number: document.getElementById('regStudentNo').value.trim(),
-            contact_number: document.getElementById('regContact').value.trim(),
-            course: document.getElementById('regCourse').value.trim(),
-            year: document.getElementById('regYear').value.trim(),
-            section: document.getElementById('regSection').value.trim(),
-            eye_condition: document.getElementById('regEyeCondition').value.trim(),
-            avatarBase64: avatarBase64
-        };
-
-        try {
-            await apiFetch('/api/register', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-
-            successDiv.classList.remove('hidden');
-            setTimeout(() => {
-                window.location.hash = '#login';
-            }, 2000);
-        } catch (error) {
-            errorDiv.textContent = error.message;
-            errorDiv.classList.remove('hidden');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Create Account';
-        }
-    },
-    
-    changePassword: async () => {
-        const currentPassword = document.getElementById('cpCurrent').value;
-        const newPassword = document.getElementById('cpNew').value;
-        const repeatPassword = document.getElementById('cpRepeat').value;
-        const errorDiv = document.getElementById('cpError');
-        const successDiv = document.getElementById('cpSuccess');
-        const submitBtn = document.getElementById('cpSubmitBtn');
-
-        errorDiv.classList.add('hidden');
-        successDiv.classList.add('hidden');
-
-        if (newPassword !== repeatPassword) {
-            errorDiv.textContent = "New passwords do not match.";
-            errorDiv.classList.remove('hidden');
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>';
-
-        try {
-            const payload = {
-                userId: AppState.user.User_ID,
-                currentPassword: currentPassword,
-                newPassword: newPassword
-            };
-            
-            const data = await apiFetch('/api/change-password', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-
-            successDiv.textContent = data.message || "Password updated successfully.";
-            successDiv.classList.remove('hidden');
-            document.getElementById('changePasswordForm').reset();
-            
-            setTimeout(() => {
-                successDiv.classList.add('hidden');
-                document.getElementById('cpModal').classList.add('hidden');
-            }, 2500);
-            
-        } catch (error) {
-            errorDiv.textContent = error.message;
-            errorDiv.classList.remove('hidden');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Update Password';
-        }
-    },
-
-    logout: () => {
-        AppState.setUser(null);
-        window.location.hash = '#login';
     }
 };
