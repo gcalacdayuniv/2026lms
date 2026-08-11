@@ -82,7 +82,7 @@ export default {
                 }
 
                 const existing = await env.DB.prepare(
-                    `SELECT User_ID FROM Users 
+                    `SELECT Username, Student_Number, Email, Contact_Number FROM Users 
                      WHERE Username COLLATE NOCASE = ? 
                      OR Student_Number COLLATE NOCASE = ? 
                      OR Email COLLATE NOCASE = ? 
@@ -90,7 +90,13 @@ export default {
                 ).bind(body.username, body.student_number, body.email, body.contact_number).first();
                     
                 if (existing) {
-                    return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already registered." }), { status: 400, headers: corsHeaders });
+                    const conflicts = [];
+                    if (existing.Username && body.username && existing.Username.toLowerCase() === body.username.toLowerCase()) conflicts.push("Username");
+                    if (existing.Student_Number && body.student_number && existing.Student_Number.toLowerCase() === body.student_number.toLowerCase()) conflicts.push("Student Number");
+                    if (existing.Email && body.email && existing.Email.toLowerCase() === body.email.toLowerCase()) conflicts.push("Email");
+                    if (existing.Contact_Number && body.contact_number && existing.Contact_Number === body.contact_number) conflicts.push("Contact Number");
+                    
+                    return new Response(JSON.stringify({ error: `The following information is already registered: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
                 }
 
                 let finalAvatarUrl = null;
@@ -214,7 +220,7 @@ export default {
                 }
 
                 const existing = await env.DB.prepare(
-                    `SELECT User_ID FROM Users 
+                    `SELECT Username, Student_Number, Email, Contact_Number FROM Users 
                      WHERE (Username COLLATE NOCASE = ? 
                      OR Student_Number COLLATE NOCASE = ? 
                      OR Email COLLATE NOCASE = ? 
@@ -223,7 +229,13 @@ export default {
                 ).bind(username, studentNumber, email, contact, userId).first();
                     
                 if (existing) {
-                    return new Response(JSON.stringify({ error: "Username, Student Number, Email, or Contact Number is already used by another account." }), { status: 400, headers: corsHeaders });
+                    const conflicts = [];
+                    if (existing.Username && username && existing.Username.toLowerCase() === username.toLowerCase()) conflicts.push("Username");
+                    if (existing.Student_Number && studentNumber && existing.Student_Number.toLowerCase() === studentNumber.toLowerCase()) conflicts.push("Student Number");
+                    if (existing.Email && email && existing.Email.toLowerCase() === email.toLowerCase()) conflicts.push("Email");
+                    if (existing.Contact_Number && contact && existing.Contact_Number === contact) conflicts.push("Contact Number");
+                    
+                    return new Response(JSON.stringify({ error: `The following information is already taken by another account: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
                 }
 
                 await env.DB.prepare(
