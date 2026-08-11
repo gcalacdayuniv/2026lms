@@ -96,7 +96,7 @@ export default {
                     if (existing.Email && body.email && existing.Email.toLowerCase() === body.email.toLowerCase()) conflicts.push("Email");
                     if (existing.Contact_Number && body.contact_number && existing.Contact_Number === body.contact_number) conflicts.push("Contact Number");
                     
-                    return new Response(JSON.stringify({ error: `The following information is already registered: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
+                    return new Response(JSON.stringify({ error: `The following is already registered to another account.: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
                 }
 
                 let finalAvatarUrl = null;
