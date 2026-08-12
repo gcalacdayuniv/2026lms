@@ -638,6 +638,33 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && path === "/api/add-participation-points") {
+                const body = await request.json();
+                const { courseId, studentId, date, points } = body;
+                
+                if (!courseId || !studentId || !date || typeof points !== 'number') {
+                    return new Response(JSON.stringify({ error: "Missing required parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare(
+                    "SELECT Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?"
+                ).bind(courseId, studentId, date).first();
+
+                if (existing) {
+                    const newTotal = (parseInt(existing.Performance_Points) || 0) + points;
+                    await env.DB.prepare(
+                        "UPDATE Attendance SET Performance_Points = ? WHERE Course_ID = ? AND Student_ID = ? AND Date = ?"
+                    ).bind(newTotal, courseId, studentId, date).run();
+                } else {
+                    const attId = crypto.randomUUID();
+                    await env.DB.prepare(
+                        "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, 'Present', ?)"
+                    ).bind(attId, courseId, studentId, date, points).run();
+                }
+                
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "GET" && path === "/api/student-summary") {
                 const courseId = url.searchParams.get("courseId");
                 const studentId = url.searchParams.get("studentId");
