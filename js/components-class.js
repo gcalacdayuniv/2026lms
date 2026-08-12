@@ -369,7 +369,19 @@ const ClassUI = {
                 <div id="recitationResult" class="hidden w-full text-center fade-in bg-purple-50 p-6 rounded-xl border border-purple-200">
                     <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-4">Selected Student</p>
                     <div id="recitationResultAvatar" class="mb-4"></div>
-                    <h4 id="recitationResultName" class="text-2xl font-black text-gray-900 mb-6"></h4>
+                    <h4 id="recitationResultName" class="text-2xl font-black text-gray-900 mb-4"></h4>
+                    
+                    <div class="flex flex-col items-center mb-6 w-full px-4">
+                        <label class="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-2">Add Participation Points</label>
+                        <div class="flex w-full max-w-[200px] gap-2">
+                            <input type="number" id="recitationPointsInput" class="w-full px-3 py-2 text-center text-lg font-bold border-2 border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white" placeholder="0" min="0">
+                            <button type="button" id="saveRecitationPointsBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-lg transition shadow-sm focus:outline-none">
+                                <i class="fa-solid fa-plus"></i> Add
+                            </button>
+                        </div>
+                        <div id="recitationPointsAlert" class="hidden mt-2 text-xs font-bold text-center w-full rounded py-1"></div>
+                    </div>
+                    
                     <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
                         Next Student
                     </button>
