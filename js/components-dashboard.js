@@ -368,6 +368,16 @@ const DashboardUI = {
                         <input type="url" id="submitUrlInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="https://...">
                     </div>
                     
+                    <div id="groupUploadSection" class="hidden border border-purple-200 bg-purple-50 p-3 rounded-md mt-2">
+                        <label class="flex items-center space-x-2 text-xs font-bold text-purple-800 cursor-pointer mb-2">
+                            <input type="checkbox" id="isGroupUpload" class="rounded text-purple-600 focus:ring-purple-500">
+                            <span>Submit as Group Upload</span>
+                        </label>
+                        <div id="groupMembersList" class="hidden space-y-1.5 mt-2 pt-2 border-t border-purple-200 max-h-32 overflow-y-auto">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+                    
                     <div id="submitDocProgress" class="hidden text-center text-blue-600 font-bold text-sm py-2">
                         <i class="fa-solid fa-spinner fa-spin mr-2"></i> Uploading to Google Drive...
                     </div>
