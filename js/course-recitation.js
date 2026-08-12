@@ -5,6 +5,7 @@ import { getLoadableAvatarSrc } from './components.js';
 export const CourseRecitation = {
     students: [],
     isSpinning: false,
+    currentSelectedStudentId: null,
 
     openModal: async (courseId) => {
         document.getElementById('recitationModal').classList.remove('hidden');
@@ -154,6 +155,69 @@ export const CourseRecitation = {
         wheel.innerHTML = '';
     },
 
+    savePoints: async () => {
+        const btn = document.getElementById('saveRecitationPointsBtn');
+        const input = document.getElementById('recitationPointsInput');
+        const alertBox = document.getElementById('recitationPointsAlert');
+        const points = parseInt(input.value);
+        
+        if (isNaN(points) || points <= 0) return;
+        
+        const courseId = window.location.hash.replace('#class-', '');
+        const dateVal = document.getElementById('attendanceDate').value;
+        
+        if (!dateVal) {
+            alertBox.textContent = "Please select an attendance date in the roster.";
+            alertBox.className = "mt-2 text-xs font-bold text-center w-full rounded py-1 bg-red-100 text-red-700 block";
+            return;
+        }
+
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        try {
+            await apiFetch('/api/add-participation-points', {
+                method: 'POST',
+                body: JSON.stringify({ courseId, studentId: CourseRecitation.currentSelectedStudentId, date: dateVal, points })
+            });
+
+            const row = document.querySelector(`.student-row[data-student-id="${CourseRecitation.currentSelectedStudentId}"]`);
+            if (row) {
+                const rosterInput = row.querySelector('.points-input');
+                if (rosterInput) {
+                    const currentVal = parseInt(rosterInput.value) || 0;
+                    rosterInput.value = currentVal + points;
+                }
+                
+                const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${dateVal}`);
+                if (draftStr) {
+                     const draft = JSON.parse(draftStr);
+                     if (draft[CourseRecitation.currentSelectedStudentId]) {
+                         draft[CourseRecitation.currentSelectedStudentId].points = parseInt(draft[CourseRecitation.currentSelectedStudentId].points || 0) + points;
+                         localStorage.setItem(`attendance_draft_${courseId}_${dateVal}`, JSON.stringify(draft));
+                     }
+                }
+            }
+            
+            const studentInPool = CourseRecitation.students.find(s => s.User_ID === CourseRecitation.currentSelectedStudentId);
+            if (studentInPool) {
+                studentInPool.Total_Points = (studentInPool.Total_Points || 0) + points;
+            }
+
+            alertBox.textContent = "Points added!";
+            alertBox.className = "mt-2 text-xs font-bold text-center w-full rounded py-1 bg-green-100 text-green-700 block fade-in";
+            input.value = '';
+            setTimeout(() => { alertBox.classList.add('hidden'); }, 2000);
+        } catch (err) {
+            alertBox.textContent = err.message;
+            alertBox.className = "mt-2 text-xs font-bold text-center w-full rounded py-1 bg-red-100 text-red-700 block fade-in";
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    },
+
     spin: () => {
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
         const courseId = window.location.hash.replace('#class-', '');
@@ -228,6 +292,14 @@ export const CourseRecitation = {
                 localStorage.setItem(calledKey, JSON.stringify(calledToday));
                 CourseRecitation.updateCalledListUI();
             }
+            
+            CourseRecitation.currentSelectedStudentId = selectedStudent.User_ID;
+            
+            const pointsInput = document.getElementById('recitationPointsInput');
+            if (pointsInput) pointsInput.value = '';
+            
+            const pointsAlert = document.getElementById('recitationPointsAlert');
+            if (pointsAlert) pointsAlert.classList.add('hidden');
             
             const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
             const avatarImg = avatarSrc 
