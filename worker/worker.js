@@ -62,10 +62,42 @@ export default {
                     return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
                 }
 
+                const isGroup = body.isGroup;
+                const includedMembers = body.includedMembers || [];
+
+                const uploader = await env.DB.prepare("SELECT Name FROM Users WHERE User_ID = ?").bind(body.studentId).first();
+                const uploaderName = uploader ? uploader.Name : "Student";
+
+                let memberNames = [];
+                if (isGroup && includedMembers.length > 0) {
+                    const placeholders = includedMembers.map(() => '?').join(',');
+                    const mems = await env.DB.prepare(`SELECT Name FROM Users WHERE User_ID IN (${placeholders})`).bind(...includedMembers).all();
+                    memberNames = mems.results.map(m => m.Name);
+                }
+
+                let finalDescription = body.description;
+                if (isGroup) {
+                    const allGroupText = memberNames.length > 0 ? memberNames.join(', ') : 'None';
+                    finalDescription = `${body.description}\n\n[Group Upload by: ${uploaderName}]\n[Included Members: ${allGroupText}]`;
+                }
+
                 const subId = crypto.randomUUID();
                 await env.DB.prepare(
                     `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-                ).bind(subId, body.courseId, body.studentId, body.term, body.title, body.description, body.type, gasData.fileUrl).run();
+                ).bind(subId, body.courseId, body.studentId, body.term, body.title, finalDescription, body.type, gasData.fileUrl).run();
+
+                if (isGroup && includedMembers.length > 0) {
+                    const statements = [];
+                    for (const memberId of includedMembers) {
+                        const mSubId = crypto.randomUUID();
+                        statements.push(
+                            env.DB.prepare(
+                                `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+                            ).bind(mSubId, body.courseId, memberId, body.term, body.title, finalDescription, body.type, gasData.fileUrl)
+                        );
+                    }
+                    await env.DB.batch(statements);
+                }
 
                 return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
             }
@@ -659,6 +691,36 @@ export default {
                 `).bind(courseId).all();
 
                 return new Response(JSON.stringify({ success: true, students: pool.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/group-members") {
+                const courseId = url.searchParams.get("courseId");
+                const studentId = url.searchParams.get("studentId");
+                
+                if (!courseId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const enrollment = await env.DB.prepare(
+                    "SELECT Group_Name FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?"
+                ).bind(courseId, studentId).first();
+
+                if (!enrollment || !enrollment.Group_Name) {
+                    return new Response(JSON.stringify({ success: true, groupName: null, members: [] }), { status: 200, headers: corsHeaders });
+                }
+
+                const members = await env.DB.prepare(
+                    `SELECT u.User_ID, u.Name, u.Student_Number 
+                     FROM Enrollments e 
+                     JOIN Users u ON e.Student_ID = u.User_ID 
+                     WHERE e.Course_ID = ? AND e.Group_Name = ? AND u.User_ID != ?`
+                ).bind(courseId, enrollment.Group_Name, studentId).all();
+
+                return new Response(JSON.stringify({ 
+                    success: true, 
+                    groupName: enrollment.Group_Name, 
+                    members: members.results 
+                }), { status: 200, headers: corsHeaders });
             }
 
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
