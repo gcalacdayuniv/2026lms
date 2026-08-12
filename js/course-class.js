@@ -53,18 +53,25 @@ export const CourseClass = {
             container.innerHTML = '<div class="text-xs text-gray-500 italic text-center py-4 bg-white rounded border border-gray-200">No documents submitted yet.</div>';
             return;
         }
-        container.innerHTML = submissions.map(sub => `
+        container.innerHTML = submissions.map(sub => {
+            let descHtml = sub.Description || '';
+            descHtml = descHtml.replace(/\n/g, '<br>');
+            descHtml = descHtml.replace(/\[Group Upload by: (.*?)\]/g, '<span class="block mt-1.5 text-[10px] text-purple-700 font-bold bg-purple-50 border border-purple-100 rounded px-1.5 py-0.5 inline-block"><i class="fa-solid fa-users mr-1"></i>Uploaded by: $1</span>');
+            descHtml = descHtml.replace(/\[Included Members: (.*?)\]/g, '<span class="block text-gray-500 italic text-[9px] mt-0.5 leading-tight">Members: $1</span>');
+
+            return `
             <div class="flex justify-between items-center p-3 bg-white border border-gray-200 rounded hover:border-blue-300 transition shadow-sm">
                 <div class="flex-1 pr-2">
                     <div class="text-xs font-bold text-blue-700 break-words">${sub.Title} <span class="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded ml-1">${sub.Term}</span></div>
-                    <div class="text-[10px] text-gray-500 mt-1 line-clamp-2">${sub.Description}</div>
-                    <div class="text-[9px] text-gray-400 mt-1 font-medium uppercase"><i class="fa-regular fa-clock"></i> ${new Date(sub.Timestamp + 'Z').toLocaleString()}</div>
+                    <div class="text-[10px] text-gray-600 mt-1">${descHtml}</div>
+                    <div class="text-[9px] text-gray-400 mt-1.5 font-medium uppercase"><i class="fa-regular fa-clock"></i> ${new Date(sub.Timestamp + 'Z').toLocaleString()}</div>
                 </div>
                 <a href="${sub.File_URL}" target="_blank" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
                     <i class="fa-solid ${sub.Type === 'url' ? 'fa-link' : 'fa-download'} block text-sm mb-0.5"></i> View
                 </a>
             </div>
-        `).join('');
+            `;
+        }).join('');
     },
 
     renderDetailsModal: (term, metric, data) => {
