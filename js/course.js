@@ -41,14 +41,15 @@ export const CourseModule = {
                 }
             });
         }
+
+        if (e.target.classList.contains('points-input')) {
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateVal = document.getElementById('attendanceDate')?.value;
+            if (courseId && dateVal) CourseAttendance.saveDraft(courseId, dateVal);
+        }
     },
 
     handleChanges: async (e) => {
-        if (e.target.classList.contains('points-input')) {
-            const row = e.target.closest('.student-row');
-            if (row) await CourseAttendance.saveSingleRecord(row);
-        }
-        
         if (e.target.id === 'submissionType') {
             if (e.target.value === 'url') {
                 document.getElementById('fileInputContainer').classList.add('hidden');
@@ -572,31 +573,19 @@ export const CourseModule = {
                 e.target.classList.replace('border-gray-200', 'border-purple-400');
             }
 
-            await CourseAttendance.saveSingleRecord(row);
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateVal = document.getElementById('attendanceDate')?.value;
+            if (courseId && dateVal) CourseAttendance.saveDraft(courseId, dateVal);
         }
 
         if (e.target.id === 'markAllPresent') {
+            document.querySelectorAll('.student-row').forEach(row => {
+                const presentBtn = row.querySelector('[data-status="Present"]');
+                if (presentBtn) presentBtn.click();
+            });
             const courseId = window.location.hash.replace('#class-', '');
             const dateVal = document.getElementById('attendanceDate')?.value;
-            
-            document.querySelectorAll('.student-row').forEach(row => {
-                const buttons = row.querySelectorAll('.attendance-btn');
-                buttons.forEach(btn => {
-                    btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
-                    btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                    btn.removeAttribute('data-selected');
-                });
-                
-                const presentBtn = row.querySelector('[data-status="Present"]');
-                if (presentBtn) {
-                    presentBtn.setAttribute('data-selected', 'true');
-                    presentBtn.classList.replace('bg-gray-50', 'bg-green-100');
-                    presentBtn.classList.replace('text-gray-600', 'text-green-800');
-                    presentBtn.classList.replace('border-gray-200', 'border-green-400');
-                }
-            });
-            
-            if (courseId && dateVal) await CourseAttendance.saveAttendance();
+            if (courseId && dateVal) CourseAttendance.saveDraft(courseId, dateVal);
         }
 
         if (e.target.closest('#saveAttendanceBtn')) {
@@ -606,25 +595,52 @@ export const CourseModule = {
         if (e.target.closest('.save-single-attendance-btn')) {
             const btn = e.target.closest('.save-single-attendance-btn');
             const row = btn.closest('.student-row');
+            const studentId = row.dataset.studentId;
+            const courseId = window.location.hash.replace('#class-', '');
+            const dateVal = document.getElementById('attendanceDate').value;
+            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+            const pointsInput = row.querySelector('.points-input');
+            const banner = document.getElementById('noClassBanner');
+            
+            if (!dateVal) {
+                alert("Please select a date first to save attendance.");
+                return;
+            }
+            if (banner && !banner.classList.contains('hidden')) {
+                alert("This date is marked as NO CLASS. Adjust it in the Course Actions menu.");
+                return;
+            }
+            
+            const status = selectedBtn ? selectedBtn.dataset.status : null;
+            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
             
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             
-            await CourseAttendance.saveSingleRecord(row);
-            
-            btn.classList.replace('text-blue-600', 'text-green-600');
-            btn.classList.replace('bg-blue-50', 'bg-green-50');
-            btn.classList.replace('border-blue-200', 'border-green-200');
-            
-            setTimeout(() => {
-                btn.classList.replace('text-green-600', 'text-blue-600');
-                btn.classList.replace('bg-green-50', 'bg-blue-50');
-                btn.classList.replace('border-green-200', 'border-blue-200');
-            }, 2000);
-            
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
+            try {
+                await apiFetch('/api/attendance/single', {
+                    method: 'POST',
+                    body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
+                });
+                
+                CourseAttendance.saveDraft(courseId, dateVal);
+
+                btn.classList.replace('text-blue-600', 'text-green-600');
+                btn.classList.replace('bg-blue-50', 'bg-green-50');
+                btn.classList.replace('border-blue-200', 'border-green-200');
+                
+                setTimeout(() => {
+                    btn.classList.replace('text-green-600', 'text-blue-600');
+                    btn.classList.replace('bg-green-50', 'bg-blue-50');
+                    btn.classList.replace('border-green-200', 'border-blue-200');
+                }, 2000);
+            } catch (err) {
+                alert("Failed to save individually: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
 
         if (e.target.closest('#openRecitationBtn')) {
@@ -642,10 +658,6 @@ export const CourseModule = {
         
         if (e.target.closest('#nextStudentBtn')) {
             CourseRecitation.resetToWheel();
-        }
-        
-        if (e.target.closest('#saveRecitationPointsBtn')) {
-            await CourseRecitation.savePoints();
         }
     }
 };
