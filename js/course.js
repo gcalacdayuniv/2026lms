@@ -64,6 +64,15 @@ export const CourseModule = {
             }
         }
 
+        if (e.target.id === 'isGroupUpload') {
+            const list = document.getElementById('groupMembersList');
+            if (e.target.checked) {
+                list.classList.remove('hidden');
+            } else {
+                list.classList.add('hidden');
+            }
+        }
+
         if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput' || e.target.id === 'manageTopicInput') {
             const studentId = document.getElementById('manageStudentId').value;
             const seatNumber = document.getElementById('manageSeatInput').value.trim();
@@ -127,6 +136,10 @@ export const CourseModule = {
     handleClicks: async (e) => {
         if (e.target.closest('#openSubmitDocModalBtn')) {
             document.getElementById('submitDocModal').classList.remove('hidden');
+            const btn = e.target.closest('#openSubmitDocModalBtn');
+            if(btn && btn.dataset.courseId) {
+                CourseDashboard.loadGroupMembersForUpload(btn.dataset.courseId);
+            }
         }
         if (e.target.closest('#closeSubmitDocModalBtn') || e.target.id === 'closeSubmitDocModalBg') {
             document.getElementById('submitDocModal').classList.add('hidden');
