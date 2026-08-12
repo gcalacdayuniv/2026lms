@@ -189,6 +189,15 @@ export const CourseRecitation = {
                     const currentVal = parseInt(rosterInput.value) || 0;
                     rosterInput.value = currentVal + points;
                 }
+                
+                const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${dateVal}`);
+                if (draftStr) {
+                     const draft = JSON.parse(draftStr);
+                     if (draft[CourseRecitation.currentSelectedStudentId]) {
+                         draft[CourseRecitation.currentSelectedStudentId].points = parseInt(draft[CourseRecitation.currentSelectedStudentId].points || 0) + points;
+                         localStorage.setItem(`attendance_draft_${courseId}_${dateVal}`, JSON.stringify(draft));
+                     }
+                }
             }
             
             const studentInPool = CourseRecitation.students.find(s => s.User_ID === CourseRecitation.currentSelectedStudentId);
