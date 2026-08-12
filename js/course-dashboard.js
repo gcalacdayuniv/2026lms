@@ -2,6 +2,34 @@
 import { apiFetch, AppState } from './globals.js';
 
 export const CourseDashboard = {
+    loadGroupMembersForUpload: async (courseId) => {
+        const section = document.getElementById('groupUploadSection');
+        const list = document.getElementById('groupMembersList');
+        const checkbox = document.getElementById('isGroupUpload');
+        
+        if (!section || !list) return;
+        
+        section.classList.add('hidden');
+        list.innerHTML = '<div class="text-[10px] text-purple-600"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Loading group...</div>';
+        if (checkbox) checkbox.checked = false;
+        list.classList.add('hidden');
+
+        try {
+            const data = await apiFetch(`/api/group-members?courseId=${courseId}&studentId=${AppState.user.User_ID}`);
+            if (data.groupName && data.members && data.members.length > 0) {
+                section.classList.remove('hidden');
+                list.innerHTML = data.members.map(m => `
+                    <label class="flex items-center space-x-2 text-[10px] font-medium text-gray-700 cursor-pointer">
+                        <input type="checkbox" class="group-member-checkbox rounded text-purple-600 focus:ring-purple-500" value="${m.User_ID}" checked>
+                        <span>${m.Name} (${m.Student_Number || 'N/A'})</span>
+                    </label>
+                `).join('');
+            }
+        } catch (err) {
+            console.error("Failed to load group members", err);
+        }
+    },
+
     submitDocument: async () => {
         const btn = document.getElementById('submitDocBtn');
         const errorDiv = document.getElementById('submitDocError');
@@ -27,6 +55,16 @@ export const CourseDashboard = {
             const title = titleInput;
             const desc = document.getElementById('submitDesc').value.trim();
             const type = document.getElementById('submissionType').value;
+            
+            const isGroupCheckbox = document.getElementById('isGroupUpload');
+            const isGroup = isGroupCheckbox && !isGroupCheckbox.closest('#groupUploadSection').classList.contains('hidden') ? isGroupCheckbox.checked : false;
+            
+            const includedMembers = [];
+            if (isGroup) {
+                document.querySelectorAll('.group-member-checkbox:checked').forEach(cb => {
+                    includedMembers.push(cb.value);
+                });
+            }
             
             const user = AppState.user;
             const now = new Date();
@@ -81,7 +119,9 @@ export const CourseDashboard = {
                 filename: finalFilename,
                 mimeType: mimeType,
                 base64: base64Data,
-                pathParts: [courseYearSection, "Submitted"]
+                pathParts: [courseYearSection, "Submitted"],
+                isGroup: isGroup,
+                includedMembers: includedMembers
             };
 
             await apiFetch('/api/upload-submission', {
