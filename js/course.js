@@ -4,6 +4,7 @@ import { CourseDashboard } from './course-dashboard.js';
 import { CourseClass } from './course-class.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseRecitation } from './course-recitation.js';
+import { getLoadableAvatarSrc } from './components.js';
 
 export const CourseModule = {
     init: () => {
@@ -134,6 +135,52 @@ export const CourseModule = {
     },
 
     handleClicks: async (e) => {
+        if (e.target.closest('.group-name-trigger') || e.target.closest('#ssGroup')) {
+            const trigger = e.target.closest('.group-name-trigger') || e.target.closest('#ssGroup');
+            if (!trigger.dataset.group) return; 
+
+            const courseId = trigger.dataset.courseId;
+            const groupName = trigger.dataset.group;
+            
+            document.getElementById('gmmTitle').textContent = `Group: ${groupName}`;
+            document.getElementById('groupMembersModal').classList.remove('hidden');
+            document.getElementById('gmmLoading').classList.remove('hidden');
+            document.getElementById('gmmContent').classList.add('hidden');
+            
+            try {
+                const data = await apiFetch(`/api/group-members?courseId=${courseId}&groupName=${encodeURIComponent(groupName)}`);
+                const content = document.getElementById('gmmContent');
+                
+                if (data.members && data.members.length > 0) {
+                    content.innerHTML = data.members.map(m => {
+                        const avatarSrc = getLoadableAvatarSrc(m.Avatar);
+                        const avatarImg = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover border border-gray-200">` : `<i class="fa-solid fa-circle-user text-[40px] text-gray-300"></i>`;
+                        return `
+                            <div class="flex items-center space-x-3 p-2 bg-gray-50 border border-gray-200 rounded">
+                                <div class="flex-shrink-0">${avatarImg}</div>
+                                <div>
+                                    <div class="text-sm font-bold text-gray-800">${m.Name}</div>
+                                    <div class="text-[10px] text-gray-500">${m.Student_Number || 'N/A'}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    content.innerHTML = '<div class="text-sm text-gray-500 italic text-center py-4">No members found.</div>';
+                }
+                document.getElementById('gmmLoading').classList.add('hidden');
+                content.classList.remove('hidden');
+            } catch (err) {
+                document.getElementById('gmmLoading').classList.add('hidden');
+                document.getElementById('gmmContent').innerHTML = `<div class="text-sm text-red-500 font-bold text-center py-4">${err.message}</div>`;
+                document.getElementById('gmmContent').classList.remove('hidden');
+            }
+        }
+        
+        if (e.target.closest('#closeGroupMembersModalBtn') || e.target.id === 'closeGroupMembersModalBg') {
+            document.getElementById('groupMembersModal').classList.add('hidden');
+        }
+
         if (e.target.closest('#openSubmitDocModalBtn')) {
             document.getElementById('submitDocModal').classList.remove('hidden');
             const btn = e.target.closest('#openSubmitDocModalBtn');
@@ -202,7 +249,20 @@ export const CourseModule = {
                 
                 if (data.enrollment) {
                     document.getElementById('ssSeat').textContent = data.enrollment.Seat_Number || 'N/A';
-                    document.getElementById('ssGroup').textContent = data.enrollment.Group_Name || 'N/A';
+                    
+                    const groupEl = document.getElementById('ssGroup');
+                    if (data.enrollment.Group_Name) {
+                        groupEl.textContent = data.enrollment.Group_Name;
+                        groupEl.classList.add('cursor-pointer', 'underline');
+                        groupEl.dataset.courseId = courseId;
+                        groupEl.dataset.group = data.enrollment.Group_Name;
+                    } else {
+                        groupEl.textContent = 'N/A';
+                        groupEl.classList.remove('cursor-pointer', 'underline');
+                        delete groupEl.dataset.courseId;
+                        delete groupEl.dataset.group;
+                    }
+
                     document.getElementById('ssTopic').textContent = data.enrollment.Assigned_Topic || 'N/A';
                     document.getElementById('ssEnrollmentInfo').classList.remove('hidden');
                 }
