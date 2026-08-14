@@ -177,11 +177,6 @@ export const CourseRecitation = {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
         try {
-            await apiFetch('/api/add-participation-points', {
-                method: 'POST',
-                body: JSON.stringify({ courseId, studentId: CourseRecitation.currentSelectedStudentId, date: dateVal, points })
-            });
-
             const row = document.querySelector(`.student-row[data-student-id="${CourseRecitation.currentSelectedStudentId}"]`);
             if (row) {
                 const rosterInput = row.querySelector('.points-input');
@@ -190,14 +185,20 @@ export const CourseRecitation = {
                     rosterInput.value = currentVal + points;
                 }
                 
-                const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${dateVal}`);
-                if (draftStr) {
-                     const draft = JSON.parse(draftStr);
-                     if (draft[CourseRecitation.currentSelectedStudentId]) {
-                         draft[CourseRecitation.currentSelectedStudentId].points = parseInt(draft[CourseRecitation.currentSelectedStudentId].points || 0) + points;
-                         localStorage.setItem(`attendance_draft_${courseId}_${dateVal}`, JSON.stringify(draft));
-                     }
+                const draftKey = `attendance_draft_${courseId}_${dateVal}`;
+                const draftStr = localStorage.getItem(draftKey);
+                let draft = draftStr ? JSON.parse(draftStr) : {};
+                
+                if (!draft[CourseRecitation.currentSelectedStudentId]) {
+                    const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
+                    draft[CourseRecitation.currentSelectedStudentId] = {
+                        status: selectedBtn ? selectedBtn.dataset.status : null,
+                        points: '0'
+                    };
                 }
+                
+                draft[CourseRecitation.currentSelectedStudentId].points = (parseInt(draft[CourseRecitation.currentSelectedStudentId].points) || 0) + points;
+                localStorage.setItem(draftKey, JSON.stringify(draft));
             }
             
             const studentInPool = CourseRecitation.students.find(s => s.User_ID === CourseRecitation.currentSelectedStudentId);
@@ -205,7 +206,7 @@ export const CourseRecitation = {
                 studentInPool.Total_Points = (studentInPool.Total_Points || 0) + points;
             }
 
-            alertBox.textContent = "Points added!";
+            alertBox.textContent = "Points added to roster draft!";
             alertBox.className = "mt-2 text-xs font-bold text-center w-full rounded py-1 bg-green-100 text-green-700 block fade-in";
             input.value = '';
             setTimeout(() => { alertBox.classList.add('hidden'); }, 2000);
