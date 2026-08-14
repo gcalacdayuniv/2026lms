@@ -155,70 +155,6 @@ export const CourseRecitation = {
         wheel.innerHTML = '';
     },
 
-    savePoints: async () => {
-        const btn = document.getElementById('saveRecitationPointsBtn');
-        const input = document.getElementById('recitationPointsInput');
-        const alertBox = document.getElementById('recitationPointsAlert');
-        const points = parseInt(input.value);
-        
-        if (isNaN(points) || points <= 0) return;
-        
-        const courseId = window.location.hash.replace('#class-', '');
-        const dateVal = document.getElementById('attendanceDate').value;
-        
-        if (!dateVal) {
-            alertBox.textContent = "Please select an attendance date in the roster.";
-            alertBox.className = "mt-2 text-xs font-bold text-center w-full rounded py-1 bg-red-100 text-red-700 block";
-            return;
-        }
-
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
-        try {
-            const row = document.querySelector(`.student-row[data-student-id="${CourseRecitation.currentSelectedStudentId}"]`);
-            if (row) {
-                const rosterInput = row.querySelector('.points-input');
-                if (rosterInput) {
-                    const currentVal = parseInt(rosterInput.value) || 0;
-                    rosterInput.value = currentVal + points;
-                }
-                
-                const draftKey = `attendance_draft_${courseId}_${dateVal}`;
-                const draftStr = localStorage.getItem(draftKey);
-                let draft = draftStr ? JSON.parse(draftStr) : {};
-                
-                if (!draft[CourseRecitation.currentSelectedStudentId]) {
-                    const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-                    draft[CourseRecitation.currentSelectedStudentId] = {
-                        status: selectedBtn ? selectedBtn.dataset.status : null,
-                        points: '0'
-                    };
-                }
-                
-                draft[CourseRecitation.currentSelectedStudentId].points = (parseInt(draft[CourseRecitation.currentSelectedStudentId].points) || 0) + points;
-                localStorage.setItem(draftKey, JSON.stringify(draft));
-            }
-            
-            const studentInPool = CourseRecitation.students.find(s => s.User_ID === CourseRecitation.currentSelectedStudentId);
-            if (studentInPool) {
-                studentInPool.Total_Points = (studentInPool.Total_Points || 0) + points;
-            }
-
-            alertBox.textContent = "Points added to roster draft!";
-            alertBox.className = "mt-2 text-xs font-bold text-center w-full rounded py-1 bg-green-100 text-green-700 block fade-in";
-            input.value = '';
-            setTimeout(() => { alertBox.classList.add('hidden'); }, 2000);
-        } catch (err) {
-            alertBox.textContent = err.message;
-            alertBox.className = "mt-2 text-xs font-bold text-center w-full rounded py-1 bg-red-100 text-red-700 block fade-in";
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
-    },
-
     spin: () => {
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
         const courseId = window.location.hash.replace('#class-', '');
@@ -296,11 +232,10 @@ export const CourseRecitation = {
             
             CourseRecitation.currentSelectedStudentId = selectedStudent.User_ID;
             
-            const pointsInput = document.getElementById('recitationPointsInput');
-            if (pointsInput) pointsInput.value = '';
-            
-            const pointsAlert = document.getElementById('recitationPointsAlert');
-            if (pointsAlert) pointsAlert.classList.add('hidden');
+            const seatDisplay = document.getElementById('recitationResultSeat');
+            if (seatDisplay) {
+                seatDisplay.textContent = selectedStudent.Seat_Number || 'Unassigned';
+            }
             
             const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
             const avatarImg = avatarSrc 
