@@ -724,12 +724,12 @@ export default {
                 }
 
                 const pool = await env.DB.prepare(`
-                    SELECT u.User_ID, u.Name, u.Avatar, COALESCE(SUM(a.Performance_Points), 0) as Total_Points
+                    SELECT u.User_ID, u.Name, u.Avatar, e.Seat_Number, COALESCE(SUM(a.Performance_Points), 0) as Total_Points
                     FROM Enrollments e
                     JOIN Users u ON e.Student_ID = u.User_ID
                     LEFT JOIN Attendance a ON e.Student_ID = a.Student_ID AND e.Course_ID = a.Course_ID
                     WHERE e.Course_ID = ?
-                    GROUP BY u.User_ID, u.Name, u.Avatar
+                    GROUP BY u.User_ID, u.Name, u.Avatar, e.Seat_Number
                 `).bind(courseId).all();
 
                 return new Response(JSON.stringify({ success: true, students: pool.results }), { status: 200, headers: corsHeaders });
