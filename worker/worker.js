@@ -738,8 +738,28 @@ export default {
             if (request.method === "GET" && path === "/api/group-members") {
                 const courseId = url.searchParams.get("courseId");
                 const studentId = url.searchParams.get("studentId");
+                const groupName = url.searchParams.get("groupName");
                 
-                if (!courseId || !studentId) {
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                if (groupName) {
+                    const members = await env.DB.prepare(
+                        `SELECT u.User_ID, u.Name, u.Student_Number, u.Avatar 
+                         FROM Enrollments e 
+                         JOIN Users u ON e.Student_ID = u.User_ID 
+                         WHERE e.Course_ID = ? AND e.Group_Name = ?`
+                    ).bind(courseId, groupName).all();
+
+                    return new Response(JSON.stringify({ 
+                        success: true, 
+                        groupName: groupName, 
+                        members: members.results 
+                    }), { status: 200, headers: corsHeaders });
+                }
+
+                if (!studentId) {
                     return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
                 }
 
