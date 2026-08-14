@@ -210,8 +210,23 @@ export default {
                 }
 
                 if (user.account_status.toLowerCase() !== 'active') {
+                    let errorMessage = "";
+                    const statusLower = user.account_status.toLowerCase();
+                    
+                    if (statusLower === 'inactive') {
+                        errorMessage = "Account is pending approval. Please wait for an admin or lecturer to activate your account.";
+                    } else if (statusLower === 'suspended') {
+                        errorMessage = "Account is Suspended";
+                    } else if (statusLower === 'ud') {
+                        errorMessage = "Account is Unofficially Dropped";
+                    } else if (statusLower === 'dropped') {
+                        errorMessage = "Account is Dropped";
+                    } else {
+                        errorMessage = `Account is ${user.account_status}`;
+                    }
+
                     return new Response(JSON.stringify({ 
-                        error: "Account is pending approval. Please wait for an admin or lecturer to activate your account." 
+                        error: errorMessage 
                     }), { status: 403, headers: corsHeaders });
                 }
 
