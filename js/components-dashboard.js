@@ -407,6 +407,24 @@ const DashboardUI = {
         </div>
     `,
 
+    renderGroupMembersModal: () => `
+        <div id="groupMembersModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeGroupMembersModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users text-blue-600 mr-2"></i><span id="gmmTitle">Group Members</span></h3>
+                    <button id="closeGroupMembersModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="gmmLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+                <div id="gmmContent" class="hidden flex-1 overflow-y-auto space-y-2 p-1">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+        </div>
+    `,
+
     renderStudentSummaryModal: () => `
         <div id="studentSummaryModal" class="hidden fixed inset-0 z-[80] bg-gray-50 flex flex-col fade-in overflow-y-auto w-full h-full">
             <div class="bg-white shadow-sm sticky top-0 z-10 w-full">
@@ -428,7 +446,7 @@ const DashboardUI = {
                     </div>
                     <div class="border-x border-blue-200">
                         <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Group</div>
-                        <div id="ssGroup" class="text-lg sm:text-xl font-black text-blue-800">-</div>
+                        <div id="ssGroup" class="text-lg sm:text-xl font-black text-blue-800 transition hover:text-blue-600">-</div>
                     </div>
                     <div>
                         <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Topic</div>
@@ -607,6 +625,7 @@ export const DashboardComponents = {
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmitDocumentModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmissionHistoryModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderDetailsModal() : ''}
+            ${DashboardUI.renderGroupMembersModal()}
         `;
     }
 };
