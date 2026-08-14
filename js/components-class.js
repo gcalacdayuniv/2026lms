@@ -388,6 +388,24 @@ const ClassUI = {
                 </div>
             </div>
         </div>
+    `,
+
+    renderGroupMembersModal: () => `
+        <div id="groupMembersModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center fade-in p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeGroupMembersModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users text-blue-600 mr-2"></i><span id="gmmTitle">Group Members</span></h3>
+                    <button id="closeGroupMembersModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div id="gmmLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+                <div id="gmmContent" class="hidden flex-1 overflow-y-auto space-y-2 p-1">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+        </div>
     `
 };
 
@@ -435,6 +453,10 @@ export const ClassComponents = {
                 ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
                 : '';
 
+            const groupDisplay = s.Group_Name 
+                ? `<span class="group-name-trigger text-blue-600 cursor-pointer hover:underline font-black" data-group="${s.Group_Name}" data-course-id="${course.Course_ID}">${s.Group_Name}</span>` 
+                : `<span class="text-gray-800">None</span>`;
+
             return `
                 <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}">
                     
@@ -451,7 +473,7 @@ export const ClassComponents = {
                                 </div>
                                 <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
                                     Seat: <span class="text-gray-800">${s.Seat_Number || ''}</span>
-                                    &nbsp;|&nbsp; Group: <span class="text-gray-800">${s.Group_Name || ''}</span>
+                                    &nbsp;|&nbsp; Group: ${groupDisplay}
                                     &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || ''}</span>
                                 </div>
                             </div>
@@ -585,6 +607,7 @@ export const ClassComponents = {
             ${ClassUI.renderDetailsModal()}
             ${ClassUI.renderAddStudentModal()}
             ${ClassUI.renderRecitationModal()}
+            ${ClassUI.renderGroupMembersModal()}
         `;
     }
 };
