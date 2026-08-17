@@ -425,6 +425,46 @@ export const CourseClass = {
                 CourseClass.resetFabOpacity();
             }
 
+            // Click Handlers inside loadClassScreen or delegated in course.js
+            // The view-summary-trigger delegates to here
+            document.querySelectorAll('.view-summary-trigger').forEach(trigger => {
+                trigger.addEventListener('click', async (e) => {
+                    const name = trigger.dataset.name;
+                    
+                    const confirmation = window.confirm(`Load performance summary for ${name}?`);
+                    if (!confirmation) return;
+
+                    const studentId = trigger.closest('.student-row').dataset.studentId;
+                    
+                    document.getElementById('summaryStudentName').textContent = name;
+                    document.getElementById('summaryModal').classList.remove('hidden');
+                    document.getElementById('summaryLoading').classList.remove('hidden');
+                    document.getElementById('summaryContent').classList.add('hidden');
+                    document.getElementById('summaryError').classList.add('hidden');
+                    
+                    CourseClass.currentSummaryData = null;
+
+                    try {
+                        const ts = new Date().getTime();
+                        const summaryData = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}&_t=${ts}`);
+                        CourseClass.currentSummaryData = summaryData;
+                        
+                        CourseAttendance.renderTermMetrics('midterm', summaryData);
+                        CourseAttendance.renderTermMetrics('finalterm', summaryData);
+                        CourseClass.renderSubmissionsHistory(summaryData.submissions, 'historySubmissionsList');
+
+                        document.getElementById('summaryLoading').classList.add('hidden');
+                        document.getElementById('summaryContent').classList.remove('hidden');
+                    } catch(err) {
+                        console.error("Failed to load summary", err);
+                        const errDiv = document.getElementById('summaryError');
+                        errDiv.textContent = err.message || "Failed to load summary records.";
+                        errDiv.classList.remove('hidden');
+                        document.getElementById('summaryLoading').classList.add('hidden');
+                    }
+                });
+            });
+
         } catch (err) {
             root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
         }
