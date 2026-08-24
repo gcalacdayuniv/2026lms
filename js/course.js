@@ -27,6 +27,33 @@ export const CourseModule = {
             e.preventDefault();
             await CourseDashboard.submitDocument();
         }
+        if (e.target.id === 'gradeForm') {
+            e.preventDefault();
+            const btn = document.getElementById('gradeSubmitBtn');
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            btn.disabled = true;
+            
+            try {
+                await apiFetch('/api/grade-submission', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        submissionId: document.getElementById('gradeSubId').value,
+                        grade: parseFloat(document.getElementById('gradeValue').value),
+                        categoryWritten: document.getElementById('gradeWritten').value,
+                        categoryPerformance: document.getElementById('gradePerformance').value,
+                        applyToGroup: document.getElementById('gradeApplyGroup').checked
+                    })
+                });
+                document.getElementById('gradeModal').classList.add('hidden');
+                alert("Grade saved successfully. Please reload the student's summary to see the updated scores.");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                btn.innerHTML = original;
+                btn.disabled = false;
+            }
+        }
     },
 
     handleInput: async (e) => {
@@ -197,6 +224,19 @@ export const CourseModule = {
         }
         if (e.target.closest('#closeSubmissionHistoryModalBtn') || e.target.id === 'closeSubmissionHistoryModalBg') {
             document.getElementById('submissionHistoryModal').classList.add('hidden');
+        }
+
+        if (e.target.closest('.open-grade-btn')) {
+            const btn = e.target.closest('.open-grade-btn');
+            document.getElementById('gradeSubId').value = btn.dataset.subId;
+            document.getElementById('gradeValue').value = btn.dataset.grade || '';
+            document.getElementById('gradeWritten').value = btn.dataset.written || '';
+            document.getElementById('gradePerformance').value = btn.dataset.performance || '';
+            document.getElementById('gradeApplyGroup').checked = btn.dataset.isGroup === 'true';
+            document.getElementById('gradeModal').classList.remove('hidden');
+        }
+        if (e.target.closest('#closeGradeModalBtn') || e.target.id === 'closeGradeModalBg') {
+            document.getElementById('gradeModal').classList.add('hidden');
         }
 
         if (e.target.closest('#toggleCalledListBtn')) {
@@ -470,7 +510,7 @@ export const CourseModule = {
                 
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
-                CourseClass.renderSubmissionsHistory(data.submissions, 'summarySubmissionsList');
+                CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
 
                 document.getElementById('summaryLoading').classList.add('hidden');
                 document.getElementById('summaryContent').classList.remove('hidden');
@@ -618,106 +658,4 @@ export const CourseModule = {
             if(status === 'Present') {
                 e.target.classList.replace('bg-gray-50', 'bg-green-100');
                 e.target.classList.replace('text-gray-600', 'text-green-800');
-                e.target.classList.replace('border-gray-200', 'border-green-400');
-            } else if(status === 'Late') {
-                e.target.classList.replace('bg-gray-50', 'bg-yellow-100');
-                e.target.classList.replace('text-gray-600', 'text-yellow-800');
-                e.target.classList.replace('border-gray-200', 'border-yellow-400');
-            } else if(status === 'Absent') {
-                e.target.classList.replace('bg-gray-50', 'bg-red-100');
-                e.target.classList.replace('text-gray-600', 'text-red-800');
-                e.target.classList.replace('border-gray-200', 'border-red-400');
-            } else if(status === 'Excused') {
-                e.target.classList.replace('bg-gray-50', 'bg-purple-100');
-                e.target.classList.replace('text-gray-600', 'text-purple-800');
-                e.target.classList.replace('border-gray-200', 'border-purple-400');
-            }
-
-            const courseId = window.location.hash.replace('#class-', '');
-            const dateVal = document.getElementById('attendanceDate')?.value;
-            if (courseId && dateVal) CourseAttendance.saveDraft(courseId, dateVal);
-        }
-
-        if (e.target.id === 'markAllPresent') {
-            document.querySelectorAll('.student-row').forEach(row => {
-                const presentBtn = row.querySelector('[data-status="Present"]');
-                if (presentBtn) presentBtn.click();
-            });
-            const courseId = window.location.hash.replace('#class-', '');
-            const dateVal = document.getElementById('attendanceDate')?.value;
-            if (courseId && dateVal) CourseAttendance.saveDraft(courseId, dateVal);
-        }
-
-        if (e.target.closest('#saveAttendanceBtn')) {
-            await CourseAttendance.saveAttendance();
-        }
-
-        if (e.target.closest('.save-single-attendance-btn')) {
-            const btn = e.target.closest('.save-single-attendance-btn');
-            const row = btn.closest('.student-row');
-            const studentId = row.dataset.studentId;
-            const courseId = window.location.hash.replace('#class-', '');
-            const dateVal = document.getElementById('attendanceDate').value;
-            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-            const pointsInput = row.querySelector('.points-input');
-            const banner = document.getElementById('noClassBanner');
-            
-            if (!dateVal) {
-                alert("Please select a date first to save attendance.");
-                return;
-            }
-            if (banner && !banner.classList.contains('hidden')) {
-                alert("This date is marked as NO CLASS. Adjust it in the Course Actions menu.");
-                return;
-            }
-            
-            const status = selectedBtn ? selectedBtn.dataset.status : null;
-            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-            
-            const originalHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            
-            try {
-                await apiFetch('/api/attendance/single', {
-                    method: 'POST',
-                    body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
-                });
-                
-                CourseAttendance.saveDraft(courseId, dateVal);
-
-                btn.classList.replace('text-blue-600', 'text-green-600');
-                btn.classList.replace('bg-blue-50', 'bg-green-50');
-                btn.classList.replace('border-blue-200', 'border-green-200');
-                
-                setTimeout(() => {
-                    btn.classList.replace('text-green-600', 'text-blue-600');
-                    btn.classList.replace('bg-green-50', 'bg-blue-50');
-                    btn.classList.replace('border-green-200', 'border-blue-200');
-                }, 2000);
-            } catch (err) {
-                alert("Failed to save individually: " + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
-            }
-        }
-
-        if (e.target.closest('#openRecitationBtn')) {
-            const courseId = window.location.hash.replace('#class-', '');
-            await CourseRecitation.openModal(courseId);
-        }
-
-        if (e.target.closest('#closeRecitationModalBtn') || e.target.id === 'recitationModalOverlay') {
-            CourseRecitation.closeModal();
-        }
-
-        if (e.target.closest('#spinWheelBtn')) {
-            CourseRecitation.spin();
-        }
-        
-        if (e.target.closest('#nextStudentBtn')) {
-            CourseRecitation.resetToWheel();
-        }
-    }
-};
+                e.target.classList.replace('border-gray-200', 'border-green-4Sorry, something went wrong. Please try your request again.
