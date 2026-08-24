@@ -292,6 +292,27 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Details updated successfully" }), { status: 200, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && path === "/api/grade-submission") {
+                const body = await request.json();
+                const { submissionId, fileUrl, grade, categoryWritten, categoryPerformance } = body;
+
+                if (!submissionId) {
+                    return new Response(JSON.stringify({ error: "Missing submissionId" }), { status: 400, headers: corsHeaders });
+                }
+
+                if (fileUrl) {
+                    await env.DB.prepare(
+                        `UPDATE Submissions SET Grade = ?, Category_Written = ?, Category_Performance = ? WHERE File_URL = ?`
+                    ).bind(grade, categoryWritten || null, categoryPerformance || null, fileUrl).run();
+                } else {
+                    await env.DB.prepare(
+                        `UPDATE Submissions SET Grade = ?, Category_Written = ?, Category_Performance = ? WHERE Submission_ID = ?`
+                    ).bind(grade, categoryWritten || null, categoryPerformance || null, submissionId).run();
+                }
+
+                return new Response(JSON.stringify({ success: true, message: "Grade saved successfully" }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && path === "/api/reset-student-password") {
                 const body = await request.json();
                 const { studentId } = body;
