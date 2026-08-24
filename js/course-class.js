@@ -53,22 +53,63 @@ export const CourseClass = {
             container.innerHTML = '<div class="text-xs text-gray-500 italic text-center py-4 bg-white rounded border border-gray-200">No documents submitted yet.</div>';
             return;
         }
+
+        const isLecturer = AppState.user && AppState.user.role.toLowerCase() === 'lecturer';
+
         container.innerHTML = submissions.map(sub => {
             let descHtml = sub.Description || '';
             descHtml = descHtml.replace(/\n/g, '<br>');
             descHtml = descHtml.replace(/\[Group Upload by: (.*?)\]/g, '<span class="block mt-1.5 text-[10px] text-purple-700 font-bold bg-purple-50 border border-purple-100 rounded px-1.5 py-0.5 inline-block"><i class="fa-solid fa-users mr-1"></i>Uploaded by: $1</span>');
             descHtml = descHtml.replace(/\[Included Members: (.*?)\]/g, '<span class="block text-gray-500 italic text-[9px] mt-0.5 leading-tight">Members: $1</span>');
 
-            return `
-            <div class="flex justify-between items-center p-3 bg-white border border-gray-200 rounded hover:border-blue-300 transition shadow-sm">
-                <div class="flex-1 pr-2">
-                    <div class="text-xs font-bold text-blue-700 break-words">${sub.Title} <span class="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded ml-1">${sub.Term}</span></div>
-                    <div class="text-[10px] text-gray-600 mt-1">${descHtml}</div>
-                    <div class="text-[9px] text-gray-400 mt-1.5 font-medium uppercase"><i class="fa-regular fa-clock"></i> ${new Date(sub.Timestamp + 'Z').toLocaleString()}</div>
+            let gradingHtml = '';
+            if (isLecturer) {
+                gradingHtml = `
+                <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2">
+                    <select class="grade-cat-written px-2 py-1 text-[10px] border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="">Written: None</option>
+                        <option value="Narrative" ${sub.Category_Written === 'Narrative' ? 'selected' : ''}>Narrative</option>
+                        <option value="Individual" ${sub.Category_Written === 'Individual' ? 'selected' : ''}>Individual</option>
+                    </select>
+                    <select class="grade-cat-perf px-2 py-1 text-[10px] border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="">Performance: None</option>
+                        <option value="Report" ${sub.Category_Performance === 'Report' ? 'selected' : ''}>Report</option>
+                    </select>
+                    <input type="number" step="0.1" class="grade-input px-2 py-1 text-[10px] w-20 border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Grade" value="${sub.Grade !== null && sub.Grade !== undefined ? sub.Grade : ''}">
+                    <button type="button" class="save-grade-btn px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-bold hover:bg-blue-100 transition shadow-sm" data-sub-id="${sub.Submission_ID}" data-file-url="${sub.File_URL}">Save Grade</button>
                 </div>
-                <a href="${sub.File_URL}" target="_blank" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
-                    <i class="fa-solid ${sub.Type === 'url' ? 'fa-link' : 'fa-download'} block text-sm mb-0.5"></i> View
-                </a>
+                `;
+            } else {
+                if (sub.Grade !== null && sub.Grade !== undefined) {
+                    gradingHtml = `
+                    <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2 text-[10px]">
+                        <span class="font-bold text-gray-700">Grade:</span> <span class="font-black text-blue-600 text-xs">${sub.Grade}</span>
+                        ${sub.Category_Written ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Written: ${sub.Category_Written}</span>` : ''}
+                        ${sub.Category_Performance ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Perf: ${sub.Category_Performance}</span>` : ''}
+                    </div>
+                    `;
+                } else {
+                    gradingHtml = `
+                    <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2 text-[10px] text-gray-400 italic">
+                        Not yet graded by lecturer
+                    </div>
+                    `;
+                }
+            }
+
+            return `
+            <div class="flex flex-col p-3 bg-white border border-gray-200 rounded hover:border-blue-300 transition shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1 pr-2">
+                        <div class="text-xs font-bold text-blue-700 break-words">${sub.Title} <span class="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded ml-1">${sub.Term}</span></div>
+                        <div class="text-[10px] text-gray-600 mt-1">${descHtml}</div>
+                        <div class="text-[9px] text-gray-400 mt-1.5 font-medium uppercase"><i class="fa-regular fa-clock"></i> ${new Date(sub.Timestamp + 'Z').toLocaleString()}</div>
+                    </div>
+                    <a href="${sub.File_URL}" target="_blank" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
+                        <i class="fa-solid ${sub.Type === 'url' ? 'fa-link' : 'fa-download'} block text-sm mb-0.5"></i> View
+                    </a>
+                </div>
+                ${gradingHtml}
             </div>
             `;
         }).join('');
@@ -425,8 +466,6 @@ export const CourseClass = {
                 CourseClass.resetFabOpacity();
             }
 
-            // Click Handlers inside loadClassScreen or delegated in course.js
-            // The view-summary-trigger delegates to here
             document.querySelectorAll('.view-summary-trigger').forEach(trigger => {
                 trigger.addEventListener('click', async (e) => {
                     const name = trigger.dataset.name;
