@@ -264,6 +264,7 @@ export const CourseAttendance = {
         const course = data.course || {};
         const sessions = data.sessions || [];
         const records = data.records || [];
+        const submissions = data.submissions || [];
         
         let termStart = '';
         let termEnd = '';
@@ -275,6 +276,24 @@ export const CourseAttendance = {
             termStart = course.Final_Start || '';
             termEnd = course.Final_End || '';
         }
+
+        const subTerm = term === 'midterm' ? 'MidTerm' : 'FinalTerm';
+        const termSubmissions = submissions.filter(s => s.Term === subTerm);
+        
+        let totalNarrative = 0, totalIndividual = 0, totalReport = 0;
+        termSubmissions.forEach(s => {
+            totalNarrative += (s.Grade_Narrative || 0);
+            totalIndividual += (s.Grade_Individual || 0);
+            totalReport += (s.Grade_Report || 0);
+        });
+
+        const elNarrative = document.getElementById(`${term}NarrativeScore`);
+        const elIndividual = document.getElementById(`${term}IndividualScore`);
+        const elReport = document.getElementById(`${term}ReportScore`);
+        
+        if (elNarrative) elNarrative.textContent = totalNarrative;
+        if (elIndividual) elIndividual.textContent = totalIndividual;
+        if (elReport) elReport.textContent = totalReport;
         
         const parseLocalDate = (dateStr) => {
             if (!dateStr) return null;
