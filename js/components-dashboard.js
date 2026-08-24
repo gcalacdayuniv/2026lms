@@ -10,8 +10,7 @@ const DashboardUI = {
                         <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight"><i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard</h1>
                     </div>
                     <div class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200" id="profileToggleBtn">
-                        <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${user.Name}</span>
-                        ${headerAvatar}
+                        <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${user.Name}</span>${headerAvatar}
                     </div>
                 </div>
             </div>
@@ -467,15 +466,24 @@ const DashboardUI = {
                                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-3 mt-2">
                                     <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div><span class="font-black text-base">...</span></div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div><span class="font-black text-base">...</span></div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="narrative" title="Click to view narrative details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div>
+                                        <span class="font-black text-blue-700 text-xl block" id="midtermNarrativeScore">...</span>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="individual" title="Click to view individual details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div>
+                                        <span class="font-black text-blue-700 text-xl block" id="midtermIndividualScore">...</span>
+                                    </div>
                                 </div>
                             </div>
                             
                             <div>
                                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-3 gap-3 mt-2">
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="report" title="Click to view report details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div>
+                                        <span class="font-black text-blue-700 text-xl block" id="midtermReportScore">...</span>
+                                    </div>
                                     <div class="bg-blue-50 p-3 border border-blue-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="participation" title="Click to view participation details">
                                         <div class="text-blue-400 text-[10px] uppercase font-bold mb-1">Participation</div>
                                         <span class="font-black text-blue-700 text-xl block" id="midtermParticipationScore">...</span>
@@ -505,15 +513,24 @@ const DashboardUI = {
                                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-3 mt-2">
                                     <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div><span class="font-black text-base">...</span></div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div><span class="font-black text-base">...</span></div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="narrative" title="Click to view narrative details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div>
+                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermNarrativeScore">...</span>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="individual" title="Click to view individual details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div>
+                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermIndividualScore">...</span>
+                                    </div>
                                 </div>
                             </div>
                             
                             <div>
                                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-3 gap-3 mt-2">
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div><span class="font-black text-base">...</span></div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="report" title="Click to view report details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div>
+                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermReportScore">...</span>
+                                    </div>
                                     <div class="bg-yellow-50 p-3 border border-yellow-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="participation" title="Click to view participation details">
                                         <div class="text-yellow-500 text-[10px] uppercase font-bold mb-1">Participation</div>
                                         <span class="font-black text-yellow-600 text-xl block" id="finaltermParticipationScore">...</span>
