@@ -719,5 +719,49 @@ export const CourseModule = {
         if (e.target.closest('#nextStudentBtn')) {
             CourseRecitation.resetToWheel();
         }
+
+        if (e.target.closest('.save-grade-btn')) {
+            const btn = e.target.closest('.save-grade-btn');
+            const container = btn.closest('.flex-wrap');
+            const catWritten = container.querySelector('.grade-cat-written').value;
+            const catPerf = container.querySelector('.grade-cat-perf').value;
+            const gradeVal = container.querySelector('.grade-input').value;
+            const subId = btn.dataset.subId;
+            const fileUrl = btn.dataset.fileUrl;
+
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '...';
+
+            try {
+                await apiFetch('/api/grade-submission', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        submissionId: subId,
+                        fileUrl: fileUrl,
+                        grade: gradeVal !== '' ? parseFloat(gradeVal) : null,
+                        categoryWritten: catWritten,
+                        categoryPerformance: catPerf
+                    })
+                });
+
+                btn.classList.replace('text-blue-600', 'text-green-600');
+                btn.classList.replace('bg-blue-50', 'bg-green-50');
+                btn.classList.replace('border-blue-200', 'border-green-200');
+                btn.innerHTML = 'Saved';
+                
+                setTimeout(() => {
+                    btn.classList.replace('text-green-600', 'text-blue-600');
+                    btn.classList.replace('bg-green-50', 'bg-blue-50');
+                    btn.classList.replace('border-green-200', 'border-blue-200');
+                    btn.innerHTML = 'Save Grade';
+                }, 2000);
+            } catch (err) {
+                alert("Failed to save grade: " + err.message);
+                btn.innerHTML = 'Save Grade';
+            } finally {
+                btn.disabled = false;
+            }
+        }
     }
 };
