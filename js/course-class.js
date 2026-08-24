@@ -66,26 +66,30 @@ export const CourseClass = {
             if (isLecturer) {
                 gradingHtml = `
                 <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2">
-                    <select class="grade-cat-written px-2 py-1 text-[10px] border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500">
-                        <option value="">Written: None</option>
-                        <option value="Narrative" ${sub.Category_Written === 'Narrative' ? 'selected' : ''}>Narrative</option>
-                        <option value="Individual" ${sub.Category_Written === 'Individual' ? 'selected' : ''}>Individual</option>
-                    </select>
-                    <select class="grade-cat-perf px-2 py-1 text-[10px] border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500">
-                        <option value="">Performance: None</option>
-                        <option value="Report" ${sub.Category_Performance === 'Report' ? 'selected' : ''}>Report</option>
-                    </select>
-                    <input type="number" step="0.1" class="grade-input px-2 py-1 text-[10px] w-20 border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" placeholder="Grade" value="${sub.Grade !== null && sub.Grade !== undefined ? sub.Grade : ''}">
-                    <button type="button" class="save-grade-btn px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-bold hover:bg-blue-100 transition shadow-sm" data-sub-id="${sub.Submission_ID}" data-file-url="${sub.File_URL}">Save Grade</button>
+                    <div class="flex items-center gap-1">
+                        <span class="text-[9px] font-bold text-gray-500 uppercase">Narrative:</span>
+                        <input type="number" step="0.1" class="grade-narrative px-1.5 py-1 text-[10px] w-14 border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" placeholder="---" value="${sub.Grade_Narrative !== null && sub.Grade_Narrative !== undefined ? sub.Grade_Narrative : ''}">
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="text-[9px] font-bold text-gray-500 uppercase">Individual:</span>
+                        <input type="number" step="0.1" class="grade-individual px-1.5 py-1 text-[10px] w-14 border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" placeholder="---" value="${sub.Grade_Individual !== null && sub.Grade_Individual !== undefined ? sub.Grade_Individual : ''}">
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="text-[9px] font-bold text-gray-500 uppercase">Report:</span>
+                        <input type="number" step="0.1" class="grade-report px-1.5 py-1 text-[10px] w-14 border border-gray-300 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" placeholder="---" value="${sub.Grade_Report !== null && sub.Grade_Report !== undefined ? sub.Grade_Report : ''}">
+                    </div>
+                    <button type="button" class="save-grade-btn px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-bold hover:bg-blue-100 transition shadow-sm ml-auto" data-sub-id="${sub.Submission_ID}" data-file-url="${sub.File_URL}">Save Grades</button>
                 </div>
                 `;
             } else {
-                if (sub.Grade !== null && sub.Grade !== undefined) {
+                const hasGrades = sub.Grade_Narrative != null || sub.Grade_Individual != null || sub.Grade_Report != null;
+                if (hasGrades) {
                     gradingHtml = `
                     <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2 text-[10px]">
-                        <span class="font-bold text-gray-700">Grade:</span> <span class="font-black text-blue-600 text-xs">${sub.Grade}</span>
-                        ${sub.Category_Written ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Written: ${sub.Category_Written}</span>` : ''}
-                        ${sub.Category_Performance ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Perf: ${sub.Category_Performance}</span>` : ''}
+                        <span class="font-bold text-gray-700">Grades:</span> 
+                        ${sub.Grade_Narrative != null ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Narrative: <span class="text-blue-600">${sub.Grade_Narrative}</span></span>` : ''}
+                        ${sub.Grade_Individual != null ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Individual: <span class="text-blue-600">${sub.Grade_Individual}</span></span>` : ''}
+                        ${sub.Grade_Report != null ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Report: <span class="text-blue-600">${sub.Grade_Report}</span></span>` : ''}
                     </div>
                     `;
                 } else {
@@ -142,19 +146,40 @@ export const CourseClass = {
             const d = new Date(dateStr);
             return isNaN(d.getTime()) ? null : d;
         };
+
+        const isSubmissionMetric = ['narrative', 'individual', 'report'].includes(metric);
+        const titleMetric = isSubmissionMetric ? `${metric.charAt(0).toUpperCase() + metric.slice(1)} Breakdown` : (metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown');
         
-        const titleMetric = metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown';
         document.getElementById('detailsModalTitle').textContent = `${titleTerm} | ${titleMetric}`;
         
         const scoreHeader = document.getElementById('detailsScoreHeader');
-        if (metric === 'attendance') {
-            scoreHeader.textContent = "Attendance Score";
-        } else {
-            scoreHeader.textContent = "Points";
-        }
+        if (metric === 'attendance') scoreHeader.textContent = "Attendance Score";
+        else if (isSubmissionMetric) scoreHeader.textContent = "Grade";
+        else scoreHeader.textContent = "Points";
 
         const tbody = document.getElementById('detailsTableBody');
         tbody.innerHTML = '';
+
+        if (isSubmissionMetric) {
+            const subTerm = term === 'midterm' ? 'MidTerm' : 'FinalTerm';
+            const colName = metric === 'narrative' ? 'Grade_Narrative' : (metric === 'individual' ? 'Grade_Individual' : 'Grade_Report');
+            
+            const termSubmissions = (data.submissions || []).filter(s => s.Term === subTerm && s[colName] != null);
+            
+            if (termSubmissions.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">No ${metric} grades found for this period.</td></tr>`;
+                return;
+            }
+            
+            tbody.innerHTML = termSubmissions.map(s => `
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${new Date(s.Timestamp + 'Z').toLocaleDateString()}</td>
+                    <td class="px-3 py-2 text-center text-gray-600 truncate max-w-[150px]" title="${s.Title}">${s.Title}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-blue-600">${s[colName]}</td>
+                </tr>
+            `).join('');
+            return;
+        }
 
         if (!termStart || !termEnd) {
             tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">Term dates are not set for this course.</td></tr>`;
