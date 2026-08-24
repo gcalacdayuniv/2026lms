@@ -294,7 +294,7 @@ export default {
 
             if (request.method === "POST" && path === "/api/grade-submission") {
                 const body = await request.json();
-                const { submissionId, fileUrl, grade, categoryWritten, categoryPerformance } = body;
+                const { submissionId, fileUrl, gradeNarrative, gradeIndividual, gradeReport } = body;
 
                 if (!submissionId) {
                     return new Response(JSON.stringify({ error: "Missing submissionId" }), { status: 400, headers: corsHeaders });
@@ -302,12 +302,12 @@ export default {
 
                 if (fileUrl) {
                     await env.DB.prepare(
-                        `UPDATE Submissions SET Grade = ?, Category_Written = ?, Category_Performance = ? WHERE File_URL = ?`
-                    ).bind(grade, categoryWritten || null, categoryPerformance || null, fileUrl).run();
+                        `UPDATE Submissions SET Grade_Narrative = ?, Grade_Individual = ?, Grade_Report = ? WHERE File_URL = ?`
+                    ).bind(gradeNarrative, gradeIndividual, gradeReport, fileUrl).run();
                 } else {
                     await env.DB.prepare(
-                        `UPDATE Submissions SET Grade = ?, Category_Written = ?, Category_Performance = ? WHERE Submission_ID = ?`
-                    ).bind(grade, categoryWritten || null, categoryPerformance || null, submissionId).run();
+                        `UPDATE Submissions SET Grade_Narrative = ?, Grade_Individual = ?, Grade_Report = ? WHERE Submission_ID = ?`
+                    ).bind(gradeNarrative, gradeIndividual, gradeReport, submissionId).run();
                 }
 
                 return new Response(JSON.stringify({ success: true, message: "Grade saved successfully" }), { status: 200, headers: corsHeaders });
