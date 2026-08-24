@@ -723,9 +723,9 @@ export const CourseModule = {
         if (e.target.closest('.save-grade-btn')) {
             const btn = e.target.closest('.save-grade-btn');
             const container = btn.closest('.flex-wrap');
-            const catWritten = container.querySelector('.grade-cat-written').value;
-            const catPerf = container.querySelector('.grade-cat-perf').value;
-            const gradeVal = container.querySelector('.grade-input').value;
+            const gnVal = container.querySelector('.grade-narrative').value;
+            const giVal = container.querySelector('.grade-individual').value;
+            const grVal = container.querySelector('.grade-report').value;
             const subId = btn.dataset.subId;
             const fileUrl = btn.dataset.fileUrl;
 
@@ -739,9 +739,9 @@ export const CourseModule = {
                     body: JSON.stringify({
                         submissionId: subId,
                         fileUrl: fileUrl,
-                        grade: gradeVal !== '' ? parseFloat(gradeVal) : null,
-                        categoryWritten: catWritten,
-                        categoryPerformance: catPerf
+                        gradeNarrative: gnVal !== '' ? parseFloat(gnVal) : null,
+                        gradeIndividual: giVal !== '' ? parseFloat(giVal) : null,
+                        gradeReport: grVal !== '' ? parseFloat(grVal) : null
                     })
                 });
 
@@ -754,11 +754,11 @@ export const CourseModule = {
                     btn.classList.replace('text-green-600', 'text-blue-600');
                     btn.classList.replace('bg-green-50', 'bg-blue-50');
                     btn.classList.replace('border-green-200', 'border-blue-200');
-                    btn.innerHTML = 'Save Grade';
+                    btn.innerHTML = 'Save Grades';
                 }, 2000);
             } catch (err) {
-                alert("Failed to save grade: " + err.message);
-                btn.innerHTML = 'Save Grade';
+                alert("Failed to save grades: " + err.message);
+                btn.innerHTML = 'Save Grades';
             } finally {
                 btn.disabled = false;
             }
