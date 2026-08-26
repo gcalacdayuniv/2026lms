@@ -1,7 +1,7 @@
 // js/globals.js
 export const CONFIG = {
-    // Updated to the new API URL without the "www" to ensure uniform requests
-    API_URL: "https://2026-api.plv.workers.dev" 
+    API_URL: "https://2026-api.plv.workers.dev",
+    GAS_WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbz1yDwSQxGfbxT-ra0t1zC0TBCQKTFTFYhYi34dYtlc1E0jv6T1SE1mbcD0JZ3ZY6rJ/exec"
 };
 
 export const AppState = {
