@@ -90,6 +90,11 @@ export const CourseDashboard = {
                 const fileInput = document.getElementById('submitFileInput');
                 if (!fileInput.files || fileInput.files.length === 0) throw new Error("Please select a file.");
                 const file = fileInput.files[0];
+                
+                if (file.size > 5 * 1024 * 1024) {
+                    throw new Error("File size exceeds 5MB. Please upload your document to Google Drive, set the sharing access to 'Anyone with the link', and submit it here as a URL Link instead.");
+                }
+
                 mimeType = file.type;
                 const ext = file.name.split('.').pop();
                 finalFilename = `${baseFilename}.${ext}`;
@@ -110,25 +115,33 @@ export const CourseDashboard = {
                 finalFilename = `${baseFilename}.txt`;
             }
             
-            const gasPayload = {
+            const payload = {
+                courseId: courseId,
+                studentId: user.User_ID,
+                term: term,
+                title: title,
+                description: desc,
+                type: type,
                 filename: finalFilename,
                 mimeType: mimeType,
                 base64: base64Data,
-                pathParts: [courseYearSection, "Submitted"]
+                pathParts: [courseYearSection, "Submitted"],
+                isGroup: isGroup,
+                includedMembers: includedMembers
             };
             
-            progressText.textContent = 'Uploading...';
+            progressText.textContent = 'Starting upload...';
             
-            const gasData = await new Promise((resolve, reject) => {
+            const dbData = await new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.open('POST', CONFIG.GAS_WEBHOOK_URL, true);
-                xhr.setRequestHeader('Content-Type', 'text/plain');
+                xhr.open('POST', `${CONFIG.API_URL}/api/upload-submission`, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
                 
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
                         const uploadedMB = (event.loaded / (1024 * 1024)).toFixed(2);
                         const totalMB = (event.total / (1024 * 1024)).toFixed(2);
-                        progressText.textContent = `Uploading... ${uploadedMB} MB / ${totalMB} MB`;
+                        progressText.textContent = `Uploading to Portal... ${uploadedMB} MB / ${totalMB} MB`;
                     }
                 };
                 
@@ -140,34 +153,22 @@ export const CourseDashboard = {
                             reject(new Error("Failed to parse server response"));
                         }
                     } else {
-                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                        try {
+                            const err = JSON.parse(xhr.responseText);
+                            reject(new Error(err.error || `Upload failed with status ${xhr.status}`));
+                        } catch (e) {
+                            reject(new Error(`Upload failed with status ${xhr.status}`));
+                        }
                     }
                 };
                 
                 xhr.onerror = () => reject(new Error("Network error occurred during upload."));
-                xhr.send(JSON.stringify(gasPayload));
+                xhr.send(JSON.stringify(payload));
             });
             
-            if (!gasData.success) {
-                throw new Error("Server Error: " + gasData.error);
+            if (!dbData.success) {
+                throw new Error("Server Error: " + (dbData.error || "Unknown error occurred"));
             }
-            
-            const dbPayload = {
-                courseId: courseId,
-                studentId: user.User_ID,
-                term: term,
-                title: title,
-                description: desc,
-                type: type,
-                fileUrl: gasData.fileUrl,
-                isGroup: isGroup,
-                includedMembers: includedMembers
-            };
-
-            await apiFetch('/api/upload-submission', {
-                method: 'POST',
-                body: JSON.stringify(dbPayload)
-            });
             
             progressDiv.classList.add('hidden');
             successDiv.textContent = "Submission uploaded successfully!";
