@@ -1,5 +1,5 @@
 // js/course-dashboard.js
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, CONFIG } from './globals.js';
 
 export const CourseDashboard = {
     loadGroupMembersForUpload: async (courseId) => {
@@ -109,24 +109,39 @@ export const CourseDashboard = {
                 finalFilename = `${baseFilename}.txt`;
             }
             
-            const payload = {
+            const gasPayload = {
+                filename: finalFilename,
+                mimeType: mimeType,
+                base64: base64Data,
+                pathParts: [courseYearSection, "Submitted"]
+            };
+            
+            const gasResponse = await fetch(CONFIG.GAS_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(gasPayload)
+            });
+            
+            const gasData = await gasResponse.json();
+            if (!gasData.success) {
+                throw new Error("Google Drive Error: " + gasData.error);
+            }
+            
+            const dbPayload = {
                 courseId: courseId,
                 studentId: user.User_ID,
                 term: term,
                 title: title,
                 description: desc,
                 type: type,
-                filename: finalFilename,
-                mimeType: mimeType,
-                base64: base64Data,
-                pathParts: [courseYearSection, "Submitted"],
+                fileUrl: gasData.fileUrl,
                 isGroup: isGroup,
                 includedMembers: includedMembers
             };
 
             await apiFetch('/api/upload-submission', {
                 method: 'POST',
-                body: JSON.stringify(payload)
+                body: JSON.stringify(dbPayload)
             });
             
             progressDiv.classList.add('hidden');
