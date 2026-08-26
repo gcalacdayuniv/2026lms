@@ -32,34 +32,8 @@ export default {
             if (request.method === "POST" && path === "/api/upload-submission") {
                 const body = await request.json();
                 
-                if (!env.GAS_WEBHOOK_URL) {
-                    return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing." }), { status: 500, headers: corsHeaders });
-                }
-
-                let gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(body),
-                    redirect: 'manual'
-                });
-
-                if (gasResponse.status === 302 || gasResponse.status === 303) {
-                    const redirectUrl = gasResponse.headers.get('Location');
-                    gasResponse = await fetch(redirectUrl);
-                }
-                
-                const gasText = await gasResponse.text();
-                let gasData;
-                try {
-                    gasData = JSON.parse(gasText);
-                } catch (parseError) {
-                    return new Response(JSON.stringify({ 
-                        error: `Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...` 
-                    }), { status: 500, headers: corsHeaders });
-                }
-
-                if (!gasData.success) {
-                    return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
+                if (!body.fileUrl) {
+                    return new Response(JSON.stringify({ error: "Missing file URL" }), { status: 400, headers: corsHeaders });
                 }
 
                 const isGroup = body.isGroup;
@@ -84,7 +58,7 @@ export default {
                 const subId = crypto.randomUUID();
                 await env.DB.prepare(
                     `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-                ).bind(subId, body.courseId, body.studentId, body.term, body.title, finalDescription, body.type, gasData.fileUrl).run();
+                ).bind(subId, body.courseId, body.studentId, body.term, body.title, finalDescription, body.type, body.fileUrl).run();
 
                 if (isGroup && includedMembers.length > 0) {
                     const statements = [];
@@ -93,13 +67,13 @@ export default {
                         statements.push(
                             env.DB.prepare(
                                 `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-                            ).bind(mSubId, body.courseId, memberId, body.term, body.title, finalDescription, body.type, gasData.fileUrl)
+                            ).bind(mSubId, body.courseId, memberId, body.term, body.title, finalDescription, body.type, body.fileUrl)
                         );
                     }
                     await env.DB.batch(statements);
                 }
 
-                return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
+                return new Response(JSON.stringify({ success: true, fileUrl: body.fileUrl }), { status: 201, headers: corsHeaders });
             }
 
             if (request.method === "POST" && path === "/api/register") {
