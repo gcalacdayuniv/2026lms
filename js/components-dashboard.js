@@ -378,7 +378,7 @@ const DashboardUI = {
                     </div>
                     
                     <div id="submitDocProgress" class="hidden text-center text-blue-600 font-bold text-sm py-2">
-                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> Uploading to Google Drive...
+                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> <span id="submitDocProgressText">Uploading...</span>
                     </div>
                     
                     <button type="submit" id="submitDocBtn" class="w-full flex justify-center py-2.5 px-4 rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-4">
