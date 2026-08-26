@@ -35,6 +35,7 @@ export const CourseDashboard = {
         const errorDiv = document.getElementById('submitDocError');
         const successDiv = document.getElementById('submitDocSuccess');
         const progressDiv = document.getElementById('submitDocProgress');
+        const progressText = document.getElementById('submitDocProgressText');
 
         errorDiv.classList.add('hidden');
         successDiv.classList.add('hidden');
@@ -116,15 +117,39 @@ export const CourseDashboard = {
                 pathParts: [courseYearSection, "Submitted"]
             };
             
-            const gasResponse = await fetch(CONFIG.GAS_WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(gasPayload)
+            progressText.textContent = 'Uploading...';
+            
+            const gasData = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', CONFIG.GAS_WEBHOOK_URL, true);
+                xhr.setRequestHeader('Content-Type', 'text/plain');
+                
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const uploadedMB = (event.loaded / (1024 * 1024)).toFixed(2);
+                        const totalMB = (event.total / (1024 * 1024)).toFixed(2);
+                        progressText.textContent = `Uploading... ${uploadedMB} MB / ${totalMB} MB`;
+                    }
+                };
+                
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            resolve(JSON.parse(xhr.responseText));
+                        } catch (e) {
+                            reject(new Error("Failed to parse server response"));
+                        }
+                    } else {
+                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                    }
+                };
+                
+                xhr.onerror = () => reject(new Error("Network error occurred during upload."));
+                xhr.send(JSON.stringify(gasPayload));
             });
             
-            const gasData = await gasResponse.json();
             if (!gasData.success) {
-                throw new Error("Google Drive Error: " + gasData.error);
+                throw new Error("Server Error: " + gasData.error);
             }
             
             const dbPayload = {
