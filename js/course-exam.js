@@ -1,8 +1,7 @@
 // js/course-exam.js
-import { apiFetch } from './globals.js';
+import { apiFetch, AppState } from './globals.js';
 
 export const CourseExam = {
-    courseId: null,
     exams: [],
     
     // Presentation State
@@ -22,7 +21,6 @@ export const CourseExam = {
         if (e.target.closest('#openExamManagerBtn')) {
             document.getElementById('courseMenuModal')?.classList.add('hidden');
             document.getElementById('examManagerModal').classList.remove('hidden');
-            CourseExam.courseId = window.location.hash.replace('#class-', '');
             await CourseExam.loadExams();
         }
 
@@ -69,7 +67,8 @@ export const CourseExam = {
         
         try {
             const ts = new Date().getTime();
-            const data = await apiFetch(`/api/exams?courseId=${CourseExam.courseId}&_t=${ts}`);
+            const lecturerId = AppState.user.User_ID;
+            const data = await apiFetch(`/api/exams?lecturerId=${lecturerId}&_t=${ts}`);
             CourseExam.exams = data.exams || [];
             
             if (CourseExam.exams.length === 0) {
@@ -143,7 +142,7 @@ export const CourseExam = {
                 await apiFetch('/api/exams', {
                     method: 'POST',
                     body: JSON.stringify({
-                        courseId: CourseExam.courseId,
+                        lecturerId: AppState.user.User_ID,
                         title: titleInput.value.trim(),
                         examData: examData
                     })
