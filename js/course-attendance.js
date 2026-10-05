@@ -1,16 +1,17 @@
 // js/course-attendance.js
 import { apiFetch } from './globals.js';
+import { CourseScores } from './course-scores.js';
 
 export const CourseAttendance = {
     getDraftKey: (courseId, date) => `attendance_draft_${courseId}_${date}`,
-    
+
     saveDraft: (courseId, date) => {
         const draft = {};
         document.querySelectorAll('.student-row').forEach(row => {
             const studentId = row.dataset.studentId;
             const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
             const pointsInput = row.querySelector('.points-input');
-            
+
             draft[studentId] = {
                 status: selectedBtn ? selectedBtn.dataset.status : null,
                 points: pointsInput ? (pointsInput.value || '0') : '0'
@@ -18,7 +19,7 @@ export const CourseAttendance = {
         });
         localStorage.setItem(`attendance_draft_${courseId}_${date}`, JSON.stringify(draft));
     },
-    
+
     clearDraft: (courseId, date) => {
         localStorage.removeItem(`attendance_draft_${courseId}_${date}`);
     },
@@ -26,18 +27,18 @@ export const CourseAttendance = {
     loadNoClassDays: async (courseId) => {
         const list = document.getElementById('noClassList');
         if (!list) return;
-        
+
         list.innerHTML = '<div class="text-center py-4 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading...</div>';
-        
+
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/no-class?courseId=${courseId}&_t=${ts}`);
-            
+
             if (!data.dates || data.dates.length === 0) {
                 list.innerHTML = '<div class="text-center py-4 text-xs font-medium text-gray-500 italic">No dates currently set.</div>';
                 return;
             }
-            
+
             list.innerHTML = data.dates.map(d => `
                 <div class="flex justify-between items-center bg-white p-2 border border-gray-200 rounded">
                     <span class="font-bold text-sm text-gray-700"><i class="fa-regular fa-calendar text-gray-400 mr-2"></i> ${d.Date}</span>
@@ -46,7 +47,7 @@ export const CourseAttendance = {
                     </button>
                 </div>
             `).join('');
-            
+
         } catch (err) {
             list.innerHTML = `<div class="text-red-500 text-xs font-bold text-center py-2">${err.message}</div>`;
         }
@@ -58,7 +59,7 @@ export const CourseAttendance = {
         const dateVal = document.getElementById('attendanceDate').value;
         const banner = document.getElementById('noClassBanner');
         const courseId = window.location.hash.replace('#class-', '');
-        
+
         if (!dateVal) {
             alertBox.textContent = "Please select a date.";
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
@@ -80,7 +81,7 @@ export const CourseAttendance = {
             const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
             const pointsInput = row.querySelector('.points-input');
             const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-            
+
             if (selectedBtn) {
                 attendanceData.push({
                     studentId: studentId,
@@ -114,7 +115,7 @@ export const CourseAttendance = {
             };
 
             await apiFetch('/api/attendance', { method: 'POST', body: JSON.stringify(payload) });
-            
+
             CourseAttendance.clearDraft(courseId, dateVal);
 
             alertBox.textContent = "All Attendance saved successfully!";
@@ -133,12 +134,12 @@ export const CourseAttendance = {
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}&_t=${ts}`);
-            
+
             const noClassBanner = document.getElementById('noClassBanner');
             const container = document.getElementById('rosterListContainer');
             const saveBtn = document.getElementById('saveAttendanceBtn');
             const markAllBtn = document.getElementById('markAllPresent');
-            
+
             if (data.isNoClass === true) {
                 if(noClassBanner) noClassBanner.classList.remove('hidden');
                 if(container) container.classList.add('opacity-50', 'pointer-events-none');
@@ -160,7 +161,7 @@ export const CourseAttendance = {
                 });
                 const pointsInput = row.querySelector('.points-input');
                 if (pointsInput) pointsInput.value = '0';
-                
+
                 const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
                 if (presentBtn && !data.isNoClass) {
                     presentBtn.setAttribute('data-selected', 'true');
@@ -208,12 +209,12 @@ export const CourseAttendance = {
                 try {
                     const draft = JSON.parse(draftStr);
                     let hasDraftChanges = false;
-                    
+
                     document.querySelectorAll('.student-row').forEach(row => {
                         const studentId = row.dataset.studentId;
                         if (draft[studentId]) {
                             hasDraftChanges = true;
-                            
+
                             const r = draft[studentId];
                             const buttons = row.querySelectorAll('.attendance-btn');
                             buttons.forEach(btn => {
@@ -221,7 +222,7 @@ export const CourseAttendance = {
                                 btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
                                 btn.removeAttribute('data-selected');
                             });
-                            
+
                             if (r.status) {
                                 const btn = row.querySelector(`.attendance-btn[data-status="${r.status}"]`);
                                 if (btn) {
@@ -238,12 +239,12 @@ export const CourseAttendance = {
                                     }
                                 }
                             }
-                            
+
                             const pointsInput = row.querySelector('.points-input');
                             if (pointsInput) pointsInput.value = r.points || '0';
                         }
                     });
-                    
+
                     if (hasDraftChanges) {
                         const alertBox = document.getElementById('attendanceAlert');
                         if (alertBox) {
@@ -265,10 +266,10 @@ export const CourseAttendance = {
         const sessions = data.sessions || [];
         const records = data.records || [];
         const submissions = data.submissions || [];
-        
+
         let termStart = '';
         let termEnd = '';
-        
+
         if (term === 'midterm') {
             termStart = course.Midterm_Start || '';
             termEnd = course.Midterm_End || '';
@@ -279,7 +280,7 @@ export const CourseAttendance = {
 
         const subTerm = term === 'midterm' ? 'MidTerm' : 'FinalTerm';
         const termSubmissions = submissions.filter(s => s.Term === subTerm);
-        
+
         let totalNarrative = 0, totalIndividual = 0, totalReport = 0;
         termSubmissions.forEach(s => {
             totalNarrative += (s.Grade_Narrative || 0);
@@ -290,11 +291,11 @@ export const CourseAttendance = {
         const elNarrative = document.getElementById(`${term}NarrativeScore`);
         const elIndividual = document.getElementById(`${term}IndividualScore`);
         const elReport = document.getElementById(`${term}ReportScore`);
-        
+
         if (elNarrative) elNarrative.textContent = totalNarrative;
         if (elIndividual) elIndividual.textContent = totalIndividual;
         if (elReport) elReport.textContent = totalReport;
-        
+
         const parseLocalDate = (dateStr) => {
             if (!dateStr) return null;
             if (dateStr.includes('-')) {
@@ -304,7 +305,7 @@ export const CourseAttendance = {
             const d = new Date(dateStr);
             return isNaN(d.getTime()) ? null : d;
         };
-        
+
         let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
         let classDays = 0;
         let pct = 0;
@@ -312,17 +313,17 @@ export const CourseAttendance = {
         if (termStart && termEnd) {
             const tStart = parseLocalDate(termStart);
             const tEnd = parseLocalDate(termEnd);
-            
+
             const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
             const dayStr = (course.ScheduleDay || '').trim().toLowerCase();
             const targetDay = dayMap[dayStr];
 
             let theoreticalDays = 0;
-            
+
             if (targetDay !== undefined && tStart && tEnd) {
                 let currentDate = new Date(tStart.getFullYear(), tStart.getMonth(), tStart.getDate());
                 let endDate = new Date(tEnd.getFullYear(), tEnd.getMonth(), tEnd.getDate());
-                
+
                 while (currentDate <= endDate) {
                     if (currentDate.getDay() === targetDay) {
                         theoreticalDays++;
@@ -354,7 +355,7 @@ export const CourseAttendance = {
                 else if (r.Status === 'Late') late++;
                 else if (r.Status === 'Excused') excused++;
                 else if (r.Status === 'Absent') absent++;
-                
+
                 totalParticipationPts += (r.Performance_Points || 0);
             });
 
@@ -374,5 +375,7 @@ export const CourseAttendance = {
         document.getElementById(`${term}TotalDays`).textContent = classDays;
         document.getElementById(`${term}AttendancePct`).textContent = pct;
         document.getElementById(`${term}ParticipationScore`).textContent = totalParticipationPts;
+
+        CourseScores.renderTermScores(term, data);
     }
 };
