@@ -9,8 +9,6 @@ export const CourseExam = {
     current: 0,
     revealed: false,
     zoom: 1,
-    parts: ["Part I: Multiple Choice", "Part II: True or False", "Part III: Enumeration"],
-    tfOptions: ["True", "False"],
 
     init: () => {
         document.addEventListener('click', CourseExam.handleClicks);
@@ -90,15 +88,25 @@ export const CourseExam = {
         }
     },
 
-    parseCSVLine: (text) => {
-        let result = [], cur = '', inQuote = false;
-        for(let i=0; i<text.length; i++){
-            if(text[i] === '"') inQuote = !inQuote;
-            else if(text[i] === ',' && !inQuote) { result.push(cur); cur = ''; }
-            else cur += text[i];
+    // Robust CSV parser supporting line breaks within quotes
+    parseCSV: (str) => {
+        const arr = [];
+        let quote = false;
+        let row = 0, col = 0;
+        for (let c = 0; c < str.length; c++) {
+            let cc = str[c], nc = str[c+1];
+            arr[row] = arr[row] || [];
+            arr[row][col] = arr[row][col] || '';
+            
+            if (cc === '"' && quote && nc === '"') { arr[row][col] += cc; ++c; continue; }
+            if (cc === '"') { quote = !quote; continue; }
+            if (cc === ',' && !quote) { ++col; continue; }
+            if (cc === '\r' && nc === '\n' && !quote) { ++row; col = 0; ++c; continue; }
+            if (cc === '\n' && !quote) { ++row; col = 0; continue; }
+            if (cc === '\r' && !quote) { ++row; col = 0; continue; }
+            arr[row][col] += cc;
         }
-        result.push(cur);
-        return result.map(s => s.trim());
+        return arr.map(r => r.map(c => c.trim()));
     },
 
     uploadCsv: async () => {
@@ -121,23 +129,25 @@ export const CourseExam = {
         reader.onload = async (e) => {
             try {
                 const text = e.target.result;
-                const lines = text.split('\n');
+                const rows = CourseExam.parseCSV(text);
                 const examData = [];
 
-                for (let i = 1; i < lines.length; i++) {
-                    const lineStr = lines[i].trim();
-                    if (!lineStr) continue;
-                    const row = CourseExam.parseCSVLine(lineStr);
-                    if (row.length < 4) continue;
+                // Skip header row
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (row.length < 4 || row.every(col => col === "")) continue;
                     
                     const part = parseInt(row[0]);
                     const question = row[1];
-                    const choices = row[2] ? row[2].split('|').map(c => c.trim()) : [];
+                    const choicesStr = row[2] ? row[2].trim() : "";
+                    const choices = choicesStr ? choicesStr.split('|').map(c => c.trim()) : [];
                     const answer = row[3];
                     const expl = row[4] || "";
                     
                     examData.push([part, question, choices, answer, expl]);
                 }
+
+                if (examData.length === 0) throw new Error("No valid questions found in CSV.");
 
                 await apiFetch('/api/exams', {
                     method: 'POST',
@@ -187,10 +197,14 @@ export const CourseExam = {
     buildTabs: () => {
         const tabsEl = document.getElementById('examTabs');
         tabsEl.innerHTML = '';
-        CourseExam.parts.forEach((name, p) => {
+        
+        // Dynamically find all unique Part Indexes from the uploaded data
+        const uniqueParts = [...new Set(CourseExam.quizData.map(d => d[0]))].sort((a, b) => a - b);
+        
+        uniqueParts.forEach((p) => {
             const b = document.createElement("button");
             b.className = "exam-tab";
-            b.textContent = name;
+            b.textContent = `Part ${p + 1}`;
             b.onclick = () => { 
                 const idx = CourseExam.quizData.findIndex(d => d[0] === p);
                 if (idx !== -1) {
@@ -215,10 +229,13 @@ export const CourseExam = {
         answerEl.classList.toggle("open", show);
         revealBtn.textContent = show ? "Hide answer" : "Show answer";
         
-        [...choicesEl.children].forEach((el, i) => {
-            el.classList.toggle("correct", show && choices[i] === ans);
-            el.classList.toggle("dim", show && choices[i] !== ans);
-        });
+        // Handle Highlighting Only if Choices Exist
+        if (choices && choices.length > 0) {
+            [...choicesEl.children].forEach((el, i) => {
+                el.classList.toggle("correct", show && choices[i] === ans);
+                el.classList.toggle("dim", show && choices[i] !== ans);
+            });
+        }
         
         if (show) answerEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
     },
@@ -253,7 +270,10 @@ export const CourseExam = {
         const posInPart = CourseExam.quizData.slice(0, CourseExam.current + 1).filter(d => d[0] === part).length;
 
         const tabsEl = document.getElementById('examTabs');
-        [...tabsEl.children].forEach((t, i) => t.classList.toggle("active", i === part));
+        [...tabsEl.children].forEach((t) => {
+            const targetPart = parseInt(t.textContent.replace('Part ', '')) - 1;
+            t.classList.toggle("active", targetPart === part);
+        });
         
         const counterEl = document.getElementById('examCounter');
         counterEl.innerHTML = `<span class="num">${CourseExam.current + 1}</span><span class="of">of ${total} &nbsp;|&nbsp; ${posInPart} of ${inPart.length} in this part</span>`;
@@ -263,9 +283,12 @@ export const CourseExam = {
         const choicesEl = document.getElementById('examChoices');
         choicesEl.innerHTML = "";
         
-        const isTF = choices.length === 2 && choices[0] === "True" && choices[1] === "False";
-        choicesEl.className = "exam-choices" + (isTF ? " two" : "");
+        let choicesClass = "exam-choices";
+        if (choices.length === 2) choicesClass += " two";
+        else if (choices.length >= 6) choicesClass += " many";
+        choicesEl.className = choicesClass;
         
+        // Will remain completely empty & cleanly hidden for Identification types
         choices.forEach(c => {
             const div = document.createElement("div");
             div.className = "exam-choice";
