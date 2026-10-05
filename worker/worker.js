@@ -32,6 +32,25 @@ export default {
         }
 
         try {
+            if (request.method === "GET" && path === "/api/exams") {
+                const courseId = url.searchParams.get("courseId");
+                const exams = await env.DB.prepare("SELECT Exam_ID, Title FROM Exams WHERE Course_ID = ? ORDER BY Created_At DESC").bind(courseId).all();
+                return new Response(JSON.stringify({ success: true, exams: exams.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/exam-data") {
+                const examId = url.searchParams.get("examId");
+                const exam = await env.DB.prepare("SELECT * FROM Exams WHERE Exam_ID = ?").bind(examId).first();
+                return new Response(JSON.stringify({ success: true, exam }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/exams") {
+                const body = await request.json();
+                const id = crypto.randomUUID();
+                await env.DB.prepare("INSERT INTO Exams (Exam_ID, Course_ID, Title, ExamData) VALUES (?, ?, ?, ?)").bind(id, body.courseId, body.title, JSON.stringify(body.examData)).run();
+                return new Response(JSON.stringify({ success: true, examId: id }), { status: 201, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && path === "/api/upload-submission") {
                 const body = await request.json();
 
