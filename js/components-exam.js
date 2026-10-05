@@ -52,7 +52,7 @@ export const ExamUI = {
                 .exam-slide {
                     background: var(--card);
                     width: 100%;
-                    max-width: 960px;
+                    max-width: 1200px;
                     height: min(820px, calc(100vh - 80px));
                     min-height: 340px;
                     border-radius: 12px;
@@ -64,8 +64,8 @@ export const ExamUI = {
                 }
                 .exam-progress { height: 6px; background: var(--line); flex-shrink: 0; }
                 .exam-progress-bar { height: 100%; width: 0; background: var(--accent); transition: width 0.25s ease; }
-                .exam-tabs { display: flex; border-bottom: 1px solid var(--line); background: #f7f9fb; flex-shrink: 0; }
-                .exam-tab { flex: 1; padding: 12px 8px; font-size: 1rem; font-weight: 600; color: var(--muted); background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; }
+                .exam-tabs { display: flex; border-bottom: 1px solid var(--line); background: #f7f9fb; flex-shrink: 0; overflow-x: auto; }
+                .exam-tab { flex: 1; min-width: max-content; padding: 12px 16px; font-size: 1rem; font-weight: 600; color: var(--muted); background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; }
                 .exam-tab:hover { color: var(--brand); }
                 .exam-tab.active { color: var(--brand); border-bottom-color: var(--brand); background: #fff; }
                 .exam-body { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 40px 12px; display: flex; flex-direction: column; }
@@ -73,16 +73,18 @@ export const ExamUI = {
                 .exam-counter { display: flex; align-items: baseline; gap: 12px; color: var(--muted); font-size: 1.05rem; }
                 .exam-counter .num { font-size: clamp(3rem, 8vw, 4.5rem); font-weight: 800; line-height: 1; color: var(--brand); }
                 .exam-restart { padding: 10px 16px; font-size: 1rem; font-weight: 700; color: var(--brand); background: #fff; border: 2px solid var(--brand); border-radius: 8px; cursor: pointer; white-space: nowrap; }
-                .exam-question { font-family: Georgia, 'Times New Roman', serif; font-size: calc(clamp(1.4rem, 3.2vw, 2.1rem) * var(--z)); line-height: 1.35; margin: 0 0 24px; max-width: 34em; }
+                .exam-question { font-family: Georgia, 'Times New Roman', serif; font-size: calc(clamp(1.4rem, 3.2vw, 2.1rem) * var(--z)); line-height: 1.35; margin: 0 0 24px; max-width: 45em; white-space: pre-wrap; }
                 .exam-choices { display: grid; gap: 10px; margin-bottom: 20px; }
                 .exam-choices.two { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: calc(460px * var(--z)); }
-                .exam-choice { padding: 12px 18px; font-size: calc(clamp(1.1rem, 2.4vw, 1.4rem) * var(--z)); background: #f1f4f8; border: 2px solid transparent; border-radius: 8px; }
+                .exam-choices.many { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+                .exam-choices.many .exam-choice { padding: 8px 12px; font-size: calc(clamp(0.85rem, 1.5vw, 1rem) * var(--z)); }
+                .exam-choice { padding: 12px 18px; font-size: calc(clamp(1.1rem, 2.4vw, 1.4rem) * var(--z)); background: #f1f4f8; border: 2px solid transparent; border-radius: 8px; transition: background 0.2s; }
                 .exam-choice.correct { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); font-weight: 700; }
                 .exam-choice.dim { opacity: 0.45; }
                 .exam-answer { display: none; background: var(--ok-bg); border-left: 6px solid var(--ok); border-radius: 6px; padding: 14px 20px; font-size: calc(clamp(1.15rem, 2.4vw, 1.45rem) * var(--z)); margin-bottom: 12px; }
                 .exam-answer.open { display: block; }
                 .exam-answer .label { display: block; font-size: 0.95rem; color: var(--muted); margin-bottom: 4px; }
-                .exam-expl { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--ok); font-size: calc(1.05rem * var(--z)); color: var(--brand); }
+                .exam-expl { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--ok); font-size: calc(1.05rem * var(--z)); color: var(--brand); white-space: pre-wrap; }
                 .exam-controls { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 40px 12px; border-top: 1px solid var(--line); }
                 .exam-controls button { width: 170px; padding: 13px 10px; font-size: 1.1rem; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; color: #fff; }
                 .exam-nav { background: var(--brand); }
