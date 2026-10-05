@@ -26,6 +26,9 @@ const ClassUI = {
                     <button id="openClassSummaryBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-table-list mr-2"></i> Class Summary
                     </button>
+                    <button id="openScoresModalBtn" class="w-full bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-pen-to-square mr-2"></i> Record Scores
+                    </button>
                     <button id="openNoClassModalBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-calendar-xmark mr-2"></i> Manage No Class Days
                     </button>
@@ -99,7 +102,7 @@ const ClassUI = {
                     </div>
                     <div id="csCount" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
                     <div class="overflow-auto flex-1 border border-gray-200 rounded-lg bg-white">
-                        <table class="w-full text-xs text-left min-w-[1200px]">
+                        <table class="w-full text-xs text-left min-w-[1600px]">
                             <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm z-10">
                                 <tr>
                                     <th class="px-3 py-2 text-center">#</th>
@@ -112,12 +115,90 @@ const ClassUI = {
                                     <th class="px-3 py-2">Topic</th>
                                     <th class="px-3 py-2 text-center">Attendance</th>
                                     <th class="px-3 py-2 text-center">Participation</th>
+                                    <th class="px-3 py-2 text-center">Written</th>
+                                    <th class="px-3 py-2 text-center">Tasks</th>
+                                    <th class="px-3 py-2 text-center">Major Exam</th>
                                     <th class="px-3 py-2">Log</th>
                                 </tr>
                             </thead>
                             <tbody id="csTableBody" class="divide-y divide-gray-200 bg-white"></tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderScoresModal: () => `
+        <div id="scoresModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-2 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeScoresModalBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-pen-to-square text-teal-600 mr-2"></i>Record Scores</h3>
+                    <button id="closeScoresModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div id="scAlert" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
+
+                <div class="mb-3">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Assessment</label>
+                    <select id="scAssessmentSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium"></select>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+                    <div class="col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Title</label>
+                        <input type="text" id="scTitle" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" placeholder="e.g. Quiz 1">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Term</label>
+                        <select id="scTerm" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm outline-none bg-gray-50">
+                            <option value="MidTerm">Mid Term</option>
+                            <option value="FinalTerm">Final Term</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Category</label>
+                        <select id="scCategory" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm outline-none bg-gray-50">
+                            <option value="Written">Written (Quiz/Long)</option>
+                            <option value="Performance">Performance (Task)</option>
+                            <option value="MajorExam">Major Exam</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Max Score</label>
+                        <input type="number" step="any" min="0" id="scMax" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-center font-mono" placeholder="20">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                        <input type="date" id="scDate" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                    </div>
+                </div>
+
+                <div id="scStudentCount" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
+                <div class="overflow-auto flex-1 border border-gray-200 rounded-lg bg-white min-h-[200px]">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm z-10">
+                            <tr>
+                                <th class="px-3 py-2 text-center">#</th>
+                                <th class="px-3 py-2 text-center">Seat</th>
+                                <th class="px-3 py-2">Student</th>
+                                <th class="px-3 py-2 text-center">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scGridBody" class="divide-y divide-gray-200 bg-white"></tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 flex gap-2">
+                    <button type="button" id="scDeleteBtn" class="hidden px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-md text-sm font-bold transition">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                    <button type="button" id="scSaveBtn" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save Assessment & Scores
+                    </button>
                 </div>
             </div>
         </div>
@@ -222,7 +303,7 @@ const ClassUI = {
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermWrittenScore">...</span></div>
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
                                 </div>
@@ -230,8 +311,9 @@ const ClassUI = {
                             
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
-                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermPerformanceTaskScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="participation" title="Click to view participation details">
                                         <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
                                         <span class="font-black text-blue-600 text-base block mt-0.5" id="midtermParticipationScore">...</span>
@@ -247,7 +329,7 @@ const ClassUI = {
 
                             <div class="bg-white p-2 border rounded flex justify-between items-center">
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
-                                <span class="font-bold text-sm">...</span>
+                                <span class="font-black text-blue-600 text-sm cursor-pointer view-scores-trigger" data-term="midterm" data-category="MajorExam" title="Click to view major exam scores" id="midtermMajorExamScore">...</span>
                             </div>
                         </div>
                     </div>
@@ -259,7 +341,7 @@ const ClassUI = {
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Quizzes/Long</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermWrittenScore">...</span></div>
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
                                 </div>
@@ -267,8 +349,9 @@ const ClassUI = {
                             
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
-                                <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermPerformanceTaskScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="participation" title="Click to view participation details">
                                         <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
                                         <span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermParticipationScore">...</span>
@@ -284,7 +367,7 @@ const ClassUI = {
 
                             <div class="bg-white p-2 border rounded flex justify-between items-center">
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
-                                <span class="font-bold text-sm">...</span>
+                                <span class="font-black text-yellow-600 text-sm cursor-pointer view-scores-trigger" data-term="finalterm" data-category="MajorExam" title="Click to view major exam scores" id="finaltermMajorExamScore">...</span>
                             </div>
                         </div>
                     </div>
@@ -662,6 +745,7 @@ export const ClassComponents = {
 
             ${ClassUI.renderCourseMenuModal(course)}
             ${ClassUI.renderClassSummaryModal()}
+            ${ClassUI.renderScoresModal()}
             ${ClassUI.renderNoClassModal()}
             ${ClassUI.renderManageStudentModal()}
             ${ClassUI.renderSummaryModal()}
