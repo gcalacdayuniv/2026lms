@@ -1,6 +1,81 @@
 // js/components-dashboard.js
 import { getLoadableAvatarSrc } from './components-utils.js';
 
+const TERM_THEMES = {
+    midterm: {
+        icon: 'fa-solid fa-star-half-stroke text-blue-500',
+        hover: 'hover:border-blue-400',
+        text: 'text-blue-700',
+        accent: 'bg-blue-50 border-blue-100',
+        label: 'text-blue-400'
+    },
+    finalterm: {
+        icon: 'fa-solid fa-star text-yellow-500',
+        hover: 'hover:border-yellow-400',
+        text: 'text-yellow-600',
+        accent: 'bg-yellow-50 border-yellow-100',
+        label: 'text-yellow-500'
+    }
+};
+
+const renderTermBlock = (term, label) => {
+    const t = TERM_THEMES[term];
+    return `
+                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="${t.icon} mr-2"></i>${label}</h4>
+
+                        <div class="space-y-4">
+                            <div>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
+                                <div class="grid grid-cols-3 gap-3 mt-2">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-scores-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-category="Written" title="Click to view quizzes and long exam scores">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div>
+                                        <span class="font-black ${t.text} text-xl block" id="${term}WrittenScore">...</span>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="narrative" title="Click to view narrative details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div>
+                                        <span class="font-black ${t.text} text-xl block" id="${term}NarrativeScore">...</span>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="individual" title="Click to view individual details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div>
+                                        <span class="font-black ${t.text} text-xl block" id="${term}IndividualScore">...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="report" title="Click to view report details">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div>
+                                        <span class="font-black ${t.text} text-xl block" id="${term}ReportScore">...</span>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-scores-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-category="Performance" title="Click to view performance task scores">
+                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Tasks</div>
+                                        <span class="font-black ${t.text} text-xl block" id="${term}PerformanceTaskScore">...</span>
+                                    </div>
+                                    <div class="${t.accent} p-3 border rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="participation" title="Click to view participation details">
+                                        <div class="${t.label} text-[10px] uppercase font-bold mb-1">Participation</div>
+                                        <span class="font-black ${t.text} text-xl block" id="${term}ParticipationScore">...</span>
+                                    </div>
+                                    <div class="${t.accent} p-3 border rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="attendance" title="Click to view attendance details">
+                                        <div class="${t.label} text-[10px] uppercase font-bold mb-1">Attendance</div>
+                                        <span class="font-black ${t.text} text-xl block mb-1"><span id="${term}AttendancePct">...</span>%</span>
+                                        <div class="text-[10px] text-gray-600 font-medium"><span id="${term}Present">0</span>P, <span id="${term}Late">0</span>L, <span id="${term}Excused">0</span>E, <span id="${term}Absent">0</span>A</div>
+                                        <div class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Class days: <span id="${term}TotalDays">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-50 p-4 border border-gray-100 rounded-lg flex justify-between items-center cursor-pointer view-scores-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-category="MajorExam" title="Click to view major exam scores">
+                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
+                                <span class="font-black ${t.text} text-lg" id="${term}MajorExamScore">...</span>
+                            </div>
+                        </div>
+                    </div>
+    `;
+};
+
 const DashboardUI = {
     renderHeader: (user, headerAvatar) => `
         <header class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
@@ -24,13 +99,13 @@ const DashboardUI = {
                 <button id="closeProfilePanel" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
                     <i class="fa-solid fa-xmark text-2xl"></i>
                 </button>
-                
+
                 <div class="text-center mt-6">
                     ${panelAvatar}
                     <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
                     <p class="text-sm font-medium text-gray-500">@${user.Username || 'N/A'}</p>
                 </div>
-                
+
                 <div class="mt-8 px-2 space-y-4">
                     <div class="flex justify-between items-start border-b border-gray-200 pb-4">
                         <div class="flex-1 pr-1">
@@ -43,7 +118,7 @@ const DashboardUI = {
                             <span class="block text-xs sm:text-sm font-medium text-gray-800">${displayCourse}</span>
                         </div>
                     </div>
-                    
+
                     <div class="flex flex-col sm:flex-row justify-between items-start space-y-2 sm:space-y-0">
                         <div class="flex-1 pr-2 w-full">
                             <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Email || 'N/A'}</span>
@@ -65,7 +140,7 @@ const DashboardUI = {
                     </button>
                 </div>
             </div>
-            
+
             <div class="p-4 border-t border-gray-200 bg-white">
                 <button id="logoutBtn" class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-red-600 hover:bg-red-700 focus:outline-none transition-colors">
                     <i class="fa-solid fa-power-off mr-2"></i> Log Out
@@ -84,7 +159,7 @@ const DashboardUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <div class="mb-4 flex flex-col sm:flex-row gap-2">
                     <input type="text" id="muSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
                     <select id="muFilterStatus" class="w-full sm:w-40 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
@@ -114,11 +189,11 @@ const DashboardUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <form id="changePasswordForm" class="space-y-4">
                     <div id="cpError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                     <div id="cpSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
-                    
+
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Current Password</label>
                         <input type="password" id="cpCurrent" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
@@ -131,7 +206,7 @@ const DashboardUI = {
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Repeat New Password</label>
                         <input type="password" id="cpRepeat" required minlength="6" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                     </div>
-                    
+
                     <button type="submit" id="cpSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
                         Update Password
                     </button>
@@ -170,11 +245,11 @@ const DashboardUI = {
                             <i class="fa-solid fa-xmark text-xl"></i>
                         </button>
                     </div>
-                    
+
                     <form id="updateDetailsForm" class="space-y-4">
                         <div id="udError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                         <div id="udSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
-                        
+
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Given Name</label>
@@ -216,7 +291,7 @@ const DashboardUI = {
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Verify Password</label>
                             <input type="password" id="udPassword" required placeholder="Enter current password to save" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                         </div>
-                        
+
                         <button type="submit" id="udSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
                             Save Details
                         </button>
@@ -236,20 +311,20 @@ const DashboardUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <form id="addCourseForm" class="space-y-4">
                     <div id="courseError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
-                    
+
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course Code</label>
                         <input type="text" id="courseCode" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. CS101">
                     </div>
-                    
+
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course Title</label>
                         <input type="text" id="courseTitle" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. Introduction to Programming">
                     </div>
-                    
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Schedule Day</label>
@@ -284,7 +359,7 @@ const DashboardUI = {
                         </div>
                         <p class="text-[10px] text-gray-500 mt-1 italic">*Leave blank to make it available to all students.</p>
                     </div>
-                    
+
                     <button type="submit" id="addCourseBtn" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors mt-4">
                         Create Course
                     </button>
@@ -303,16 +378,16 @@ const DashboardUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <form id="addProgramForm" class="space-y-4">
                     <div id="programError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                     <div id="programSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
-                    
+
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Course / Program Code</label>
                         <input type="text" id="programCode" required class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-purple-500 outline-none bg-gray-50 text-sm uppercase" placeholder="e.g. BSCS">
                     </div>
-                    
+
                     <button type="submit" id="addProgramBtn" class="w-full bg-purple-600 text-white py-2.5 px-4 rounded-md hover:bg-purple-700 shadow-sm font-bold transition-colors mt-4">
                         Add to Registration List
                     </button>
@@ -334,7 +409,7 @@ const DashboardUI = {
                 <form id="submitDocForm" class="space-y-4">
                     <div id="submitDocError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                     <div id="submitDocSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
-                    
+
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Term</label>
                         <select id="submitTerm" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm">
@@ -366,7 +441,7 @@ const DashboardUI = {
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Link URL</label>
                         <input type="url" id="submitUrlInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="https://...">
                     </div>
-                    
+
                     <div id="groupUploadSection" class="hidden border border-purple-200 bg-purple-50 p-3 rounded-md mt-2">
                         <label class="flex items-center space-x-2 text-xs font-bold text-purple-800 cursor-pointer mb-2">
                             <input type="checkbox" id="isGroupUpload" class="rounded text-purple-600 focus:ring-purple-500">
@@ -376,11 +451,11 @@ const DashboardUI = {
                             <!-- Dynamically populated -->
                         </div>
                     </div>
-                    
+
                     <div id="submitDocProgress" class="hidden text-center text-blue-600 font-bold text-sm py-2">
                         <i class="fa-solid fa-spinner fa-spin mr-2"></i> <span id="submitDocProgressText">Uploading...</span>
                     </div>
-                    
+
                     <button type="submit" id="submitDocBtn" class="w-full flex justify-center py-2.5 px-4 rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-4">
                         Submit
                     </button>
@@ -434,10 +509,10 @@ const DashboardUI = {
                     </button>
                 </div>
             </div>
-            
+
             <div class="max-w-4xl mx-auto w-full p-4 sm:p-6 flex-1">
                 <div id="ssCourseTitle" class="font-black text-blue-700 text-center mb-6 text-xl sm:text-2xl"></div>
-                
+
                 <div id="ssEnrollmentInfo" class="hidden grid grid-cols-3 gap-4 mb-6 text-center border border-blue-200 bg-blue-50 p-4 rounded-xl shadow-sm">
                     <div>
                         <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Seat</div>
@@ -455,101 +530,13 @@ const DashboardUI = {
 
                 <div id="summaryLoading" class="text-center py-12 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-4xl"></i></div>
                 <div id="summaryError" class="hidden text-center py-12 text-red-500 font-bold text-lg"></div>
-                
+
                 <div id="summaryContent" class="hidden space-y-6">
                     <!-- Mid Term -->
-                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
-                        
-                        <div class="space-y-4">
-                            <div>
-                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
-                                <div class="grid grid-cols-3 gap-3 mt-2">
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div><span class="font-black text-base">...</span></div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="narrative" title="Click to view narrative details">
-                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div>
-                                        <span class="font-black text-blue-700 text-xl block" id="midtermNarrativeScore">...</span>
-                                    </div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="individual" title="Click to view individual details">
-                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div>
-                                        <span class="font-black text-blue-700 text-xl block" id="midtermIndividualScore">...</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
-                                <div class="grid grid-cols-3 gap-3 mt-2">
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="report" title="Click to view report details">
-                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div>
-                                        <span class="font-black text-blue-700 text-xl block" id="midtermReportScore">...</span>
-                                    </div>
-                                    <div class="bg-blue-50 p-3 border border-blue-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="participation" title="Click to view participation details">
-                                        <div class="text-blue-400 text-[10px] uppercase font-bold mb-1">Participation</div>
-                                        <span class="font-black text-blue-700 text-xl block" id="midtermParticipationScore">...</span>
-                                    </div>
-                                    <div class="bg-blue-50 p-3 border border-blue-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-blue-400 transition hover:shadow-md" data-term="midterm" data-metric="attendance" title="Click to view attendance details">
-                                        <div class="text-blue-400 text-[10px] uppercase font-bold mb-1">Attendance</div>
-                                        <span class="font-black text-blue-700 text-xl block mb-1"><span id="midtermAttendancePct">...</span>%</span>
-                                        <div class="text-[10px] text-gray-600 font-medium"><span id="midtermPresent">0</span>P, <span id="midtermLate">0</span>L, <span id="midtermExcused">0</span>E, <span id="midtermAbsent">0</span>A</div>
-                                        <div class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Class days: <span id="midtermTotalDays">0</span></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-gray-50 p-4 border border-gray-100 rounded-lg flex justify-between items-center">
-                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
-                                <span class="font-black text-lg">...</span>
-                            </div>
-                        </div>
-                    </div>
+                    ${renderTermBlock('midterm', 'Mid Term')}
 
                     <!-- Final Term -->
-                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="fa-solid fa-star text-yellow-500 mr-2"></i>Final Term</h4>
-                        
-                        <div class="space-y-4">
-                            <div>
-                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
-                                <div class="grid grid-cols-3 gap-3 mt-2">
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center"><div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div><span class="font-black text-base">...</span></div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="narrative" title="Click to view narrative details">
-                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div>
-                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermNarrativeScore">...</span>
-                                    </div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="individual" title="Click to view individual details">
-                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div>
-                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermIndividualScore">...</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
-                                <div class="grid grid-cols-3 gap-3 mt-2">
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="report" title="Click to view report details">
-                                        <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div>
-                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermReportScore">...</span>
-                                    </div>
-                                    <div class="bg-yellow-50 p-3 border border-yellow-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="participation" title="Click to view participation details">
-                                        <div class="text-yellow-500 text-[10px] uppercase font-bold mb-1">Participation</div>
-                                        <span class="font-black text-yellow-600 text-xl block" id="finaltermParticipationScore">...</span>
-                                    </div>
-                                    <div class="bg-yellow-50 p-3 border border-yellow-100 rounded-lg text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition hover:shadow-md" data-term="finalterm" data-metric="attendance" title="Click to view attendance details">
-                                        <div class="text-yellow-500 text-[10px] uppercase font-bold mb-1">Attendance</div>
-                                        <span class="font-black text-yellow-600 text-xl block mb-1"><span id="finaltermAttendancePct">...</span>%</span>
-                                        <div class="text-[10px] text-gray-600 font-medium"><span id="finaltermPresent">0</span>P, <span id="finaltermLate">0</span>L, <span id="finaltermExcused">0</span>E, <span id="finaltermAbsent">0</span>A</div>
-                                        <div class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Class days: <span id="finaltermTotalDays">0</span></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-gray-50 p-4 border border-gray-100 rounded-lg flex justify-between items-center">
-                                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Major Exam</span>
-                                <span class="font-black text-lg">...</span>
-                            </div>
-                        </div>
-                    </div>
+                    ${renderTermBlock('finalterm', 'Final Term')}
 
                     <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3 border-t border-gray-200 pt-6">
                         <button id="openHistoryModalBtn" class="bg-white border-2 border-green-500 text-green-600 hover:bg-green-50 font-bold py-3 px-6 rounded-lg shadow-sm transition flex items-center justify-center w-full sm:w-auto">
@@ -596,12 +583,12 @@ export const DashboardComponents = {
     renderDashboard: (user) => {
         const avatarSrc = getLoadableAvatarSrc(user.Avatar);
         const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
-        
+
         let displayCourse = 'N/A';
         if (user.course) {
             displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
         }
-        
+
         const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${user.Name}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
 
         let lecturerBtns = '';
