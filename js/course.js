@@ -4,6 +4,7 @@ import { CourseDashboard } from './course-dashboard.js';
 import { CourseClass } from './course-class.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseRecitation } from './course-recitation.js';
+import { CourseExam } from './course-exam.js';
 import { getLoadableAvatarSrc } from './components.js';
 
 export const CourseModule = {
