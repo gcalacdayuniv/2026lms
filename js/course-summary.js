@@ -140,6 +140,7 @@ export const CourseSummary = {
             CourseSummary.rows = students.map((s, i) => ({
                 student: s,
                 records: results[i].records || [],
+                assessments: results[i].assessments || [],
                 failed: !!results[i].error
             }));
 
@@ -230,6 +231,31 @@ export const CourseSummary = {
         return stats;
     },
 
+    computeScores: (assessments, term) => {
+        const terms = term === 'midterm' ? ['MidTerm'] : (term === 'finalterm' ? ['FinalTerm'] : ['MidTerm', 'FinalTerm']);
+        const out = {
+            Written: { score: 0, max: 0, count: 0 },
+            Performance: { score: 0, max: 0, count: 0 },
+            MajorExam: { score: 0, max: 0, count: 0 },
+            items: []
+        };
+        (assessments || []).forEach(a => {
+            if (!terms.includes(a.Term) || !out[a.Category] || a.Category === 'items') return;
+            if (a.Score === null || a.Score === undefined) return;
+            out[a.Category].score += a.Score;
+            out[a.Category].max += a.Max_Score;
+            out[a.Category].count++;
+            out.items.push(a);
+        });
+        return out;
+    },
+
+    scoreText: (c) => {
+        if (!c.count) return '—';
+        const n = (v) => Number(v.toFixed(2));
+        return `${n(c.score)}/${n(c.max)}`;
+    },
+
     termLabel: (term) => term === 'midterm' ? 'Mid Term' : (term === 'finalterm' ? 'Final Term' : 'Mid + Final Term'),
 
     render: () => {
@@ -240,7 +266,7 @@ export const CourseSummary = {
         const search = (document.getElementById('csSearchInput').value || '').toLowerCase().trim();
         CourseSummary.currentTerm = term;
 
-        const computed = CourseSummary.rows.map(r => ({ ...r, stats: CourseSummary.computeStats(r.records, term) }));
+        const computed = CourseSummary.rows.map(r => ({ ...r, stats: CourseSummary.computeStats(r.records, term), scores: CourseSummary.computeScores(r.assessments, term) }));
 
         const filtered = computed.filter(r => {
             if (!search) return true;
@@ -261,7 +287,7 @@ export const CourseSummary = {
         else warn.classList.remove('hidden');
 
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" class="px-3 py-8 text-center text-gray-500 italic">No students found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="14" class="px-3 py-8 text-center text-gray-500 italic">No students found.</td></tr>';
             return;
         }
 
@@ -272,6 +298,10 @@ export const CourseSummary = {
             const avatar = avatarSrc
                 ? `<img src="${esc(avatarSrc)}" class="w-10 h-10 rounded-full object-cover border border-gray-200 flex-shrink-0" alt="">`
                 : '<i class="fa-solid fa-circle-user text-[40px] text-gray-300 flex-shrink-0"></i>';
+            const sc = r.scores;
+            const scoreBlock = sc.items.length === 0 ? '' : `
+                                <div class="flex justify-between gap-3 pt-2 mt-2 border-t border-gray-300 font-bold text-gray-500 uppercase"><span>Assessment</span><span>Score</span></div>
+                                ${sc.items.map(a => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(a.Title)} <span class="text-gray-400">(${esc(a.Term === 'MidTerm' ? 'Mid' : 'Final')})</span></span><span class="font-mono font-bold text-blue-600">${esc(Number(a.Score.toFixed(2)))}/${esc(Number(a.Max_Score.toFixed(2)))}</span></div>`).join('')}`;
             const statusText = s.account_status || 'Inactive';
             const badge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${STATUS_BADGE[statusText] || STATUS_BADGE['Inactive']}">${esc(statusText)}</span>`;
 
@@ -303,12 +333,15 @@ export const CourseSummary = {
                         <div class="text-[9px] text-gray-400 uppercase font-bold">Days: ${st.classDays}</div>
                     </td>
                     <td class="px-3 py-2 text-center font-black text-blue-700 text-sm">${st.points}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.Written)}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.Performance)}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.MajorExam)}</td>
                     <td class="px-3 py-2">
                         <details>
                             <summary class="cursor-pointer text-blue-600 font-bold text-[11px]">View (${st.records.length})</summary>
                             <div class="mt-1 max-h-40 overflow-y-auto text-[10px] bg-gray-50 border border-gray-200 rounded p-2 min-w-[200px]">
                                 <div class="flex justify-between gap-3 pb-1 mb-1 border-b border-gray-300 font-bold text-gray-500 uppercase"><span>Date</span><span>Status</span><span>Pts</span></div>
-                                ${logItems}
+                                ${logItems}${scoreBlock}
                             </div>
                         </details>
                     </td>
@@ -336,7 +369,9 @@ export const CourseSummary = {
 
         const header = [
             'Seat No.', 'Student No.', 'Name', 'Email', 'Contact Number', 'Account Status', 'Course/Year/Section', 'Group', 'Assigned Topic',
-            'Term', 'Present', 'Late', 'Excused', 'Absent', 'Class Days', 'Attendance %', 'Participation Points', 'Attendance & Participation Log'
+            'Term', 'Present', 'Late', 'Excused', 'Absent', 'Class Days', 'Attendance %', 'Participation Points',
+            'Written Score', 'Written Max', 'Task Score', 'Task Max', 'Major Exam Score', 'Major Exam Max',
+            'Attendance & Participation Log', 'Assessment Scores'
         ];
 
         const lines = [header.map(CourseSummary.csvCell).join(',')];
@@ -346,10 +381,15 @@ export const CourseSummary = {
             const st = r.stats;
             const cys = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
             const log = st.records.map(rec => `${rec.Date}: ${rec.Status || 'N/A'} (${rec.Performance_Points || 0} pts)`).join('; ');
+            const sc = r.scores;
+            const blank = (c) => c.count ? [Number(c.score.toFixed(2)), Number(c.max.toFixed(2))] : ['', ''];
+            const scoreLog = sc.items.map(a => `${a.Title} [${a.Term === 'MidTerm' ? 'Mid' : 'Final'}]: ${Number(a.Score.toFixed(2))}/${Number(a.Max_Score.toFixed(2))}`).join('; ');
             lines.push([
                 s.Seat_Number || '', s.Student_Number || '', s.Name || '', s.Email || '', s.Contact_Number || '', s.account_status || 'Inactive', cys,
                 s.Group_Name || '', s.Assigned_Topic || '', termLabel,
-                st.present, st.late, st.excused, st.absent, st.classDays, st.pct, st.points, log
+                st.present, st.late, st.excused, st.absent, st.classDays, st.pct, st.points,
+                ...blank(sc.Written), ...blank(sc.Performance), ...blank(sc.MajorExam),
+                log, scoreLog
             ].map(CourseSummary.csvCell).join(','));
         });
 
