@@ -23,6 +23,9 @@ const ClassUI = {
                     <button id="exportRosterBtn" data-course-id="${course.Course_ID}" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-print mr-2"></i> Print Roster
                     </button>
+                    <button id="openClassSummaryBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-table-list mr-2"></i> Class Summary
+                    </button>
                     <button id="openNoClassModalBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-calendar-xmark mr-2"></i> Manage No Class Days
                     </button>
@@ -52,6 +55,68 @@ const ClassUI = {
                         <button type="button" id="saveCourseTermsBtn" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                             Save Term Periods
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderClassSummaryModal: () => `
+        <div id="classSummaryModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-2 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeClassSummaryBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-7xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-table-list text-purple-600 mr-2"></i>Class Summary</h3>
+                        <div id="csCourseTitle" class="text-xs font-bold text-blue-700 mt-0.5"></div>
+                    </div>
+                    <button id="closeClassSummaryBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="mb-3 flex flex-col md:flex-row gap-2">
+                    <input type="text" id="csSearchInput" placeholder="Search name, student no., email, contact, group, topic, status..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
+                    <select id="csTermSelect" class="w-full md:w-44 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                        <option value="midterm">Mid Term</option>
+                        <option value="finalterm">Final Term</option>
+                        <option value="all">Mid + Final Term</option>
+                    </select>
+                    <button type="button" id="csExportCsvBtn" disabled class="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-file-csv mr-2"></i> Export CSV
+                    </button>
+                </div>
+
+                <div id="csLoading" class="text-center py-16 text-gray-500">
+                    <i class="fa-solid fa-spinner fa-spin text-3xl text-purple-600"></i>
+                    <p id="csLoadingText" class="mt-3 text-sm font-medium">Loading class list...</p>
+                </div>
+                <div id="csError" class="hidden text-center py-12 text-red-500 font-bold"></div>
+
+                <div id="csContent" class="hidden flex-1 flex flex-col min-h-0">
+                    <div id="csTermWarning" class="hidden mb-2 p-2 rounded text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                        Term dates are not set for the selected term. Set them in Course Actions to compute attendance.
+                    </div>
+                    <div id="csCount" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
+                    <div class="overflow-auto flex-1 border border-gray-200 rounded-lg bg-white">
+                        <table class="w-full text-xs text-left min-w-[1200px]">
+                            <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm z-10">
+                                <tr>
+                                    <th class="px-3 py-2 text-center">#</th>
+                                    <th class="px-3 py-2">Student</th>
+                                    <th class="px-3 py-2 text-center">Seat</th>
+                                    <th class="px-3 py-2">Email</th>
+                                    <th class="px-3 py-2">Contact</th>
+                                    <th class="px-3 py-2 text-center">Status</th>
+                                    <th class="px-3 py-2">Group</th>
+                                    <th class="px-3 py-2">Topic</th>
+                                    <th class="px-3 py-2 text-center">Attendance</th>
+                                    <th class="px-3 py-2 text-center">Participation</th>
+                                    <th class="px-3 py-2">Log</th>
+                                </tr>
+                            </thead>
+                            <tbody id="csTableBody" class="divide-y divide-gray-200 bg-white"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -596,6 +661,7 @@ export const ClassComponents = {
             </main>
 
             ${ClassUI.renderCourseMenuModal(course)}
+            ${ClassUI.renderClassSummaryModal()}
             ${ClassUI.renderNoClassModal()}
             ${ClassUI.renderManageStudentModal()}
             ${ClassUI.renderSummaryModal()}
