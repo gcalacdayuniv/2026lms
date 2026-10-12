@@ -13,7 +13,7 @@ const ClassUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <div class="space-y-3 mb-6">
                     <button id="openAddStudentModalBtn" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
@@ -41,7 +41,7 @@ const ClassUI = {
                 <div class="border-t border-gray-200 pt-5">
                     <h4 class="text-sm font-bold text-gray-800 mb-3"><i class="fa-regular fa-calendar-days text-purple-600 mr-2"></i>Term Period Settings</h4>
                     <div id="courseMenuAlert" class="hidden text-xs mb-3 p-2 rounded"></div>
-                    
+
                     <div class="space-y-4">
                         <div class="bg-gray-50 p-3 rounded border border-gray-200">
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Mid Term</label>
@@ -106,7 +106,7 @@ const ClassUI = {
                     </div>
                     <div id="csCount" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
                     <div class="overflow-auto flex-1 border border-gray-200 rounded-lg bg-white">
-                        <table class="w-full text-xs text-left min-w-[1600px]">
+                        <table class="w-full text-xs text-left min-w-[2000px]">
                             <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm z-10">
                                 <tr>
                                     <th class="px-3 py-2 text-center">#</th>
@@ -120,6 +120,9 @@ const ClassUI = {
                                     <th class="px-3 py-2 text-center">Attendance</th>
                                     <th class="px-3 py-2 text-center">Participation</th>
                                     <th class="px-3 py-2 text-center">Written</th>
+                                    <th class="px-3 py-2 text-center">Narrative</th>
+                                    <th class="px-3 py-2 text-center">Individual</th>
+                                    <th class="px-3 py-2 text-center">Report</th>
                                     <th class="px-3 py-2 text-center">Tasks</th>
                                     <th class="px-3 py-2 text-center">Major Exam</th>
                                     <th class="px-3 py-2">Log</th>
@@ -167,7 +170,10 @@ const ClassUI = {
                         <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Category</label>
                         <select id="scCategory" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm outline-none bg-gray-50">
                             <option value="Written">Written (Quiz/Long)</option>
+                            <option value="Narrative">Written (Narrative)</option>
+                            <option value="Individual">Written (Individual)</option>
                             <option value="Performance">Performance (Task)</option>
+                            <option value="Report">Performance (Report)</option>
                             <option value="MajorExam">Major Exam</option>
                         </select>
                     </div>
@@ -218,12 +224,12 @@ const ClassUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <div class="flex gap-2 mb-4">
                     <input type="date" id="addNoClassDate" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50">
                     <button type="button" id="addNoClassBtn" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-bold transition">Add</button>
                 </div>
-                
+
                 <div id="noClassList" class="flex-1 overflow-y-auto space-y-2 bg-gray-50 p-2 rounded border border-gray-200 min-h-[150px] max-h-[300px]">
                     <!-- Dynamically populated -->
                 </div>
@@ -243,7 +249,7 @@ const ClassUI = {
                 </div>
                 <div id="manageStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
                 <input type="hidden" id="manageStudentId">
-                
+
                 <div class="space-y-4">
                     <div class="grid grid-cols-3 gap-2">
                         <div>
@@ -259,7 +265,7 @@ const ClassUI = {
                             <input type="text" id="manageTopicInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="Assigned">
                         </div>
                     </div>
-                    
+
                     <div>
                         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
                         <select id="manageStatusSelect" class="w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition">
@@ -270,7 +276,7 @@ const ClassUI = {
                             <option value="Dropped">Dropped</option>
                         </select>
                     </div>
-                    
+
                     <div class="border-t border-gray-200 pt-4 mt-4 flex flex-col space-y-2">
                         <button type="button" id="manageResetPwdBtn" class="w-full py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded text-sm font-bold border border-red-200 transition focus:outline-none">
                             <i class="fa-solid fa-key mr-2"></i> Reset Password
@@ -295,28 +301,28 @@ const ClassUI = {
                     </button>
                 </div>
                 <div id="summaryStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
-                
+
                 <div id="summaryLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
                 <div id="summaryError" class="hidden text-center py-6 text-red-500 font-bold"></div>
 
                 <div id="summaryContent" class="hidden space-y-4">
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
                         <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star-half-stroke text-blue-500 mr-2"></i>Mid Term</h4>
-                        
+
                         <div class="space-y-2">
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermWrittenScore">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Narrative" title="Click to view narrative grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Narrative</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermNarrativeScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Individual" title="Click to view individual grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Individual</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermIndividualScore">...</span></div>
                                 </div>
                             </div>
-                            
+
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Report" title="Click to view report grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Report</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermReportScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermPerformanceTaskScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="participation" title="Click to view participation details">
                                         <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
@@ -340,21 +346,21 @@ const ClassUI = {
 
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
                         <h4 class="text-sm font-bold text-gray-800 mb-2 border-b pb-1 border-gray-200"><i class="fa-solid fa-star text-yellow-500 mr-2"></i>Final Term</h4>
-                        
+
                         <div class="space-y-2">
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermWrittenScore">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Narrative</div><span class="font-bold">...</span></div>
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Individual</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Narrative" title="Click to view narrative grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Narrative</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermNarrativeScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Individual" title="Click to view individual grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Individual</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermIndividualScore">...</span></div>
                                 </div>
                             </div>
-                            
+
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-1 border rounded text-center"><div class="text-gray-400 text-[9px] uppercase">Report</div><span class="font-bold">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Report" title="Click to view report grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Report</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermReportScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermPerformanceTaskScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="participation" title="Click to view participation details">
                                         <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
@@ -375,7 +381,7 @@ const ClassUI = {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mt-4 flex justify-center">
                         <button id="openHistoryModalBtn" class="w-full bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center justify-center">
                             <i class="fa-solid fa-file-lines mr-2"></i> View Submission History
@@ -412,7 +418,7 @@ const ClassUI = {
             </div>
         </div>
     `,
-    
+
     renderSubmissionHistoryModal: () => `
         <div id="submissionHistoryModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmissionHistoryModalBg"></div>
@@ -440,7 +446,7 @@ const ClassUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <div class="mb-4 flex flex-col md:flex-row gap-2">
                     <input type="text" id="studentSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
                     <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
@@ -479,7 +485,7 @@ const ClassUI = {
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
-                
+
                 <div class="w-full flex justify-between items-center mb-4">
                     <div class="flex space-x-3">
                         <label class="flex items-center space-x-1.5 text-xs font-bold text-gray-700 cursor-pointer">
@@ -505,7 +511,7 @@ const ClassUI = {
                         <!-- Populated dynamically -->
                     </div>
                 </div>
-                
+
                 <div id="wheelContainer" class="w-full flex flex-col items-center">
                     <div class="relative w-64 h-64 mb-6">
                         <div class="absolute top-[-15px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-600 z-20 filter drop-shadow-md"></div>
@@ -513,23 +519,23 @@ const ClassUI = {
                         </div>
                     </div>
                 </div>
-                
+
                 <button id="spinWheelBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-lg shadow-md transition transform active:scale-95 focus:outline-none">
                     CALL STUDENT
                 </button>
-                
+
                 <div id="recitationResult" class="hidden w-full text-center fade-in bg-purple-50 p-6 rounded-xl border border-purple-200">
                     <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-4">Selected Student</p>
                     <div id="recitationResultAvatar" class="mb-4"></div>
                     <h4 id="recitationResultName" class="text-2xl font-black text-gray-900 mb-4"></h4>
-                    
+
                     <div class="flex flex-col items-center mb-6 w-full px-4">
                         <div class="bg-purple-100 text-purple-800 px-4 py-2 rounded-lg border border-purple-200">
                             <span class="text-xs font-bold uppercase tracking-wider">Seat Number: </span>
                             <span id="recitationResultSeat" class="text-lg font-black ml-1"></span>
                         </div>
                     </div>
-                    
+
                     <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
                         Next Student
                     </button>
@@ -560,7 +566,7 @@ const ClassUI = {
 export const ClassComponents = {
     renderClassScreen: (course, students) => {
         const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
-        
+
         students.sort((a, b) => {
             const seatAStr = (a.Seat_Number || '').toString().trim();
             const seatBStr = (b.Seat_Number || '').toString().trim();
@@ -593,21 +599,21 @@ export const ClassComponents = {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
 
-            const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" alt="${s.Name}">` 
+            const avatarImg = avatarSrc
+                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" alt="${s.Name}">`
                 : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
-            
-            const eyeConditionBadge = s.eye_condition 
+
+            const eyeConditionBadge = s.eye_condition
                 ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
                 : '';
 
-            const groupDisplay = s.Group_Name 
-                ? `<span class="group-name-trigger text-blue-600 cursor-pointer hover:underline font-black" data-group="${s.Group_Name}" data-course-id="${course.Course_ID}">${s.Group_Name}</span>` 
+            const groupDisplay = s.Group_Name
+                ? `<span class="group-name-trigger text-blue-600 cursor-pointer hover:underline font-black" data-group="${s.Group_Name}" data-course-id="${course.Course_ID}">${s.Group_Name}</span>`
                 : `<span class="text-gray-800">None</span>`;
 
             return `
                 <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}">
-                    
+
                     <div class="flex items-start justify-between w-full lg:w-1/2">
                         <div class="flex items-center space-x-3 p-1.5 -ml-1.5 rounded-lg transition">
                             <span class="text-xs font-bold text-gray-400 w-5 text-center">${index + 1}</span>
@@ -626,13 +632,13 @@ export const ClassComponents = {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="lg:hidden">
-                            <button type="button" class="manage-student-btn px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm" 
-                                data-student-id="${s.User_ID}" 
-                                data-name="${s.Name}" 
-                                data-seat="${s.Seat_Number || ''}" 
-                                data-group="${s.Group_Name || ''}" 
+                            <button type="button" class="manage-student-btn px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm"
+                                data-student-id="${s.User_ID}"
+                                data-name="${s.Name}"
+                                data-seat="${s.Seat_Number || ''}"
+                                data-group="${s.Group_Name || ''}"
                                 data-topic="${s.Assigned_Topic || ''}"
                                 data-status="${s.account_status || 'Inactive'}">
                                 <i class="fa-solid fa-gear"></i>
@@ -641,17 +647,17 @@ export const ClassComponents = {
                     </div>
 
                     <div class="hidden lg:flex items-center justify-center w-auto px-2">
-                        <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm" 
-                            data-student-id="${s.User_ID}" 
-                            data-name="${s.Name}" 
-                            data-seat="${s.Seat_Number || ''}" 
-                            data-group="${s.Group_Name || ''}" 
+                        <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm"
+                            data-student-id="${s.User_ID}"
+                            data-name="${s.Name}"
+                            data-seat="${s.Seat_Number || ''}"
+                            data-group="${s.Group_Name || ''}"
                             data-topic="${s.Assigned_Topic || ''}"
                             data-status="${s.account_status || 'Inactive'}">
                             <i class="fa-solid fa-gear mr-1"></i> Manage
                         </button>
                     </div>
-                    
+
                     <div class="flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto">
                         <div class="flex items-center lg:items-start lg:flex-col gap-2 lg:gap-0">
                             <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider lg:mb-0.5 text-center">Pts</label>
@@ -670,7 +676,7 @@ export const ClassComponents = {
                             <button type="button" data-status="Absent" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
                                 Absent
                             </button>
-                            
+
                             <button type="button" class="save-single-attendance-btn ml-1 px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition shadow-sm" title="Save Individual Attendance">
                                 <i class="fa-solid fa-floppy-disk"></i>
                             </button>
@@ -683,8 +689,8 @@ export const ClassComponents = {
         const emptyState = `<div class="p-8 text-center text-gray-500 bg-white rounded-b-xl border-dashed border-gray-300">No students enrolled yet.</div>`;
 
         const targetDisplay = [course.Target_Course, course.Target_Year, course.Target_Section].filter(Boolean).join(' ');
-        const audienceBadge = targetDisplay 
-            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-blue-200 uppercase align-middle ml-2 sm:ml-3">${targetDisplay} Only</span>` 
+        const audienceBadge = targetDisplay
+            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-blue-200 uppercase align-middle ml-2 sm:ml-3">${targetDisplay} Only</span>`
             : `<span class="inline-block bg-gray-100 text-gray-600 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-gray-200 uppercase align-middle ml-2 sm:ml-3">All Students</span>`;
 
         return `
@@ -710,10 +716,10 @@ export const ClassComponents = {
                         </h2>
                         <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
                     </div>
-                    
+
                     <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
                         <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
-                        
+
                         <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
                             <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
                         </button>
@@ -722,7 +728,7 @@ export const ClassComponents = {
                         </button>
                     </div>
                 </div>
-                
+
                 <div id="noClassBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-bold bg-orange-100 text-orange-800 border border-orange-200 uppercase tracking-wider flex items-center justify-center">
                     <i class="fa-solid fa-triangle-exclamation mr-2 text-lg"></i> This date is marked as No Class
                 </div>
