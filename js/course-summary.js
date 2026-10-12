@@ -26,6 +26,8 @@ const STATUS_BADGE = {
     'Dropped': 'text-red-700 border-red-300 bg-red-100'
 };
 
+const SCORE_CATEGORIES = ['Written', 'Narrative', 'Individual', 'Performance', 'Report', 'MajorExam'];
+
 export const CourseSummary = {
     course: null,
     sessions: [],
@@ -233,14 +235,10 @@ export const CourseSummary = {
 
     computeScores: (assessments, term) => {
         const terms = term === 'midterm' ? ['MidTerm'] : (term === 'finalterm' ? ['FinalTerm'] : ['MidTerm', 'FinalTerm']);
-        const out = {
-            Written: { score: 0, max: 0, count: 0 },
-            Performance: { score: 0, max: 0, count: 0 },
-            MajorExam: { score: 0, max: 0, count: 0 },
-            items: []
-        };
+        const out = { items: [] };
+        SCORE_CATEGORIES.forEach(c => { out[c] = { score: 0, max: 0, count: 0 }; });
         (assessments || []).forEach(a => {
-            if (!terms.includes(a.Term) || !out[a.Category] || a.Category === 'items') return;
+            if (!terms.includes(a.Term) || !SCORE_CATEGORIES.includes(a.Category)) return;
             if (a.Score === null || a.Score === undefined) return;
             out[a.Category].score += a.Score;
             out[a.Category].max += a.Max_Score;
@@ -287,7 +285,7 @@ export const CourseSummary = {
         else warn.classList.remove('hidden');
 
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="14" class="px-3 py-8 text-center text-gray-500 italic">No students found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-gray-500 italic">No students found.</td></tr>';
             return;
         }
 
@@ -301,7 +299,7 @@ export const CourseSummary = {
             const sc = r.scores;
             const scoreBlock = sc.items.length === 0 ? '' : `
                                 <div class="flex justify-between gap-3 pt-2 mt-2 border-t border-gray-300 font-bold text-gray-500 uppercase"><span>Assessment</span><span>Score</span></div>
-                                ${sc.items.map(a => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(a.Title)} <span class="text-gray-400">(${esc(a.Term === 'MidTerm' ? 'Mid' : 'Final')})</span></span><span class="font-mono font-bold text-blue-600">${esc(Number(a.Score.toFixed(2)))}/${esc(Number(a.Max_Score.toFixed(2)))}</span></div>`).join('')}`;
+                                ${sc.items.map(a => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(a.Title)} <span class="text-gray-400">(${esc(a.Category)}, ${esc(a.Term === 'MidTerm' ? 'Mid' : 'Final')})</span></span><span class="font-mono font-bold text-blue-600">${esc(Number(a.Score.toFixed(2)))}/${esc(Number(a.Max_Score.toFixed(2)))}</span></div>`).join('')}`;
             const statusText = s.account_status || 'Inactive';
             const badge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${STATUS_BADGE[statusText] || STATUS_BADGE['Inactive']}">${esc(statusText)}</span>`;
 
@@ -334,6 +332,9 @@ export const CourseSummary = {
                     </td>
                     <td class="px-3 py-2 text-center font-black text-blue-700 text-sm">${st.points}</td>
                     <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.Written)}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.Narrative)}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.Individual)}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.Report)}</td>
                     <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.Performance)}</td>
                     <td class="px-3 py-2 text-center font-mono font-bold text-gray-800">${CourseSummary.scoreText(sc.MajorExam)}</td>
                     <td class="px-3 py-2">
@@ -370,7 +371,8 @@ export const CourseSummary = {
         const header = [
             'Seat No.', 'Student No.', 'Name', 'Email', 'Contact Number', 'Account Status', 'Course/Year/Section', 'Group', 'Assigned Topic',
             'Term', 'Present', 'Late', 'Excused', 'Absent', 'Class Days', 'Attendance %', 'Participation Points',
-            'Written Score', 'Written Max', 'Task Score', 'Task Max', 'Major Exam Score', 'Major Exam Max',
+            'Written Score', 'Written Max', 'Narrative Score', 'Narrative Max', 'Individual Score', 'Individual Max',
+            'Report Score', 'Report Max', 'Task Score', 'Task Max', 'Major Exam Score', 'Major Exam Max',
             'Attendance & Participation Log', 'Assessment Scores'
         ];
 
@@ -383,17 +385,18 @@ export const CourseSummary = {
             const log = st.records.map(rec => `${rec.Date}: ${rec.Status || 'N/A'} (${rec.Performance_Points || 0} pts)`).join('; ');
             const sc = r.scores;
             const blank = (c) => c.count ? [Number(c.score.toFixed(2)), Number(c.max.toFixed(2))] : ['', ''];
-            const scoreLog = sc.items.map(a => `${a.Title} [${a.Term === 'MidTerm' ? 'Mid' : 'Final'}]: ${Number(a.Score.toFixed(2))}/${Number(a.Max_Score.toFixed(2))}`).join('; ');
+            const scoreLog = sc.items.map(a => `${a.Title} [${a.Category}, ${a.Term === 'MidTerm' ? 'Mid' : 'Final'}]: ${Number(a.Score.toFixed(2))}/${Number(a.Max_Score.toFixed(2))}`).join('; ');
             lines.push([
                 s.Seat_Number || '', s.Student_Number || '', s.Name || '', s.Email || '', s.Contact_Number || '', s.account_status || 'Inactive', cys,
                 s.Group_Name || '', s.Assigned_Topic || '', termLabel,
                 st.present, st.late, st.excused, st.absent, st.classDays, st.pct, st.points,
-                ...blank(sc.Written), ...blank(sc.Performance), ...blank(sc.MajorExam),
+                ...blank(sc.Written), ...blank(sc.Narrative), ...blank(sc.Individual),
+                ...blank(sc.Report), ...blank(sc.Performance), ...blank(sc.MajorExam),
                 log, scoreLog
             ].map(CourseSummary.csvCell).join(','));
         });
 
-        const csv = '\uFEFF' + lines.join('\r\n');
+        const csv = '﻿' + lines.join('\r\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
