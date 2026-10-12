@@ -1,6 +1,6 @@
 // js/course-class.js
 import { apiFetch, AppState } from './globals.js';
-import { Components, getLoadableAvatarSrc } from './components.js'; 
+import { Components, getLoadableAvatarSrc } from './components.js';
 import { CourseAttendance } from './course-attendance.js';
 
 export const CourseClass = {
@@ -12,7 +12,7 @@ export const CourseClass = {
     updateManageStatusColor: (selectEl) => {
         const status = selectEl.value;
         selectEl.className = `w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition ${
-            status === 'Active' ? 'text-green-600 border-green-300 bg-green-50 focus:ring-green-500' : 
+            status === 'Active' ? 'text-green-600 border-green-300 bg-green-50 focus:ring-green-500' :
             status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' :
             status === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50 focus:ring-orange-500' :
             status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' :
@@ -25,7 +25,7 @@ export const CourseClass = {
             alert("No students enrolled to copy emails.");
             return;
         }
-        
+
         const emails = CourseClass.currentStudents
             .map(s => s.Email)
             .filter(email => email && email.trim() !== '');
@@ -36,7 +36,7 @@ export const CourseClass = {
         }
 
         const emailString = emails.join(', ');
-        
+
         try {
             await navigator.clipboard.writeText(emailString);
             alert(`Successfully copied ${emails.length} email address(es) to your clipboard! Ready to paste into Google Calendar.`);
@@ -86,7 +86,7 @@ export const CourseClass = {
                 if (hasGrades) {
                     gradingHtml = `
                     <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2 text-[10px]">
-                        <span class="font-bold text-gray-700">Grades:</span> 
+                        <span class="font-bold text-gray-700">Grades:</span>
                         ${sub.Grade_Narrative != null ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Narrative: <span class="text-blue-600">${sub.Grade_Narrative}</span></span>` : ''}
                         ${sub.Grade_Individual != null ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Individual: <span class="text-blue-600">${sub.Grade_Individual}</span></span>` : ''}
                         ${sub.Grade_Report != null ? `<span class="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">Report: <span class="text-blue-600">${sub.Grade_Report}</span></span>` : ''}
@@ -122,11 +122,11 @@ export const CourseClass = {
     renderDetailsModal: (term, metric, data) => {
         const course = data.course || {};
         const records = data.records || [];
-        
+
         let termStart = '';
         let termEnd = '';
         let titleTerm = '';
-        
+
         if (term === 'midterm') {
             termStart = course.Midterm_Start || '';
             termEnd = course.Midterm_End || '';
@@ -149,9 +149,9 @@ export const CourseClass = {
 
         const isSubmissionMetric = ['narrative', 'individual', 'report'].includes(metric);
         const titleMetric = isSubmissionMetric ? `${metric.charAt(0).toUpperCase() + metric.slice(1)} Breakdown` : (metric === 'attendance' ? 'Attendance Breakdown' : 'Participation Breakdown');
-        
+
         document.getElementById('detailsModalTitle').textContent = `${titleTerm} | ${titleMetric}`;
-        
+
         const scoreHeader = document.getElementById('detailsScoreHeader');
         if (metric === 'attendance') scoreHeader.textContent = "Attendance Score";
         else if (isSubmissionMetric) scoreHeader.textContent = "Grade";
@@ -163,14 +163,14 @@ export const CourseClass = {
         if (isSubmissionMetric) {
             const subTerm = term === 'midterm' ? 'MidTerm' : 'FinalTerm';
             const colName = metric === 'narrative' ? 'Grade_Narrative' : (metric === 'individual' ? 'Grade_Individual' : 'Grade_Report');
-            
+
             const termSubmissions = (data.submissions || []).filter(s => s.Term === subTerm && s[colName] != null);
-            
+
             if (termSubmissions.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">No ${metric} grades found for this period.</td></tr>`;
                 return;
             }
-            
+
             tbody.innerHTML = termSubmissions.map(s => `
                 <tr class="hover:bg-gray-50 transition">
                     <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${new Date(s.Timestamp + 'Z').toLocaleDateString()}</td>
@@ -188,7 +188,7 @@ export const CourseClass = {
 
         const tStart = parseLocalDate(termStart);
         const tEnd = parseLocalDate(termEnd);
-        
+
         const termRecords = records.filter(r => {
             const rDate = parseLocalDate(r.Date);
             if (!rDate || !tStart || !tEnd) return false;
@@ -203,12 +203,12 @@ export const CourseClass = {
         const rowsHtml = termRecords.map(r => {
             let statusColor = 'text-gray-600';
             let attScore = 0;
-            
+
             if (r.Status === 'Present') { statusColor = 'text-green-600 font-bold'; attScore = 1; }
             else if (r.Status === 'Late') { statusColor = 'text-yellow-600 font-bold'; attScore = 0.5; }
             else if (r.Status === 'Excused') { statusColor = 'text-purple-600 font-bold'; attScore = 0; }
             else if (r.Status === 'Absent') { statusColor = 'text-red-600 font-bold'; attScore = 0; }
-            
+
             const displayScore = metric === 'attendance' ? attScore : (r.Performance_Points || 0);
 
             return `
@@ -340,24 +340,24 @@ export const CourseClass = {
     loadUnenrolledStudents: async (courseId) => {
         const listContainer = document.getElementById('unenrolledStudentsList');
         if (!listContainer) return;
-        
+
         const filterStatus = document.getElementById('filterStatus')?.value ?? 'Active';
         const filterCourse = document.getElementById('filterCourse')?.value || '';
         const filterYear = document.getElementById('filterYear')?.value || '';
         const filterSection = document.getElementById('filterSection')?.value || '';
 
         listContainer.innerHTML = '<div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>';
-        
+
         try {
             let url = `/api/unenrolled-students?courseId=${courseId}`;
             if (filterStatus) url += `&statusFilter=${encodeURIComponent(filterStatus)}`;
             if (filterCourse) url += `&courseFilter=${encodeURIComponent(filterCourse)}`;
             if (filterYear) url += `&yearFilter=${encodeURIComponent(filterYear)}`;
             if (filterSection) url += `&sectionFilter=${encodeURIComponent(filterSection)}`;
-            
+
             const ts = new Date().getTime();
             const data = await apiFetch(`${url}&_t=${ts}`);
-            
+
             if (!data.students || data.students.length === 0) {
                 listContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white border border-gray-200 rounded-md shadow-sm">No new students available to enroll matching criteria.</div>';
                 return;
@@ -366,7 +366,7 @@ export const CourseClass = {
             const html = data.students.map(s => {
                 const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
                 const statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                    s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' : 
+                    s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' :
                     s.account_status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
                     s.account_status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
                     s.account_status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
@@ -391,12 +391,12 @@ export const CourseClass = {
             }).join('');
 
             listContainer.innerHTML = html;
-            
+
             const searchInput = document.getElementById('studentSearchInput');
             if (searchInput && searchInput.value) {
                 searchInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            
+
         } catch (err) {
             listContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-sm font-medium border border-red-200 text-center">${err.message}</div>`;
         }
@@ -405,14 +405,14 @@ export const CourseClass = {
     loadClassScreen: async (courseId, skipSpinner = false) => {
         const root = document.getElementById('app-root');
         if (!root || !AppState.user) return;
-        
+
         let modalWasOpen = false;
         let searchVal = '';
         let statusVal = 'Active';
         let courseVal = '';
         let yearVal = '';
         let sectionVal = '';
-        
+
         const modal = document.getElementById('addStudentModal');
         if (modal && !modal.classList.contains('hidden')) {
             modalWasOpen = true;
@@ -422,44 +422,44 @@ export const CourseClass = {
             yearVal = document.getElementById('filterYear')?.value || '';
             sectionVal = document.getElementById('filterSection')?.value || '';
         }
-        
+
         if (!skipSpinner) {
             root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
         }
-        
+
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
-            
-            CourseClass.currentStudents = data.students; 
+
+            CourseClass.currentStudents = data.students;
 
             root.innerHTML = Components.renderClassScreen(data.course, data.students);
-            
+
             const dateInput = document.getElementById('attendanceDate');
             if (dateInput) {
                 await CourseAttendance.loadAttendanceData(courseId, dateInput.value);
             }
-            
+
             if (modalWasOpen) {
                 document.getElementById('addStudentModal').classList.remove('hidden');
-                
+
                 const filterCourseSelect = document.getElementById('filterCourse');
                 if (filterCourseSelect) {
                     try {
                         const programsData = await apiFetch(`/api/programs?_t=${ts}`);
                         if (programsData.programs) {
-                            filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' + 
+                            filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' +
                                 programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
                         }
                     } catch(e) {}
                 }
-                
+
                 if (document.getElementById('studentSearchInput')) document.getElementById('studentSearchInput').value = searchVal;
                 if (document.getElementById('filterStatus')) document.getElementById('filterStatus').value = statusVal;
                 if (document.getElementById('filterCourse')) document.getElementById('filterCourse').value = courseVal;
                 if (document.getElementById('filterYear')) document.getElementById('filterYear').value = yearVal;
                 if (document.getElementById('filterSection')) document.getElementById('filterSection').value = sectionVal;
-                
+
                 CourseClass.loadUnenrolledStudents(courseId);
             }
 
@@ -471,7 +471,7 @@ export const CourseClass = {
                     document.removeEventListener('keydown', CourseClass.resetFabOpacity);
                     document.removeEventListener('touchstart', CourseClass.resetFabOpacity);
                 }
-                
+
                 CourseClass.resetFabOpacity = () => {
                     const currentFab = document.getElementById('openRecitationBtn');
                     if (currentFab) {
@@ -484,50 +484,15 @@ export const CourseClass = {
                         }, 10000);
                     }
                 };
-                
+
                 document.addEventListener('mousemove', CourseClass.resetFabOpacity);
                 document.addEventListener('keydown', CourseClass.resetFabOpacity);
                 document.addEventListener('touchstart', CourseClass.resetFabOpacity);
                 CourseClass.resetFabOpacity();
             }
 
-            document.querySelectorAll('.view-summary-trigger').forEach(trigger => {
-                trigger.addEventListener('click', async (e) => {
-                    const name = trigger.dataset.name;
-                    
-                    const confirmation = window.confirm(`Load performance summary for ${name}?`);
-                    if (!confirmation) return;
-
-                    const studentId = trigger.closest('.student-row').dataset.studentId;
-                    
-                    document.getElementById('summaryStudentName').textContent = name;
-                    document.getElementById('summaryModal').classList.remove('hidden');
-                    document.getElementById('summaryLoading').classList.remove('hidden');
-                    document.getElementById('summaryContent').classList.add('hidden');
-                    document.getElementById('summaryError').classList.add('hidden');
-                    
-                    CourseClass.currentSummaryData = null;
-
-                    try {
-                        const ts = new Date().getTime();
-                        const summaryData = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}&_t=${ts}`);
-                        CourseClass.currentSummaryData = summaryData;
-                        
-                        CourseAttendance.renderTermMetrics('midterm', summaryData);
-                        CourseAttendance.renderTermMetrics('finalterm', summaryData);
-                        CourseClass.renderSubmissionsHistory(summaryData.submissions, 'historySubmissionsList');
-
-                        document.getElementById('summaryLoading').classList.add('hidden');
-                        document.getElementById('summaryContent').classList.remove('hidden');
-                    } catch(err) {
-                        console.error("Failed to load summary", err);
-                        const errDiv = document.getElementById('summaryError');
-                        errDiv.textContent = err.message || "Failed to load summary records.";
-                        errDiv.classList.remove('hidden');
-                        document.getElementById('summaryLoading').classList.add('hidden');
-                    }
-                });
-            });
+            // NOTE: the .view-summary-trigger click is handled by the delegated
+            // listener in course.js. Do not bind it here, or it fires twice.
 
         } catch (err) {
             root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
