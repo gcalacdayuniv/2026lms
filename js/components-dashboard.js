@@ -32,11 +32,11 @@ const renderTermBlock = (term, label) => {
                                         <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Quizzes/Long</div>
                                         <span class="font-black ${t.text} text-xl block" id="${term}WrittenScore">...</span>
                                     </div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="narrative" title="Click to view narrative details">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-scores-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-category="Narrative" title="Click to view narrative grades">
                                         <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Narrative</div>
                                         <span class="font-black ${t.text} text-xl block" id="${term}NarrativeScore">...</span>
                                     </div>
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="individual" title="Click to view individual details">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-scores-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-category="Individual" title="Click to view individual grades">
                                         <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Individual</div>
                                         <span class="font-black ${t.text} text-xl block" id="${term}IndividualScore">...</span>
                                     </div>
@@ -46,7 +46,7 @@ const renderTermBlock = (term, label) => {
                             <div>
                                 <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-details-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-metric="report" title="Click to view report details">
+                                    <div class="bg-gray-50 p-3 border border-gray-100 rounded-lg text-center cursor-pointer view-scores-trigger ${t.hover} transition hover:shadow-md" data-term="${term}" data-category="Report" title="Click to view report grades">
                                         <div class="text-gray-400 text-[10px] uppercase font-bold mb-1">Report</div>
                                         <span class="font-black ${t.text} text-xl block" id="${term}ReportScore">...</span>
                                     </div>
