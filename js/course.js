@@ -81,7 +81,7 @@ export const CourseModule = {
             const groupName = document.getElementById('manageGroupInput').value.trim();
             const assignedTopic = document.getElementById('manageTopicInput').value.trim();
             const courseId = window.location.hash.replace('#class-', '');
-            
+
             try {
                 await apiFetch('/api/update-student-info', {
                     method: 'POST',
@@ -91,12 +91,12 @@ export const CourseModule = {
                 console.error('Failed to update student info:', err);
             }
         }
-        
+
         if (e.target.id === 'manageStatusSelect') {
             const studentId = document.getElementById('manageStudentId').value;
             const status = e.target.value;
             CourseClass.updateManageStatusColor(e.target);
-            
+
             try {
                 await apiFetch('/api/update-user-status', {
                     method: 'POST',
@@ -120,7 +120,7 @@ export const CourseModule = {
                 await CourseAttendance.loadAttendanceData(courseId, date);
             }
         }
-        
+
         if (e.target.name === 'callerMode') {
             const toggleBtn = document.getElementById('toggleCalledListBtn');
             const calledContainer = document.getElementById('calledListContainer');
@@ -138,20 +138,20 @@ export const CourseModule = {
     handleClicks: async (e) => {
         if (e.target.closest('.group-name-trigger') || e.target.closest('#ssGroup')) {
             const trigger = e.target.closest('.group-name-trigger') || e.target.closest('#ssGroup');
-            if (!trigger.dataset.group) return; 
+            if (!trigger.dataset.group) return;
 
             const courseId = trigger.dataset.courseId;
             const groupName = trigger.dataset.group;
-            
+
             document.getElementById('gmmTitle').textContent = `Group: ${groupName}`;
             document.getElementById('groupMembersModal').classList.remove('hidden');
             document.getElementById('gmmLoading').classList.remove('hidden');
             document.getElementById('gmmContent').classList.add('hidden');
-            
+
             try {
                 const data = await apiFetch(`/api/group-members?courseId=${courseId}&groupName=${encodeURIComponent(groupName)}`);
                 const content = document.getElementById('gmmContent');
-                
+
                 if (data.members && data.members.length > 0) {
                     content.innerHTML = data.members.map(m => {
                         const avatarSrc = getLoadableAvatarSrc(m.Avatar);
@@ -177,7 +177,7 @@ export const CourseModule = {
                 document.getElementById('gmmContent').classList.remove('hidden');
             }
         }
-        
+
         if (e.target.closest('#closeGroupMembersModalBtn') || e.target.id === 'closeGroupMembersModalBg') {
             document.getElementById('groupMembersModal').classList.add('hidden');
         }
@@ -192,7 +192,7 @@ export const CourseModule = {
         if (e.target.closest('#closeSubmitDocModalBtn') || e.target.id === 'closeSubmitDocModalBg') {
             document.getElementById('submitDocModal').classList.add('hidden');
         }
-        
+
         if (e.target.closest('#openHistoryModalBtn')) {
             document.getElementById('submissionHistoryModal').classList.remove('hidden');
         }
@@ -228,29 +228,29 @@ export const CourseModule = {
             const card = e.target.closest('.student-active-course');
             const courseId = card.dataset.courseId;
             const courseTitle = card.dataset.courseTitle;
-            
+
             document.getElementById('ssCourseTitle').textContent = courseTitle;
             document.getElementById('ssEnrollmentInfo').classList.add('hidden');
-            
+
             document.getElementById('studentSummaryModal').classList.remove('hidden');
             document.getElementById('summaryLoading').classList.remove('hidden');
             document.getElementById('summaryContent').classList.add('hidden');
             document.getElementById('summaryError').classList.add('hidden');
-            
+
             CourseClass.currentSummaryData = null;
 
             try {
                 const ts = new Date().getTime();
                 const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${AppState.user.User_ID}&_t=${ts}`);
                 CourseClass.currentSummaryData = data;
-                
+
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
                 CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
-                
+
                 if (data.enrollment) {
                     document.getElementById('ssSeat').textContent = data.enrollment.Seat_Number || 'N/A';
-                    
+
                     const groupEl = document.getElementById('ssGroup');
                     if (data.enrollment.Group_Name) {
                         groupEl.textContent = data.enrollment.Group_Name;
@@ -267,7 +267,7 @@ export const CourseModule = {
                     document.getElementById('ssTopic').textContent = data.enrollment.Assigned_Topic || 'N/A';
                     document.getElementById('ssEnrollmentInfo').classList.remove('hidden');
                 }
-                
+
                 const submitBtn = document.getElementById('openSubmitDocModalBtn');
                 if (submitBtn) submitBtn.dataset.courseId = courseId;
 
@@ -281,7 +281,7 @@ export const CourseModule = {
                 document.getElementById('summaryLoading').classList.add('hidden');
             }
         }
-        
+
         if (e.target.closest('#closeStudentSummaryModalBtn') || e.target.id === 'closeStudentSummaryModalBg') {
             document.getElementById('studentSummaryModal').classList.add('hidden');
         }
@@ -291,7 +291,7 @@ export const CourseModule = {
             if (!confirmation) {
                 return;
             }
-            
+
             const btn = e.target.closest('.enroll-btn');
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
@@ -312,7 +312,7 @@ export const CourseModule = {
             const courseId = window.location.hash.replace('#class-', '');
             await CourseAttendance.loadNoClassDays(courseId);
         }
-        
+
         if (e.target.closest('#closeNoClassModalBtn') || e.target.id === 'closeNoClassModalBg') {
             document.getElementById('noClassModal').classList.add('hidden');
             const courseId = window.location.hash.replace('#class-', '');
@@ -321,14 +321,14 @@ export const CourseModule = {
                 await CourseAttendance.loadAttendanceData(courseId, dateInput.value);
             }
         }
-        
+
         if (e.target.closest('#addNoClassBtn')) {
             const dateInput = document.getElementById('addNoClassDate');
             if (!dateInput.value) return;
             const courseId = window.location.hash.replace('#class-', '');
             const btn = e.target.closest('#addNoClassBtn');
             const originalHtml = btn.innerHTML;
-            
+
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
@@ -345,12 +345,12 @@ export const CourseModule = {
                 btn.innerHTML = originalHtml;
             }
         }
-        
+
         if (e.target.closest('.remove-no-class-btn')) {
             const btn = e.target.closest('.remove-no-class-btn');
             const date = btn.dataset.date;
             const courseId = window.location.hash.replace('#class-', '');
-            
+
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
@@ -370,7 +370,7 @@ export const CourseModule = {
             const btn = e.target.closest('#saveCourseTermsBtn');
             const alertBox = document.getElementById('courseMenuAlert');
             const courseId = window.location.hash.replace('#class-', '');
-            
+
             const payload = {
                 courseId: courseId,
                 midtermStart: document.getElementById('midtermStart').value,
@@ -406,9 +406,9 @@ export const CourseModule = {
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
-            
+
             await CourseClass.exportRoster(courseId);
-            
+
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
@@ -418,9 +418,9 @@ export const CourseModule = {
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Copying...';
-            
+
             await CourseClass.copyStudentEmails();
-            
+
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
@@ -432,7 +432,7 @@ export const CourseModule = {
             document.getElementById('manageSeatInput').value = btn.dataset.seat;
             document.getElementById('manageGroupInput').value = btn.dataset.group;
             document.getElementById('manageTopicInput').value = btn.dataset.topic;
-            
+
             const statusSelect = document.getElementById('manageStatusSelect');
             statusSelect.value = btn.dataset.status;
             CourseClass.updateManageStatusColor(statusSelect);
@@ -443,35 +443,35 @@ export const CourseModule = {
         if (e.target.closest('#closeManageStudentModalBtn') || e.target.id === 'closeManageStudentModalBg') {
             document.getElementById('manageStudentModal').classList.add('hidden');
             const courseId = window.location.hash.replace('#class-', '');
-            await CourseClass.loadClassScreen(courseId, true); 
+            await CourseClass.loadClassScreen(courseId, true);
         }
 
         if (e.target.closest('.view-summary-trigger')) {
             const trigger = e.target.closest('.view-summary-trigger');
             const name = trigger.dataset.name;
-            
+
             const confirmation = window.confirm(`Load performance summary for ${name}?`);
             if (!confirmation) return;
 
             const studentId = trigger.closest('.student-row').dataset.studentId;
             const courseId = window.location.hash.replace('#class-', '');
-            
+
             document.getElementById('summaryStudentName').textContent = name;
             document.getElementById('summaryModal').classList.remove('hidden');
             document.getElementById('summaryLoading').classList.remove('hidden');
             document.getElementById('summaryContent').classList.add('hidden');
             document.getElementById('summaryError').classList.add('hidden');
-            
+
             CourseClass.currentSummaryData = null;
 
             try {
                 const ts = new Date().getTime();
                 const data = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${studentId}&_t=${ts}`);
                 CourseClass.currentSummaryData = data;
-                
+
                 CourseAttendance.renderTermMetrics('midterm', data);
                 CourseAttendance.renderTermMetrics('finalterm', data);
-                CourseClass.renderSubmissionsHistory(data.submissions, 'summarySubmissionsList');
+                CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
 
                 document.getElementById('summaryLoading').classList.add('hidden');
                 document.getElementById('summaryContent').classList.remove('hidden');
@@ -483,7 +483,7 @@ export const CourseModule = {
                 document.getElementById('summaryLoading').classList.add('hidden');
             }
         }
-        
+
         if (e.target.closest('#closeSummaryModalBtn') || e.target.id === 'closeSummaryModalBg') {
             document.getElementById('summaryModal').classList.add('hidden');
         }
@@ -492,13 +492,13 @@ export const CourseModule = {
             const trigger = e.target.closest('.view-details-trigger');
             const term = trigger.dataset.term;
             const metric = trigger.dataset.metric;
-            
+
             if (CourseClass.currentSummaryData) {
                 CourseClass.renderDetailsModal(term, metric, CourseClass.currentSummaryData);
                 document.getElementById('detailsModal').classList.remove('hidden');
             }
         }
-        
+
         if (e.target.closest('#closeDetailsModalBtn') || e.target.id === 'closeDetailsModalBg') {
             document.getElementById('detailsModal').classList.add('hidden');
         }
@@ -506,13 +506,13 @@ export const CourseModule = {
         if (e.target.closest('#manageResetPwdBtn')) {
             const studentId = document.getElementById('manageStudentId').value;
             const confirmReset = window.confirm("Are you sure you want to reset this student's password to '123456'?");
-            
+
             if (confirmReset) {
                 const btn = e.target.closest('#manageResetPwdBtn');
                 const originalHtml = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                
+
                 try {
                     await apiFetch('/api/reset-student-password', {
                         method: 'POST',
@@ -532,13 +532,13 @@ export const CourseModule = {
             const studentId = document.getElementById('manageStudentId').value;
             const courseId = window.location.hash.replace('#class-', '');
             const confirmRemove = window.confirm("Are you sure you want to remove this student from the course?");
-            
+
             if (confirmRemove) {
                 const btn = e.target.closest('#manageRemoveBtn');
                 const originalHtml = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                
+
                 try {
                     await apiFetch('/api/unenroll', {
                         method: 'POST',
@@ -558,18 +558,18 @@ export const CourseModule = {
             document.getElementById('courseMenuModal').classList.add('hidden');
             document.getElementById('addStudentModal').classList.remove('hidden');
             const courseId = window.location.hash.replace('#class-', '');
-            
+
             const filterCourse = document.getElementById('filterCourse');
             if (filterCourse && filterCourse.options.length <= 1) {
                 try {
                     const programsData = await apiFetch('/api/programs');
                     if (programsData.programs) {
-                        filterCourse.innerHTML = '<option value="">Course (All)</option>' + 
+                        filterCourse.innerHTML = '<option value="">Course (All)</option>' +
                             programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
                     }
                 } catch(err) {}
             }
-            
+
             await CourseClass.loadUnenrolledStudents(courseId);
         }
 
@@ -588,13 +588,13 @@ export const CourseModule = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             const courseId = window.location.hash.replace('#class-', '');
             const studentId = btn.dataset.studentId;
-            
+
             try {
-                await apiFetch('/api/enroll', { 
-                    method: 'POST', 
-                    body: JSON.stringify({ courseId: courseId, studentId: studentId }) 
+                await apiFetch('/api/enroll', {
+                    method: 'POST',
+                    body: JSON.stringify({ courseId: courseId, studentId: studentId })
                 });
-                
+
                 await CourseClass.loadClassScreen(courseId, true);
             } catch (err) {
                 alert(err.message);
@@ -606,16 +606,16 @@ export const CourseModule = {
         if (e.target.classList.contains('attendance-btn')) {
             const row = e.target.closest('.student-row');
             const buttons = row.querySelectorAll('.attendance-btn');
-            
+
             buttons.forEach(btn => {
                 btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
                 btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
                 btn.removeAttribute('data-selected');
             });
-            
+
             const status = e.target.dataset.status;
             e.target.setAttribute('data-selected', 'true');
-            
+
             if(status === 'Present') {
                 e.target.classList.replace('bg-gray-50', 'bg-green-100');
                 e.target.classList.replace('text-gray-600', 'text-green-800');
@@ -662,7 +662,7 @@ export const CourseModule = {
             const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
             const pointsInput = row.querySelector('.points-input');
             const banner = document.getElementById('noClassBanner');
-            
+
             if (!dateVal) {
                 alert("Please select a date first to save attendance.");
                 return;
@@ -671,26 +671,26 @@ export const CourseModule = {
                 alert("This date is marked as NO CLASS. Adjust it in the Course Actions menu.");
                 return;
             }
-            
+
             const status = selectedBtn ? selectedBtn.dataset.status : null;
             const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-            
+
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            
+
             try {
                 await apiFetch('/api/attendance/single', {
                     method: 'POST',
                     body: JSON.stringify({ courseId, studentId, date: dateVal, status, points })
                 });
-                
+
                 CourseAttendance.saveDraft(courseId, dateVal);
 
                 btn.classList.replace('text-blue-600', 'text-green-600');
                 btn.classList.replace('bg-blue-50', 'bg-green-50');
                 btn.classList.replace('border-blue-200', 'border-green-200');
-                
+
                 setTimeout(() => {
                     btn.classList.replace('text-green-600', 'text-blue-600');
                     btn.classList.replace('bg-green-50', 'bg-blue-50');
@@ -716,7 +716,7 @@ export const CourseModule = {
         if (e.target.closest('#spinWheelBtn')) {
             CourseRecitation.spin();
         }
-        
+
         if (e.target.closest('#nextStudentBtn')) {
             CourseRecitation.resetToWheel();
         }
@@ -750,7 +750,7 @@ export const CourseModule = {
                 btn.classList.replace('bg-blue-50', 'bg-green-50');
                 btn.classList.replace('border-blue-200', 'border-green-200');
                 btn.innerHTML = 'Saved';
-                
+
                 setTimeout(() => {
                     btn.classList.replace('text-green-600', 'text-blue-600');
                     btn.classList.replace('bg-green-50', 'bg-blue-50');
