@@ -8,7 +8,7 @@ async function hashPassword(password) {
 }
 
 const ASSESSMENT_TERMS = ['MidTerm', 'FinalTerm'];
-const ASSESSMENT_CATEGORIES = ['Written', 'Performance', 'MajorExam'];
+const ASSESSMENT_CATEGORIES = ['Written', 'Narrative', 'Individual', 'Performance', 'Report', 'MajorExam'];
 
 export default {
     async fetch(request, env, ctx) {
