@@ -13,14 +13,22 @@ const fmt = (n) => Number(Number(n).toFixed(2));
 const TERM_LABELS = { MidTerm: 'Mid Term', FinalTerm: 'Final Term' };
 const CATEGORY_LABELS = {
     Written: 'Written Output (Quizzes/Long)',
+    Narrative: 'Written Output (Narrative)',
+    Individual: 'Written Output (Individual)',
     Performance: 'Performance Output (Tasks)',
+    Report: 'Performance Output (Report)',
     MajorExam: 'Major Exam'
 };
 const CATEGORY_ELEMENT = {
     Written: 'WrittenScore',
+    Narrative: 'NarrativeScore',
+    Individual: 'IndividualScore',
     Performance: 'PerformanceTaskScore',
+    Report: 'ReportScore',
     MajorExam: 'MajorExamScore'
 };
+// Categories that previously came only from submission grades; keep that value when no assessment is recorded.
+const SUBMISSION_FALLBACK = ['Narrative', 'Individual', 'Report'];
 
 export const CourseScores = {
     summaryData: null,
@@ -92,7 +100,7 @@ export const CourseScores = {
 
             const scored = assessments.filter(a => a.Term === subTerm && a.Category === category && a.Score !== null && a.Score !== undefined);
             if (scored.length === 0) {
-                el.textContent = '—';
+                if (!SUBMISSION_FALLBACK.includes(category)) el.textContent = '—';
                 return;
             }
             const total = scored.reduce((sum, a) => sum + a.Score, 0);
@@ -132,6 +140,22 @@ export const CourseScores = {
 
     // ---------- Lecturer side (Record Scores modal) ----------
 
+    ensureCategoryOptions: () => {
+        const select = document.getElementById('scCategory');
+        if (!select) return;
+        const labels = {
+            Written: 'Written (Quiz/Long)',
+            Narrative: 'Written (Narrative)',
+            Individual: 'Written (Individual)',
+            Performance: 'Performance (Task)',
+            Report: 'Performance (Report)',
+            MajorExam: 'Major Exam'
+        };
+        const current = select.value;
+        select.innerHTML = Object.keys(labels).map(k => `<option value="${k}">${labels[k]}</option>`).join('');
+        select.value = labels[current] ? current : 'Written';
+    },
+
     setAlert: (message, ok) => {
         const box = document.getElementById('scAlert');
         if (!box) return;
@@ -145,6 +169,7 @@ export const CourseScores = {
 
     load: async () => {
         CourseScores.setAlert('');
+        CourseScores.ensureCategoryOptions();
         const body = document.getElementById('scGridBody');
         body.innerHTML = '<tr><td colspan="4" class="px-3 py-8 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin text-xl text-blue-600"></i></td></tr>';
 
