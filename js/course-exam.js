@@ -65,11 +65,15 @@ export const CourseExam = {
                     CourseExam.speak(`You have selected Choice ${idx + 1}, ${letter}. ${q.choices[idx]}. Press Space or Enter to lock that answer.`);
                 }
             } else if (e.target.id === 'accExamPrevBtn') {
-                CourseExam.speak("Go back to previous question button.");
+                CourseExam.speak("Previous button. Double press the space or enter key to go to the previous question, or press the left arrow key.");
             } else if (e.target.id === 'accExamNextBtn') {
-                CourseExam.speak("Next question button.");
+                CourseExam.speak("Next button. Double press the space or enter key to go to the next question, or press the right arrow key.");
             } else if (e.target.id === 'accExamSubmitBtn') {
-                CourseExam.speak("Submit exam button.");
+                CourseExam.speak("Submit button. Double press the space or enter key to submit your answer.");
+            } else if (e.target.id === 'accExamExitBtn') {
+                CourseExam.speak("Exit Exam Button");
+            } else if (e.target.id === 'accExamRepeatAudioBtn') {
+                CourseExam.speak("Read Question Again Button");
             } else if (e.target.id === 'accExamTextAnswerInput') {
                 CourseExam.speak("Text Answer Input. Type your answer here, then press Enter.");
             }
