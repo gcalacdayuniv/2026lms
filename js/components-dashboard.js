@@ -1,5 +1,6 @@
 // js/components-dashboard.js
 import { getLoadableAvatarSrc } from './components-utils.js';
+import { ExamUI } from './components-exam.js';
 
 const TERM_THEMES = {
     midterm: {
@@ -173,7 +174,6 @@ const DashboardUI = {
                 </div>
 
                 <div id="manageUsersList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
-                    <!-- Dynamic content -->
                 </div>
             </div>
         </div>
@@ -448,7 +448,6 @@ const DashboardUI = {
                             <span>Submit as Group Upload</span>
                         </label>
                         <div id="groupMembersList" class="hidden space-y-1.5 mt-2 pt-2 border-t border-purple-200 max-h-32 overflow-y-auto">
-                            <!-- Dynamically populated -->
                         </div>
                     </div>
 
@@ -475,7 +474,6 @@ const DashboardUI = {
                     </button>
                 </div>
                 <div id="historySubmissionsList" class="flex-1 overflow-y-auto space-y-2 p-1">
-                    <!-- Dynamic Content -->
                 </div>
             </div>
         </div>
@@ -493,7 +491,6 @@ const DashboardUI = {
                 </div>
                 <div id="gmmLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
                 <div id="gmmContent" class="hidden flex-1 overflow-y-auto space-y-2 p-1">
-                    <!-- Dynamic Content -->
                 </div>
             </div>
         </div>
@@ -532,10 +529,7 @@ const DashboardUI = {
                 <div id="summaryError" class="hidden text-center py-12 text-red-500 font-bold text-lg"></div>
 
                 <div id="summaryContent" class="hidden space-y-6">
-                    <!-- Mid Term -->
                     ${renderTermBlock('midterm', 'Mid Term')}
-
-                    <!-- Final Term -->
                     ${renderTermBlock('finalterm', 'Final Term')}
 
                     <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3 border-t border-gray-200 pt-6">
@@ -629,6 +623,7 @@ export const DashboardComponents = {
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmitDocumentModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmissionHistoryModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderDetailsModal() : ''}
+            ${user.role.toLowerCase() === 'student' && ExamUI.renderAccessibleExamOverlay ? ExamUI.renderAccessibleExamOverlay() : ''}
             ${DashboardUI.renderGroupMembersModal()}
         `;
     }
