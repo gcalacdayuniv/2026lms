@@ -1,136 +1,17 @@
 // js/auth.js
 import { apiFetch, AppState } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
-import { CourseExam } from './course-exam.js';
 
 export const AuthModule = {
     usersList: [],
     currentImageGallery: [],
     currentImageIndex: 0,
-    accessibleExams: [],
-    accessibleStudent: null,
-    accessibleCredentials: null,
 
     init: () => {
         document.addEventListener('submit', AuthModule.handleForms);
         document.addEventListener('click', AuthModule.handleClicks);
         document.addEventListener('input', AuthModule.handleInputs);
         document.addEventListener('change', AuthModule.handleChanges);
-    },
-
-    speak: (text) => {
-        if (!('speechSynthesis' in window)) return;
-        try {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 0.98;
-            utterance.pitch = 1;
-            window.speechSynthesis.speak(utterance);
-        } catch (e) {
-            console.error('Speech synthesis error:', e);
-        }
-    },
-
-    loadStudentAccessibleExams: async () => {
-        const idInput = document.getElementById('loginIdentifier');
-        const pwInput = document.getElementById('loginPassword');
-        const errorDiv = document.getElementById('loginError');
-        const listDiv = document.getElementById('accessibleExamPortalList');
-        const btn = document.getElementById('enterExamLoginBtn');
-
-        if (!idInput || !pwInput || !listDiv) return;
-
-        const identifier = idInput.value.trim();
-        const password = pwInput.value;
-
-        errorDiv.classList.add('hidden');
-
-        if (!identifier || !password) {
-            const msg = "Please enter your Username or Student Number and your Password first, then press Enter Assigned Exam.";
-            errorDiv.textContent = msg;
-            errorDiv.classList.remove('hidden');
-            AuthModule.speak(msg);
-            if (!identifier) idInput.focus();
-            else pwInput.focus();
-            return;
-        }
-
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Checking Assigned Exams...';
-        AuthModule.speak("Checking your assigned exams. Please wait.");
-
-        try {
-            const data = await apiFetch('/api/student-accessible-exams', {
-                method: 'POST',
-                body: JSON.stringify({ identifier, password })
-            });
-
-            AuthModule.accessibleStudent = data.student;
-            AuthModule.accessibleExams = data.exams || [];
-            AuthModule.accessibleCredentials = { identifier, password };
-
-            listDiv.classList.remove('hidden');
-
-            if (AuthModule.accessibleExams.length === 0) {
-                const emptyMsg = `Hello ${data.student.Name}. You currently have no open exams assigned to you.`;
-                listDiv.innerHTML = `
-                    <div class="p-3 bg-indigo-900 border border-indigo-700 rounded-lg text-xs text-yellow-200 font-bold text-center">
-                        ${emptyMsg}
-                    </div>
-                `;
-                AuthModule.speak(emptyMsg);
-                return;
-            }
-
-            const pendingExams = AuthModule.accessibleExams.filter(e => e.status !== 'Completed');
-            let speechSummary = `Hello ${data.student.Name}. You have ${AuthModule.accessibleExams.length} assigned exam${AuthModule.accessibleExams.length > 1 ? 's' : ''}. `;
-            if (pendingExams.length > 0) {
-                speechSummary += `Select an exam button below to start. `;
-                pendingExams.forEach((ex, idx) => {
-                    speechSummary += `Option ${idx + 1}: ${ex.examTitle} for ${ex.courseCode}. `;
-                });
-            } else {
-                speechSummary += `All assigned exams have already been completed.`;
-            }
-            AuthModule.speak(speechSummary);
-
-            listDiv.innerHTML = `
-                <div class="text-xs font-bold text-yellow-300 mb-2">
-                    Welcome, ${data.student.Name} (${data.student.eye_condition || 'Student'})
-                </div>
-                ${AuthModule.accessibleExams.map((ex) => {
-                    const isDone = ex.status === 'Completed';
-                    return `
-                        <div class="p-3 rounded-lg border ${isDone ? 'bg-indigo-900/60 border-indigo-700' : 'bg-indigo-900 border-yellow-400'} flex flex-col gap-2">
-                            <div>
-                                <div class="text-sm font-black text-white">${ex.examTitle}</div>
-                                <div class="text-[11px] text-indigo-200 font-medium">${ex.courseCode} - ${ex.courseTitle} (${ex.term})</div>
-                                <div class="text-[10px] text-yellow-300 mt-0.5">
-                                    Questions: ${ex.regularCount}${ex.bonusCount > 0 ? ` + ${ex.bonusCount} Bonus` : ''} | Max Score: ${ex.maxScore}
-                                </div>
-                            </div>
-                            ${isDone ? `
-                                <div class="w-full py-2 px-3 bg-green-700 text-white font-black text-xs rounded text-center">
-                                    <i class="fa-solid fa-circle-check mr-1"></i> Submitted - Score: ${ex.finalScore} / ${ex.maxScore}
-                                </div>
-                            ` : `
-                                <button type="button" class="start-accessible-exam-btn w-full py-2.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-xs rounded-md shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}">
-                                    <i class="fa-solid fa-play mr-2"></i> Start Exam: ${ex.examTitle}
-                                </button>
-                            `}
-                        </div>
-                    `;
-                }).join('')}
-            `;
-        } catch (err) {
-            errorDiv.textContent = err.message;
-            errorDiv.classList.remove('hidden');
-            AuthModule.speak("Error: " + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
     },
 
     handleForms: async (e) => {
@@ -159,7 +40,7 @@ export const AuthModule = {
                 errorDiv.classList.remove('hidden');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = 'Sign In to Dashboard';
+                btn.innerHTML = 'Sign In';
             }
         }
 
@@ -181,7 +62,7 @@ export const AuthModule = {
                 const payload = {
                     username: document.getElementById('regUsername').value.trim(),
                     password: pw,
-                    name: `${document.getElementById('regLastName').value.trim()}, ${document.getElementById('regGivenName').value.trim()} ${document.getElementById('regSuffix').value.trim()}`.trim(),
+                    name: `${document.getElementById('regLastName').value.trim()}, ${document.getElementById('regGivenName').value.trim()}${document.getElementById('regSuffix').value.trim()}`.trim(),
                     email: document.getElementById('regEmail').value.trim(),
                     contact_number: document.getElementById('regContact').value.trim(),
                     student_number: document.getElementById('regStudentNo').value.trim(),
@@ -244,7 +125,7 @@ export const AuthModule = {
             const givenName = document.getElementById('udGivenName').value.trim();
             const lastName = document.getElementById('udLastName').value.trim();
             const suffix = document.getElementById('udSuffix').value.trim();
-            const formattedName = `${lastName}, ${givenName} ${suffix}`.trim();
+            const formattedName = `${lastName}, ${givenName}${suffix}`.trim();
 
             const payload = {
                 userId: AppState.user.User_ID,
@@ -417,26 +298,7 @@ export const AuthModule = {
         }
     },
 
-    handleClicks: async (e) => {
-        if (e.target.closest('#readLoginScreenBtn')) {
-            AuthModule.speak("Welcome to the Online Portal Accessible Exam Login. Please enter your Username or Student Number in the first text box, and your Password in the second text box. Then press the Enter Assigned Exam button to hear and start your available exams.");
-        }
-
-        if (e.target.closest('#enterExamLoginBtn')) {
-            await AuthModule.loadStudentAccessibleExams();
-        }
-
-        if (e.target.closest('.start-accessible-exam-btn')) {
-            const btn = e.target.closest('.start-accessible-exam-btn');
-            const assignmentId = btn.dataset.assignmentId;
-            const examObj = AuthModule.accessibleExams.find(ex => ex.assignmentId === assignmentId);
-            if (examObj && AuthModule.accessibleStudent && CourseExam.startAccessibleExam) {
-                CourseExam.startAccessibleExam(examObj, AuthModule.accessibleStudent, () => {
-                    AuthModule.loadStudentAccessibleExams();
-                });
-            }
-        }
-
+    handleClicks: (e) => {
         if (e.target.closest('#toggleLoginPassword')) {
             const input = document.getElementById('loginPassword');
             const icon = e.target.closest('#toggleLoginPassword').querySelector('i');
@@ -639,7 +501,7 @@ export const AuthModule = {
         list.innerHTML = filtered.map(u => {
             const avatarSrc = u.Avatar ? getLoadableAvatarSrc(u.Avatar) : null;
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${avatarSrc}" data-name="${u.Name}" data-info="${u.course || ''} ${u.year || ''} ${u.section || ''}">` 
+                ? `<img src="${avatarSrc}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${avatarSrc}" data-name="${u.Name}" data-info="${u.course || ''} ${u.year \vert{}\vert{} ''}${u.section || ''}">` 
                 : `<i class="fa-solid fa-circle-user text-[48px] sm:text-[56px] text-gray-300"></i>`;
                 
             const regDate = u.registration_timestamp ? new Date(u.registration_timestamp + 'Z').toLocaleString() : 'N/A';
@@ -661,19 +523,13 @@ export const AuthModule = {
                             <a href="mailto:${u.Email || ''}" class="text-blue-600 hover:underline truncate bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition inline-flex items-center" title="Send Email"><i class="fa-regular fa-envelope mr-1.5"></i>${u.Email || 'No Email Provided'}</a>
                         </div>
                         
-                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${u.course || 'N/A'} ${u.year || ''} ${u.section || ''}</div>
+                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${u.course || 'N/A'} ${u.year \vert{}\vert{} ''}${u.section || ''}</div>
                         <div class="text-[9px] sm:text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-wider"><i class="fa-regular fa-clock mr-1"></i>Reg: ${regDate}</div>
                     </div>
                 </div>
                 <div class="w-full sm:w-auto flex-shrink-0 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                     <label class="block sm:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
-                    <select class="mu-status-select w-full sm:w-36 px-3 py-2 text-xs sm:text-sm font-bold border rounded-md outline-none cursor-pointer transition shadow-sm ${
-                        u.account_status === 'Active' ? 'text-green-700 border-green-300 bg-green-50 focus:ring-green-500' : 
-                        u.account_status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' :
-                        u.account_status === 'Suspended' ? 'text-orange-700 border-orange-300 bg-orange-50 focus:ring-orange-500' :
-                        u.account_status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' :
-                        u.account_status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50'
-                    }" data-user-id="${u.User_ID}">
+                    <select class="mu-status-select w-full sm:w-36 px-3 py-2 text-xs sm:text-sm font-bold border rounded-md outline-none cursor-pointer transition shadow-sm ${ u.account_status === 'Active' ? 'text-green-700 border-green-300 bg-green-50 focus:ring-green-500' : u.account_status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' : u.account_status === 'Suspended' ? 'text-orange-700 border-orange-300 bg-orange-50 focus:ring-orange-500' : u.account_status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' : u.account_status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50' }" data-user-id="${u.User_ID}">
                         <option value="Active" ${u.account_status === 'Active' ? 'selected' : ''}>Active</option>
                         <option value="Inactive" ${u.account_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
                         <option value="Suspended" ${u.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
