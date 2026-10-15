@@ -1,38 +1,62 @@
 // js/components-auth.js
+import { ExamUI } from './components-exam.js';
 
 export const AuthUI = {
     renderLogin: () => `
-        <div class="flex flex-col justify-center items-center min-h-screen p-4">
-            <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in">
-                <div class="text-center mb-8">
-                    <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-4"></i>
+        <div class="flex flex-col justify-center items-center min-h-screen p-4 gap-6">
+            <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in border border-gray-200">
+                <div class="text-center mb-6">
+                    <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-3"></i>
                     <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
                     <p class="text-gray-500 text-sm">Please sign in to your account</p>
                 </div>
                 <form id="loginForm" class="space-y-4">
-                    <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
+                    <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-bold" role="alert" aria-live="assertive"></div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Username, Email, Contact, or Student No.</label>
-                        <input type="text" id="loginIdentifier" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <label for="loginIdentifier" class="block text-sm font-medium text-gray-700">Username, Email, Contact, or Student No.</label>
+                        <input type="text" id="loginIdentifier" required aria-label="Username, Email, Contact, or Student Number" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Password</label>
+                        <label for="loginPassword" class="block text-sm font-medium text-gray-700">Password</label>
                         <div class="relative">
-                            <input type="password" id="loginPassword" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
-                            <button type="button" id="toggleLoginPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600 mt-1 focus:outline-none">
+                            <input type="password" id="loginPassword" required aria-label="Password" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
+                            <button type="button" id="toggleLoginPassword" aria-label="Toggle Password Visibility" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600 mt-1 focus:outline-none">
                                 <i class="fa-solid fa-eye" id="loginPasswordEye"></i>
                             </button>
                         </div>
                     </div>
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Sign In
+                    <button type="submit" id="loginBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Sign In to Dashboard
                     </button>
                 </form>
+
+                <!-- Accessible Exam Entry Section on Login Screen -->
+                <div class="mt-6 pt-6 border-t-2 border-indigo-100">
+                    <div class="bg-indigo-950 text-white rounded-xl p-4 shadow-md border-2 border-yellow-400">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-black uppercase tracking-wider text-yellow-300 flex items-center">
+                                <i class="fa-solid fa-universal-access text-lg mr-2"></i> Accessible Exam Portal
+                            </span>
+                            <button type="button" id="readLoginScreenBtn" class="px-2.5 py-1 bg-yellow-400 text-gray-900 hover:bg-yellow-300 rounded text-xs font-black transition focus:outline-none focus:ring-2 focus:ring-white" aria-label="Read instructions aloud">
+                                <i class="fa-solid fa-volume-high mr-1"></i> Read Aloud
+                            </button>
+                        </div>
+                        <p class="text-xs text-indigo-100 mb-3 leading-relaxed">
+                            Enter your Student Number or Username and Password above, then press the button below to load and take your assigned class exam with voice read-aloud.
+                        </p>
+                        <button type="button" id="enterExamLoginBtn" class="w-full py-3 px-4 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black rounded-lg shadow text-sm transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-yellow-200">
+                            <i class="fa-solid fa-headphones Simple mr-2 text-base"></i> Enter Assigned Exam
+                        </button>
+                        <div id="accessibleExamPortalList" class="hidden mt-4 pt-3 border-t border-indigo-800 space-y-2" aria-live="polite"></div>
+                    </div>
+                </div>
+
                 <div class="mt-6 text-center">
                     <p class="text-sm text-gray-600">Don't have an account? <a href="#register" class="text-blue-600 font-medium hover:text-blue-500">Register here</a></p>
                 </div>
             </div>
         </div>
+        ${ExamUI.renderAccessibleExamOverlay ? ExamUI.renderAccessibleExamOverlay() : ''}
     `,
 
     renderRegister: () => `
@@ -136,12 +160,13 @@ export const AuthUI = {
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Eye Condition</label>
+                            <label class="block text-sm font-medium text-gray-700">Eye Condition / Accessibility</label>
                             <select id="regEyeCondition" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                                 <option value="" disabled selected>Select Condition</option>
                                 <option value="No Eye Condition">No Eye Condition</option>
                                 <option value="Near Sighted">Near Sighted</option>
                                 <option value="Far Sighted">Far Sighted</option>
+                                <option value="Legally Blind">Legally Blind</option>
                             </select>
                         </div>
                     </div>
