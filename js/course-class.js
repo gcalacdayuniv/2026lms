@@ -229,7 +229,7 @@ export const CourseClass = {
             const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
             const students = data.students;
 
-            const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
+            const eyeOrder = { 'Legally Blind': 0, 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
             students.sort((a, b) => {
                 const seatAStr = (a.Seat_Number || '').toString().trim();
                 const seatBStr = (b.Seat_Number || '').toString().trim();
@@ -246,8 +246,8 @@ export const CourseClass = {
                         if (seatAStr !== seatBStr) return seatAStr.localeCompare(seatBStr);
                     }
                 }
-                const eyeA = eyeOrder[a.eye_condition] || 4;
-                const eyeB = eyeOrder[b.eye_condition] || 4;
+                const eyeA = eyeOrder[a.eye_condition] !== undefined ? eyeOrder[a.eye_condition] : 4;
+                const eyeB = eyeOrder[b.eye_condition] !== undefined ? eyeOrder[b.eye_condition] : 4;
                 if (eyeA !== eyeB) return eyeA - eyeB;
                 const nameA = a.Name || '';
                 const nameB = b.Name || '';
