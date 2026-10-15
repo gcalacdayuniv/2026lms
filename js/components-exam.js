@@ -18,8 +18,77 @@ export const ExamUI = {
                 <!-- Main Exam List & Upload View -->
                 <div id="examManagerMainView" class="flex-1 flex flex-col min-h-0 overflow-hidden">
                     <div class="mb-4 bg-blue-50 p-4 border border-blue-200 rounded-lg flex-shrink-0">
-                        <h4 class="text-sm font-bold text-blue-800 mb-1">Upload New Exam (CSV Format)</h4>
-                        <p class="text-xs text-blue-600 mb-3">Columns: Part Index (0=MCQ, 1=TF, 2=Enum), Question, Choices (Pipe separated "|"), Answer, Explanation, Bonus (Optional: 1 or Bonus).</p>
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                            <h4 class="text-sm font-bold text-blue-800">Upload New Exam (CSV Format)</h4>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" id="toggleExamCsvGuideBtn" class="px-3 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs font-bold transition shadow-sm flex items-center">
+                                    <i class="fa-solid fa-circle-question mr-1.5"></i> Spreadsheet Guide
+                                </button>
+                                <button type="button" id="downloadExamCsvTemplateBtn" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-sm flex items-center">
+                                    <i class="fa-solid fa-file-csv mr-1.5"></i> Download CSV Template
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-blue-600 mb-3">Columns: Part Index (0=Part 1, 1=Part 2, 2=Part 3), Question, Choices (Pipe separated "|"), Answer, Explanation, Bonus (Optional: 1 or Bonus).</p>
+
+                        <!-- Collapsible Spreadsheet Guide -->
+                        <div id="examCsvGuidePanel" class="hidden mb-3 bg-white p-3 rounded-lg border border-blue-200 text-xs text-gray-700 space-y-2">
+                            <div class="font-black text-blue-900 uppercase tracking-wider text-[11px]">How to Prepare Your Exam in Excel or Google Sheets:</div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse border border-gray-200 text-[11px]">
+                                    <thead class="bg-gray-100 text-gray-800 font-bold">
+                                        <tr>
+                                            <th class="border border-gray-200 px-2 py-1">Col</th>
+                                            <th class="border border-gray-200 px-2 py-1">Header</th>
+                                            <th class="border border-gray-200 px-2 py-1">Description & Rules</th>
+                                            <th class="border border-gray-200 px-2 py-1">Sample Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">A</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-bold">Part Index</td>
+                                            <td class="border border-gray-200 px-2 py-1">Use <code class="bg-gray-100 px-1 rounded">0</code> for Part 1, <code class="bg-gray-100 px-1 rounded">1</code> for Part 2, <code class="bg-gray-100 px-1 rounded">2</code> for Part 3.</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono">0</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">B</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-bold">Question</td>
+                                            <td class="border border-gray-200 px-2 py-1">Full question text. Multi-line text inside a cell is supported.</td>
+                                            <td class="border border-gray-200 px-2 py-1">What does HTML stand for?</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">C</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-bold">Choices</td>
+                                            <td class="border border-gray-200 px-2 py-1">Separate choices with a pipe <code class="bg-gray-100 px-1 rounded">|</code>. Leave blank for Identification.</td>
+                                            <td class="border border-gray-200 px-2 py-1">HyperText Markup Language | HighText Machine Language | HyperLoop</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">D</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-bold">Answer</td>
+                                            <td class="border border-gray-200 px-2 py-1">Must match the exact text of the correct choice (case-insensitive when grading).</td>
+                                            <td class="border border-gray-200 px-2 py-1">HyperText Markup Language</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">E</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-bold">Explanation</td>
+                                            <td class="border border-gray-200 px-2 py-1">Optional note shown when revealing the answer in Present mode.</td>
+                                            <td class="border border-gray-200 px-2 py-1">HTML is the standard markup language for web pages.</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">F</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-bold">Bonus</td>
+                                            <td class="border border-gray-200 px-2 py-1">Optional: type <code class="bg-gray-100 px-1 rounded">1</code> or <code class="bg-gray-100 px-1 rounded">Bonus</code> for bonus credit (capped at Max Score).</td>
+                                            <td class="border border-gray-200 px-2 py-1 font-mono">1</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-[11px] text-gray-600">
+                                <strong>Tip:</strong> Click <strong>Download CSV Template</strong>, open it in Excel or Google Sheets, replace the sample rows with your questions, keep Row 1 as the header, and save/export as <strong>CSV (Comma delimited) (*.csv)</strong>.
+                            </div>
+                        </div>
+
                         <div class="flex flex-col sm:flex-row gap-2">
                             <input type="text" id="newExamTitle" placeholder="Exam Title (links to Record Scores)" class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
                             <input type="file" id="examCsvUpload" accept=".csv" class="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-white">
@@ -50,7 +119,7 @@ export const ExamUI = {
                     <div id="ecaAlert" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-indigo-50 p-3 rounded-lg border border-indigo-200 mb-3 flex-shrink-0">
-                        <div class=" flex items-center">
+                        <div class="flex items-center">
                             <label class="flex items-center space-x-2 cursor-pointer text-xs font-black text-indigo-900">
                                 <input type="checkbox" id="ecaIsActive" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" checked>
                                 <span>Link & Enable for Class</span>
