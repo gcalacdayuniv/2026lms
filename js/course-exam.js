@@ -1089,11 +1089,22 @@ export const CourseExam = {
         const q = questions[CourseExam.accIndex];
         if (!q) return;
 
-        let speech = `Question ${CourseExam.accIndex + 1} of ${total}. `;
+        const currentAns = CourseExam.accAnswers[CourseExam.accIndex];
+        let speech = "";
+
+        if (currentAns) {
+            speech += "Answered question. ";
+        }
+
+        speech += `Question ${CourseExam.accIndex + 1} of ${total}. `;
         if (q.isBonus) {
             speech += `This is a bonus question. `;
         }
         speech += `${q.question}. `;
+
+        if (currentAns) {
+            speech += `Your selected answer is ${currentAns}. `;
+        }
 
         if (q.choices && q.choices.length > 0) {
             speech += `The choices are: `;
@@ -1103,11 +1114,6 @@ export const CourseExam = {
             });
         } else {
             speech += `This is an identification question. Please type your answer in the text box. `;
-        }
-
-        const currentAns = CourseExam.accAnswers[CourseExam.accIndex];
-        if (currentAns) {
-            speech += `Your currently selected answer is ${currentAns}. `;
         }
 
         const isLast = CourseExam.accIndex === total - 1;
