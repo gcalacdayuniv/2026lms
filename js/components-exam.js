@@ -364,7 +364,7 @@ export const ExamUI = {
                         Next <i class="fa-solid fa-arrow-right ml-2"></i>
                     </button>
 
-                    <button type="button" id="accExamSubmitBtn" class="w-full sm:w-auto flex-1 py-4 px-8 bg-green-600 hover:bg-green-500 text-white font-black text-lg sm:text-xl rounded-xl border-2 border-yellow-300 shadow-lg transition focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                    <button type="button" id="accExamSubmitBtn" class="hidden flex-1 py-4 px-8 bg-green-600 hover:bg-green-500 text-white font-black text-lg sm:text-xl rounded-xl border-2 border-yellow-300 shadow-lg transition focus:outline-none focus:ring-4 focus:ring-yellow-400">
                         <i class="fa-solid fa-paper-plane mr-2"></i> Submit Exam
                     </button>
                 </div>
