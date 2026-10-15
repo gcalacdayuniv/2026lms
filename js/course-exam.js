@@ -241,6 +241,9 @@ export const CourseExam = {
         if (e.target.id === 'accExamTextAnswerInput') {
             const val = e.target.value.trim();
             CourseExam.accAnswers[CourseExam.accIndex] = val;
+            if (CourseExam.accExam) {
+                localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
+            }
             CourseExam.updateAccessibleAnsweredBadge();
             if (val) {
                 const msg = `You typed ${val} as your answer for Question ${CourseExam.accIndex + 1}.`;
@@ -254,6 +257,23 @@ export const CourseExam = {
         // Accessible Exam Keyboard Shortcuts
         const accOverlay = document.getElementById('accessibleExamOverlay');
         if (accOverlay && !accOverlay.classList.contains('hidden') && CourseExam.accExam) {
+            
+            if (e.key === 'Enter') {
+                if (document.activeElement && document.activeElement.id === 'accExamTextAnswerInput') {
+                    const val = document.activeElement.value.trim();
+                    CourseExam.accAnswers[CourseExam.accIndex] = val;
+                    localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
+                    document.activeElement.blur();
+                }
+                e.preventDefault();
+                if (CourseExam.accIndex < CourseExam.accExam.questions.length - 1) {
+                    CourseExam.navigateAccessible(1);
+                } else {
+                    CourseExam.submitAccessibleExam();
+                }
+                return;
+            }
+
             if (document.activeElement && document.activeElement.tagName === 'INPUT') {
                 return;
             }
@@ -267,7 +287,14 @@ export const CourseExam = {
             } else if (e.key === 'r' || e.key === 'R') {
                 e.preventDefault();
                 CourseExam.readCurrentAccessibleQuestion();
-            } else if (/^[1-9]$/.test(e.key)) { const idx = parseInt(e.key, 10) - 1; const q = CourseExam.accExam.questions[CourseExam.accIndex]; if (q && q.choices && idx < q.choices.length) { e.preventDefault(); CourseExam.selectAccessibleChoice(idx); } } else if (/^[a-dA-D]$/.test(e.key)) {
+            } else if (/^[1-9]$/.test(e.key)) { 
+                const idx = parseInt(e.key, 10) - 1; 
+                const q = CourseExam.accExam.questions[CourseExam.accIndex]; 
+                if (q && q.choices && idx < q.choices.length) { 
+                    e.preventDefault(); 
+                    CourseExam.selectAccessibleChoice(idx); 
+                } 
+            } else if (/^[a-dA-D]$/.test(e.key)) {
                 const idx = e.key.toUpperCase().charCodeAt(0) - 65;
                 const q = CourseExam.accExam.questions[CourseExam.accIndex];
                 if (q && q.choices && idx < q.choices.length) {
@@ -421,7 +448,7 @@ export const CourseExam = {
                         data-class-exam-id="${esc(linked.Class_Exam_ID)}"
                         data-student-id="${esc(s.User_ID)}"
                         data-name="${esc(s.Name)}">
-                        Reset Attempt
+                        <i class="fa-solid fa-folder-open mr-1"></i> Re-open Exam (Reset)
                     </button>
                 `;
             }
@@ -510,7 +537,7 @@ export const CourseExam = {
     },
 
     resetStudentAttempt: async (classExamId, studentId, studentName) => {
-        if (!window.confirm(`Reset exam submission for ${studentName} so they can take it again?`)) return;
+        if (!window.confirm(`Reset and explicitly re-open the exam submission for ${studentName} so they can take it again?`)) return;
 
         try {
             await apiFetch('/api/reset-exam-attempt', {
@@ -664,7 +691,6 @@ export const CourseExam = {
         }
     },
 
-    // Robust CSV parser supporting line breaks within quotes
     parseCSV: (str) => {
         const arr = [];
         let quote = false;
@@ -891,10 +917,20 @@ export const CourseExam = {
     startAccessibleExam: (examObj, student, onComplete) => {
         CourseExam.accExam = examObj;
         CourseExam.accStudent = student;
-        CourseExam.accAnswers = new Array(examObj.questions.length).fill('');
         CourseExam.accIndex = 0;
         CourseExam.accSubmitting = false;
         CourseExam.accOnComplete = onComplete || null;
+        
+        const cachedDraft = localStorage.getItem('acc_exam_draft_' + examObj.assignmentId);
+        if (cachedDraft) {
+            try { 
+                CourseExam.accAnswers = JSON.parse(cachedDraft); 
+            } catch(e) { 
+                CourseExam.accAnswers = new Array(examObj.questions.length).fill(''); 
+            }
+        } else {
+            CourseExam.accAnswers = new Array(examObj.questions.length).fill('');
+        }
 
         const overlay = document.getElementById('accessibleExamOverlay');
         if (!overlay) return;
@@ -985,9 +1021,11 @@ export const CourseExam = {
                 </div>
             `;
         }
-
+        
+        const isLastQuestion = CourseExam.accIndex === total - 1;
         document.getElementById('accExamPrevBtn').disabled = CourseExam.accIndex === 0;
-        document.getElementById('accExamNextBtn').disabled = CourseExam.accIndex === total - 1;
+        document.getElementById('accExamNextBtn').classList.toggle('hidden', isLastQuestion);
+        document.getElementById('accExamSubmitBtn').classList.toggle('hidden', !isLastQuestion);
 
         document.getElementById('accExamBody').scrollTop = 0;
 
@@ -1043,12 +1081,13 @@ export const CourseExam = {
         const chosenText = q.choices[choiceIndex];
         const letter = String.fromCharCode(65 + choiceIndex);
         CourseExam.accAnswers[CourseExam.accIndex] = chosenText;
-
+        
+        localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
         CourseExam.renderAccessibleQuestion(false);
 
         const total = CourseExam.accExam.questions.length;
         const navHint = CourseExam.accIndex < total - 1
-            ? "Press Next or Right Arrow to move to the next question."
+            ? "Press Enter, Next, or Right Arrow to move to the next question."
             : "This is the last question. Press Submit Exam when you are ready.";
 
         const confirmSpeech = `Choice ${choiceIndex + 1}, ${letter}: ${chosenText}. You selected ${chosenText} as your answer for Question ${CourseExam.accIndex + 1}. ${navHint}`;
@@ -1109,6 +1148,8 @@ export const CourseExam = {
                     answers: CourseExam.accAnswers
                 })
             });
+
+            localStorage.removeItem('acc_exam_draft_' + CourseExam.accExam.assignmentId);
 
             const resultSpeech = `Exam submitted successfully! Your regular score is ${res.rawScore}, plus ${res.bonusScore} bonus points. Your final recorded score is ${res.finalScore} out of ${res.maxScore}. This score has been automatically recorded in your class assessment.`;
 
