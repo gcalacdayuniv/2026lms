@@ -62,20 +62,16 @@ export const CourseExam = {
                 const letter = String.fromCharCode(65 + idx);
                 const q = CourseExam.accExam.questions[CourseExam.accIndex];
                 if (q && q.choices && q.choices[idx]) {
-                    CourseExam.speak(`Choice ${idx + 1}, ${letter}: ${q.choices[idx]}`);
+                    CourseExam.speak(`You have selected Choice ${idx + 1}, ${letter}. ${q.choices[idx]}. Press Space or Enter to lock that answer.`);
                 }
             } else if (e.target.id === 'accExamPrevBtn') {
-                CourseExam.speak("Previous Button");
+                CourseExam.speak("Go back to previous question button.");
             } else if (e.target.id === 'accExamNextBtn') {
-                CourseExam.speak("Next Button");
+                CourseExam.speak("Next question button.");
             } else if (e.target.id === 'accExamSubmitBtn') {
-                CourseExam.speak("Submit Exam Button");
-            } else if (e.target.id === 'accExamExitBtn') {
-                CourseExam.speak("Exit Exam Button");
-            } else if (e.target.id === 'accExamRepeatAudioBtn') {
-                CourseExam.speak("Read Question Again Button");
+                CourseExam.speak("Submit exam button.");
             } else if (e.target.id === 'accExamTextAnswerInput') {
-                CourseExam.speak("Text Answer Input. Type your answer here.");
+                CourseExam.speak("Text Answer Input. Type your answer here, then press Enter.");
             }
         }
     },
@@ -235,6 +231,8 @@ export const CourseExam = {
 
         if (e.target.closest('.acc-exam-choice-btn')) {
             const btn = e.target.closest('.acc-exam-choice-btn');
+            
+            // Single tap mouse/touch logic for locking the answer explicitly 
             const choiceIndex = parseInt(btn.dataset.choiceIndex, 10);
             CourseExam.selectAccessibleChoice(choiceIndex);
         }
@@ -275,18 +273,34 @@ export const CourseExam = {
             
             // Allow normal typing in text input, but let Enter register as a submit/blur
             if (document.activeElement && document.activeElement.id === 'accExamTextAnswerInput') {
-                if (e.key === ' ') return; // Let space type space
+                if (e.key === ' ') return; // Let space type space normally inside text box
             } else {
                 if (e.key === ' ') e.preventDefault(); // Prevent page scroll for space globally in exam
+            }
+
+            // Custom Tab Cycling (Trap focus strictly to Question, Choices, Nav Buttons)
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const focusables = Array.from(document.querySelectorAll('#accExamQuestionText, .acc-exam-choice-btn, #accExamPrevBtn, #accExamNextBtn:not(.hidden), #accExamSubmitBtn:not(.hidden), #accExamTextAnswerInput'))
+                    .filter(el => !el.disabled && el.offsetParent !== null);
+                
+                const currIdx = focusables.indexOf(document.activeElement);
+                let nextIdx = e.shiftKey ? currIdx - 1 : currIdx + 1;
+                
+                if (nextIdx >= focusables.length) nextIdx = 0;
+                if (nextIdx < 0) nextIdx = focusables.length - 1;
+                
+                focusables[nextIdx].focus();
+                return;
             }
 
             // Enter & Space Double Tap Logic
             if (e.key === 'Enter' || e.key === ' ') {
                 const now = Date.now();
                 if (now - (CourseExam.lastEnterSpaceTime || 0) < 600) { 
-                    // Double press detected
+                    // Double press detected - Trigger Navigation
                     e.preventDefault(); 
-                    CourseExam.lastEnterSpaceTime = 0; // Reset
+                    CourseExam.lastEnterSpaceTime = 0; 
                     const isLast = CourseExam.accIndex === CourseExam.accExam.questions.length - 1;
                     if (isLast) {
                         CourseExam.submitAccessibleExam();
@@ -296,13 +310,18 @@ export const CourseExam = {
                     return;
                 } else {
                     CourseExam.lastEnterSpaceTime = now;
-                    // Single Press
+                    // Single Press Detected - Lock Answer if on a choice
                     const activeEl = document.activeElement;
                     const isChoice = activeEl && activeEl.classList.contains('acc-exam-choice-btn');
                     
-                    if (e.key === ' ' && isChoice) {
-                        activeEl.click();
+                    if ((e.key === ' ' || e.key === 'Enter') && isChoice) {
+                        e.preventDefault();
+                        const idx = parseInt(activeEl.dataset.choiceIndex, 10);
+                        CourseExam.selectAccessibleChoice(idx);
+                    } else if (e.key === 'Enter' && activeEl && activeEl.id === 'accExamTextAnswerInput') {
+                        activeEl.blur(); // Save text input on single enter
                     } else if (!isChoice && (!activeEl || activeEl.id !== 'accExamTextAnswerInput')) {
+                        // General hint if pressing space randomly
                         const isLast = CourseExam.accIndex === CourseExam.accExam.questions.length - 1;
                         const action = isLast ? "submit the exam" : "go to the next question";
                         CourseExam.speak(`Double press Enter or Space to ${action}.`);
@@ -323,7 +342,7 @@ export const CourseExam = {
                 }
             }
 
-            // Right/Left for Question Navigation
+            // Right/Left for Fast Question Navigation
             if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 CourseExam.navigateAccessible(1);
@@ -1112,8 +1131,9 @@ export const CourseExam = {
                 const letter = String.fromCharCode(65 + idx);
                 speech += `Choice ${idx + 1}, ${letter}: ${c}. `;
             });
+            speech += `Press R to repeat the question. Press Enter or Space for the selected answer. `;
         } else {
-            speech += `This is an identification question. Please type your answer in the text box. `;
+            speech += `This is an identification question. Please type your answer in the text box. Press R to repeat the question. `;
         }
 
         const isLast = CourseExam.accIndex === total - 1;
@@ -1147,7 +1167,7 @@ export const CourseExam = {
             ? "Double press Enter or Space to go to the next question."
             : "This is the last question. Double press Enter or Space to submit the exam.";
 
-        const confirmSpeech = `Choice ${choiceIndex + 1}, ${letter}: ${chosenText}. You selected ${chosenText} as your answer for Question ${CourseExam.accIndex + 1}. ${navHint}`;
+        const confirmSpeech = `You have selected ${chosenText} as your answer. ${navHint}`;
         document.getElementById('accExamLiveFeedback').textContent = confirmSpeech;
         CourseExam.speak(confirmSpeech);
     },
