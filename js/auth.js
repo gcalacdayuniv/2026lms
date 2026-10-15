@@ -62,7 +62,7 @@ export const AuthModule = {
                 const payload = {
                     username: document.getElementById('regUsername').value.trim(),
                     password: pw,
-                    name: `${document.getElementById('regLastName').value.trim()}, ${document.getElementById('regGivenName').value.trim()}${document.getElementById('regSuffix').value.trim()}`.trim(),
+                    name: `${document.getElementById('regLastName').value.trim()}, ${document.getElementById('regGivenName').value.trim()} ${document.getElementById('regSuffix').value.trim()}`.trim(),
                     email: document.getElementById('regEmail').value.trim(),
                     contact_number: document.getElementById('regContact').value.trim(),
                     student_number: document.getElementById('regStudentNo').value.trim(),
@@ -125,7 +125,7 @@ export const AuthModule = {
             const givenName = document.getElementById('udGivenName').value.trim();
             const lastName = document.getElementById('udLastName').value.trim();
             const suffix = document.getElementById('udSuffix').value.trim();
-            const formattedName = `${lastName}, ${givenName}${suffix}`.trim();
+            const formattedName = `${lastName}, ${givenName} ${suffix}`.trim();
 
             const payload = {
                 userId: AppState.user.User_ID,
@@ -501,7 +501,7 @@ export const AuthModule = {
         list.innerHTML = filtered.map(u => {
             const avatarSrc = u.Avatar ? getLoadableAvatarSrc(u.Avatar) : null;
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${avatarSrc}" data-name="${u.Name}" data-info="${u.course || ''} ${u.year \vert{}\vert{} ''}${u.section || ''}">` 
+                ? `<img src="${avatarSrc}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${avatarSrc}" data-name="${u.Name}" data-info="${u.course || ''} ${u.year || ''} ${u.section || ''}">` 
                 : `<i class="fa-solid fa-circle-user text-[48px] sm:text-[56px] text-gray-300"></i>`;
                 
             const regDate = u.registration_timestamp ? new Date(u.registration_timestamp + 'Z').toLocaleString() : 'N/A';
@@ -523,13 +523,19 @@ export const AuthModule = {
                             <a href="mailto:${u.Email || ''}" class="text-blue-600 hover:underline truncate bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition inline-flex items-center" title="Send Email"><i class="fa-regular fa-envelope mr-1.5"></i>${u.Email || 'No Email Provided'}</a>
                         </div>
                         
-                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${u.course || 'N/A'} ${u.year \vert{}\vert{} ''}${u.section || ''}</div>
+                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${u.course || 'N/A'} ${u.year || ''} ${u.section || ''}</div>
                         <div class="text-[9px] sm:text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-wider"><i class="fa-regular fa-clock mr-1"></i>Reg: ${regDate}</div>
                     </div>
                 </div>
                 <div class="w-full sm:w-auto flex-shrink-0 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                     <label class="block sm:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
-                    <select class="mu-status-select w-full sm:w-36 px-3 py-2 text-xs sm:text-sm font-bold border rounded-md outline-none cursor-pointer transition shadow-sm ${ u.account_status === 'Active' ? 'text-green-700 border-green-300 bg-green-50 focus:ring-green-500' : u.account_status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' : u.account_status === 'Suspended' ? 'text-orange-700 border-orange-300 bg-orange-50 focus:ring-orange-500' : u.account_status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' : u.account_status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50' }" data-user-id="${u.User_ID}">
+                    <select class="mu-status-select w-full sm:w-36 px-3 py-2 text-xs sm:text-sm font-bold border rounded-md outline-none cursor-pointer transition shadow-sm ${
+                        u.account_status === 'Active' ? 'text-green-700 border-green-300 bg-green-50 focus:ring-green-500' : 
+                        u.account_status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50 focus:ring-gray-500' :
+                        u.account_status === 'Suspended' ? 'text-orange-700 border-orange-300 bg-orange-50 focus:ring-orange-500' :
+                        u.account_status === 'UD' ? 'text-red-600 border-red-300 bg-red-50 focus:ring-red-500' :
+                        u.account_status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100 focus:ring-red-500' : 'text-gray-600 border-gray-300 bg-gray-50'
+                    }" data-user-id="${u.User_ID}">
                         <option value="Active" ${u.account_status === 'Active' ? 'selected' : ''}>Active</option>
                         <option value="Inactive" ${u.account_status === 'Inactive' ? 'selected' : ''}>Inactive</option>
                         <option value="Suspended" ${u.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
