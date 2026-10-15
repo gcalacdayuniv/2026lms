@@ -573,4 +573,58 @@ const DashboardUI = {
     `
 };
 
-export { DashboardUI, DashboardComponents };
+export const DashboardComponents = {
+    renderDashboard: (user) => {
+        const avatarSrc = getLoadableAvatarSrc(user.Avatar);
+        const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
+
+        let displayCourse = 'N/A';
+        if (user.course) {
+            displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
+        }
+
+        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${user.Name}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
+
+        let lecturerBtns = '';
+        if (user.role.toLowerCase() === 'lecturer') {
+            lecturerBtns = `
+                <div class="mt-6">
+                    <button id="openCreateCourseModalBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <button id="openApModalBtn" class="w-full flex justify-center py-2 px-4 border border-purple-300 rounded-md shadow-sm text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-graduation-cap mr-2 mt-0.5"></i> Add Registration Course List
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <button id="openMuModalBtn" class="w-full flex justify-center py-2 px-4 border border-green-300 rounded-md shadow-sm text-sm font-bold text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-users-gear mr-2 mt-0.5"></i> Manage Users
+                    </button>
+                </div>
+            `;
+        }
+
+        return `
+            ${DashboardUI.renderHeader(user, headerAvatar)}
+
+            <main class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full fade-in">
+                <div id="courseContainer" class="w-full"></div>
+            </main>
+
+            ${DashboardUI.renderProfilePanel(user, panelAvatar, displayCourse, lecturerBtns)}
+            ${DashboardUI.renderUpdateDetailsModal(user)}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderManageUsersModal() : ''}
+            ${DashboardUI.renderChangePasswordModal()}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderCreateCourseModal() : ''}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAddProgramModal() : ''}
+            ${user.role.toLowerCase() === 'student' ? DashboardUI.renderStudentSummaryModal() : ''}
+            ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmitDocumentModal() : ''}
+            ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmissionHistoryModal() : ''}
+            ${user.role.toLowerCase() === 'student' ? DashboardUI.renderDetailsModal() : ''}
+            ${user.role.toLowerCase() === 'student' && ExamUI.renderAccessibleExamOverlay ? ExamUI.renderAccessibleExamOverlay() : ''}
+            ${DashboardUI.renderGroupMembersModal()}
+        `;
+    }
+};
