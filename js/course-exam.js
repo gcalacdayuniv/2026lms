@@ -22,7 +22,8 @@ export const CourseExam = {
     revealed: false,
     zoom: 1,
 
-    // Student Accessible Exam State
+    // Student Dashboard & Accessible Exam State
+    studentAssignedExams: [],
     accExam: null,
     accStudent: null,
     accAnswers: [],
@@ -49,7 +50,42 @@ export const CourseExam = {
         }
     },
 
+    announceDashboardExams: () => {
+        const exams = CourseExam.studentAssignedExams || [];
+        const userName = AppState.user?.Name || 'Student';
+        if (exams.length === 0) {
+            CourseExam.speak(`Hello ${userName}. You currently have no active exams assigned to you.`);
+            return;
+        }
+
+        const pending = exams.filter(e => e.status !== 'Completed');
+        let msg = `Hello ${userName}. You have ${exams.length} assigned exam${exams.length > 1 ? 's' : ''} on your dashboard. `;
+        if (pending.length > 0) {
+            pending.forEach((ex, i) => {
+                msg += `Exam ${i + 1}: ${ex.examTitle} for ${ex.courseCode}, with ${ex.regularCount} regular questions${ex.bonusCount > 0 ? ` and ${ex.bonusCount} bonus questions` : ''}. Press the Enter Exam button for ${ex.examTitle} to begin. `;
+            });
+        } else {
+            msg += `All of your assigned exams have already been submitted.`;
+        }
+        CourseExam.speak(msg);
+    },
+
     handleClicks: async (e) => {
+        if (e.target.closest('#readDashboardExamsBtn')) {
+            CourseExam.announceDashboardExams();
+        }
+
+        if (e.target.closest('.start-accessible-exam-btn')) {
+            const btn = e.target.closest('.start-accessible-exam-btn');
+            const assignmentId = btn.dataset.assignmentId;
+            const examObj = (CourseExam.studentAssignedExams || []).find(ex => ex.assignmentId === assignmentId);
+            if (examObj && AppState.user) {
+                CourseExam.startAccessibleExam(examObj, AppState.user, () => {
+                    window.dispatchEvent(new Event('hashchange'));
+                });
+            }
+        }
+
         if (e.target.closest('#openExamManagerBtn')) {
             document.getElementById('courseMenuModal')?.classList.add('hidden');
             document.getElementById('examManagerModal').classList.remove('hidden');
@@ -195,7 +231,14 @@ export const CourseExam = {
             } else if (e.key === 'r' || e.key === 'R') {
                 e.preventDefault();
                 CourseExam.readCurrentAccessibleQuestion();
-            } else if (/^[1-9]$/.test(e.key)) { const idx = parseInt(e.key, 10) - 1; const q = CourseExam.accExam.questions[CourseExam.accIndex]; if (q && q.choices && idx < q.choices.length) { e.preventDefault(); CourseExam.selectAccessibleChoice(idx); } } else if (/^[a-dA-D]$/.test(e.key)) {
+            } else if (/^[1-9]$/.test(e.key)) {
+                const idx = parseInt(e.key, 10) - 1;
+                const q = CourseExam.accExam.questions[CourseExam.accIndex];
+                if (q && q.choices && idx < q.choices.length) {
+                    e.preventDefault();
+                    CourseExam.selectAccessibleChoice(idx);
+                }
+            } else if (/^[a-dA-D]$/.test(e.key)) {
                 const idx = e.key.toUpperCase().charCodeAt(0) - 65;
                 const q = CourseExam.accExam.questions[CourseExam.accIndex];
                 if (q && q.choices && idx < q.choices.length) {
