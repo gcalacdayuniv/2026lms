@@ -1,5 +1,6 @@
 // js/course-dashboard.js
 import { apiFetch, AppState, CONFIG } from './globals.js';
+import { CourseExam } from './course-exam.js';
 
 export const CourseDashboard = {
     loadGroupMembersForUpload: async (courseId) => {
@@ -347,11 +348,75 @@ export const CourseDashboard = {
     renderStudentDashboard: async (container) => {
         try {
             const ts = new Date().getTime();
-            const [myCoursesRes, allCoursesRes] = await Promise.all([
+            const [myCoursesRes, allCoursesRes, examsRes] = await Promise.all([
                 apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=student&_t=${ts}`),
-                apiFetch(`/api/courses?studentId=${AppState.user.User_ID}&_t=${ts}`)
+                apiFetch(`/api/courses?studentId=${AppState.user.User_ID}&_t=${ts}`),
+                apiFetch(`/api/student-accessible-exams?studentId=${AppState.user.User_ID}&_t=${ts}`).catch(() => ({ exams: [] }))
             ]);
-            
+
+            const assignedExams = examsRes.exams || [];
+            CourseExam.studentAssignedExams = assignedExams;
+            if (examsRes.student) {
+                AppState.user.eye_condition = examsRes.student.eye_condition;
+            }
+
+            const isBlind = AppState.user.eye_condition === 'Legally Blind';
+            let assignedExamsSectionHtml = '';
+
+            if (assignedExams.length > 0 || isBlind) {
+                const examCardsHtml = assignedExams.length > 0
+                    ? assignedExams.map(ex => {
+                        const isDone = ex.status === 'Completed';
+                        return `
+                            <div class="p-5 rounded-xl border-2 ${isDone ? 'bg-indigo-900/70 border-indigo-700' : 'bg-indigo-900 border-yellow-400'} flex flex-col justify-between gap-4 shadow-md">
+                                <div>
+                                    <div class="flex justify-between items-start gap-2">
+                                        <span class="px-2.5 py-0.5 bg-yellow-400 text-gray-950 font-black text-[10px] rounded uppercase tracking-wider">${ex.courseCode} &bull; ${ex.term}</span>
+                                        ${ex.toDate ? `<span class="text-[10px] text-indigo-200 font-mono">Open until: ${ex.toDate}</span>` : ''}
+                                    </div>
+                                    <h3 class="text-lg sm:text-xl font-black text-white mt-2">${ex.examTitle}</h3>
+                                    <p class="text-xs text-indigo-200 font-medium mt-0.5">${ex.courseTitle}</p>
+                                    <div class="text-xs text-yellow-300 font-bold mt-2">
+                                        Questions: ${ex.regularCount}${ex.bonusCount > 0 ? ` + ${ex.bonusCount} Bonus` : ''} &nbsp;|&nbsp; Max Score: ${ex.maxScore}
+                                    </div>
+                                </div>
+                                ${isDone ? `
+                                    <div class="w-full py-3 px-4 bg-green-700 text-white font-black text-sm rounded-lg text-center border border-green-400">
+                                        <i class="fa-solid fa-circle-check mr-1.5"></i> Completed - Score: ${ex.finalScore} /${ex.maxScore}
+                                    </div>
+                                ` : `
+                                    <button type="button" class="start-accessible-exam-btn w-full py-3.5 px-4 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-sm sm:text-base rounded-lg shadow-md transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}">
+                                        <i class="fa-solid fa-headphones mr-2 text-lg"></i> Enter Exam: ${ex.examTitle}
+                                    </button>
+                                `}
+                            </div>
+                        `;
+                    }).join('')
+                    : `<div class="col-span-full p-6 text-center text-indigo-200 border-2 border-dashed border-indigo-700 rounded-xl font-bold text-sm">You have no active assigned exams at this moment.</div>`;
+
+                assignedExamsSectionHtml = `
+                    <section class="bg-indigo-950 text-white p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-yellow-400">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-indigo-800">
+                            <div class="flex items-center">
+                                <div class="bg-yellow-400 text-gray-950 p-2.5 rounded-xl mr-3">
+                                    <i class="fa-solid fa-universal-access text-xl"></i>
+                                </div>
+                                <div>
+                                    <h2 class="text-xl sm:text-2xl font-black text-white">Assigned Accessible Exams</h2>
+                                    <p class="text-xs text-indigo-200">Full-screen exam mode with voice read-aloud and automatic score recording</p>
+                                </div>
+                            </div>
+                            <button type="button" id="readDashboardExamsBtn" class="w-full sm:w-auto px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-xs sm:text-sm rounded-lg shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white">
+                                <i class="fa-solid fa-volume-high mr-2"></i> Read Aloud Assigned Exams
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${examCardsHtml}
+                        </div>
+                    </section>
+                `;
+            }
+
             const enrolledIds = myCoursesRes.courses.map(c => c.Course_ID);
             
             let enrolledHtml = myCoursesRes.courses.map(c => `
@@ -390,6 +455,7 @@ export const CourseDashboard = {
 
             container.innerHTML = `
                 <div class="space-y-12 fade-in">
+                    ${assignedExamsSectionHtml}
                     <section>
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -405,6 +471,10 @@ export const CourseDashboard = {
                     </section>
                 </div>
             `;
+
+            if (isBlind && assignedExams.some(e => e.status !== 'Completed') && CourseExam.announceDashboardExams) {
+                CourseExam.announceDashboardExams();
+            }
         } catch (err) {
             container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${err.message}</div>`;
         }
