@@ -30,11 +30,13 @@ export const CourseExam = {
     accIndex: 0,
     accSubmitting: false,
     accOnComplete: null,
+    lastEnterSpaceTime: 0,
 
     init: () => {
         document.addEventListener('click', CourseExam.handleClicks);
         document.addEventListener('change', CourseExam.handleChanges);
         document.addEventListener('keydown', CourseExam.handleKeydown);
+        document.addEventListener('focusin', CourseExam.handleFocus);
     },
 
     speak: (text) => {
@@ -47,6 +49,34 @@ export const CourseExam = {
             window.speechSynthesis.speak(utterance);
         } catch (e) {
             console.error('Speech synthesis error:', e);
+        }
+    },
+
+    handleFocus: (e) => {
+        const accOverlay = document.getElementById('accessibleExamOverlay');
+        if (accOverlay && !accOverlay.classList.contains('hidden') && CourseExam.accExam) {
+            if (e.target.id === 'accExamQuestionText') {
+                CourseExam.speak("Question: " + e.target.textContent);
+            } else if (e.target.classList.contains('acc-exam-choice-btn')) {
+                const idx = parseInt(e.target.dataset.choiceIndex, 10);
+                const letter = String.fromCharCode(65 + idx);
+                const q = CourseExam.accExam.questions[CourseExam.accIndex];
+                if (q && q.choices && q.choices[idx]) {
+                    CourseExam.speak(`Choice ${idx + 1}, ${letter}: ${q.choices[idx]}`);
+                }
+            } else if (e.target.id === 'accExamPrevBtn') {
+                CourseExam.speak("Previous Button");
+            } else if (e.target.id === 'accExamNextBtn') {
+                CourseExam.speak("Next Button");
+            } else if (e.target.id === 'accExamSubmitBtn') {
+                CourseExam.speak("Submit Exam Button");
+            } else if (e.target.id === 'accExamExitBtn') {
+                CourseExam.speak("Exit Exam Button");
+            } else if (e.target.id === 'accExamRepeatAudioBtn') {
+                CourseExam.speak("Read Question Again Button");
+            } else if (e.target.id === 'accExamTextAnswerInput') {
+                CourseExam.speak("Text Answer Input. Type your answer here.");
+            }
         }
     },
 
@@ -198,38 +228,22 @@ export const CourseExam = {
             document.getElementById('examPresentationOverlay').classList.add('hidden');
         }
 
-        // Lecturer Presentation Navigations
         if (e.target.closest('#examPrevBtn')) CourseExam.navigate(-1);
         if (e.target.closest('#examNextBtn')) CourseExam.navigate(1);
         if (e.target.closest('#examRevealBtn')) CourseExam.toggleAnswer();
         if (e.target.closest('#examRestartBtn')) CourseExam.restart();
 
-        // Student Accessible Exam Interactions
         if (e.target.closest('.acc-exam-choice-btn')) {
             const btn = e.target.closest('.acc-exam-choice-btn');
             const choiceIndex = parseInt(btn.dataset.choiceIndex, 10);
             CourseExam.selectAccessibleChoice(choiceIndex);
         }
 
-        if (e.target.closest('#accExamPrevBtn')) {
-            CourseExam.navigateAccessible(-1);
-        }
-
-        if (e.target.closest('#accExamNextBtn')) {
-            CourseExam.navigateAccessible(1);
-        }
-
-        if (e.target.closest('#accExamRepeatAudioBtn')) {
-            CourseExam.readCurrentAccessibleQuestion();
-        }
-
-        if (e.target.closest('#accExamSubmitBtn')) {
-            await CourseExam.submitAccessibleExam();
-        }
-
-        if (e.target.closest('#accExamExitBtn')) {
-            CourseExam.closeAccessibleExam();
-        }
+        if (e.target.closest('#accExamPrevBtn')) CourseExam.navigateAccessible(-1);
+        if (e.target.closest('#accExamNextBtn')) CourseExam.navigateAccessible(1);
+        if (e.target.closest('#accExamRepeatAudioBtn')) CourseExam.readCurrentAccessibleQuestion();
+        if (e.target.closest('#accExamSubmitBtn')) await CourseExam.submitAccessibleExam();
+        if (e.target.closest('#accExamExitBtn')) CourseExam.closeAccessibleExam();
     },
 
     handleChanges: async (e) => {
@@ -254,58 +268,89 @@ export const CourseExam = {
     },
 
     handleKeydown: (e) => {
-        // Accessible Exam Keyboard Shortcuts
         const accOverlay = document.getElementById('accessibleExamOverlay');
+        
+        // 1. Accessible Exam Overlay Logic
         if (accOverlay && !accOverlay.classList.contains('hidden') && CourseExam.accExam) {
             
-            if (e.key === 'Enter') {
-                if (document.activeElement && document.activeElement.id === 'accExamTextAnswerInput') {
-                    const val = document.activeElement.value.trim();
-                    CourseExam.accAnswers[CourseExam.accIndex] = val;
-                    localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
-                    document.activeElement.blur();
-                }
-                e.preventDefault();
-                if (CourseExam.accIndex < CourseExam.accExam.questions.length - 1) {
-                    CourseExam.navigateAccessible(1);
+            // Allow normal typing in text input, but let Enter register as a submit/blur
+            if (document.activeElement && document.activeElement.id === 'accExamTextAnswerInput') {
+                if (e.key === ' ') return; // Let space type space
+            } else {
+                if (e.key === ' ') e.preventDefault(); // Prevent page scroll for space globally in exam
+            }
+
+            // Enter & Space Double Tap Logic
+            if (e.key === 'Enter' || e.key === ' ') {
+                const now = Date.now();
+                if (now - (CourseExam.lastEnterSpaceTime || 0) < 600) { 
+                    // Double press detected
+                    e.preventDefault(); 
+                    CourseExam.lastEnterSpaceTime = 0; // Reset
+                    const isLast = CourseExam.accIndex === CourseExam.accExam.questions.length - 1;
+                    if (isLast) {
+                        CourseExam.submitAccessibleExam();
+                    } else {
+                        CourseExam.navigateAccessible(1);
+                    }
+                    return;
                 } else {
-                    CourseExam.submitAccessibleExam();
+                    CourseExam.lastEnterSpaceTime = now;
+                    // Single Press
+                    const activeEl = document.activeElement;
+                    const isChoice = activeEl && activeEl.classList.contains('acc-exam-choice-btn');
+                    
+                    if (e.key === ' ' && isChoice) {
+                        activeEl.click();
+                    } else if (!isChoice && (!activeEl || activeEl.id !== 'accExamTextAnswerInput')) {
+                        const isLast = CourseExam.accIndex === CourseExam.accExam.questions.length - 1;
+                        const action = isLast ? "submit the exam" : "go to the next question";
+                        CourseExam.speak(`Double press Enter or Space to ${action}.`);
+                    }
                 }
-                return;
             }
 
-            if (document.activeElement && document.activeElement.tagName === 'INPUT') {
-                return;
+            // Arrow Up/Down for Focus Navigation
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                const focusables = Array.from(document.querySelectorAll('#accessibleExamOverlay [tabindex="0"], #accessibleExamOverlay button, #accessibleExamOverlay input')).filter(el => !el.disabled && el.offsetParent !== null);
+                const currIdx = focusables.indexOf(document.activeElement);
+                if (currIdx > -1) {
+                    e.preventDefault();
+                    const nextIdx = e.key === 'ArrowDown' ? currIdx + 1 : currIdx - 1;
+                    if (nextIdx >= 0 && nextIdx < focusables.length) {
+                        focusables[nextIdx].focus();
+                    }
+                }
             }
 
+            // Right/Left for Question Navigation
             if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 CourseExam.navigateAccessible(1);
             } else if (e.key === 'ArrowLeft') {
                 e.preventDefault();
                 CourseExam.navigateAccessible(-1);
-            } else if (e.key === 'r' || e.key === 'R') {
+            }
+
+            // Hotkeys for Audio and Direct Focus
+            if (e.key === 'r' || e.key === 'R') {
                 e.preventDefault();
                 CourseExam.readCurrentAccessibleQuestion();
-            } else if (/^[1-9]$/.test(e.key)) { 
-                const idx = parseInt(e.key, 10) - 1; 
-                const q = CourseExam.accExam.questions[CourseExam.accIndex]; 
-                if (q && q.choices && idx < q.choices.length) { 
-                    e.preventDefault(); 
-                    CourseExam.selectAccessibleChoice(idx); 
-                } 
-            } else if (/^[a-dA-D]$/.test(e.key)) {
+            } else if (e.key === 'q' || e.key === 'Q') {
+                e.preventDefault();
+                document.getElementById('accExamQuestionText')?.focus();
+            } else if (/^[1-9]$/.test(e.key)) { e.preventDefault(); const idx = parseInt(e.key, 10) - 1; const choices = document.querySelectorAll('.acc-exam-choice-btn'); if (choices[idx]) { choices[idx].focus(); } } else if (/^[a-dA-D]$/.test(e.key)) {
+                e.preventDefault();
                 const idx = e.key.toUpperCase().charCodeAt(0) - 65;
-                const q = CourseExam.accExam.questions[CourseExam.accIndex];
-                if (q && q.choices && idx < q.choices.length) {
-                    e.preventDefault();
-                    CourseExam.selectAccessibleChoice(idx);
+                const choices = document.querySelectorAll('.acc-exam-choice-btn');
+                if (choices[idx]) {
+                    choices[idx].focus();
                 }
             }
             return;
         }
 
-        // Lecturer Presentation Keyboard Shortcuts
+        // 2. Lecturer Presentation Keyboard Shortcuts
         const overlay = document.getElementById('examPresentationOverlay');
         if (!overlay || overlay.classList.contains('hidden')) return;
 
@@ -982,6 +1027,9 @@ export const CourseExam = {
             ? ` <span class="ml-2 px-3 py-0.5 bg-amber-400 text-gray-950 rounded-full text-sm sm:text-lg font-black uppercase">Bonus Question</span>`
             : '';
         document.getElementById('accExamQuestionCounter').innerHTML = `Question ${CourseExam.accIndex + 1} of ${total}${bonusBadge}`;
+        
+        // Add tabindex="0" so the question text itself can receive focus naturally.
+        document.getElementById('accExamQuestionText').setAttribute('tabindex', '0');
         document.getElementById('accExamQuestionText').textContent = q.question;
 
         CourseExam.updateAccessibleAnsweredBadge();
@@ -1062,8 +1110,11 @@ export const CourseExam = {
             speech += `Your currently selected answer is ${currentAns}. `;
         }
 
-        if (CourseExam.accIndex === total - 1) {
-            speech += `You are on the final question. You can press Submit Exam when you are ready.`;
+        const isLast = CourseExam.accIndex === total - 1;
+        if (isLast) {
+            speech += `You are on the final question. Double press Enter or Space to submit the exam.`;
+        } else {
+            speech += `Double press Enter or Space to go to the next question.`;
         }
 
         document.getElementById('accExamLiveFeedback').textContent = currentAns
@@ -1087,8 +1138,8 @@ export const CourseExam = {
 
         const total = CourseExam.accExam.questions.length;
         const navHint = CourseExam.accIndex < total - 1
-            ? "Press Enter, Next, or Right Arrow to move to the next question."
-            : "This is the last question. Press Submit Exam when you are ready.";
+            ? "Double press Enter or Space to go to the next question."
+            : "This is the last question. Double press Enter or Space to submit the exam.";
 
         const confirmSpeech = `Choice ${choiceIndex + 1}, ${letter}: ${chosenText}. You selected ${chosenText} as your answer for Question ${CourseExam.accIndex + 1}. ${navHint}`;
         document.getElementById('accExamLiveFeedback').textContent = confirmSpeech;
@@ -1176,8 +1227,10 @@ export const CourseExam = {
             CourseExam.speak(errMsg);
             alert(errMsg);
         } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalHtml;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+            }
         }
     }
 };
