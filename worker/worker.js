@@ -57,6 +57,71 @@ function isWithinScheduleWindow(fromDate, toDate) {
     return true;
 }
 
+async function getStudentAccessibleExamsList(env, studentId) {
+    await ensureAccessibleExamTables(env);
+
+    const rows = await env.DB.prepare(
+        `SELECT ea.Assignment_ID, ea.Class_Exam_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score as Recorded_Max,
+                ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date,
+                e.Title as Exam_Title, e.ExamData,
+                c.CourseCode, c.CourseTitle
+         FROM Exam_Assignments ea
+         JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
+         JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+         JOIN Courses c ON ce.Course_ID = c.Course_ID
+         WHERE ea.Student_ID = ? AND ea.Is_Enabled = 1 AND ce.Is_Active = 1
+         ORDER BY ce.Created_At DESC`
+    ).bind(studentId).all();
+
+    const availableExams = [];
+
+    for (const r of (rows.results || [])) {
+        if (!isWithinScheduleWindow(r.From_Date, r.To_Date)) {
+            continue;
+        }
+
+        let parsed = [];
+        try {
+            parsed = JSON.parse(r.ExamData || "[]");
+        } catch (e) {
+            parsed = [];
+        }
+
+        const questions = parsed.map((q, idx) => ({
+            index: idx,
+            part: q[0],
+            question: q[1],
+            choices: Array.isArray(q[2]) ? q[2] : [],
+            isBonus: Boolean(q[5])
+        }));
+
+        const regularCount = questions.filter(q => !q.isBonus).length;
+        const bonusCount = questions.filter(q => q.isBonus).length;
+
+        availableExams.push({
+            assignmentId: r.Assignment_ID,
+            classExamId: r.Class_Exam_ID,
+            examId: r.Exam_ID,
+            courseId: r.Course_ID,
+            courseCode: r.CourseCode,
+            courseTitle: r.CourseTitle,
+            examTitle: r.Exam_Title,
+            term: r.Term,
+            category: r.Category,
+            fromDate: r.From_Date,
+            toDate: r.To_Date,
+            status: r.Status,
+            finalScore: r.Final_Score,
+            maxScore: r.Recorded_Max || (regularCount > 0 ? regularCount : questions.length),
+            regularCount,
+            bonusCount,
+            questions
+        });
+    }
+
+    return availableExams;
+}
+
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
@@ -293,6 +358,30 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
+            if (request.method === "GET" && path === "/api/student-accessible-exams") {
+                const studentId = url.searchParams.get("studentId");
+                if (!studentId) {
+                    return new Response(JSON.stringify({ error: "Missing studentId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const user = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Student_Number, account_status, role, course, year, section, eye_condition
+                     FROM Users WHERE User_ID = ?`
+                ).bind(studentId).first();
+
+                if (!user) {
+                    return new Response(JSON.stringify({ error: "Student not found." }), { status: 404, headers: corsHeaders });
+                }
+
+                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID);
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    student: user,
+                    exams: availableExams
+                }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && path === "/api/student-accessible-exams") {
                 const body = await request.json();
                 const hashedPassword = await hashPassword(body.password || "");
@@ -317,66 +406,7 @@ export default {
                     return new Response(JSON.stringify({ error: `Account is ${user.account_status}.` }), { status: 403, headers: corsHeaders });
                 }
 
-                await ensureAccessibleExamTables(env);
-
-                const rows = await env.DB.prepare(
-                    `SELECT ea.Assignment_ID, ea.Class_Exam_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score as Recorded_Max,
-                            ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date,
-                            e.Title as Exam_Title, e.ExamData,
-                            c.CourseCode, c.CourseTitle
-                     FROM Exam_Assignments ea
-                     JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
-                     JOIN Exams e ON ce.Exam_ID = e.Exam_ID
-                     JOIN Courses c ON ce.Course_ID = c.Course_ID
-                     WHERE ea.Student_ID = ? AND ea.Is_Enabled = 1 AND ce.Is_Active = 1
-                     ORDER BY ce.Created_At DESC`
-                ).bind(user.User_ID).all();
-
-                const availableExams = [];
-
-                for (const r of (rows.results || [])) {
-                    if (!isWithinScheduleWindow(r.From_Date, r.To_Date)) {
-                        continue;
-                    }
-
-                    let parsed = [];
-                    try {
-                        parsed = JSON.parse(r.ExamData || "[]");
-                    } catch (e) {
-                        parsed = [];
-                    }
-
-                    const questions = parsed.map((q, idx) => ({
-                        index: idx,
-                        part: q[0],
-                        question: q[1],
-                        choices: Array.isArray(q[2]) ? q[2] : [],
-                        isBonus: Boolean(q[5])
-                    }));
-
-                    const regularCount = questions.filter(q => !q.isBonus).length;
-                    const bonusCount = questions.filter(q => q.isBonus).length;
-
-                    availableExams.push({
-                        assignmentId: r.Assignment_ID,
-                        classExamId: r.Class_Exam_ID,
-                        examId: r.Exam_ID,
-                        courseId: r.Course_ID,
-                        courseCode: r.CourseCode,
-                        courseTitle: r.CourseTitle,
-                        examTitle: r.Exam_Title,
-                        term: r.Term,
-                        category: r.Category,
-                        fromDate: r.From_Date,
-                        toDate: r.To_Date,
-                        status: r.Status,
-                        finalScore: r.Final_Score,
-                        maxScore: r.Recorded_Max || (regularCount > 0 ? regularCount : questions.length),
-                        regularCount,
-                        bonusCount,
-                        questions
-                    });
-                }
+                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID);
 
                 return new Response(JSON.stringify({
                     success: true,
