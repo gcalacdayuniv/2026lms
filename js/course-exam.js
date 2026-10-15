@@ -50,6 +50,33 @@ export const CourseExam = {
         }
     },
 
+    downloadCsvTemplate: () => {
+        const rows = [
+            ['Part Index', 'Question', 'Choices', 'Answer', 'Explanation', 'Bonus'],
+            ['0', 'What does CPU stand for?', 'Central Processing Unit | Control Processing Unit | Computer Personal Unit | Central Power Unit', 'Central Processing Unit', 'The CPU is the primary component of a computer that processes instructions.', ''],
+            ['0', 'Statement I: HTML is used to structure web pages.\nStatement II: CSS is used to style web pages.', 'Both statements are true | Both statements are false | Only Statement I is true | Only Statement II is true', 'Both statements are true', 'HTML provides structure while CSS handles presentation.', ''],
+            ['1', 'The binary number system uses only 0 and 1.', 'True | False', 'True', 'Binary is a base-2 numeral system.', ''],
+            ['2', 'Identify the protocol used for secure communication over a computer network (abbreviation).', '', 'HTTPS', 'Hypertext Transfer Protocol Secure encrypts data between browser and server.', ''],
+            ['0', 'BONUS: Which company developed the JavaScript programming language originally named Mocha?', 'Netscape | Microsoft | Sun Microsystems | IBM', 'Netscape', 'Brendan Eich created JavaScript at Netscape in 1995.', '1']
+        ];
+
+        const csvCell = (val) => {
+            const str = String(val ?? '');
+            return `"${str.replace(/"/g, '""')}"`;
+        };
+
+        const csvContent = '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'exam_upload_template.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    },
+
     announceDashboardExams: () => {
         const exams = CourseExam.studentAssignedExams || [];
         const userName = AppState.user?.Name || 'Student';
@@ -71,6 +98,15 @@ export const CourseExam = {
     },
 
     handleClicks: async (e) => {
+        if (e.target.closest('#downloadExamCsvTemplateBtn')) {
+            CourseExam.downloadCsvTemplate();
+        }
+
+        if (e.target.closest('#toggleExamCsvGuideBtn')) {
+            const panel = document.getElementById('examCsvGuidePanel');
+            if (panel) panel.classList.toggle('hidden');
+        }
+
         if (e.target.closest('#readDashboardExamsBtn')) {
             CourseExam.announceDashboardExams();
         }
@@ -231,14 +267,7 @@ export const CourseExam = {
             } else if (e.key === 'r' || e.key === 'R') {
                 e.preventDefault();
                 CourseExam.readCurrentAccessibleQuestion();
-            } else if (/^[1-9]$/.test(e.key)) {
-                const idx = parseInt(e.key, 10) - 1;
-                const q = CourseExam.accExam.questions[CourseExam.accIndex];
-                if (q && q.choices && idx < q.choices.length) {
-                    e.preventDefault();
-                    CourseExam.selectAccessibleChoice(idx);
-                }
-            } else if (/^[a-dA-D]$/.test(e.key)) {
+            } else if (/^[1-9]$/.test(e.key)) { const idx = parseInt(e.key, 10) - 1; const q = CourseExam.accExam.questions[CourseExam.accIndex]; if (q && q.choices && idx < q.choices.length) { e.preventDefault(); CourseExam.selectAccessibleChoice(idx); } } else if (/^[a-dA-D]$/.test(e.key)) {
                 const idx = e.key.toUpperCase().charCodeAt(0) - 65;
                 const q = CourseExam.accExam.questions[CourseExam.accIndex];
                 if (q && q.choices && idx < q.choices.length) {
