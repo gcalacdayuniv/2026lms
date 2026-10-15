@@ -231,7 +231,6 @@ const ClassUI = {
                 </div>
 
                 <div id="noClassList" class="flex-1 overflow-y-auto space-y-2 bg-gray-50 p-2 rounded border border-gray-200 min-h-[150px] max-h-[300px]">
-                    <!-- Dynamically populated -->
                 </div>
             </div>
         </div>
@@ -264,6 +263,16 @@ const ClassUI = {
                             <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Topic</label>
                             <input type="text" id="manageTopicInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="Assigned">
                         </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Eye Condition / Disability Tag</label>
+                        <select id="manageEyeConditionSelect" class="w-full px-3 py-2 text-sm border border-gray-300 rounded outline-none font-bold bg-gray-50 cursor-pointer transition focus:ring-2 focus:ring-blue-500">
+                            <option value="No Eye Condition">No Eye Condition</option>
+                            <option value="Near Sighted">Near Sighted</option>
+                            <option value="Far Sighted">Far Sighted</option>
+                            <option value="Legally Blind">Legally Blind (Accessible Read-Aloud)</option>
+                        </select>
                     </div>
 
                     <div>
@@ -430,7 +439,6 @@ const ClassUI = {
                     </button>
                 </div>
                 <div id="historySubmissionsList" class="flex-1 overflow-y-auto space-y-2 p-1">
-                    <!-- Dynamic Content -->
                 </div>
             </div>
         </div>
@@ -508,7 +516,6 @@ const ClassUI = {
                         <button type="button" id="resetCalledListBtn" class="text-[10px] font-bold text-red-600 hover:text-red-800 uppercase">Reset All</button>
                     </div>
                     <div id="calledStudentsListContent" class="space-y-1.5">
-                        <!-- Populated dynamically -->
                     </div>
                 </div>
 
@@ -556,7 +563,6 @@ const ClassUI = {
                 </div>
                 <div id="gmmLoading" class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
                 <div id="gmmContent" class="hidden flex-1 overflow-y-auto space-y-2 p-1">
-                    <!-- Dynamic Content -->
                 </div>
             </div>
         </div>
@@ -565,7 +571,7 @@ const ClassUI = {
 
 export const ClassComponents = {
     renderClassScreen: (course, students) => {
-        const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
+        const eyeOrder = { 'Legally Blind': 0, 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
 
         students.sort((a, b) => {
             const seatAStr = (a.Seat_Number || '').toString().trim();
@@ -586,8 +592,8 @@ export const ClassComponents = {
                 }
             }
 
-            const eyeA = eyeOrder[a.eye_condition] || 4;
-            const eyeB = eyeOrder[b.eye_condition] || 4;
+            const eyeA = eyeOrder[a.eye_condition] !== undefined ? eyeOrder[a.eye_condition] : 4;
+            const eyeB = eyeOrder[b.eye_condition] !== undefined ? eyeOrder[b.eye_condition] : 4;
             if (eyeA !== eyeB) return eyeA - eyeB;
 
             const nameA = a.Name || '';
@@ -603,9 +609,12 @@ export const ClassComponents = {
                 ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" alt="${s.Name}">`
                 : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
 
-            const eyeConditionBadge = s.eye_condition
-                ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`
-                : '';
+            let eyeConditionBadge = '';
+            if (s.eye_condition === 'Legally Blind') {
+                eyeConditionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300"><i class="fa-solid fa-universal-access mr-1"></i> Legally Blind</span>`;
+            } else if (s.eye_condition) {
+                eyeConditionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`;
+            }
 
             const groupDisplay = s.Group_Name
                 ? `<span class="group-name-trigger text-blue-600 cursor-pointer hover:underline font-black" data-group="${s.Group_Name}" data-course-id="${course.Course_ID}">${s.Group_Name}</span>`
@@ -640,6 +649,7 @@ export const ClassComponents = {
                                 data-seat="${s.Seat_Number || ''}"
                                 data-group="${s.Group_Name || ''}"
                                 data-topic="${s.Assigned_Topic || ''}"
+                                data-eye="${s.eye_condition || 'No Eye Condition'}"
                                 data-status="${s.account_status || 'Inactive'}">
                                 <i class="fa-solid fa-gear"></i>
                             </button>
@@ -653,6 +663,7 @@ export const ClassComponents = {
                             data-seat="${s.Seat_Number || ''}"
                             data-group="${s.Group_Name || ''}"
                             data-topic="${s.Assigned_Topic || ''}"
+                            data-eye="${s.eye_condition || 'No Eye Condition'}"
                             data-status="${s.account_status || 'Inactive'}">
                             <i class="fa-solid fa-gear mr-1"></i> Manage
                         </button>
@@ -766,6 +777,7 @@ export const ClassComponents = {
             ${ClassUI.renderGroupMembersModal()}
             ${ExamUI.renderManagerModal()}
             ${ExamUI.renderPresentationOverlay()}
+            ${ExamUI.renderAccessibleExamOverlay ? ExamUI.renderAccessibleExamOverlay() : ''}
         `;
     }
 };
