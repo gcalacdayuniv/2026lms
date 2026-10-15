@@ -72,7 +72,7 @@ export const CourseSummary = {
     },
 
     sortStudents: (students) => {
-        const eyeOrder = { 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
+        const eyeOrder = { 'Legally Blind': 0, 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
         return [...students].sort((a, b) => {
             const seatAStr = (a.Seat_Number || '').toString().trim();
             const seatBStr = (b.Seat_Number || '').toString().trim();
@@ -89,8 +89,8 @@ export const CourseSummary = {
                     return seatAStr.localeCompare(seatBStr);
                 }
             }
-            const eyeA = eyeOrder[a.eye_condition] || 4;
-            const eyeB = eyeOrder[b.eye_condition] || 4;
+            const eyeA = eyeOrder[a.eye_condition] !== undefined ? eyeOrder[a.eye_condition] : 4;
+            const eyeB = eyeOrder[b.eye_condition] !== undefined ? eyeOrder[b.eye_condition] : 4;
             if (eyeA !== eyeB) return eyeA - eyeB;
             return (a.Name || '').localeCompare(b.Name || '');
         });
@@ -249,7 +249,7 @@ export const CourseSummary = {
     },
 
     scoreText: (c) => {
-        if (!c.count) return '—';
+        if (!c.count) return '---';
         const n = (v) => Number(v.toFixed(2));
         return `${n(c.score)}/${n(c.max)}`;
     },
@@ -299,7 +299,7 @@ export const CourseSummary = {
             const sc = r.scores;
             const scoreBlock = sc.items.length === 0 ? '' : `
                                 <div class="flex justify-between gap-3 pt-2 mt-2 border-t border-gray-300 font-bold text-gray-500 uppercase"><span>Assessment</span><span>Score</span></div>
-                                ${sc.items.map(a => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(a.Title)} <span class="text-gray-400">(${esc(a.Category)}, ${esc(a.Term === 'MidTerm' ? 'Mid' : 'Final')})</span></span><span class="font-mono font-bold text-blue-600">${esc(Number(a.Score.toFixed(2)))}/${esc(Number(a.Max_Score.toFixed(2)))}</span></div>`).join('')}`;
+                                ${sc.items.map(a => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(a.Title)} <span class="text-gray-400">(${esc(a.Category)},${esc(a.Term === 'MidTerm' ? 'Mid' : 'Final')})</span></span><span class="font-mono font-bold text-blue-600">${esc(Number(a.Score.toFixed(2)))}/${esc(Number(a.Max_Score.toFixed(2)))}</span></div>`).join('')}`;
             const statusText = s.account_status || 'Inactive';
             const badge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${STATUS_BADGE[statusText] || STATUS_BADGE['Inactive']}">${esc(statusText)}</span>`;
 
@@ -396,7 +396,7 @@ export const CourseSummary = {
             ].map(CourseSummary.csvCell).join(','));
         });
 
-        const csv = '﻿' + lines.join('\r\n');
+        const csv = '\uFEFF' + lines.join('\r\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
