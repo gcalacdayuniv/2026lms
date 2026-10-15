@@ -75,18 +75,31 @@ export const CourseModule = {
             }
         }
 
-        if (e.target.id === 'manageSeatInput' || e.target.id === 'manageGroupInput' || e.target.id === 'manageTopicInput') {
+        if (
+            e.target.id === 'manageSeatInput' ||
+            e.target.id === 'manageGroupInput' ||
+            e.target.id === 'manageTopicInput' ||
+            e.target.id === 'manageEyeConditionSelect'
+        ) {
             const studentId = document.getElementById('manageStudentId').value;
             const seatNumber = document.getElementById('manageSeatInput').value.trim();
             const groupName = document.getElementById('manageGroupInput').value.trim();
             const assignedTopic = document.getElementById('manageTopicInput').value.trim();
+            const eyeCondition = document.getElementById('manageEyeConditionSelect')?.value || 'No Eye Condition';
             const courseId = window.location.hash.replace('#class-', '');
 
             try {
                 await apiFetch('/api/update-student-info', {
                     method: 'POST',
-                    body: JSON.stringify({ courseId, studentId, seatNumber, groupName, assignedTopic })
+                    body: JSON.stringify({ courseId, studentId, seatNumber, groupName, assignedTopic, eyeCondition })
                 });
+                const stu = CourseClass.currentStudents.find(s => s.User_ID === studentId);
+                if (stu) {
+                    stu.Seat_Number = seatNumber;
+                    stu.Group_Name = groupName;
+                    stu.Assigned_Topic = assignedTopic;
+                    stu.eye_condition = eyeCondition;
+                }
             } catch (err) {
                 console.error('Failed to update student info:', err);
             }
@@ -432,6 +445,11 @@ export const CourseModule = {
             document.getElementById('manageSeatInput').value = btn.dataset.seat;
             document.getElementById('manageGroupInput').value = btn.dataset.group;
             document.getElementById('manageTopicInput').value = btn.dataset.topic;
+
+            const eyeSelect = document.getElementById('manageEyeConditionSelect');
+            if (eyeSelect) {
+                eyeSelect.value = btn.dataset.eye || 'No Eye Condition';
+            }
 
             const statusSelect = document.getElementById('manageStatusSelect');
             statusSelect.value = btn.dataset.status;
