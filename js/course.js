@@ -289,6 +289,7 @@ export const CourseModule = {
             document.getElementById('summaryError').classList.add('hidden');
 
             CourseClass.currentSummaryData = null;
+            CourseClass.currentSummaryStudentId = AppState.user.User_ID;
 
             try {
                 const ts = new Date().getTime();
@@ -484,15 +485,22 @@ export const CourseModule = {
 
         if (e.target.closest('#manageResetPwdBtn')) {
             const studentId = document.getElementById('manageStudentId').value;
-            if (window.confirm("Are you sure you want to reset this student's password to 'password123'?")) {
+            if (window.confirm("Are you sure you want to reset this student's password to '123456'?")) {
+                const resetBtn = e.target.closest('#manageResetPwdBtn');
+                const originalHtml = resetBtn.innerHTML;
+                resetBtn.disabled = true;
+                resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Resetting...';
                 try {
-                    await apiFetch('/api/reset-password', {
+                    await apiFetch('/api/reset-student-password', {
                         method: 'POST',
-                        body: JSON.stringify({ userId: studentId })
+                        body: JSON.stringify({ studentId: studentId })
                     });
-                    alert("Password successfully reset to 'password123'.");
+                    alert("Password successfully reset to '123456'.");
                 } catch (err) {
                     alert("Failed to reset password: " + err.message);
+                } finally {
+                    resetBtn.disabled = false;
+                    resetBtn.innerHTML = originalHtml;
                 }
             }
         }
@@ -722,6 +730,7 @@ export const CourseModule = {
             document.getElementById('summaryError').classList.add('hidden');
 
             CourseClass.currentSummaryData = null;
+            CourseClass.currentSummaryStudentId = studentId;
 
             try {
                 const ts = new Date().getTime();
@@ -769,6 +778,7 @@ export const CourseModule = {
         if (e.target.closest('.save-grade-btn')) {
             const btn = e.target.closest('.save-grade-btn');
             const subId = btn.dataset.subId;
+            const fileUrl = btn.dataset.fileUrl || null;
             const container = btn.closest('.flex');
             
             const narrativeVal = container.querySelector('.grade-narrative').value;
@@ -784,9 +794,10 @@ export const CourseModule = {
                     method: 'POST',
                     body: JSON.stringify({
                         submissionId: subId,
-                        narrative: narrativeVal !== '' ? parseFloat(narrativeVal) : null,
-                        individual: individualVal !== '' ? parseFloat(individualVal) : null,
-                        report: reportVal !== '' ? parseFloat(reportVal) : null
+                        fileUrl: fileUrl,
+                        gradeNarrative: narrativeVal !== '' ? parseFloat(narrativeVal) : null,
+                        gradeIndividual: individualVal !== '' ? parseFloat(individualVal) : null,
+                        gradeReport: reportVal !== '' ? parseFloat(reportVal) : null
                     })
                 });
                 
@@ -803,14 +814,19 @@ export const CourseModule = {
                     btn.disabled = false;
                 }, 2000);
                 
-                const currentCourseId = window.location.hash.replace('#class-', '');
-                if (CourseClass.currentSummaryData && CourseClass.currentSummaryData.enrollment) {
-                    const studentId = CourseClass.currentSummaryData.enrollment.Student_ID;
-                    const ts = new Date().getTime();
-                    const updatedData = await apiFetch(`/api/student-summary?courseId=${currentCourseId}&studentId=${studentId}&_t=${ts}`);
-                    CourseClass.currentSummaryData = updatedData;
-                    CourseAttendance.renderTermMetrics('midterm', updatedData);
-                    CourseAttendance.renderTermMetrics('finalterm', updatedData);
+                // Refresh summary metrics (grade save already succeeded; refresh failure must not alert)
+                try {
+                    const currentCourseId = window.location.hash.replace('#class-', '');
+                    const studentId = CourseClass.currentSummaryStudentId;
+                    if (studentId && currentCourseId) {
+                        const ts = new Date().getTime();
+                        const updatedData = await apiFetch(`/api/student-summary?courseId=${currentCourseId}&studentId=${studentId}&_t=${ts}`);
+                        CourseClass.currentSummaryData = updatedData;
+                        CourseAttendance.renderTermMetrics('midterm', updatedData);
+                        CourseAttendance.renderTermMetrics('finalterm', updatedData);
+                    }
+                } catch (refreshErr) {
+                    console.error('Grade saved, but summary refresh failed:', refreshErr);
                 }
                 
             } catch(err) {
