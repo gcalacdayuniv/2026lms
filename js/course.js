@@ -591,10 +591,8 @@ export const CourseModule = {
             const status = btn.dataset.status;
             if (status === 'Present') {
                 btn.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
-                if (pointsInput && pointsInput.value === '0') pointsInput.value = '10';
             } else if (status === 'Late') {
                 btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
-                if (pointsInput && pointsInput.value === '0') pointsInput.value = '5';
             } else if (status === 'Absent') {
                 btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
                 if (pointsInput) pointsInput.value = '0';

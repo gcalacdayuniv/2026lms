@@ -6,6 +6,7 @@ import { CourseSummary } from './course-summary.js';
 import { CourseScores } from './course-scores.js';
 import { CourseExam } from './course-exam.js';
 import { AppState } from './globals.js';
+import { A11y } from './a11y.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     AppState.init();
@@ -15,4 +16,5 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseScores.init();
     CourseExam.init();
     AppRouter.init();
+    A11y.init();
 });

@@ -85,9 +85,9 @@ const DashboardUI = {
                     <div class="flex items-center">
                         <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight"><i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard</h1>
                     </div>
-                    <div class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200" id="profileToggleBtn">
+                    <button type="button" id="profileToggleBtn" aria-haspopup="dialog" aria-label="Open profile menu for ${user.Name}" class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                         <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${user.Name}</span>${headerAvatar}
-                    </div>
+                    </button>
                 </div>
             </div>
         </header>
