@@ -40,7 +40,11 @@ export const CourseExam = {
         document.addEventListener('focusin', CourseExam.handleFocus);
     },
 
+    // Read-aloud and the audio-driven keyboard flow are for Legally Blind students only.
+    isVoiceUser: () => AppState.user?.eye_condition === 'Legally Blind',
+
     speak: (text) => {
+        if (!CourseExam.isVoiceUser()) return;
         if (!('speechSynthesis' in window)) return;
         try {
             window.speechSynthesis.cancel();
@@ -54,6 +58,7 @@ export const CourseExam = {
     },
 
     handleFocus: (e) => {
+        if (!CourseExam.isVoiceUser()) return;
         const accOverlay = document.getElementById('accessibleExamOverlay');
         if (accOverlay && !accOverlay.classList.contains('hidden') && CourseExam.accExam) {
             if (e.target.id === 'accExamQuestionText') {
@@ -109,6 +114,7 @@ export const CourseExam = {
     },
 
     announceDashboardExams: () => {
+        if (!CourseExam.isVoiceUser()) return;
         const exams = CourseExam.studentAssignedExams || [];
         const userName = AppState.user?.Name || 'Student';
         if (exams.length === 0) {
@@ -236,8 +242,8 @@ export const CourseExam = {
 
         if (e.target.closest('.acc-exam-choice-btn')) {
             const btn = e.target.closest('.acc-exam-choice-btn');
-            
-            // Single tap mouse/touch logic for locking the answer explicitly 
+
+            // Single tap mouse/touch logic for locking the answer explicitly
             const choiceIndex = parseInt(btn.dataset.choiceIndex, 10);
             CourseExam.selectAccessibleChoice(choiceIndex);
         }
@@ -262,7 +268,7 @@ export const CourseExam = {
                 localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
             }
             CourseExam.updateAccessibleAnsweredBadge();
-            if (val) {
+            if (val && CourseExam.isVoiceUser()) {
                 const msg = `You typed ${val} as your answer for Question ${CourseExam.accIndex + 1}.`;
                 document.getElementById('accExamLiveFeedback').textContent = msg;
                 CourseExam.speak(msg);
@@ -272,10 +278,13 @@ export const CourseExam = {
 
     handleKeydown: (e) => {
         const accOverlay = document.getElementById('accessibleExamOverlay');
-        
+
         // 1. Accessible Exam Overlay Logic
         if (accOverlay && !accOverlay.classList.contains('hidden') && CourseExam.accExam) {
-            
+
+            // Sighted students use normal mouse/keyboard behavior: no audio-driven key handling.
+            if (!CourseExam.isVoiceUser()) return;
+
             // Allow normal typing in text input, but let Enter register as a submit/blur
             if (document.activeElement && document.activeElement.id === 'accExamTextAnswerInput') {
                 if (e.key === ' ') return; // Let space type space normally inside text box
@@ -288,13 +297,13 @@ export const CourseExam = {
                 e.preventDefault();
                 const focusables = Array.from(document.querySelectorAll('#accExamQuestionText, .acc-exam-choice-btn, #accExamPrevBtn, #accExamNextBtn:not(.hidden), #accExamSubmitBtn:not(.hidden), #accExamTextAnswerInput'))
                     .filter(el => !el.disabled && el.offsetParent !== null);
-                
+
                 const currIdx = focusables.indexOf(document.activeElement);
                 let nextIdx = e.shiftKey ? currIdx - 1 : currIdx + 1;
-                
+
                 if (nextIdx >= focusables.length) nextIdx = 0;
                 if (nextIdx < 0) nextIdx = focusables.length - 1;
-                
+
                 focusables[nextIdx].focus();
                 return;
             }
@@ -302,10 +311,10 @@ export const CourseExam = {
             // Enter & Space Double Tap Logic
             if (e.key === 'Enter' || e.key === ' ') {
                 const now = Date.now();
-                if (now - (CourseExam.lastEnterSpaceTime || 0) < 600) { 
+                if (now - (CourseExam.lastEnterSpaceTime || 0) < 600) {
                     // Double press detected - Trigger Navigation
-                    e.preventDefault(); 
-                    CourseExam.lastEnterSpaceTime = 0; 
+                    e.preventDefault();
+                    CourseExam.lastEnterSpaceTime = 0;
                     const isLast = CourseExam.accIndex === CourseExam.accExam.questions.length - 1;
                     if (isLast) {
                         CourseExam.submitAccessibleExam();
@@ -318,7 +327,7 @@ export const CourseExam = {
                     // Single Press Detected - Lock Answer if on a choice
                     const activeEl = document.activeElement;
                     const isChoice = activeEl && activeEl.classList.contains('acc-exam-choice-btn');
-                    
+
                     if ((e.key === ' ' || e.key === 'Enter') && isChoice) {
                         e.preventDefault();
                         const idx = parseInt(activeEl.dataset.choiceIndex, 10);
@@ -991,13 +1000,13 @@ export const CourseExam = {
         CourseExam.accIndex = 0;
         CourseExam.accSubmitting = false;
         CourseExam.accOnComplete = onComplete || null;
-        
+
         const cachedDraft = localStorage.getItem('acc_exam_draft_' + examObj.assignmentId);
         if (cachedDraft) {
-            try { 
-                CourseExam.accAnswers = JSON.parse(cachedDraft); 
-            } catch(e) { 
-                CourseExam.accAnswers = new Array(examObj.questions.length).fill(''); 
+            try {
+                CourseExam.accAnswers = JSON.parse(cachedDraft);
+            } catch(e) {
+                CourseExam.accAnswers = new Array(examObj.questions.length).fill('');
             }
         } else {
             CourseExam.accAnswers = new Array(examObj.questions.length).fill('');
@@ -1006,8 +1015,19 @@ export const CourseExam = {
         const overlay = document.getElementById('accessibleExamOverlay');
         if (!overlay) return;
 
+        const voice = CourseExam.isVoiceUser();
+
         document.getElementById('accExamHeaderTitle').textContent = examObj.examTitle;
         document.getElementById('accExamCourseBadge').textContent = `${examObj.courseCode} - ${student.Name}`;
+
+        // Sighted students: no read-aloud controls.
+        document.getElementById('accExamRepeatAudioBtn')?.classList.toggle('hidden', !voice);
+        const feedback = document.getElementById('accExamLiveFeedback');
+        if (feedback) {
+            feedback.classList.toggle('hidden', !voice);
+            if (voice) feedback.textContent = 'Select an answer choice below or press number keys 1 to 4.';
+        }
+
         overlay.classList.remove('hidden');
 
         CourseExam.renderAccessibleQuestion(true);
@@ -1053,7 +1073,7 @@ export const CourseExam = {
             ? ` <span class="ml-2 px-3 py-0.5 bg-amber-400 text-gray-950 rounded-full text-sm sm:text-lg font-black uppercase">Bonus Question</span>`
             : '';
         document.getElementById('accExamQuestionCounter').innerHTML = `Question ${CourseExam.accIndex + 1} of ${total}${bonusBadge}`;
-        
+
         // Add tabindex="0" so the question text itself can receive focus naturally.
         document.getElementById('accExamQuestionText').setAttribute('tabindex', '0');
         document.getElementById('accExamQuestionText').textContent = q.question;
@@ -1095,7 +1115,7 @@ export const CourseExam = {
                 </div>
             `;
         }
-        
+
         const isLastQuestion = CourseExam.accIndex === total - 1;
         document.getElementById('accExamPrevBtn').disabled = CourseExam.accIndex === 0;
         document.getElementById('accExamNextBtn').classList.toggle('hidden', isLastQuestion);
@@ -1109,7 +1129,7 @@ export const CourseExam = {
     },
 
     readCurrentAccessibleQuestion: () => {
-        if (!CourseExam.accExam) return;
+        if (!CourseExam.accExam || !CourseExam.isVoiceUser()) return;
         const questions = CourseExam.accExam.questions;
         const total = questions.length;
         const q = questions[CourseExam.accIndex];
@@ -1163,11 +1183,12 @@ export const CourseExam = {
         if (!q || !q.choices || choiceIndex < 0 || choiceIndex >= q.choices.length) return;
 
         const chosenText = q.choices[choiceIndex];
-        const letter = String.fromCharCode(65 + choiceIndex);
         CourseExam.accAnswers[CourseExam.accIndex] = chosenText;
-        
+
         localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
         CourseExam.renderAccessibleQuestion(false);
+
+        if (!CourseExam.isVoiceUser()) return;
 
         const total = CourseExam.accExam.questions.length;
         const navHint = CourseExam.accIndex < total - 1
