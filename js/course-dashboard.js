@@ -9,9 +9,9 @@ export const CourseDashboard = {
         const section = document.getElementById('groupUploadSection');
         const list = document.getElementById('groupMembersList');
         const checkbox = document.getElementById('isGroupUpload');
-        
+
         if (!section || !list) return;
-        
+
         section.classList.add('hidden');
         list.innerHTML = '<div class="text-[10px] text-purple-600"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Loading group...</div>';
         if (checkbox) checkbox.checked = false;
@@ -51,25 +51,25 @@ export const CourseDashboard = {
 
             const term = document.getElementById('submitTerm').value;
             const titleInput = document.getElementById('submitTitle').value.trim();
-            
+
             if (/[.\/\\:*?"<>|]/.test(titleInput)) {
                 throw new Error("Title cannot contain special characters like dots (.) or slashes (/).");
             }
-            
+
             const title = titleInput;
             const desc = document.getElementById('submitDesc').value.trim();
             const type = document.getElementById('submissionType').value;
-            
+
             const isGroupCheckbox = document.getElementById('isGroupUpload');
             const isGroup = isGroupCheckbox && !isGroupCheckbox.closest('#groupUploadSection').classList.contains('hidden') ? isGroupCheckbox.checked : false;
-            
+
             const includedMembers = [];
             if (isGroup) {
                 document.querySelectorAll('.group-member-checkbox:checked').forEach(cb => {
                     includedMembers.push(cb.value);
                 });
             }
-            
+
             const user = AppState.user;
             const now = new Date();
             const yyyy = now.getFullYear();
@@ -78,13 +78,13 @@ export const CourseDashboard = {
             const hh = String(now.getHours()).padStart(2, '0');
             const ss = String(now.getSeconds()).padStart(2, '0');
             const timestamp = `${yyyy}${mm}${dd}${hh}${ss}`;
-            
+
             const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, ' ');
             const studentName = user.Name.replace(/[^a-zA-Z0-9_-]/g, ' ');
             const baseFilename = `${term}_${timestamp}_${user.Student_Number}_${studentName}_${safeTitle}`;
-            
+
             const courseYearSection = [user.course, user.year, user.section].filter(Boolean).join(" ") || "General";
-            
+
             let base64Data = "";
             let mimeType = "";
             let finalFilename = "";
@@ -93,7 +93,7 @@ export const CourseDashboard = {
                 const fileInput = document.getElementById('submitFileInput');
                 if (!fileInput.files || fileInput.files.length === 0) throw new Error("Please select a file.");
                 const file = fileInput.files[0];
-                
+
                 if (file.size > 5 * 1024 * 1024) {
                     throw new Error("File size exceeds 5MB. Please upload your document to Google Drive, set the sharing access to 'Anyone with the link', and submit it here as a URL Link instead.");
                 }
@@ -101,7 +101,7 @@ export const CourseDashboard = {
                 mimeType = file.type;
                 const ext = file.name.split('.').pop();
                 finalFilename = `${baseFilename}.${ext}`;
-                
+
                 base64Data = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -111,13 +111,13 @@ export const CourseDashboard = {
             } else {
                 const urlLink = document.getElementById('submitUrlInput').value.trim();
                 if (!urlLink) throw new Error("Please enter a URL link.");
-                
+
                 const content = `Title: ${title}\nTerm: ${term}\nDescription: ${desc}\nLink: ${urlLink}`;
                 base64Data = btoa(unescape(encodeURIComponent(content)));
                 mimeType = "text/plain";
                 finalFilename = `${baseFilename}.txt`;
             }
-            
+
             const payload = {
                 courseId: courseId,
                 studentId: user.User_ID,
@@ -132,14 +132,14 @@ export const CourseDashboard = {
                 isGroup: isGroup,
                 includedMembers: includedMembers
             };
-            
+
             progressText.textContent = 'Starting upload...';
-            
+
             const dbData = await new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', `${CONFIG.API_URL}/api/upload-submission`, true);
                 xhr.setRequestHeader('Content-Type', 'application/json');
-                
+
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
                         const uploadedMB = (event.loaded / (1024 * 1024)).toFixed(2);
@@ -147,7 +147,7 @@ export const CourseDashboard = {
                         progressText.textContent = `Uploading to Portal... ${uploadedMB} MB / ${totalMB} MB`;
                     }
                 };
-                
+
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         try {
@@ -164,24 +164,24 @@ export const CourseDashboard = {
                         }
                     }
                 };
-                
+
                 xhr.onerror = () => reject(new Error("Network error occurred during upload."));
                 xhr.send(JSON.stringify(payload));
             });
-            
+
             if (!dbData.success) {
                 throw new Error("Server Error: " + (dbData.error || "Unknown error occurred"));
             }
-            
+
             progressDiv.classList.add('hidden');
             successDiv.textContent = "Submission uploaded successfully!";
             successDiv.classList.remove('hidden');
             document.getElementById('submitDocForm').reset();
-            
+
             setTimeout(() => {
                 document.getElementById('submitDocModal').classList.add('hidden');
                 successDiv.classList.add('hidden');
-                
+
                 const summaryModal = document.getElementById('studentSummaryModal');
                 if (summaryModal && !summaryModal.classList.contains('hidden')) {
                     const activeCard = document.querySelector(`.student-active-course[data-course-id="${courseId}"]`);
@@ -205,22 +205,22 @@ export const CourseDashboard = {
         successDiv.classList.add('hidden');
         btn.disabled = true;
         btn.innerHTML = 'Saving...';
-        
+
         const payload = {
             programCode: document.getElementById('programCode').value.trim()
         };
-        
+
         try {
             await apiFetch('/api/programs', { method: 'POST', body: JSON.stringify(payload) });
             successDiv.textContent = "Added to Registration List successfully!";
             successDiv.classList.remove('hidden');
             document.getElementById('addProgramForm').reset();
-            
+
             const ts = new Date().getTime();
             const programsData = await apiFetch(`/api/programs?_t=${ts}`);
             const targetCourseSelect = document.getElementById('targetCourse');
             if (targetCourseSelect && programsData.programs) {
-                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
+                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' +
                     programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
             }
 
@@ -243,7 +243,7 @@ export const CourseDashboard = {
         errorDiv.classList.add('hidden');
         btn.disabled = true;
         btn.innerHTML = 'Saving...';
-        
+
         const payload = {
             courseCode: document.getElementById('courseCode').value.trim(),
             courseTitle: document.getElementById('courseTitle').value.trim(),
@@ -254,7 +254,7 @@ export const CourseDashboard = {
             targetSection: document.getElementById('targetSection').value.trim(),
             lecturerId: AppState.user.User_ID
         };
-        
+
         try {
             await apiFetch('/api/courses', { method: 'POST', body: JSON.stringify(payload) });
             document.getElementById('addCourseForm').reset();
@@ -271,9 +271,9 @@ export const CourseDashboard = {
 
     enrollCourse: async (courseId) => {
         try {
-            await apiFetch('/api/enroll', { 
-                method: 'POST', 
-                body: JSON.stringify({ courseId: courseId, studentId: AppState.user.User_ID }) 
+            await apiFetch('/api/enroll', {
+                method: 'POST',
+                body: JSON.stringify({ courseId: courseId, studentId: AppState.user.User_ID })
             });
             await CourseDashboard.loadDashboardData();
         } catch (err) {
@@ -288,12 +288,12 @@ export const CourseDashboard = {
             const programsData = await apiFetch(`/api/programs?_t=${ts}`);
             const targetCourseSelect = document.getElementById('targetCourse');
             if (targetCourseSelect && programsData.programs) {
-                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' + 
+                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' +
                     programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
             }
 
             const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&_t=${ts}`);
-            
+
             const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
             const parseTime = (timeStr) => {
                 if (!timeStr) return 0;
@@ -311,15 +311,15 @@ export const CourseDashboard = {
                 if (dayDiff !== 0) return dayDiff;
                 return parseTime(a.TimePeriod) - parseTime(b.TimePeriod);
             });
-            
+
             let coursesHtml = data.courses.map(c => `
                 <a href="#class-${c.Course_ID}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
                     <div class="flex justify-between items-start mb-1">
                         <div class="font-bold text-xl text-blue-700">${c.CourseCode}</div>
-                        ${(c.Target_Course || c.Target_Year || c.Target_Section) ? 
+                        ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
                             `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
                                 ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
-                            </span>` : 
+                            </span>` :
                             `<span class="bg-blue-50 text-blue-500 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
                         }
                     </div>
@@ -329,11 +329,11 @@ export const CourseDashboard = {
                     </div>
                 </a>
             `).join('');
-            
+
             if (!coursesHtml) {
                 coursesHtml = `<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><p class="mb-4">No courses created yet.</p><button type="button" id="emptyNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button></div>`;
             }
-            
+
             container.innerHTML = `
                 <div class="fade-in max-w-5xl mx-auto">
                     <div class="flex items-center justify-between gap-3 mb-6">
@@ -391,7 +391,7 @@ export const CourseDashboard = {
                                     </div>
                                 ` : `
                                     <button type="button" class="start-accessible-exam-btn w-full py-3.5 px-4 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-sm sm:text-base rounded-lg shadow-md transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}">
-                                        <i class="fa-solid fa-headphones mr-2 text-lg"></i> Enter Exam: ${ex.examTitle}
+                                        <i class="fa-solid ${isBlind ? 'fa-headphones' : 'fa-pen-to-square'} mr-2 text-lg"></i> Enter Exam: ${ex.examTitle}
                                     </button>
                                 `}
                             </div>
@@ -399,21 +399,24 @@ export const CourseDashboard = {
                     }).join('')
                     : `<div class="col-span-full p-6 text-center text-indigo-200 border-2 border-dashed border-indigo-700 rounded-xl font-bold text-sm">You have no active assigned exams at this moment.</div>`;
 
+                const readAloudBtnHtml = isBlind ? `
+                            <button type="button" id="readDashboardExamsBtn" class="w-full sm:w-auto px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-xs sm:text-sm rounded-lg shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white">
+                                <i class="fa-solid fa-volume-high mr-2"></i> Read Aloud Assigned Exams
+                            </button>` : '';
+
                 assignedExamsSectionHtml = `
                     <section class="bg-indigo-950 text-white p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-yellow-400">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-indigo-800">
                             <div class="flex items-center">
                                 <div class="bg-yellow-400 text-gray-950 p-2.5 rounded-xl mr-3">
-                                    <i class="fa-solid fa-universal-access text-xl"></i>
+                                    <i class="fa-solid ${isBlind ? 'fa-universal-access' : 'fa-file-pen'} text-xl"></i>
                                 </div>
                                 <div>
-                                    <h2 class="text-xl sm:text-2xl font-black text-white">Assigned Accessible Exams</h2>
-                                    <p class="text-xs text-indigo-200">Full-screen exam mode with voice read-aloud and automatic score recording</p>
+                                    <h2 class="text-xl sm:text-2xl font-black text-white">${isBlind ? 'Assigned Accessible Exams' : 'Assigned Exams'}</h2>
+                                    <p class="text-xs text-indigo-200">${isBlind ? 'Full-screen exam mode with voice read-aloud and automatic score recording' : 'Full-screen exam mode with automatic score recording'}</p>
                                 </div>
                             </div>
-                            <button type="button" id="readDashboardExamsBtn" class="w-full sm:w-auto px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-xs sm:text-sm rounded-lg shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white">
-                                <i class="fa-solid fa-volume-high mr-2"></i> Read Aloud Assigned Exams
-                            </button>
+                            ${readAloudBtnHtml}
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             ${examCardsHtml}
@@ -423,7 +426,7 @@ export const CourseDashboard = {
             }
 
             const enrolledIds = myCoursesRes.courses.map(c => c.Course_ID);
-            
+
             let enrolledHtml = myCoursesRes.courses.map(c => `
                 <div class="cursor-pointer student-active-course p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md hover:border-green-400 transform hover:-translate-y-1" data-course-id="${c.Course_ID}" data-course-title="${c.CourseCode} | ${c.CourseTitle}">
                     <div class="absolute top-0 right-0 bg-green-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold shadow-sm tracking-widest uppercase">Enrolled</div>
@@ -434,11 +437,11 @@ export const CourseDashboard = {
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${c.Seat_Number || 'Unassigned'}</span></div>
                 </div>
             `).join('');
-            
+
             if (!enrolledHtml) {
                 enrolledHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">You are not enrolled in any courses yet.</div>';
             }
-            
+
             const availableCourses = allCoursesRes.courses.filter(c => !enrolledIds.includes(c.Course_ID));
             let availableHtml = availableCourses.map(c => `
                 <div class="p-5 border rounded-xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start md:items-center transition hover:border-blue-300 gap-4">
@@ -453,7 +456,7 @@ export const CourseDashboard = {
                     </button>
                 </div>
             `).join('');
-            
+
             if (!availableHtml) {
                 availableHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No new courses available for enrollment.</div>';
             }
@@ -467,7 +470,7 @@ export const CourseDashboard = {
                             ${enrolledHtml}
                         </div>
                     </section>
-                    
+
                     <section>
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center pt-8 border-t border-gray-200"><div class="bg-blue-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-book-open text-blue-600"></i></div>Available Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -488,9 +491,9 @@ export const CourseDashboard = {
     loadDashboardData: async () => {
         const container = document.getElementById('courseContainer');
         if (!container || !AppState.user) return;
-        
+
         container.innerHTML = Skeleton.dashboard(AppState.user.role);
-        
+
         if (AppState.user.role.toLowerCase() === 'lecturer') {
             await CourseDashboard.renderLecturerDashboard(container);
         } else {
