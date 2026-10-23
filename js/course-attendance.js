@@ -1,6 +1,7 @@
 // js/course-attendance.js
 import { apiFetch } from './globals.js';
 import { CourseScores } from './course-scores.js';
+import { UI } from './ui-feedback.js';
 
 export const CourseAttendance = {
     getDraftKey: (courseId, date) => `attendance_draft_${courseId}_${date}`,
@@ -94,7 +95,11 @@ export const CourseAttendance = {
         });
 
         if (missingCount > 0) {
-            const confirmProceed = window.confirm(`${missingCount} student(s) have no attendance marked. Do you want to proceed anyway? Unmarked students will not be saved.`);
+            const confirmProceed = await UI.confirm({
+                title: 'Unmarked students',
+                message: `${missingCount} student(s) have no attendance marked. Unmarked students will not be saved. Proceed anyway?`,
+                confirmText: 'Save anyway'
+            });
             if (!confirmProceed) return;
         }
 
@@ -120,6 +125,7 @@ export const CourseAttendance = {
 
             alertBox.textContent = "All Attendance saved successfully!";
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
+            UI.success('Attendance saved.');
         } catch (err) {
             alertBox.textContent = err.message;
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";

@@ -1,6 +1,7 @@
 // js/course-exam.js
 import { apiFetch, AppState } from './globals.js';
 import { CourseClass } from './course-class.js';
+import { UI } from './ui-feedback.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -605,7 +606,8 @@ export const CourseExam = {
     },
 
     resetStudentAttempt: async (classExamId, studentId, studentName) => {
-        if (!window.confirm(`Reset and explicitly re-open the exam submission for ${studentName} so they can take it again?`)) return;
+        const ok = await UI.confirm({ title: 'Reset exam attempt', message: `Reset and re-open the exam submission for ${studentName} so they can take it again?`, confirmText: 'Reset', danger: true });
+        if (!ok) return;
 
         try {
             await apiFetch('/api/reset-exam-attempt', {
@@ -620,7 +622,7 @@ export const CourseExam = {
             const title = document.getElementById('ecaExamTitle').textContent;
             await CourseExam.openClassAssignView(CourseExam.activeConfigExamId, title);
         } catch (err) {
-            alert('Failed to reset attempt: ' + err.message);
+            UI.error('Failed to reset attempt: ' + err.message);
         }
     },
 
@@ -737,12 +739,13 @@ export const CourseExam = {
             });
             CourseExam.renderBonusQuestionsList();
         } catch (err) {
-            alert('Failed to update bonus status: ' + err.message);
+            UI.error('Failed to update bonus status: ' + err.message);
         }
     },
 
     deleteExamQuestion: async (idx) => {
-        if (!window.confirm(`Delete Question #${idx + 1} from this exam?`)) return;
+        const ok = await UI.confirm({ title: 'Delete question', message: `Delete Question #${idx + 1} from this exam?`, confirmText: 'Delete', danger: true });
+        if (!ok) return;
         CourseExam.activeBonusData.splice(idx, 1);
 
         try {
@@ -755,7 +758,7 @@ export const CourseExam = {
             });
             CourseExam.renderBonusQuestionsList();
         } catch (err) {
-            alert('Failed to delete question: ' + err.message);
+            UI.error('Failed to delete question: ' + err.message);
         }
     },
 
@@ -862,7 +865,7 @@ export const CourseExam = {
             CourseExam.buildTabs();
             CourseExam.render();
         } catch (err) {
-            alert("Failed to load exam data: " + err.message);
+            UI.error("Failed to load exam data: " + err.message);
             overlay.classList.add('hidden');
         }
     },

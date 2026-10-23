@@ -1,6 +1,7 @@
 // js/course-scores.js
 import { apiFetch } from './globals.js';
 import { CourseSummary } from './course-summary.js';
+import { UI } from './ui-feedback.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -323,6 +324,7 @@ export const CourseScores = {
             document.getElementById('scDeleteBtn').classList.remove('hidden');
 
             CourseScores.setAlert(`Saved "${title}" with ${scores.length} score(s).`, true);
+            UI.success(`Saved "${title}" (${scores.length} score${scores.length === 1 ? '' : 's'}).`);
         } catch (err) {
             CourseScores.setAlert(err.message || 'Failed to save.', false);
         } finally {
@@ -334,7 +336,13 @@ export const CourseScores = {
     remove: async () => {
         const id = CourseScores.currentId;
         if (!id) return;
-        if (!window.confirm('Delete this assessment and all of its recorded scores? This cannot be undone.')) return;
+        const confirmed = await UI.confirm({
+            title: 'Delete assessment',
+            message: 'Delete this assessment and all of its recorded scores? This cannot be undone.',
+            confirmText: 'Delete',
+            danger: true
+        });
+        if (!confirmed) return;
 
         const btn = document.getElementById('scDeleteBtn');
         const originalHtml = btn.innerHTML;
@@ -353,6 +361,7 @@ export const CourseScores = {
             CourseScores.renderSelect();
             await CourseScores.selectAssessment('');
             CourseScores.setAlert('Assessment deleted.', true);
+            UI.success('Assessment deleted.');
         } catch (err) {
             CourseScores.setAlert(err.message || 'Failed to delete.', false);
         } finally {

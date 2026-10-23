@@ -1,6 +1,7 @@
 // js/auth.js
 import { apiFetch, AppState } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
+import { UI } from './ui-feedback.js';
 
 export const AuthModule = {
     usersList: [],
@@ -268,7 +269,7 @@ export const AuthModule = {
                 if(user) user.account_status = status;
                 
             } catch (err) {
-                alert('Failed to update status: ' + err.message);
+                UI.error('Failed to update status: ' + err.message);
             }
         }
     },

@@ -6,6 +6,7 @@ import { CourseAttendance } from './course-attendance.js';
 import { CourseRecitation } from './course-recitation.js';
 import { CourseExam } from './course-exam.js';
 import { getLoadableAvatarSrc } from './components.js';
+import { UI } from './ui-feedback.js';
 
 export const CourseModule = {
     lastTap: 0,
@@ -155,7 +156,7 @@ export const CourseModule = {
                 });
             } catch (err) {
                 console.error('Failed to update user status:', err);
-                alert('Failed to update student status.');
+                UI.error('Failed to update student status.');
             }
         }
 
@@ -269,7 +270,7 @@ export const CourseModule = {
         }
 
         if (e.target.closest('#resetCalledListBtn')) {
-            const confirmation = window.confirm("Are you sure you want to reset all called students for today?");
+            const confirmation = await UI.confirm({ title: 'Reset called list', message: 'Reset all called students for today?', confirmText: 'Reset', danger: true });
             if (confirmation) {
                 CourseRecitation.resetCalledList();
             }
@@ -339,7 +340,7 @@ export const CourseModule = {
         }
 
         if (e.target.closest('.enroll-btn')) {
-            const confirmation = window.confirm("Are you sure you want to enroll in this Course? This action cannot be undone.");
+            const confirmation = await UI.confirm({ title: 'Enroll in course', message: 'Are you sure you want to enroll in this course? This action cannot be undone.', confirmText: 'Enroll' });
             if (!confirmation) {
                 return;
             }
@@ -392,7 +393,7 @@ export const CourseModule = {
                 dateInput.value = '';
                 await CourseAttendance.loadNoClassDays(courseId);
             } catch (err) {
-                alert('Failed to add date: ' + err.message);
+                UI.error('Failed to add date: ' + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
@@ -415,7 +416,7 @@ export const CourseModule = {
                 });
                 await CourseAttendance.loadNoClassDays(courseId);
             } catch (err) {
-                alert('Failed to remove date: ' + err.message);
+                UI.error('Failed to remove date: ' + err.message);
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
             }
@@ -485,7 +486,7 @@ export const CourseModule = {
 
         if (e.target.closest('#manageResetPwdBtn')) {
             const studentId = document.getElementById('manageStudentId').value;
-            if (window.confirm("Are you sure you want to reset this student's password to '123456'?")) {
+            if (await UI.confirm({ title: 'Reset password', message: "Reset this student's password to '123456'?", confirmText: 'Reset', danger: true })) {
                 const resetBtn = e.target.closest('#manageResetPwdBtn');
                 const originalHtml = resetBtn.innerHTML;
                 resetBtn.disabled = true;
@@ -495,9 +496,9 @@ export const CourseModule = {
                         method: 'POST',
                         body: JSON.stringify({ studentId: studentId })
                     });
-                    alert("Password successfully reset to '123456'.");
+                    UI.success("Password reset to '123456'.");
                 } catch (err) {
-                    alert("Failed to reset password: " + err.message);
+                    UI.error("Failed to reset password: " + err.message);
                 } finally {
                     resetBtn.disabled = false;
                     resetBtn.innerHTML = originalHtml;
@@ -508,7 +509,7 @@ export const CourseModule = {
         if (e.target.closest('#manageRemoveBtn')) {
             const studentId = document.getElementById('manageStudentId').value;
             const courseId = window.location.hash.replace('#class-', '');
-            if (window.confirm("Are you sure you want to remove this student from the course? This action cannot be undone.")) {
+            if (await UI.confirm({ title: 'Remove student', message: 'Remove this student from the course? This action cannot be undone.', confirmText: 'Remove', danger: true })) {
                 try {
                     await apiFetch('/api/unenroll', {
                         method: 'POST',
@@ -517,7 +518,7 @@ export const CourseModule = {
                     document.getElementById('manageStudentModal').classList.add('hidden');
                     CourseClass.loadClassScreen(courseId, true);
                 } catch (err) {
-                    alert("Failed to remove student: " + err.message);
+                    UI.error("Failed to remove student: " + err.message);
                 }
             }
         }
@@ -566,7 +567,7 @@ export const CourseModule = {
                 await CourseClass.loadUnenrolledStudents(courseId);
                 CourseClass.loadClassScreen(courseId, true);
             } catch (err) {
-                alert(err.message);
+                UI.error(err.message);
                 btn.disabled = false;
                 btn.innerHTML = 'Enroll';
             }
@@ -619,12 +620,12 @@ export const CourseModule = {
             const courseId = window.location.hash.replace('#class-', '');
             
             if (!dateVal) {
-                alert("Please select a date first.");
+                UI.warning("Please select a date first.");
                 return;
             }
             
             if (!selectedBtn) {
-                alert("Please select an attendance status (Present, Late, etc.) first.");
+                UI.warning("Please select an attendance status (Present, Late, etc.) first.");
                 return;
             }
             
@@ -671,7 +672,7 @@ export const CourseModule = {
                 }, 1500);
                 
             } catch (err) {
-                alert("Failed to save individual attendance: " + err.message);
+                UI.error("Failed to save individual attendance: " + err.message);
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
             }
@@ -830,7 +831,7 @@ export const CourseModule = {
                 }
                 
             } catch(err) {
-                alert("Failed to save grades: " + err.message);
+                UI.error("Failed to save grades: " + err.message);
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
             }

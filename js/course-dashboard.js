@@ -1,6 +1,7 @@
 // js/course-dashboard.js
 import { apiFetch, AppState, CONFIG } from './globals.js';
 import { CourseExam } from './course-exam.js';
+import { UI } from './ui-feedback.js';
 
 export const CourseDashboard = {
     loadGroupMembersForUpload: async (courseId) => {
@@ -275,7 +276,7 @@ export const CourseDashboard = {
             });
             await CourseDashboard.loadDashboardData();
         } catch (err) {
-            alert(err.message);
+            UI.error(err.message);
             await CourseDashboard.loadDashboardData();
         }
     },

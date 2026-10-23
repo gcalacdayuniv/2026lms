@@ -1,6 +1,7 @@
 // js/course-summary.js
 import { apiFetch } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
+import { UI } from './ui-feedback.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -360,7 +361,7 @@ export const CourseSummary = {
     exportCsv: () => {
         const rows = CourseSummary.visibleRows;
         if (!rows || rows.length === 0) {
-            alert('No students to export.');
+            UI.warning('No students to export.');
             return;
         }
 

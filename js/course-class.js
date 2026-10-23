@@ -2,6 +2,7 @@
 import { apiFetch, AppState } from './globals.js';
 import { Components, getLoadableAvatarSrc } from './components.js';
 import { CourseAttendance } from './course-attendance.js';
+import { UI } from './ui-feedback.js';
 
 export const CourseClass = {
     currentSummaryData: null,
@@ -22,7 +23,7 @@ export const CourseClass = {
 
     copyStudentEmails: async () => {
         if (!CourseClass.currentStudents || CourseClass.currentStudents.length === 0) {
-            alert("No students enrolled to copy emails.");
+            UI.warning("No students enrolled to copy emails.");
             return;
         }
 
@@ -31,7 +32,7 @@ export const CourseClass = {
             .filter(email => email && email.trim() !== '');
 
         if (emails.length === 0) {
-            alert("No valid email addresses found for the enrolled students.");
+            UI.warning("No valid email addresses found for the enrolled students.");
             return;
         }
 
@@ -39,9 +40,9 @@ export const CourseClass = {
 
         try {
             await navigator.clipboard.writeText(emailString);
-            alert(`Successfully copied ${emails.length} email address(es) to your clipboard! Ready to paste into Google Calendar.`);
+            UI.success(`Copied ${emails.length} email address(es). Ready to paste into Google Calendar.`);
         } catch (err) {
-            alert("Failed to copy to clipboard. Please grant clipboard permissions or copy manually.");
+            UI.error("Failed to copy to clipboard. Please grant clipboard permissions or copy manually.");
             console.error("Clipboard Error:", err);
         }
     },
@@ -256,7 +257,7 @@ export const CourseClass = {
 
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
-                alert("Please allow pop-ups to print the roster.");
+                UI.warning("Please allow pop-ups to print the roster.");
                 return;
             }
 
@@ -333,7 +334,7 @@ export const CourseClass = {
             printWindow.document.close();
 
         } catch (err) {
-            alert('Failed to generate export: ' + err.message);
+            UI.error('Failed to generate export: ' + err.message);
         }
     },
 
