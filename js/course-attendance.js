@@ -4,6 +4,64 @@ import { CourseScores } from './course-scores.js';
 import { UI } from './ui-feedback.js';
 
 export const CourseAttendance = {
+    // What the server currently has for the selected date. The roster is "dirty"
+    // (unsaved changes) whenever the on-screen state differs from this.
+    baseline: {},
+    baselineReady: false,
+
+    snapshotRow: (row) => {
+        const selected = row.querySelector('.attendance-btn[data-selected="true"]');
+        const pointsInput = row.querySelector('.points-input');
+        return {
+            status: selected ? selected.dataset.status : null,
+            points: parseInt(pointsInput ? pointsInput.value : '0', 10) || 0
+        };
+    },
+
+    snapshot: () => {
+        const snap = {};
+        document.querySelectorAll('.student-row').forEach(row => {
+            snap[row.dataset.studentId] = CourseAttendance.snapshotRow(row);
+        });
+        return snap;
+    },
+
+    setBaseline: () => {
+        CourseAttendance.baseline = CourseAttendance.snapshot();
+        CourseAttendance.baselineReady = true;
+    },
+
+    isDirty: () => {
+        if (!CourseAttendance.baselineReady) return true;
+        return Array.from(document.querySelectorAll('.student-row')).some(row => {
+            const base = CourseAttendance.baseline[row.dataset.studentId];
+            const cur = CourseAttendance.snapshotRow(row);
+            return !base || base.status !== cur.status || base.points !== cur.points;
+        });
+    },
+
+    // Shows or hides the "unsaved changes" dot on the sticky bar. Returns the dirty state.
+    updateDirty: () => {
+        const bar = document.getElementById('attendanceBar');
+        if (!bar) return false;
+        const dirty = CourseAttendance.isDirty();
+        bar.dataset.dirty = dirty ? 'true' : 'false';
+        const status = document.getElementById('attendanceDirtyStatus');
+        if (status) status.textContent = dirty ? 'Unsaved changes' : '';
+        return dirty;
+    },
+
+    // Called after a single student's row has been saved.
+    markSaved: (studentId) => {
+        const row = document.querySelector(`.student-row[data-student-id="${studentId}"]`);
+        if (row) CourseAttendance.baseline[studentId] = CourseAttendance.snapshotRow(row);
+        if (!CourseAttendance.updateDirty()) {
+            const courseId = window.location.hash.replace('#class-', '');
+            const date = document.getElementById('attendanceDate')?.value;
+            if (courseId && date) CourseAttendance.clearDraft(courseId, date);
+        }
+    },
+
     getDraftKey: (courseId, date) => `attendance_draft_${courseId}_${date}`,
 
     saveDraft: (courseId, date) => {
@@ -19,6 +77,8 @@ export const CourseAttendance = {
             };
         });
         localStorage.setItem(`attendance_draft_${courseId}_${date}`, JSON.stringify(draft));
+        // Nothing differs from what is saved, so there is no draft worth keeping.
+        if (!CourseAttendance.updateDirty()) CourseAttendance.clearDraft(courseId, date);
     },
 
     clearDraft: (courseId, date) => {
@@ -122,6 +182,8 @@ export const CourseAttendance = {
             await apiFetch('/api/attendance', { method: 'POST', body: JSON.stringify(payload) });
 
             CourseAttendance.clearDraft(courseId, dateVal);
+            CourseAttendance.setBaseline();
+            CourseAttendance.updateDirty();
 
             alertBox.textContent = "All Attendance saved successfully!";
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
@@ -137,6 +199,7 @@ export const CourseAttendance = {
     },
 
     loadAttendanceData: async (courseId, date) => {
+        CourseAttendance.baselineReady = false;
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}&_t=${ts}`);
@@ -210,6 +273,9 @@ export const CourseAttendance = {
                 });
             }
 
+            // The saved state is now on screen; remember it before any local draft is applied.
+            CourseAttendance.setBaseline();
+
             const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${date}`);
             if (draftStr && !data.isNoClass) {
                 try {
@@ -251,7 +317,10 @@ export const CourseAttendance = {
                         }
                     });
 
-                    if (hasDraftChanges) {
+                    if (hasDraftChanges && !CourseAttendance.updateDirty()) {
+                        // Stale draft that matches what is already saved.
+                        CourseAttendance.clearDraft(courseId, date);
+                    } else if (hasDraftChanges) {
                         const alertBox = document.getElementById('attendanceAlert');
                         if (alertBox) {
                             alertBox.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-2"></i> Unsaved changes restored from local cache.';
@@ -261,6 +330,8 @@ export const CourseAttendance = {
                     }
                 } catch(e) {}
             }
+
+            CourseAttendance.updateDirty();
 
         } catch (err) {
             console.error("Failed to load attendance:", err);

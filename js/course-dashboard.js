@@ -2,6 +2,7 @@
 import { apiFetch, AppState, CONFIG } from './globals.js';
 import { CourseExam } from './course-exam.js';
 import { UI } from './ui-feedback.js';
+import { Skeleton } from './skeletons.js';
 
 export const CourseDashboard = {
     loadGroupMembersForUpload: async (courseId) => {
@@ -330,12 +331,15 @@ export const CourseDashboard = {
             `).join('');
             
             if (!coursesHtml) {
-                coursesHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No courses created yet. Open the profile panel to create one.</div>';
+                coursesHtml = `<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><p class="mb-4">No courses created yet.</p><button type="button" id="emptyNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button></div>`;
             }
             
             container.innerHTML = `
                 <div class="fade-in max-w-5xl mx-auto">
-                    <h2 class="text-xl font-bold mb-6 text-gray-800 flex items-center"><div class="bg-gray-200 p-2 rounded-lg mr-3"><i class="fa-solid fa-chalkboard-user text-gray-600"></i></div>My Created Courses</h2>
+                    <div class="flex items-center justify-between gap-3 mb-6">
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center"><div class="bg-gray-200 p-2 rounded-lg mr-3"><i class="fa-solid fa-chalkboard-user text-gray-600"></i></div>My Created Courses</h2>
+                        <button type="button" id="headerNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         ${coursesHtml}
                     </div>
@@ -485,7 +489,7 @@ export const CourseDashboard = {
         const container = document.getElementById('courseContainer');
         if (!container || !AppState.user) return;
         
-        container.innerHTML = '<div class="text-center py-12"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i><p class="mt-4 text-gray-500 font-medium">Loading Courses...</p></div>';
+        container.innerHTML = Skeleton.dashboard(AppState.user.role);
         
         if (AppState.user.role.toLowerCase() === 'lecturer') {
             await CourseDashboard.renderLecturerDashboard(container);

@@ -3,6 +3,7 @@ import { apiFetch, AppState } from './globals.js';
 import { Components, getLoadableAvatarSrc } from './components.js';
 import { CourseAttendance } from './course-attendance.js';
 import { UI } from './ui-feedback.js';
+import { Skeleton } from './skeletons.js';
 
 export const CourseClass = {
     currentSummaryData: null,
@@ -425,7 +426,7 @@ export const CourseClass = {
         }
 
         if (!skipSpinner) {
-            root.innerHTML = '<div class="flex justify-center items-center h-screen"><i class="fa-solid fa-spinner fa-spin text-blue-600 text-4xl"></i></div>';
+            root.innerHTML = Skeleton.classScreen();
         }
 
         try {

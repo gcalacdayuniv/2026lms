@@ -660,6 +660,8 @@ export const CourseModule = {
                     } catch(e) {}
                 }
                 
+                CourseAttendance.markSaved(studentId);
+
                 btn.innerHTML = '<i class="fa-solid fa-check text-green-600"></i>';
                 btn.classList.replace('border-blue-200', 'border-green-300');
                 btn.classList.replace('bg-blue-50', 'bg-green-50');

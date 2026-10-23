@@ -309,9 +309,9 @@ export const CourseSummary = {
                 : st.records.map(rec => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(rec.Date)}</span><span class="text-gray-600">${esc(rec.Status || 'N/A')}</span><span class="font-mono font-bold text-blue-600">${esc(rec.Performance_Points || 0)}</span></div>`).join('');
 
             return `
-                <tr class="hover:bg-gray-50 align-top">
-                    <td class="px-3 py-2 text-center text-gray-400 font-bold">${idx + 1}</td>
-                    <td class="px-3 py-2">
+                <tr class="group hover:bg-gray-50 align-top">
+                    <td class="px-1 py-2 w-12 min-w-[3rem] text-center text-gray-400 font-bold sm:sticky sm:left-0 z-10 bg-white group-hover:bg-gray-50">${idx + 1}</td>
+                    <td class="px-3 py-2 min-w-[220px] sticky left-0 sm:left-12 z-10 bg-white group-hover:bg-gray-50 pin-edge">
                         <div class="flex items-center gap-2">
                             ${avatar}
                             <div>

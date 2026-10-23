@@ -368,7 +368,7 @@ export const AuthModule = {
             document.getElementById('cpSuccess').classList.add('hidden');
         }
         
-        if (e.target.closest('#openCreateCourseModalBtn')) {
+        if (e.target.closest('#openCreateCourseModalBtn, .open-create-course-btn')) {
             document.getElementById('profilePanelOverlay').classList.add('hidden');
             document.getElementById('profilePanel').classList.add('translate-x-full');
             document.getElementById('profilePanel').classList.remove('translate-x-0');

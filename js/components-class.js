@@ -1,6 +1,29 @@
 // js/components-class.js
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { ExamUI } from './components-exam.js';
+import { Skeleton } from './skeletons.js';
+
+// Class summary columns. The first two are pinned while scrolling sideways
+// (on phones only the Student column is pinned, to leave room to scroll).
+const SUMMARY_COLUMNS = [
+    { label: '#',             cls: 'px-1 w-12 min-w-[3rem] text-center sm:left-0 z-30' },
+    { label: 'Student',       cls: 'px-3 min-w-[220px] left-0 sm:left-12 z-30 pin-edge' },
+    { label: 'Seat',          cls: 'px-3 text-center z-20' },
+    { label: 'Email',         cls: 'px-3 z-20' },
+    { label: 'Contact',       cls: 'px-3 z-20' },
+    { label: 'Status',        cls: 'px-3 text-center z-20' },
+    { label: 'Group',         cls: 'px-3 z-20' },
+    { label: 'Topic',         cls: 'px-3 z-20' },
+    { label: 'Attendance',    cls: 'px-3 text-center z-20' },
+    { label: 'Participation', cls: 'px-3 text-center z-20' },
+    { label: 'Written',       cls: 'px-3 text-center z-20' },
+    { label: 'Narrative',     cls: 'px-3 text-center z-20' },
+    { label: 'Individual',    cls: 'px-3 text-center z-20' },
+    { label: 'Report',        cls: 'px-3 text-center z-20' },
+    { label: 'Tasks',         cls: 'px-3 text-center z-20' },
+    { label: 'Major Exam',    cls: 'px-3 text-center z-20' },
+    { label: 'Log',           cls: 'px-3 z-20' }
+];
 
 const ClassUI = {
     renderCourseMenuModal: (course) => `
@@ -94,9 +117,9 @@ const ClassUI = {
                     </button>
                 </div>
 
-                <div id="csLoading" class="text-center py-16 text-gray-500">
-                    <i class="fa-solid fa-spinner fa-spin text-3xl text-purple-600"></i>
-                    <p id="csLoadingText" class="mt-3 text-sm font-medium">Loading class list...</p>
+                <div id="csLoading" class="flex-1 flex flex-col min-h-0" role="status">
+                    <p id="csLoadingText" aria-live="off" class="mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Loading class list...</p>
+                    ${Skeleton.summaryTable()}
                 </div>
                 <div id="csError" class="hidden text-center py-12 text-red-500 font-bold"></div>
 
@@ -107,25 +130,9 @@ const ClassUI = {
                     <div id="csCount" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
                     <div class="overflow-auto flex-1 border border-gray-200 rounded-lg bg-white">
                         <table class="w-full text-xs text-left min-w-[2000px]">
-                            <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm z-10">
+                            <thead class="text-gray-700 shadow-sm">
                                 <tr>
-                                    <th class="px-3 py-2 text-center">#</th>
-                                    <th class="px-3 py-2">Student</th>
-                                    <th class="px-3 py-2 text-center">Seat</th>
-                                    <th class="px-3 py-2">Email</th>
-                                    <th class="px-3 py-2">Contact</th>
-                                    <th class="px-3 py-2 text-center">Status</th>
-                                    <th class="px-3 py-2">Group</th>
-                                    <th class="px-3 py-2">Topic</th>
-                                    <th class="px-3 py-2 text-center">Attendance</th>
-                                    <th class="px-3 py-2 text-center">Participation</th>
-                                    <th class="px-3 py-2 text-center">Written</th>
-                                    <th class="px-3 py-2 text-center">Narrative</th>
-                                    <th class="px-3 py-2 text-center">Individual</th>
-                                    <th class="px-3 py-2 text-center">Report</th>
-                                    <th class="px-3 py-2 text-center">Tasks</th>
-                                    <th class="px-3 py-2 text-center">Major Exam</th>
-                                    <th class="px-3 py-2">Log</th>
+                                    ${SUMMARY_COLUMNS.map(c => `<th class="sticky top-0 bg-gray-200 py-2 ${c.cls}">${c.label}</th>`).join('')}
                                 </tr>
                             </thead>
                             <tbody id="csTableBody" class="divide-y divide-gray-200 bg-white"></tbody>
@@ -720,22 +727,28 @@ export const ClassComponents = {
             </header>
 
             <main class="pt-20 pb-12 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in relative">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 mt-2 sm:mt-4 gap-4 px-2 sm:px-0">
+                <div class="mb-4 mt-2 sm:mt-4 px-2 sm:px-0">
                     <div>
                         <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
                             Class Roster & Attendance ${audienceBadge}
                         </h2>
                         <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
                     </div>
+                </div>
 
-                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
-                        <input type="date" id="attendanceDate" class="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
-
-                        <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                            <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
-                        </button>
-                        <button id="openCourseMenuBtn" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                            <i class="fa-solid fa-bars mr-2"></i> Menu
+                <div id="attendanceBar" data-dirty="false" class="sticky top-16 z-30 mb-4 px-2 sm:px-3 py-2 bg-gray-50/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <input type="date" id="attendanceDate" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
+                        <span id="attendanceDirtyLabel" class="ml-auto text-xs font-bold text-orange-600 whitespace-nowrap"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>Unsaved changes</span>
+                        <span id="attendanceDirtyStatus" class="sr-only" role="status"></span>
+                        <div class="relative flex-shrink-0 sm:ml-0">
+                            <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center whitespace-nowrap">
+                                <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
+                            </button>
+                            <span id="attendanceDirtyDot" title="Unsaved changes" aria-hidden="true" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-400 border-2 border-white pointer-events-none"></span>
+                        </div>
+                        <button id="openCourseMenuBtn" aria-label="Menu" class="flex-shrink-0 bg-gray-800 hover:bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                            <i class="fa-solid fa-bars sm:mr-2"></i><span class="hidden sm:inline">Menu</span>
                         </button>
                     </div>
                 </div>
