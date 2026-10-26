@@ -55,7 +55,8 @@ body {
 }
 
 @media (min-width: 640px) {
-    #attendanceBar[data-dirty="true"] #attendanceDirtyLabel {
+    #attendanceBar[data-dirty="true"] #attendanceDirtyLabel,
+    #attendanceBar[data-drafts="true"] #attendanceDirtyLabel {
         display: inline;
     }
 }
