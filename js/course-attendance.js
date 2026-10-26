@@ -2,6 +2,7 @@
 import { apiFetch } from './globals.js';
 import { CourseScores } from './course-scores.js';
 import { UI } from './ui-feedback.js';
+import { parseLocalDate, getWeekdayName, matchesScheduleDay } from './date-utils.js';
 
 export const CourseAttendance = {
     // What the server currently has for the selected date. The roster is "dirty"
@@ -60,6 +61,20 @@ export const CourseAttendance = {
             const date = document.getElementById('attendanceDate')?.value;
             if (courseId && date) CourseAttendance.clearDraft(courseId, date);
         }
+    },
+
+    // Asks the lecturer to confirm when the date is not on the class's scheduled weekday.
+    // Returns true when the date matches the schedule or the lecturer confirms it.
+    confirmScheduleDay: async (dateStr, scheduleDay) => {
+        const day = scheduleDay !== undefined
+            ? scheduleDay
+            : (document.getElementById('attendanceDate')?.dataset.scheduleDay || '');
+        if (matchesScheduleDay(dateStr, day)) return true;
+        return UI.confirm({
+            title: 'Different day of the week',
+            message: `${dateStr} is a ${getWeekdayName(dateStr)}, but this class is scheduled on ${day}. Is this date correct?`,
+            confirmText: 'Yes, use this date'
+        });
     },
 
     getDraftKey: (courseId, date) => `attendance_draft_${courseId}_${date}`,
@@ -132,6 +147,8 @@ export const CourseAttendance = {
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
             return;
         }
+
+        if (!(await CourseAttendance.confirmScheduleDay(dateVal))) return;
 
         const rows = document.querySelectorAll('.student-row');
         const attendanceData = [];
@@ -372,16 +389,6 @@ export const CourseAttendance = {
         if (elNarrative) elNarrative.textContent = totalNarrative;
         if (elIndividual) elIndividual.textContent = totalIndividual;
         if (elReport) elReport.textContent = totalReport;
-
-        const parseLocalDate = (dateStr) => {
-            if (!dateStr) return null;
-            if (dateStr.includes('-')) {
-                const [y, m, d] = dateStr.split('-');
-                return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
-            }
-            const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? null : d;
-        };
 
         let present = 0, late = 0, excused = 0, absent = 0, totalParticipationPts = 0;
         let classDays = 0;

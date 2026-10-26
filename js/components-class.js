@@ -2,6 +2,7 @@
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { ExamUI } from './components-exam.js';
 import { Skeleton } from './skeletons.js';
+import { getLocalDateString } from './date-utils.js';
 
 // Class summary columns. The first two are pinned while scrolling sideways
 // (on phones only the Student column is pinned, to leave room to scroll).
@@ -53,6 +54,9 @@ const ClassUI = {
                     <button id="openScoresModalBtn" class="w-full bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-pen-to-square mr-2"></i> Record Scores
                     </button>
+                    <button id="openAttendanceDatesBtn" class="w-full bg-sky-600 hover:bg-sky-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-calendar-check mr-2"></i> Attendance Dates
+                    </button>
                     <button id="openNoClassModalBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-calendar-xmark mr-2"></i> Manage No Class Days
                     </button>
@@ -85,6 +89,53 @@ const ClassUI = {
                         <button type="button" id="saveCourseTermsBtn" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                             Save Term Periods
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+
+    renderAttendanceDatesModal: () => `
+        <div id="attendanceDatesModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-2 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeAttendanceDatesBg"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-check text-sky-600 mr-2"></i>Attendance Dates</h3>
+                        <p class="text-xs text-gray-500">All dates with saved records. Change, delete, or merge two dates.</p>
+                    </div>
+                    <button id="closeAttendanceDatesBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div id="adAlert" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
+
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <span id="adSummary" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider"></span>
+                    <button type="button" id="adMergeBtn" disabled class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded text-xs font-bold transition shadow-sm">
+                        <i class="fa-solid fa-code-merge mr-1"></i> Merge Selected (select 2)
+                    </button>
+                </div>
+
+                <div id="adList" class="flex-1 overflow-y-auto space-y-2 bg-gray-50 p-2 rounded border border-gray-200 min-h-[220px]"></div>
+
+                <div id="adEditPanel" class="hidden mt-3 p-3 bg-sky-50 border border-sky-200 rounded-lg">
+                    <div class="text-xs font-bold text-sky-900 mb-2">Change date of records from <span id="adEditLabel" class="font-black"></span></div>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="date" id="adEditDate" class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white outline-none focus:ring-2 focus:ring-sky-500">
+                        <button type="button" id="adEditSaveBtn" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-sm font-bold transition">Save New Date</button>
+                        <button type="button" id="adEditCancelBtn" class="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-md text-sm font-bold transition">Cancel</button>
+                    </div>
+                </div>
+
+                <div id="adMergePanel" class="hidden mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div class="text-xs font-bold text-purple-900 mb-2">Choose the date to keep:</div>
+                    <div id="adKeepOptions" class="space-y-1.5 mb-2"></div>
+                    <p class="text-[11px] text-purple-800 mb-3">Participation points are added together. If a student has a different status on each date, the stricter one is kept (Absent &gt; Late &gt; Excused &gt; Present). The other date is removed.</p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button type="button" id="adMergeConfirmBtn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-bold transition">Merge Records</button>
+                        <button type="button" id="adMergeCancelBtn" class="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-md text-sm font-bold transition">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -738,7 +789,7 @@ export const ClassComponents = {
 
                 <div id="attendanceBar" data-dirty="false" class="sticky top-16 z-30 mb-4 px-2 sm:px-3 py-2 bg-gray-50/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
                     <div class="flex items-center gap-2">
-                        <input type="date" id="attendanceDate" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${new Date().toISOString().split('T')[0]}">
+                        <input type="date" id="attendanceDate" data-schedule-day="${course.ScheduleDay || ''}" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
                         <span id="attendanceDirtyLabel" class="ml-auto text-xs font-bold text-orange-600 whitespace-nowrap"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>Unsaved changes</span>
                         <span id="attendanceDirtyStatus" class="sr-only" role="status"></span>
                         <div class="relative flex-shrink-0 sm:ml-0">
@@ -780,6 +831,7 @@ export const ClassComponents = {
             ${ClassUI.renderCourseMenuModal(course)}
             ${ClassUI.renderClassSummaryModal()}
             ${ClassUI.renderScoresModal()}
+            ${ClassUI.renderAttendanceDatesModal()}
             ${ClassUI.renderNoClassModal()}
             ${ClassUI.renderManageStudentModal()}
             ${ClassUI.renderSummaryModal()}

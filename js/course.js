@@ -626,6 +626,8 @@ export const CourseModule = {
                 UI.warning("Please select an attendance status (Present, Late, etc.) first.");
                 return;
             }
+
+            if (!(await CourseAttendance.confirmScheduleDay(dateVal))) return;
             
             const status = selectedBtn.dataset.status;
             const originalHtml = btn.innerHTML;

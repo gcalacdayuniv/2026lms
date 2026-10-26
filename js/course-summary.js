@@ -2,22 +2,13 @@
 import { apiFetch } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
+import { parseLocalDate, getLocalDateString } from './date-utils.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-
-const parseLocalDate = (dateStr) => {
-    if (!dateStr) return null;
-    if (dateStr.includes('-')) {
-        const [y, m, d] = dateStr.split('-');
-        return new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
-    }
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d;
-};
 
 const STATUS_BADGE = {
     'Active': 'text-green-600 border-green-200 bg-green-50',
@@ -404,7 +395,7 @@ export const CourseSummary = {
         const safeCode = (course.CourseCode || 'class').replace(/[^a-zA-Z0-9_-]/g, '_');
         const safeTerm = term === 'all' ? 'all-terms' : term;
         a.href = url;
-        a.download = `${safeCode}_summary_${safeTerm}_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `${safeCode}_summary_${safeTerm}_${getLocalDateString()}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

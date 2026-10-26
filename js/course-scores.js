@@ -2,6 +2,7 @@
 import { apiFetch } from './globals.js';
 import { CourseSummary } from './course-summary.js';
 import { UI } from './ui-feedback.js';
+import { getLocalDateString } from './date-utils.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -206,7 +207,7 @@ export const CourseScores = {
         CourseScores.currentId = id;
         CourseScores.setAlert('');
         const deleteBtn = document.getElementById('scDeleteBtn');
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateString();
 
         if (!id) {
             document.getElementById('scTitle').value = '';

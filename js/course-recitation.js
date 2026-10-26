@@ -1,6 +1,21 @@
 // js/course-recitation.js
 import { apiFetch } from './globals.js';
 import { getLoadableAvatarSrc } from './components.js';
+import { getLocalDateString } from './date-utils.js';
+
+// Storage key for today's called list (local date, not UTC).
+const getCalledKey = () => {
+    const courseId = window.location.hash.replace('#class-', '');
+    return `student_caller_${courseId}_${getLocalDateString()}`;
+};
+
+const readCalled = (key) => {
+    try {
+        return JSON.parse(localStorage.getItem(key)) || [];
+    } catch (e) {
+        return [];
+    }
+};
 
 export const CourseRecitation = {
     students: [],
@@ -13,7 +28,7 @@ export const CourseRecitation = {
         document.getElementById('wheelContainer').classList.remove('hidden');
         document.getElementById('spinWheelBtn').classList.remove('hidden');
         document.getElementById('spinWheelBtn').disabled = false;
-        
+
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
         const toggleBtn = document.getElementById('toggleCalledListBtn');
         if (mode === '2') {
@@ -23,11 +38,11 @@ export const CourseRecitation = {
             document.getElementById('calledListContainer').classList.add('hidden');
             toggleBtn.textContent = "View Called List";
         }
-        
+
         const wheel = document.getElementById('recitationWheel');
         wheel.style.transform = `rotate(0deg)`;
         wheel.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-500 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl"></i></div>';
-        
+
         try {
             const data = await apiFetch(`/api/recitation-pool?courseId=${courseId}`);
             CourseRecitation.students = data.students || [];
@@ -55,18 +70,11 @@ export const CourseRecitation = {
     },
 
     updateCalledListUI: () => {
-        const courseId = window.location.hash.replace('#class-', '');
-        const today = new Date().toISOString().split('T')[0];
-        const calledKey = `student_caller_${courseId}_${today}`;
-        
-        let calledToday = [];
-        try {
-            calledToday = JSON.parse(localStorage.getItem(calledKey)) || [];
-        } catch(e) {}
-        
+        const calledToday = readCalled(getCalledKey());
+
         const contentContainer = document.getElementById('calledStudentsListContent');
         if (!contentContainer) return;
-        
+
         if (calledToday.length === 0) {
             contentContainer.innerHTML = '<div class="text-xs text-gray-500 italic text-center py-2">No students called yet today.</div>';
             return;
@@ -87,45 +95,26 @@ export const CourseRecitation = {
     },
 
     removeCalledStudent: (userId) => {
-        const courseId = window.location.hash.replace('#class-', '');
-        const today = new Date().toISOString().split('T')[0];
-        const calledKey = `student_caller_${courseId}_${today}`;
-        
-        let calledToday = [];
-        try {
-            calledToday = JSON.parse(localStorage.getItem(calledKey)) || [];
-        } catch(e) {}
-        
-        calledToday = calledToday.filter(id => id !== userId);
+        const calledKey = getCalledKey();
+        const calledToday = readCalled(calledKey).filter(id => id !== userId);
         localStorage.setItem(calledKey, JSON.stringify(calledToday));
-        
+
         CourseRecitation.updateCalledListUI();
         CourseRecitation.drawWheel();
     },
 
     resetCalledList: () => {
-        const courseId = window.location.hash.replace('#class-', '');
-        const today = new Date().toISOString().split('T')[0];
-        const calledKey = `student_caller_${courseId}_${today}`;
-        
-        localStorage.removeItem(calledKey);
+        localStorage.removeItem(getCalledKey());
         CourseRecitation.updateCalledListUI();
         CourseRecitation.drawWheel();
     },
 
     drawWheel: () => {
         const wheel = document.getElementById('recitationWheel');
-        
+
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
-        const courseId = window.location.hash.replace('#class-', '');
-        const today = new Date().toISOString().split('T')[0];
-        const calledKey = `student_caller_${courseId}_${today}`;
-        
-        let calledToday = [];
-        try {
-            calledToday = JSON.parse(localStorage.getItem(calledKey)) || [];
-        } catch(e) {}
-        
+        const calledToday = readCalled(getCalledKey());
+
         let availableStudents = CourseRecitation.students;
         if (mode === '2') {
             availableStudents = CourseRecitation.students.filter(s => !calledToday.includes(s.User_ID));
@@ -137,33 +126,31 @@ export const CourseRecitation = {
             document.getElementById('spinWheelBtn').disabled = true;
             return;
         }
-        
+
         document.getElementById('spinWheelBtn').disabled = false;
 
         let conicString = '';
         const angle = 360 / total;
         const colors = ['#f56565', '#ed8936', '#ecc94b', '#48bb78', '#38b2ac', '#4299e1', '#667eea', '#9f7aea', '#ed64a6'];
-        
+
         for(let i = 0; i < total; i++) {
             const startAngle = i * angle;
             const endAngle = (i + 1) * angle;
             const color = colors[i % colors.length];
             conicString += `${color} ${startAngle}deg ${endAngle}deg${i < total - 1 ? ',' : ''}`;
         }
-        
+
         wheel.style.background = `conic-gradient(${conicString})`;
         wheel.innerHTML = '';
     },
 
     spin: () => {
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
-        const courseId = window.location.hash.replace('#class-', '');
-        const today = new Date().toISOString().split('T')[0];
-        const calledKey = `student_caller_${courseId}_${today}`;
-        
+        const calledKey = getCalledKey();
+
         let calledToday = [];
         if (mode === '2') {
-            try { calledToday = JSON.parse(localStorage.getItem(calledKey)) || []; } catch(e) {}
+            calledToday = readCalled(calledKey);
         }
 
         let availableStudents = CourseRecitation.students;
@@ -173,16 +160,16 @@ export const CourseRecitation = {
 
         if (CourseRecitation.isSpinning || availableStudents.length === 0) return;
         CourseRecitation.isSpinning = true;
-        
+
         document.getElementById('recitationResult').classList.add('hidden');
         document.getElementById('spinWheelBtn').disabled = true;
 
         let selectedIndex = 0;
-        
+
         if (mode === '1') {
             let maxPoints = 0;
             availableStudents.forEach(s => { if(s.Total_Points > maxPoints) maxPoints = s.Total_Points; });
-            
+
             let totalWeight = 0;
             const weightedStudents = availableStudents.map(s => {
                 const weight = (maxPoints - s.Total_Points) + 1;
@@ -191,7 +178,7 @@ export const CourseRecitation = {
             });
 
             let randomVal = Math.random() * totalWeight;
-            
+
             for(let i = 0; i < weightedStudents.length; i++) {
                 randomVal -= weightedStudents[i].weight;
                 if(randomVal <= 0) {
@@ -206,49 +193,49 @@ export const CourseRecitation = {
         const selectedStudent = availableStudents[selectedIndex];
         const totalSlices = availableStudents.length;
         const sliceAngle = 360 / totalSlices;
-        
+
         const sliceCenter = (selectedIndex * sliceAngle) + (sliceAngle / 2);
-        
-        const extraRotations = 5 * 360; 
+
+        const extraRotations = 5 * 360;
         const finalRotation = extraRotations + (360 - sliceCenter);
 
         const wheel = document.getElementById('recitationWheel');
         wheel.style.transition = 'none';
-        
-        void wheel.offsetHeight; 
-        
+
+        void wheel.offsetHeight;
+
         wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
         wheel.style.transform = `rotate(${finalRotation}deg)`;
 
         setTimeout(() => {
             CourseRecitation.isSpinning = false;
             document.getElementById('spinWheelBtn').disabled = false;
-            
+
             if (mode === '2') {
                 calledToday.push(selectedStudent.User_ID);
                 localStorage.setItem(calledKey, JSON.stringify(calledToday));
                 CourseRecitation.updateCalledListUI();
             }
-            
+
             CourseRecitation.currentSelectedStudentId = selectedStudent.User_ID;
-            
+
             const seatDisplay = document.getElementById('recitationResultSeat');
             if (seatDisplay) {
                 seatDisplay.textContent = selectedStudent.Seat_Number || 'Unassigned';
             }
-            
+
             const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
-            const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-32 h-32 rounded-full object-cover border-4 border-purple-500 mx-auto shadow-md">` 
+            const avatarImg = avatarSrc
+                ? `<img src="${avatarSrc}" class="w-32 h-32 rounded-full object-cover border-4 border-purple-500 mx-auto shadow-md">`
                 : `<i class="fa-solid fa-circle-user text-[128px] text-gray-300"></i>`;
-            
+
             document.getElementById('recitationResultAvatar').innerHTML = avatarImg;
             document.getElementById('recitationResultName').textContent = selectedStudent.Name;
-            
+
             document.getElementById('wheelContainer').classList.add('hidden');
             document.getElementById('spinWheelBtn').classList.add('hidden');
             document.getElementById('recitationResult').classList.remove('hidden');
-            
+
             wheel.style.transition = 'none';
             wheel.style.transform = `rotate(${finalRotation % 360}deg)`;
         }, 4000);
