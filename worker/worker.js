@@ -1,4 +1,6 @@
 // worker/worker.js
+import { getRequestDate, handleAttendanceDates } from './attendance-dates.js';
+
 async function hashPassword(password) {
     const encoder = new TextEncoder();
     const data = encoder.encode(password);
@@ -246,7 +248,7 @@ export default {
                 const defaultMaxScore = regularCount > 0 ? regularCount : Math.max(1, parsedQuestions.length);
                 const selectedTerm = ASSESSMENT_TERMS.includes(term) ? term : 'MidTerm';
                 const selectedCategory = ASSESSMENT_CATEGORIES.includes(category) ? category : 'MajorExam';
-                const today = new Date().toISOString().split('T')[0];
+                const today = getRequestDate(request);
 
                 let existingClassExam = await env.DB.prepare(
                     "SELECT * FROM Class_Exams WHERE Course_ID = ? AND Exam_ID = ?"
@@ -487,7 +489,7 @@ export default {
                     ).bind(record.Assessment_ID).first();
                 }
 
-                const today = new Date().toISOString().split('T')[0];
+                const today = getRequestDate(request);
                 let targetAssessmentId = record.Assessment_ID;
 
                 if (!assessment) {
@@ -1099,6 +1101,9 @@ export default {
 
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
+
+            const attendanceDatesResponse = await handleAttendanceDates(request, env, path, url, corsHeaders);
+            if (attendanceDatesResponse) return attendanceDatesResponse;
 
             if (request.method === "GET" && path === "/api/no-class") {
                 const courseId = url.searchParams.get("courseId");
