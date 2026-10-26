@@ -46,10 +46,47 @@ export const CourseAttendance = {
         const bar = document.getElementById('attendanceBar');
         if (!bar) return false;
         const dirty = CourseAttendance.isDirty();
+        const courseId = window.location.hash.replace('#class-', '');
+        const dateVal = document.getElementById('attendanceDate')?.value || '';
+        const others = CourseAttendance.getDraftDates(courseId).filter(d => d !== dateVal);
+
+        // Say exactly which date(s) hold unsaved changes.
+        const parts = [];
+        if (dirty && dateVal) parts.push(`Unsaved changes for ${CourseAttendance.describeDate(dateVal)}`);
+        else if (dirty) parts.push('Unsaved changes');
+        if (others.length > 0) {
+            const shown = others.slice(0, 2).map(CourseAttendance.describeDate).join(', ');
+            const more = others.length > 2 ? ` +${others.length - 2} more` : '';
+            parts.push(`${dirty ? 'also unsaved' : 'Unsaved changes'} on ${shown}${more}`);
+        }
+        const text = parts.join(' | ');
+
         bar.dataset.dirty = dirty ? 'true' : 'false';
+        bar.dataset.drafts = others.length > 0 ? 'true' : 'false';
+
+        const label = document.getElementById('attendanceDirtyLabel');
+        if (label) label.innerHTML = `<i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>${text}`;
+        const dot = document.getElementById('attendanceDirtyDot');
+        if (dot) dot.title = dirty && dateVal ? `Unsaved changes for ${CourseAttendance.describeDate(dateVal)}` : 'Unsaved changes';
         const status = document.getElementById('attendanceDirtyStatus');
-        if (status) status.textContent = dirty ? 'Unsaved changes' : '';
+        if (status) status.textContent = text;
         return dirty;
+    },
+
+    // "2026-10-26 (Mon)"
+    describeDate: (dateStr) => `${dateStr} (${getWeekdayName(dateStr).slice(0, 3)})`,
+
+    // Dates (other than the saved state) that still have a local unsaved draft for this class.
+    getDraftDates: (courseId) => {
+        const prefix = `attendance_draft_${courseId}_`;
+        const dates = [];
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(prefix)) dates.push(key.slice(prefix.length));
+            }
+        } catch (e) {}
+        return dates.sort();
     },
 
     // Called after a single student's row has been saved.
@@ -340,7 +377,7 @@ export const CourseAttendance = {
                     } else if (hasDraftChanges) {
                         const alertBox = document.getElementById('attendanceAlert');
                         if (alertBox) {
-                            alertBox.innerHTML = '<i class="fa-solid fa-clock-rotate-left mr-2"></i> Unsaved changes restored from local cache.';
+                            alertBox.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-2"></i> Unsaved changes for ${CourseAttendance.describeDate(date)} restored from local cache. Press Save All to save them.`;
                             alertBox.className = "mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium bg-blue-100 text-blue-800 block fade-in";
                             alertBox.classList.remove('hidden');
                         }
