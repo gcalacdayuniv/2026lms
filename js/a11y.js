@@ -12,6 +12,11 @@
 //
 // It works from the DOM, so the existing code that shows/hides modals by toggling
 // the `hidden` class needs no changes.
+//
+// The same dialog stack also drives three phone behaviours:
+//   - page scroll is locked while any dialog is open,
+//   - the browser Back button closes the top dialog instead of leaving the page,
+//   - bottom sheets can be dragged down by their handle/header to close.
 
 const DIALOG_SELECTOR = '.fixed.inset-0';
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -28,6 +33,11 @@ const ICON_LABELS = [
     ['fa-bars', 'Menu']
 ];
 
+// Dialogs that must not be closed by Back or a swipe: they have no close button of their own.
+const NO_BACK_IDS = new Set(['profilePanel', 'accessibleExamOverlay', 'examPresentationOverlay']);
+const SWIPE_ZONE = 72;      // px from the top of a sheet where a drag starts a swipe-to-close
+const SWIPE_CLOSE = 110;    // px dragged down that closes the sheet
+
 const isRendered = (el) => el.isConnected && el.getClientRects().length > 0;
 
 export const A11y = {
@@ -36,11 +46,22 @@ export const A11y = {
     lastOutside: null,    // last focused element that was not inside the current top dialog
     uid: 0,
     observer: null,
+    historyDepth: 0,      // history entries we pushed for open dialogs
+    ignorePop: false,     // next popstate came from our own history.go()
+    lastHash: '',
+    swipe: null,
 
     init: () => {
         if (A11y.observer) return;
+        A11y.lastHash = window.location.hash;
         document.addEventListener('focusin', A11y.trackFocus, true);
         document.addEventListener('keydown', A11y.handleKeydown);
+        window.addEventListener('popstate', A11y.handlePopState);
+        window.addEventListener('hashchange', A11y.handleHashChange);
+        document.addEventListener('touchstart', A11y.swipeStart, { passive: true });
+        document.addEventListener('touchmove', A11y.swipeMove, { passive: true });
+        document.addEventListener('touchend', A11y.swipeEnd, { passive: true });
+        document.addEventListener('touchcancel', A11y.swipeEnd, { passive: true });
         A11y.observer = new MutationObserver(A11y.handleMutations);
         A11y.observer.observe(document.body, {
             childList: true,
@@ -174,6 +195,88 @@ export const A11y = {
             if (o && isRendered(o) && !o.closest('[inert]')) o.focus({ preventScroll: true });
         }
         next.forEach(e => { delete e.fresh; });
+
+        document.documentElement.classList.toggle('dialog-open', next.length > 0);
+        A11y.syncHistory(next);
+    },
+
+    // ---- Back button -------------------------------------------------------
+
+    isBackClosable: (el) => !NO_BACK_IDS.has(el.id) && el.getAttribute('role') !== 'alertdialog',
+
+    // Keep one history entry per open closable dialog, so Back has something to consume.
+    syncHistory: (stack) => {
+        const want = stack.filter(e => A11y.isBackClosable(e.el)).length;
+        if (want > A11y.historyDepth) {
+            for (let i = A11y.historyDepth; i < want; i++) history.pushState({ dialog: true }, '');
+            A11y.historyDepth = want;
+        } else if (want < A11y.historyDepth) {
+            const n = A11y.historyDepth - want;
+            A11y.historyDepth = want;
+            A11y.ignorePop = true;
+            history.go(-n);
+        }
+    },
+
+    closeTop: () => {
+        const entry = [...A11y.stack].reverse().find(e => A11y.isBackClosable(e.el));
+        if (!entry) return false;
+        const closer = entry.el.querySelector('button[id^="close"], button[aria-label="Close"]');
+        if (!closer) return false;
+        closer.click();
+        return true;
+    },
+
+    handlePopState: () => {
+        if (A11y.ignorePop) { A11y.ignorePop = false; return; }
+        if (A11y.historyDepth === 0) return;
+        A11y.historyDepth--;                      // the browser already popped our entry
+        if (!A11y.closeTop()) {                   // nothing closable: put the entry back
+            history.pushState({ dialog: true }, '');
+            A11y.historyDepth++;
+        }
+    },
+
+    // A real route change leaves our entries behind; forget them instead of going back
+    // (going back would undo the navigation). Synthetic hashchange events are ignored.
+    handleHashChange: () => {
+        if (window.location.hash === A11y.lastHash) return;
+        A11y.lastHash = window.location.hash;
+        A11y.historyDepth = 0;
+    },
+
+    // ---- Swipe down to close a bottom sheet --------------------------------
+
+    swipeStart: (e) => {
+        A11y.swipe = null;
+        if (e.touches.length !== 1 || window.innerWidth >= 640) return;
+        const panel = e.target.closest ? e.target.closest('.sheet-panel') : null;
+        // Only sheets that show a drag handle (full-screen panels do not).
+        if (!panel || !panel.querySelector(':scope > .h-1.w-10')) return;
+        const top = A11y.stack[A11y.stack.length - 1];
+        if (!top || !top.el.contains(panel)) return;
+        const y = e.touches[0].clientY;
+        if (y - panel.getBoundingClientRect().top > SWIPE_ZONE) return;
+        A11y.swipe = { panel, startY: y, dy: 0 };
+    },
+
+    swipeMove: (e) => {
+        const sw = A11y.swipe;
+        if (!sw) return;
+        sw.dy = Math.max(0, e.touches[0].clientY - sw.startY);
+        sw.panel.style.transition = 'none';
+        sw.panel.style.transform = `translateY(${sw.dy}px)`;
+    },
+
+    swipeEnd: () => {
+        const sw = A11y.swipe;
+        A11y.swipe = null;
+        if (!sw) return;
+        const { panel, dy } = sw;
+        panel.style.transition = 'transform 0.2s ease-out';
+        panel.style.transform = '';
+        setTimeout(() => { panel.style.transition = ''; }, 220);
+        if (dy > SWIPE_CLOSE) A11y.closeTop();
     },
 
     findOpener: (dialog) => {
