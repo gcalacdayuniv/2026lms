@@ -23,6 +23,27 @@ body {
     to { transform: scale(1); opacity: 1; }
 }
 
+/* ---------- Sheet / full-screen panels ----------
+   Phones: slide up from the bottom. Tablets and desktop: same scale-up as a modal. */
+@keyframes sheetUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.sheet-panel {
+    animation: sheetUp 0.25s ease-out;
+}
+
+@media (min-width: 640px) {
+    .sheet-panel {
+        animation: scaleUp 0.3s ease-in-out;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sheet-panel { animation: none; }
+}
+
 /* ---------- Skeleton loaders ---------- */
 .skeleton {
     background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 37%, #e5e7eb 63%);
