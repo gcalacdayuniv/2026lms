@@ -10,7 +10,7 @@ import { UI } from './ui-feedback.js';
 
 export const CourseModule = {
     lastTap: 0,
-    
+
     init: () => {
         document.addEventListener('submit', CourseModule.handleForms);
         document.addEventListener('click', CourseModule.handleClicks);
@@ -39,7 +39,7 @@ export const CourseModule = {
         if (activeEl && activeEl.classList.contains('dash-exam-card')) {
             const cards = Array.from(document.querySelectorAll('.dash-exam-card'));
             const idx = cards.indexOf(activeEl);
-            
+
             if (e.key === 'ArrowRight') {
                 e.preventDefault();
                 if (idx < cards.length - 1) cards[idx + 1].focus();
@@ -464,7 +464,7 @@ export const CourseModule = {
             document.getElementById('manageSeatInput').value = btn.dataset.seat || '';
             document.getElementById('manageGroupInput').value = btn.dataset.group || '';
             document.getElementById('manageTopicInput').value = btn.dataset.topic || '';
-            
+
             const eyeConditionSelect = document.getElementById('manageEyeConditionSelect');
             if (eyeConditionSelect) {
                 eyeConditionSelect.value = btn.dataset.eye || 'No Eye Condition';
@@ -526,19 +526,19 @@ export const CourseModule = {
         if (e.target.closest('#openAddStudentModalBtn')) {
             document.getElementById('courseMenuModal').classList.add('hidden');
             document.getElementById('addStudentModal').classList.remove('hidden');
-            
+
             const courseId = window.location.hash.replace('#class-', '');
             const filterCourseSelect = document.getElementById('filterCourse');
-            
+
             try {
                 const ts = new Date().getTime();
                 const programsData = await apiFetch(`/api/programs?_t=${ts}`);
                 if (programsData.programs) {
-                    filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' + 
+                    filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' +
                         programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
                 }
             } catch(e) {}
-            
+
             CourseClass.loadUnenrolledStudents(courseId);
         }
 
@@ -605,80 +605,6 @@ export const CourseModule = {
             const dateVal = document.getElementById('attendanceDate')?.value;
             if (courseId && dateVal) CourseAttendance.saveDraft(courseId, dateVal);
         }
-        
-        if (e.target.closest('.save-single-attendance-btn')) {
-            const btn = e.target.closest('.save-single-attendance-btn');
-            const row = btn.closest('.student-row');
-            const studentId = row.dataset.studentId;
-            const selectedBtn = row.querySelector('.attendance-btn[data-selected="true"]');
-            const pointsInput = row.querySelector('.points-input');
-            const points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
-            
-            const dateVal = document.getElementById('attendanceDate').value;
-            const courseId = window.location.hash.replace('#class-', '');
-            
-            if (!dateVal) {
-                UI.warning("Please select a date first.");
-                return;
-            }
-            
-            if (!selectedBtn) {
-                UI.warning("Please select an attendance status (Present, Late, etc.) first.");
-                return;
-            }
-
-            if (!(await CourseAttendance.confirmScheduleDay(dateVal))) return;
-            
-            const status = selectedBtn.dataset.status;
-            const originalHtml = btn.innerHTML;
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            
-            try {
-                await apiFetch('/api/attendance', { 
-                    method: 'POST', 
-                    body: JSON.stringify({
-                        courseId: courseId,
-                        date: dateVal,
-                        records: [{
-                            studentId: studentId,
-                            status: status,
-                            points: points
-                        }]
-                    }) 
-                });
-                
-                const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${dateVal}`);
-                if (draftStr) {
-                    try {
-                        const draft = JSON.parse(draftStr);
-                        if (draft[studentId]) {
-                            delete draft[studentId];
-                            localStorage.setItem(`attendance_draft_${courseId}_${dateVal}`, JSON.stringify(draft));
-                        }
-                    } catch(e) {}
-                }
-                
-                CourseAttendance.markSaved(studentId);
-
-                btn.innerHTML = '<i class="fa-solid fa-check text-green-600"></i>';
-                btn.classList.replace('border-blue-200', 'border-green-300');
-                btn.classList.replace('bg-blue-50', 'bg-green-50');
-                
-                setTimeout(() => {
-                    btn.innerHTML = originalHtml;
-                    btn.classList.replace('border-green-300', 'border-blue-200');
-                    btn.classList.replace('bg-green-50', 'bg-blue-50');
-                    btn.disabled = false;
-                }, 1500);
-                
-            } catch (err) {
-                UI.error("Failed to save individual attendance: " + err.message);
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
-            }
-        }
 
         if (e.target.closest('#markAllPresent')) {
             const rows = document.querySelectorAll('.student-row');
@@ -707,7 +633,7 @@ export const CourseModule = {
         if (e.target.closest('#closeRecitationModalBtn')) {
             CourseRecitation.closeModal();
         }
-        
+
         if (e.target.id === 'recitationModalOverlay') {
             CourseRecitation.closeModal();
         }
@@ -763,7 +689,7 @@ export const CourseModule = {
             const trigger = e.target.closest('.view-details-trigger');
             const term = trigger.dataset.term;
             const metric = trigger.dataset.metric;
-            
+
             if (CourseClass.currentSummaryData) {
                 CourseClass.renderDetailsModal(term, metric, CourseClass.currentSummaryData);
                 document.getElementById('detailsModal').classList.remove('hidden');
@@ -777,21 +703,21 @@ export const CourseModule = {
         if (e.target.closest('#copyEmailsBtn')) {
             await CourseClass.copyStudentEmails();
         }
-        
+
         if (e.target.closest('.save-grade-btn')) {
             const btn = e.target.closest('.save-grade-btn');
             const subId = btn.dataset.subId;
             const fileUrl = btn.dataset.fileUrl || null;
             const container = btn.closest('.flex');
-            
+
             const narrativeVal = container.querySelector('.grade-narrative').value;
             const individualVal = container.querySelector('.grade-individual').value;
             const reportVal = container.querySelector('.grade-report').value;
-            
+
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            
+
             try {
                 await apiFetch('/api/grade-submission', {
                     method: 'POST',
@@ -803,12 +729,12 @@ export const CourseModule = {
                         gradeReport: reportVal !== '' ? parseFloat(reportVal) : null
                     })
                 });
-                
+
                 btn.innerHTML = '<i class="fa-solid fa-check text-green-600"></i> Saved';
                 btn.classList.replace('bg-blue-50', 'bg-green-50');
                 btn.classList.replace('text-blue-600', 'text-green-700');
                 btn.classList.replace('border-blue-200', 'border-green-300');
-                
+
                 setTimeout(() => {
                     btn.innerHTML = 'Save Grades';
                     btn.classList.replace('bg-green-50', 'bg-blue-50');
@@ -816,7 +742,7 @@ export const CourseModule = {
                     btn.classList.replace('border-green-300', 'border-blue-200');
                     btn.disabled = false;
                 }, 2000);
-                
+
                 // Refresh summary metrics (grade save already succeeded; refresh failure must not alert)
                 try {
                     const currentCourseId = window.location.hash.replace('#class-', '');
@@ -831,7 +757,7 @@ export const CourseModule = {
                 } catch (refreshErr) {
                     console.error('Grade saved, but summary refresh failed:', refreshErr);
                 }
-                
+
             } catch(err) {
                 UI.error("Failed to save grades: " + err.message);
                 btn.innerHTML = originalHtml;

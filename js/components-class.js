@@ -745,10 +745,6 @@ export const ClassComponents = {
                             <button type="button" data-status="Absent" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-gray-200 text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-700 transition text-center">
                                 Absent
                             </button>
-
-                            <button type="button" class="save-single-attendance-btn ml-1 px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition shadow-sm" title="Save Individual Attendance">
-                                <i class="fa-solid fa-floppy-disk"></i>
-                            </button>
                         </div>
                     </div>
                 </div>
