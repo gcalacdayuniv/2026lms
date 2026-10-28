@@ -28,9 +28,10 @@ const SUMMARY_COLUMNS = [
 
 const ClassUI = {
     renderCourseMenuModal: (course) => `
-        <div id="courseMenuModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-4">
+        <div id="courseMenuModal" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div id="closeCourseMenuBg" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[90vh] overflow-y-auto">
+                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-layer-group text-blue-600 mr-2"></i>Course Actions</h3>
                     <button id="closeCourseMenuBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
@@ -96,9 +97,9 @@ const ClassUI = {
     `,
 
     renderAttendanceDatesModal: () => `
-        <div id="attendanceDatesModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-2 sm:p-4">
+        <div id="attendanceDatesModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeAttendanceDatesBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] flex flex-col">
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel max-h-full sm:max-h-[95vh] flex flex-col">
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <div>
                         <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-check text-sky-600 mr-2"></i>Attendance Dates</h3>
@@ -143,9 +144,9 @@ const ClassUI = {
     `,
 
     renderClassSummaryModal: () => `
-        <div id="classSummaryModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-2 sm:p-4">
+        <div id="classSummaryModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeClassSummaryBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-7xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] flex flex-col">
+            <div class="bg-white rounded-none shadow-xl w-full h-full p-4 sm:p-6 relative z-10 fade-in flex flex-col">
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <div>
                         <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-table-list text-purple-600 mr-2"></i>Class Summary</h3>
@@ -195,9 +196,9 @@ const ClassUI = {
     `,
 
     renderScoresModal: () => `
-        <div id="scoresModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-2 sm:p-4">
+        <div id="scoresModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeScoresModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] flex flex-col">
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel max-h-full sm:max-h-[95vh] flex flex-col">
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-pen-to-square text-teal-600 mr-2"></i>Record Scores</h3>
                     <button id="closeScoresModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -273,9 +274,10 @@ const ClassUI = {
     `,
 
     renderNoClassModal: () => `
-        <div id="noClassModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-4">
+        <div id="noClassModal" class="hidden fixed inset-0 z-[70] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeNoClassModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[90vh] flex flex-col">
+                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-xmark text-orange-600 mr-2"></i>No Class Days</h3>
                     <button id="closeNoClassModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -295,9 +297,10 @@ const ClassUI = {
     `,
 
     renderManageStudentModal: () => `
-        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-4">
+        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeManageStudentModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[92vh] overflow-y-auto">
+                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-gear text-blue-600 mr-2"></i>Manage Student</h3>
                     <button id="closeManageStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -460,9 +463,10 @@ const ClassUI = {
     `,
 
     renderDetailsModal: () => `
-        <div id="detailsModal" class="hidden fixed inset-0 z-[90] flex items-center justify-center fade-in p-4">
+        <div id="detailsModal" class="hidden fixed inset-0 z-[90] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeDetailsModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
+                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-base sm:text-lg font-bold text-gray-800" id="detailsModalTitle">Details</h3>
                     <button id="closeDetailsModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -503,9 +507,10 @@ const ClassUI = {
     `,
 
     renderAddStudentModal: () => `
-        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-2 sm:p-4">
+        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm modal-backdrop" id="closeAddStudentModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 scale-up max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 sheet-panel max-h-[92vh] sm:max-h-[90vh] flex flex-col">
+                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
                     <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -610,9 +615,10 @@ const ClassUI = {
     `,
 
     renderGroupMembersModal: () => `
-        <div id="groupMembersModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center fade-in p-4">
+        <div id="groupMembersModal" class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeGroupMembersModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] flex flex-col">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
+                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users text-blue-600 mr-2"></i><span id="gmmTitle">Group Members</span></h3>
                     <button id="closeGroupMembersModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
