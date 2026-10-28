@@ -1,88 +1,19 @@
-/* styles.css */
-body {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+
+/* ---------- Dialogs on phones ---------- */
+/* Lock page scroll behind any open dialog (set by a11y.js). */
+html.dialog-open,
+html.dialog-open body {
+    overflow: hidden;
+    overscroll-behavior: none;
 }
 
-.fade-in {
-    animation: fadeIn 0.3s ease-in-out;
-}
-
-.scale-up {
-    animation: scaleUp 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes scaleUp {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-/* ---------- Sheet / full-screen panels ----------
-   Phones: slide up from the bottom. Tablets and desktop: same scale-up as a modal. */
-@keyframes sheetUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-}
-
-.sheet-panel {
-    animation: sheetUp 0.25s ease-out;
-}
-
-@media (min-width: 640px) {
-    .sheet-panel {
-        animation: scaleUp 0.3s ease-in-out;
+/* Keep sheet buttons clear of the iPhone home bar (needs viewport-fit=cover). */
+@media (max-width: 639px) {
+    .fixed > .sheet-panel {
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
     }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .sheet-panel { animation: none; }
-}
-
-/* ---------- Skeleton loaders ---------- */
-.skeleton {
-    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 37%, #e5e7eb 63%);
-    background-size: 400% 100%;
-    animation: skeletonShimmer 1.4s ease infinite;
-}
-
-.skeleton-dark {
-    background: linear-gradient(90deg, #1d4ed8 25%, #3b82f6 37%, #1d4ed8 63%);
-    background-size: 400% 100%;
-}
-
-@keyframes skeletonShimmer {
-    0%   { background-position: 100% 50%; }
-    100% { background-position: 0 50%; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .skeleton { animation: none; }
-}
-
-/* ---------- Attendance bar: unsaved-changes indicator ---------- */
-#attendanceDirtyDot,
-#attendanceDirtyLabel {
-    display: none;
-}
-
-#attendanceBar[data-dirty="true"] #attendanceDirtyDot {
-    display: block;
-}
-
-@media (min-width: 640px) {
-    #attendanceBar[data-dirty="true"] #attendanceDirtyLabel,
-    #attendanceBar[data-drafts="true"] #attendanceDirtyLabel {
-        display: inline;
+    /* The drag handle area must not scroll the page while swiping. */
+    .sheet-panel > .h-1.w-10 {
+        touch-action: none;
     }
-}
-
-/* ---------- Class summary table: divider after pinned columns ---------- */
-.pin-edge {
-    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.18);
 }
