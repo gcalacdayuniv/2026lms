@@ -1,5 +1,166 @@
 // worker/worker.js
-import { getRequestDate, handleAttendanceDates } from './attendance-dates.js';
+// ---------- Attendance date management and timezone-aware dates ----------
+// Attendance date management: list, change, delete and merge dates that have records.
+// Also exports a timezone-aware "today" helper so the server never falls back to UTC.
+
+const DEFAULT_TIMEZONE = 'Asia/Manila';
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Status priority when merging two records for the same student (higher wins).
+const STATUS_PRIORITY = { Absent: 4, Late: 3, Excused: 2, Present: 1 };
+
+// Returns YYYY-MM-DD for "today" in the visitor's timezone (Cloudflare supplies it),
+// falling back to Asia/Manila. Never uses the UTC date.
+function getRequestDate(request) {
+    const requested = request && request.cf && request.cf.timezone;
+    const zones = [requested, DEFAULT_TIMEZONE];
+    for (const timeZone of zones) {
+        if (!timeZone) continue;
+        try {
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone, year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(new Date());
+        } catch (e) {
+            // Invalid timezone name: try the next one.
+        }
+    }
+    return new Date().toISOString().split('T')[0];
+}
+
+const json = (corsHeaders, body, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: corsHeaders });
+
+const pickStatus = (a, b) =>
+    (STATUS_PRIORITY[a] || 0) >= (STATUS_PRIORITY[b] || 0) ? a : b;
+
+const insertStmt = (env, courseId, studentId, date, status, points) =>
+    env.DB.prepare(
+        "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(crypto.randomUUID(), courseId, studentId, date, status, points);
+
+// Returns a Response when the request is handled here, otherwise null.
+async function handleAttendanceDates(request, env, path, url, corsHeaders) {
+    if (!path.startsWith('/api/attendance-dates')) return null;
+    const method = request.method;
+
+    // List every date that has records for a course.
+    if (method === 'GET' && path === '/api/attendance-dates') {
+        const courseId = url.searchParams.get('courseId');
+        if (!courseId) return json(corsHeaders, { error: 'Missing courseId' }, 400);
+
+        const rows = await env.DB.prepare(
+            `SELECT Date,
+                    COUNT(*) AS Total,
+                    SUM(CASE WHEN Status = 'Present' THEN 1 ELSE 0 END) AS Present,
+                    SUM(CASE WHEN Status = 'Late' THEN 1 ELSE 0 END) AS Late,
+                    SUM(CASE WHEN Status = 'Excused' THEN 1 ELSE 0 END) AS Excused,
+                    SUM(CASE WHEN Status = 'Absent' THEN 1 ELSE 0 END) AS Absent,
+                    SUM(COALESCE(Performance_Points, 0)) AS Points
+             FROM Attendance WHERE Course_ID = ?
+             GROUP BY Date ORDER BY Date DESC`
+        ).bind(courseId).all();
+
+        const noClass = await env.DB.prepare(
+            "SELECT Date FROM Course_Sessions WHERE Course_ID = ? AND Is_No_Class = 1"
+        ).bind(courseId).all();
+        const noClassDates = new Set((noClass.results || []).map(r => r.Date));
+
+        const dates = (rows.results || []).map(r => ({ ...r, Is_No_Class: noClassDates.has(r.Date) }));
+        return json(corsHeaders, { success: true, dates });
+    }
+
+    // Change the date of all records on a date.
+    if (method === 'POST' && path === '/api/attendance-dates/change') {
+        const { courseId, oldDate, newDate } = await request.json();
+        if (!courseId || !DATE_RE.test(oldDate || '') || !DATE_RE.test(newDate || '')) {
+            return json(corsHeaders, { error: 'Invalid parameters' }, 400);
+        }
+        if (oldDate === newDate) return json(corsHeaders, { success: true, unchanged: true });
+
+        const source = await env.DB.prepare(
+            "SELECT COUNT(*) AS c FROM Attendance WHERE Course_ID = ? AND Date = ?"
+        ).bind(courseId, oldDate).first();
+        if (!source || !source.c) return json(corsHeaders, { error: 'No records found on that date.' }, 404);
+
+        const target = await env.DB.prepare(
+            "SELECT COUNT(*) AS c FROM Attendance WHERE Course_ID = ? AND Date = ?"
+        ).bind(courseId, newDate).first();
+        if (target && target.c > 0) {
+            return json(corsHeaders, {
+                error: 'The new date already has records. Use Merge instead.',
+                code: 'DATE_HAS_RECORDS'
+            }, 409);
+        }
+
+        const noClass = await env.DB.prepare(
+            "SELECT Session_ID FROM Course_Sessions WHERE Course_ID = ? AND Date = ? AND Is_No_Class = 1"
+        ).bind(courseId, newDate).first();
+        if (noClass) {
+            return json(corsHeaders, { error: 'The new date is marked as No Class.', code: 'NO_CLASS_DATE' }, 409);
+        }
+
+        await env.DB.prepare(
+            "UPDATE Attendance SET Date = ? WHERE Course_ID = ? AND Date = ?"
+        ).bind(newDate, courseId, oldDate).run();
+
+        return json(corsHeaders, { success: true });
+    }
+
+    // Delete all records on a date.
+    if (method === 'DELETE' && path === '/api/attendance-dates') {
+        const { courseId, date } = await request.json();
+        if (!courseId || !DATE_RE.test(date || '')) {
+            return json(corsHeaders, { error: 'Invalid parameters' }, 400);
+        }
+        await env.DB.prepare(
+            "DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?"
+        ).bind(courseId, date).run();
+        return json(corsHeaders, { success: true });
+    }
+
+    // Merge two dates into one. Points are added; status priority is Absent > Late > Excused > Present.
+    if (method === 'POST' && path === '/api/attendance-dates/merge') {
+        const { courseId, dateA, dateB, keepDate } = await request.json();
+        if (!courseId || !DATE_RE.test(dateA || '') || !DATE_RE.test(dateB || '') || dateA === dateB) {
+            return json(corsHeaders, { error: 'Two different dates are required.' }, 400);
+        }
+        if (keepDate !== dateA && keepDate !== dateB) {
+            return json(corsHeaders, { error: 'keepDate must be one of the two dates.' }, 400);
+        }
+
+        const rows = await env.DB.prepare(
+            `SELECT Student_ID, Date, Status, Performance_Points
+             FROM Attendance WHERE Course_ID = ? AND Date IN (?, ?)`
+        ).bind(courseId, dateA, dateB).all();
+
+        const merged = new Map();
+        for (const r of (rows.results || [])) {
+            const points = parseInt(r.Performance_Points, 10) || 0;
+            const existing = merged.get(r.Student_ID);
+            if (!existing) {
+                merged.set(r.Student_ID, { status: r.Status, points });
+            } else {
+                existing.status = pickStatus(existing.status, r.Status);
+                existing.points += points;
+            }
+        }
+        if (merged.size === 0) return json(corsHeaders, { error: 'No records to merge.' }, 404);
+
+        const statements = [
+            env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date IN (?, ?)")
+                .bind(courseId, dateA, dateB)
+        ];
+        for (const [studentId, v] of merged) {
+            statements.push(insertStmt(env, courseId, studentId, keepDate, v.status, v.points));
+        }
+        await env.DB.batch(statements);
+
+        return json(corsHeaders, { success: true, merged: merged.size, keepDate });
+    }
+
+    return null;
+}
+// ---------- End attendance date management ----------
 
 async function hashPassword(password) {
     const encoder = new TextEncoder();
@@ -124,6 +285,128 @@ async function getStudentAccessibleExamsList(env, studentId) {
     return availableExams;
 }
 
+const MAX_UPLOAD_CHUNKS = 10; // keep in sync with gas/Code.gs
+
+// ---- Submission upload helpers -------------------------------------------------
+// Sends a body to the Google Apps Script web app and returns its parsed JSON answer.
+// Throws an Error with a user-readable message on failure.
+async function callGas(env, body) {
+    if (!env.GAS_WEBHOOK_URL) {
+        throw new Error("Server Configuration Error: GAS_WEBHOOK_URL is missing.");
+    }
+
+    let gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body,
+        redirect: 'manual'
+    });
+
+    if (gasResponse.status === 302 || gasResponse.status === 303) {
+        const redirectUrl = gasResponse.headers.get('Location');
+        gasResponse = await fetch(redirectUrl);
+    }
+
+    const gasText = await gasResponse.text();
+    let gasData;
+    try {
+        gasData = JSON.parse(gasText);
+    } catch (parseError) {
+        throw new Error(`Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...`);
+    }
+
+    if (!gasData.success) {
+        throw new Error("Google Drive Error: " + gasData.error);
+    }
+    return gasData;
+}
+
+// Streams  prefix + <client request body, untouched> + suffix  to Google Apps Script.
+// The (large) base64 body is never decoded or parsed in the Worker, which keeps CPU
+// and memory use tiny and fits the free plan.
+async function streamToGas(env, request, prefix, suffix) {
+    if (!request.body) {
+        throw new Error("Upload body is missing.");
+    }
+
+    // Browsers send Content-Length, so the body can be piped straight through.
+    // If it is missing, fall back to buffering the bytes (still no decoding/parsing).
+    let contentLength = parseInt(request.headers.get('Content-Length') || '', 10);
+    let buffered = null;
+    if (!Number.isFinite(contentLength) || contentLength <= 0) {
+        buffered = new Uint8Array(await request.arrayBuffer());
+        contentLength = buffered.byteLength;
+    }
+    if (contentLength <= 0) {
+        throw new Error("Upload body is empty.");
+    }
+
+    const encoder = new TextEncoder();
+    const pre = encoder.encode(prefix);
+    const suf = encoder.encode(suffix);
+
+    const { readable, writable } = new FixedLengthStream(pre.length + contentLength + suf.length);
+    const writer = writable.getWriter();
+    const pump = (async () => {
+        await writer.write(pre);
+        if (buffered) {
+            await writer.write(buffered);
+        } else {
+            const reader = request.body.getReader();
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                await writer.write(value);
+            }
+        }
+        await writer.write(suf);
+        await writer.close();
+    })();
+    pump.catch(() => {});
+
+    return callGas(env, readable);
+}
+
+// Saves the Submissions row(s) after the file reached Drive.
+async function recordSubmission(env, body, fileUrl) {
+    const isGroup = body.isGroup;
+    const includedMembers = body.includedMembers || [];
+
+    const uploader = await env.DB.prepare("SELECT Name FROM Users WHERE User_ID = ?").bind(body.studentId).first();
+    const uploaderName = uploader ? uploader.Name : "Student";
+
+    let memberNames = [];
+    if (isGroup && includedMembers.length > 0) {
+        const placeholders = includedMembers.map(() => '?').join(',');
+        const mems = await env.DB.prepare(`SELECT Name FROM Users WHERE User_ID IN (${placeholders})`).bind(...includedMembers).all();
+        memberNames = mems.results.map(m => m.Name);
+    }
+
+    let finalDescription = body.description;
+    if (isGroup) {
+        const allGroupText = memberNames.length > 0 ? memberNames.join(', ') : 'None';
+        finalDescription = `${body.description}\n\n[Group Upload by: ${uploaderName}]\n[Included Members: ${allGroupText}]`;
+    }
+
+    const subId = crypto.randomUUID();
+    await env.DB.prepare(
+        `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(subId, body.courseId, body.studentId, body.term, body.title, finalDescription, body.type, fileUrl).run();
+
+    if (isGroup && includedMembers.length > 0) {
+        const statements = [];
+        for (const memberId of includedMembers) {
+            const mSubId = crypto.randomUUID();
+            statements.push(
+                env.DB.prepare(
+                    `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+                ).bind(mSubId, body.courseId, memberId, body.term, body.title, finalDescription, body.type, fileUrl)
+            );
+        }
+        await env.DB.batch(statements);
+    }
+}
+
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
@@ -138,7 +421,7 @@ export default {
         const corsHeaders = {
             "Access-Control-Allow-Origin": allowedOrigin,
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
-            "Access-Control-Allow-Headers": "Content-Type"
+            "Access-Control-Allow-Headers": "Content-Type, X-Submission-Meta, X-Chunk-Meta"
         };
 
         if (request.method === "OPTIONS") {
@@ -367,7 +650,7 @@ export default {
                 }
 
                 const user = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Student_Number, account_status, role, course, year, section, eye_condition
+                    `SELECT User_ID, Username, Name, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition
                      FROM Users WHERE User_ID = ?`
                 ).bind(studentId).first();
 
@@ -541,76 +824,77 @@ export default {
             }
 
             if (request.method === "POST" && path === "/api/upload-submission") {
-                const body = await request.json();
-
-                if (!env.GAS_WEBHOOK_URL) {
-                    return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing." }), { status: 500, headers: corsHeaders });
-                }
-
-                let gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(body),
-                    redirect: 'manual'
-                });
-
-                if (gasResponse.status === 302 || gasResponse.status === 303) {
-                    const redirectUrl = gasResponse.headers.get('Location');
-                    gasResponse = await fetch(redirectUrl);
-                }
-
-                const gasText = await gasResponse.text();
-                let gasData;
                 try {
-                    gasData = JSON.parse(gasText);
-                } catch (parseError) {
-                    return new Response(JSON.stringify({
-                        error: `Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...`
-                    }), { status: 500, headers: corsHeaders });
-                }
+                    const metaHeader = request.headers.get("X-Submission-Meta");
+                    let body, gasData;
 
-                if (!gasData.success) {
-                    return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
-                }
-
-                const isGroup = body.isGroup;
-                const includedMembers = body.includedMembers || [];
-
-                const uploader = await env.DB.prepare("SELECT Name FROM Users WHERE User_ID = ?").bind(body.studentId).first();
-                const uploaderName = uploader ? uploader.Name : "Student";
-
-                let memberNames = [];
-                if (isGroup && includedMembers.length > 0) {
-                    const placeholders = includedMembers.map(() => '?').join(',');
-                    const mems = await env.DB.prepare(`SELECT Name FROM Users WHERE User_ID IN (${placeholders})`).bind(...includedMembers).all();
-                    memberNames = mems.results.map(m => m.Name);
-                }
-
-                let finalDescription = body.description;
-                if (isGroup) {
-                    const allGroupText = memberNames.length > 0 ? memberNames.join(', ') : 'None';
-                    finalDescription = `${body.description}\n\n[Group Upload by: ${uploaderName}]\n[Included Members: ${allGroupText}]`;
-                }
-
-                const subId = crypto.randomUUID();
-                await env.DB.prepare(
-                    `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-                ).bind(subId, body.courseId, body.studentId, body.term, body.title, finalDescription, body.type, gasData.fileUrl).run();
-
-                if (isGroup && includedMembers.length > 0) {
-                    const statements = [];
-                    for (const memberId of includedMembers) {
-                        const mSubId = crypto.randomUUID();
-                        statements.push(
-                            env.DB.prepare(
-                                `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-                            ).bind(mSubId, body.courseId, memberId, body.term, body.title, finalDescription, body.type, gasData.fileUrl)
-                        );
+                    if (metaHeader) {
+                        // New path: metadata in a header, raw base64 file in the body (streamed, never parsed here).
+                        body = JSON.parse(decodeURIComponent(metaHeader));
+                        const gasMeta = JSON.stringify({
+                            filename: body.filename,
+                            mimeType: body.mimeType,
+                            pathParts: body.pathParts || []
+                        });
+                        const prefix = gasMeta.slice(0, -1) + ',"base64":"';
+                        gasData = await streamToGas(env, request, prefix, '"}');
+                    } else {
+                        // Legacy path: whole payload as JSON.
+                        body = await request.json();
+                        gasData = await callGas(env, JSON.stringify(body));
                     }
-                    await env.DB.batch(statements);
-                }
 
-                return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
+                    await recordSubmission(env, body, gasData.fileUrl);
+                    return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
+                } catch (err) {
+                    const msg = err && err.message ? err.message : "Upload failed.";
+                    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: corsHeaders });
+                }
+            }
+
+            // Large files: the browser sends the base64 text in pieces (each piece is streamed to
+            // Google Drive untouched), then asks the Worker to join them and record the submission.
+            if (request.method === "POST" && path === "/api/upload-chunk") {
+                try {
+                    const metaHeader = request.headers.get("X-Chunk-Meta");
+                    if (!metaHeader) {
+                        return new Response(JSON.stringify({ error: "Missing X-Chunk-Meta header." }), { status: 400, headers: corsHeaders });
+                    }
+                    const { uploadId, index, total } = JSON.parse(decodeURIComponent(metaHeader));
+                    if (!/^[A-Za-z0-9-]{8,64}$/.test(String(uploadId || "")) ||
+                        !Number.isInteger(index) || !Number.isInteger(total) ||
+                        total < 1 || total > MAX_UPLOAD_CHUNKS || index < 0 || index >= total) {
+                        return new Response(JSON.stringify({ error: "Invalid chunk details." }), { status: 400, headers: corsHeaders });
+                    }
+                    const prefix = JSON.stringify({ action: "chunk", uploadId, index, total }).slice(0, -1) + ',"data":"';
+                    await streamToGas(env, request, prefix, '"}');
+                    return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+                } catch (err) {
+                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Chunk upload failed." }), { status: 500, headers: corsHeaders });
+                }
+            }
+
+            if (request.method === "POST" && path === "/api/finish-chunked-upload") {
+                try {
+                    const body = await request.json();
+                    const total = body.total;
+                    if (!/^[A-Za-z0-9-]{8,64}$/.test(String(body.uploadId || "")) ||
+                        !Number.isInteger(total) || total < 1 || total > MAX_UPLOAD_CHUNKS) {
+                        return new Response(JSON.stringify({ error: "Invalid upload details." }), { status: 400, headers: corsHeaders });
+                    }
+                    const gasData = await callGas(env, JSON.stringify({
+                        action: "finish",
+                        uploadId: body.uploadId,
+                        total,
+                        filename: body.filename,
+                        mimeType: body.mimeType,
+                        pathParts: body.pathParts || []
+                    }));
+                    await recordSubmission(env, body, gasData.fileUrl);
+                    return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
+                } catch (err) {
+                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Upload failed." }), { status: 500, headers: corsHeaders });
+                }
             }
 
             if (request.method === "POST" && path === "/api/register") {
@@ -710,7 +994,7 @@ export default {
                 const id = body.identifier;
 
                 const user = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, eye_condition
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition
                      FROM Users
                      WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?)
                      AND Password = ?`
@@ -763,7 +1047,7 @@ export default {
 
             if (request.method === "POST" && path === "/api/update-details") {
                 const body = await request.json();
-                const { userId, password, name, username, email, contact, studentNumber } = body;
+                const { userId, password, name, username, email, contact, studentNumber, programCourse, programYear, programSection } = body;
 
                 const studentNoFormat = /^\d{2}-\d{4}$/;
                 if (!studentNoFormat.test(studentNumber)) {
@@ -799,6 +1083,14 @@ export default {
                 await env.DB.prepare(
                     `UPDATE Users SET Name = ?, Username = ?, Email = ?, Contact_Number = ?, Student_Number = ? WHERE User_ID = ?`
                 ).bind(name, username, email, contact, studentNumber, userId).run();
+
+                // Optional: the student's own Program Course / Year / Section
+                if (programCourse !== undefined || programYear !== undefined || programSection !== undefined) {
+                    const cleanProg = (v) => (v === undefined || v === null) ? null : (String(v).trim() || null);
+                    await env.DB.prepare(
+                        `UPDATE Users SET Program_Course = ?, Program_Year = ?, Program_Section = ? WHERE User_ID = ?`
+                    ).bind(cleanProg(programCourse), cleanProg(programYear), cleanProg(programSection), userId).run();
+                }
 
                 return new Response(JSON.stringify({ success: true, message: "Details updated successfully" }), { status: 200, headers: corsHeaders });
             }
@@ -840,7 +1132,7 @@ export default {
 
             if (request.method === "GET" && path === "/api/users") {
                 const users = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, registration_timestamp
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, role, registration_timestamp
                      FROM Users ORDER BY Name ASC`
                 ).all();
                 return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });
@@ -1037,7 +1329,7 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name, e.Assigned_Topic
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name, e.Assigned_Topic
                      FROM Enrollments e
                      JOIN Users u ON e.Student_ID = u.User_ID
                      WHERE e.Course_ID = ?`
@@ -1057,7 +1349,7 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
                 }
 
-                let query = `SELECT User_ID, Student_Number, Name, course, year, section, account_status
+                let query = `SELECT User_ID, Student_Number, Name, course, year, section, Program_Course, Program_Year, Program_Section, account_status
                              FROM Users
                              WHERE role COLLATE NOCASE = 'student'
                              AND User_ID NOT IN (SELECT Student_ID FROM Enrollments WHERE Course_ID = ?)`;
@@ -1099,7 +1391,86 @@ export default {
                     ).bind(body.eyeCondition, body.studentId).run();
                 }
 
+                // Lecturer-assigned Program Course / Year / Section (separate from class course/year/section).
+                // Only touched when at least one field is sent, so older clients keep working.
+                if (body.programCourse !== undefined || body.programYear !== undefined || body.programSection !== undefined) {
+                    const clean = (v) => (v === undefined || v === null) ? null : (String(v).trim() || null);
+                    await env.DB.prepare(
+                        `UPDATE Users SET Program_Course = ?, Program_Year = ?, Program_Section = ? WHERE User_ID = ?`
+                    ).bind(clean(body.programCourse), clean(body.programYear), clean(body.programSection), body.studentId).run();
+                }
+
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            // Lecturer edits a student's profile details. Only the lecturer who owns the course,
+            // and only for a student enrolled in that course.
+            if (request.method === "POST" && path === "/api/update-student-details") {
+                const body = await request.json();
+                const { lecturerId, courseId, studentId } = body;
+
+                if (!lecturerId || !courseId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Missing lecturerId, courseId or studentId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const course = await env.DB.prepare("SELECT Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!course || course.Lecturer_ID !== lecturerId) {
+                    return new Response(JSON.stringify({ error: "You can only edit students of your own classes" }), { status: 403, headers: corsHeaders });
+                }
+
+                const enrolled = await env.DB.prepare("SELECT 1 AS ok FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?").bind(courseId, studentId).first();
+                if (!enrolled) {
+                    return new Response(JSON.stringify({ error: "Student is not enrolled in this class" }), { status: 403, headers: corsHeaders });
+                }
+
+                const clean = (v) => (v === undefined || v === null) ? "" : String(v).trim();
+                const opt = (v) => clean(v) || null;
+                const name = clean(body.name);
+                const studentNumber = clean(body.studentNumber);
+                const email = clean(body.email);
+                const contact = clean(body.contact);
+
+                if (!name) {
+                    return new Response(JSON.stringify({ error: "Name is required" }), { status: 400, headers: corsHeaders });
+                }
+                if (!/^\d{2}-\d{4}$/.test(studentNumber)) {
+                    return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare(
+                    `SELECT Student_Number, Email, Contact_Number FROM Users
+                     WHERE (Student_Number COLLATE NOCASE = ?
+                     OR (? != '' AND Email COLLATE NOCASE = ?)
+                     OR (? != '' AND Contact_Number = ?))
+                     AND User_ID != ?`
+                ).bind(studentNumber, email, email, contact, contact, studentId).first();
+
+                if (existing) {
+                    const conflicts = [];
+                    if (existing.Student_Number && existing.Student_Number.toLowerCase() === studentNumber.toLowerCase()) conflicts.push("Student Number");
+                    if (email && existing.Email && existing.Email.toLowerCase() === email.toLowerCase()) conflicts.push("Email");
+                    if (contact && existing.Contact_Number && existing.Contact_Number === contact) conflicts.push("Contact Number");
+                    return new Response(JSON.stringify({ error: `Already used by another account: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare(
+                    `UPDATE Users SET Name = ?, Student_Number = ?, Email = ?, Contact_Number = ?,
+                            course = ?, year = ?, section = ?,
+                            Program_Course = ?, Program_Year = ?, Program_Section = ?
+                     WHERE User_ID = ?`
+                ).bind(
+                    name, studentNumber, opt(email), opt(contact),
+                    opt(body.course), opt(body.year), opt(body.section),
+                    opt(body.programCourse), opt(body.programYear), opt(body.programSection),
+                    studentId
+                ).run();
+
+                const student = await env.DB.prepare(
+                    `SELECT User_ID, Name, Student_Number, Email, Contact_Number, course, year, section, Program_Course, Program_Year, Program_Section
+                     FROM Users WHERE User_ID = ?`
+                ).bind(studentId).first();
+
+                return new Response(JSON.stringify({ success: true, student }), { status: 200, headers: corsHeaders });
             }
 
             const attendanceDatesResponse = await handleAttendanceDates(request, env, path, url, corsHeaders);
