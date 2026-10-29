@@ -295,6 +295,7 @@ export const CourseClass = {
                                 <th class="center">Seat No.</th>
                                 <th>Student No.</th>
                                 <th>Name</th>
+                                <th>Program</th>
                                 <th>Email Address</th>
                                 <th>Group Name</th>
                                 <th>Assigned Topic</th>
@@ -311,6 +312,7 @@ export const CourseClass = {
                                     <td class="center"><strong>${s.Seat_Number || ''}</strong></td>
                                     <td>${s.Student_Number || ''}</td>
                                     <td><strong>${s.Name}</strong></td>
+                                    <td>${`${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim()}</td>
                                     <td><a href="mailto:${s.Email || ''}" style="color: #000; text-decoration: none;">${s.Email || ''}</a></td>
                                     <td>${s.Group_Name || ''}</td>
                                     <td>${s.Assigned_Topic || ''}</td>
@@ -367,6 +369,7 @@ export const CourseClass = {
 
             const html = data.students.map(s => {
                 const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
+                const displayProgram = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
                 const statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
                     s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' :
                     s.account_status === 'Inactive' ? 'text-gray-500 border-gray-200 bg-gray-50' :
@@ -384,6 +387,7 @@ export const CourseClass = {
                             <div class="text-[11px] text-gray-500 mt-0.5">
                                 <span class="font-bold text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
                             </div>
+                            ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${displayProgram}</div>` : ''}
                         </div>
                         <button type="button" data-student-id="${s.User_ID}" class="lecturer-enroll-btn bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition">
                             Enroll

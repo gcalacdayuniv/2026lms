@@ -307,7 +307,7 @@ export const CourseSummary = {
                             ${avatar}
                             <div>
                                 <div class="font-bold text-gray-800">${esc(s.Name)}</div>
-                                <div class="text-[10px] text-gray-500">${esc(s.Student_Number || 'N/A')}${r.failed ? ' <span class="text-red-500 font-bold">(failed to load records)</span>' : ''}</div>
+                                <div class="text-[10px] text-gray-500">${esc(s.Student_Number || 'N/A')}${(() => { const prog = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim(); return prog ? ' &bull; <span class="text-blue-700 font-medium" title="Program">' + esc(prog) + '</span>' : ''; })()}${r.failed ? ' <span class="text-red-500 font-bold">(failed to load records)</span>' : ''}</div>
                             </div>
                         </div>
                     </td>
@@ -361,7 +361,7 @@ export const CourseSummary = {
         const termLabel = CourseSummary.termLabel(term);
 
         const header = [
-            'Seat No.', 'Student No.', 'Name', 'Email', 'Contact Number', 'Account Status', 'Course/Year/Section', 'Group', 'Assigned Topic',
+            'Seat No.', 'Student No.', 'Name', 'Email', 'Contact Number', 'Account Status', 'Course/Year/Section', 'Program Course/Year/Section', 'Group', 'Assigned Topic',
             'Term', 'Present', 'Late', 'Excused', 'Absent', 'Class Days', 'Attendance %', 'Participation Points',
             'Written Score', 'Written Max', 'Narrative Score', 'Narrative Max', 'Individual Score', 'Individual Max',
             'Report Score', 'Report Max', 'Task Score', 'Task Max', 'Major Exam Score', 'Major Exam Max',
@@ -374,12 +374,13 @@ export const CourseSummary = {
             const s = r.student;
             const st = r.stats;
             const cys = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
+            const prog = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
             const log = st.records.map(rec => `${rec.Date}: ${rec.Status || 'N/A'} (${rec.Performance_Points || 0} pts)`).join('; ');
             const sc = r.scores;
             const blank = (c) => c.count ? [Number(c.score.toFixed(2)), Number(c.max.toFixed(2))] : ['', ''];
             const scoreLog = sc.items.map(a => `${a.Title} [${a.Category}, ${a.Term === 'MidTerm' ? 'Mid' : 'Final'}]: ${Number(a.Score.toFixed(2))}/${Number(a.Max_Score.toFixed(2))}`).join('; ');
             lines.push([
-                s.Seat_Number || '', s.Student_Number || '', s.Name || '', s.Email || '', s.Contact_Number || '', s.account_status || 'Inactive', cys,
+                s.Seat_Number || '', s.Student_Number || '', s.Name || '', s.Email || '', s.Contact_Number || '', s.account_status || 'Inactive', cys, prog,
                 s.Group_Name || '', s.Assigned_Topic || '', termLabel,
                 st.present, st.late, st.excused, st.absent, st.classDays, st.pct, st.points,
                 ...blank(sc.Written), ...blank(sc.Narrative), ...blank(sc.Individual),

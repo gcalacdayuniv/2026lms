@@ -363,6 +363,11 @@ export const CourseDashboard = {
             CourseExam.studentAssignedExams = assignedExams;
             if (examsRes.student) {
                 AppState.user.eye_condition = examsRes.student.eye_condition;
+                AppState.user.Program_Course = examsRes.student.Program_Course;
+                AppState.user.Program_Year = examsRes.student.Program_Year;
+                AppState.user.Program_Section = examsRes.student.Program_Section;
+                const progEl = document.getElementById('profileProgramText');
+                if (progEl) progEl.textContent = [examsRes.student.Program_Course, examsRes.student.Program_Year, examsRes.student.Program_Section].filter(Boolean).join(' ') || 'Not assigned';
             }
 
             const isBlind = AppState.user.eye_condition === 'Legally Blind';

@@ -299,7 +299,7 @@ const ClassUI = {
     renderManageStudentModal: () => `
         <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeManageStudentModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[92vh] overflow-y-auto">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 sheet-panel max-h-[92vh] overflow-y-auto">
                 <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-gear text-blue-600 mr-2"></i>Manage Student</h3>
@@ -327,6 +327,24 @@ const ClassUI = {
                     </div>
 
                     <div>
+                        <div class="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1"><i class="fa-solid fa-graduation-cap mr-1"></i>Program (assigned by lecturer)</div>
+                        <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Course</label>
+                            <input type="text" id="manageProgramCourseInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="e.g. BSCS">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Year</label>
+                            <input type="text" id="manageProgramYearInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="e.g. 2">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Section</label>
+                            <input type="text" id="manageProgramSectionInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="e.g. A">
+                        </div>
+                        </div>
+                    </div>
+
+                    <div>
                         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Eye Condition / Disability Tag</label>
                         <select id="manageEyeConditionSelect" class="w-full px-3 py-2 text-sm border border-gray-300 rounded outline-none font-bold bg-gray-50 cursor-pointer transition focus:ring-2 focus:ring-blue-500">
                             <option value="No Eye Condition">No Eye Condition</option>
@@ -346,6 +364,47 @@ const ClassUI = {
                             <option value="Dropped">Dropped</option>
                         </select>
                     </div>
+
+                    <details class="border border-gray-200 rounded-lg p-3 bg-gray-50/50" id="manageDetailsBox">
+                        <summary class="text-xs font-bold text-gray-700 cursor-pointer select-none"><i class="fa-solid fa-id-card text-blue-600 mr-1"></i>Edit Student Details</summary>
+                        <div class="space-y-3 mt-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Full Name</label>
+                            <input type="text" id="manageNameInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Student Number</label>
+                            <input type="text" id="manageStudentNumberInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="00-0000">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Email</label>
+                            <input type="text" id="manageEmailInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Contact Number</label>
+                            <input type="text" id="manageContactInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
+                        </div>
+
+                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Class Course / Year / Section</div>
+                            <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Course</label>
+                            <input type="text" id="manageClassCourseInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Year</label>
+                            <input type="text" id="manageClassYearInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Section</label>
+                            <input type="text" id="manageClassSectionInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
+                        </div>
+                            </div>
+                            <button type="button" id="manageSaveDetailsBtn" class="w-full py-2 bg-blue-600 text-white hover:bg-blue-700 rounded text-sm font-bold transition focus:outline-none">
+                                <i class="fa-solid fa-floppy-disk mr-2"></i> Save Details
+                            </button>
+                        </div>
+                    </details>
 
                     <div class="border-t border-gray-200 pt-4 mt-4 flex flex-col space-y-2">
                         <button type="button" id="manageResetPwdBtn" class="w-full py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded text-sm font-bold border border-red-200 transition focus:outline-none">
@@ -668,6 +727,7 @@ export const ClassComponents = {
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
+            const displayProgram = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
 
             const avatarImg = avatarSrc
                 ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" alt="${s.Name}">`
@@ -698,6 +758,7 @@ export const ClassComponents = {
                                 <div class="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
                                     <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
                                 </div>
+                                ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${displayProgram}</div>` : ''}
                                 <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
                                     Seat: <span class="text-gray-800">${s.Seat_Number || ''}</span>
                                     &nbsp;|&nbsp; Group: ${groupDisplay}

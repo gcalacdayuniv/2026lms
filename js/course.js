@@ -118,6 +118,9 @@ export const CourseModule = {
             e.target.id === 'manageSeatInput' ||
             e.target.id === 'manageGroupInput' ||
             e.target.id === 'manageTopicInput' ||
+            e.target.id === 'manageProgramCourseInput' ||
+            e.target.id === 'manageProgramYearInput' ||
+            e.target.id === 'manageProgramSectionInput' ||
             e.target.id === 'manageEyeConditionSelect'
         ) {
             const studentId = document.getElementById('manageStudentId').value;
@@ -126,11 +129,14 @@ export const CourseModule = {
             const assignedTopic = document.getElementById('manageTopicInput').value.trim();
             const eyeCondition = document.getElementById('manageEyeConditionSelect')?.value || 'No Eye Condition';
             const courseId = window.location.hash.replace('#class-', '');
+            const programCourse = document.getElementById('manageProgramCourseInput')?.value.trim() || '';
+            const programYear = document.getElementById('manageProgramYearInput')?.value.trim() || '';
+            const programSection = document.getElementById('manageProgramSectionInput')?.value.trim() || '';
 
             try {
                 await apiFetch('/api/update-student-info', {
                     method: 'POST',
-                    body: JSON.stringify({ courseId, studentId, seatNumber, groupName, assignedTopic, eyeCondition })
+                    body: JSON.stringify({ courseId, studentId, seatNumber, groupName, assignedTopic, eyeCondition, programCourse, programYear, programSection })
                 });
                 const stu = CourseClass.currentStudents.find(s => s.User_ID === studentId);
                 if (stu) {
@@ -138,6 +144,9 @@ export const CourseModule = {
                     stu.Group_Name = groupName;
                     stu.Assigned_Topic = assignedTopic;
                     stu.eye_condition = eyeCondition;
+                    stu.Program_Course = programCourse || null;
+                    stu.Program_Year = programYear || null;
+                    stu.Program_Section = programSection || null;
                 }
             } catch (err) {
                 console.error('Failed to update student info:', err);
@@ -470,12 +479,75 @@ export const CourseModule = {
                 eyeConditionSelect.value = btn.dataset.eye || 'No Eye Condition';
             }
 
+            const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+            const stuData = (CourseClass.currentStudents || []).find(x => x.User_ID === btn.dataset.studentId) || {};
+            setVal('manageProgramCourseInput', stuData.Program_Course);
+            setVal('manageProgramYearInput', stuData.Program_Year);
+            setVal('manageProgramSectionInput', stuData.Program_Section);
+            setVal('manageNameInput', stuData.Name);
+            setVal('manageStudentNumberInput', stuData.Student_Number);
+            setVal('manageEmailInput', stuData.Email);
+            setVal('manageContactInput', stuData.Contact_Number);
+            setVal('manageClassCourseInput', stuData.course);
+            setVal('manageClassYearInput', stuData.year);
+            setVal('manageClassSectionInput', stuData.section);
+            const detailsBox = document.getElementById('manageDetailsBox');
+            if (detailsBox) detailsBox.open = false;
+
             const statusSelect = document.getElementById('manageStatusSelect');
             statusSelect.value = btn.dataset.status || 'Inactive';
             CourseClass.updateManageStatusColor(statusSelect);
 
             document.getElementById('courseMenuModal')?.classList.add('hidden');
             document.getElementById('manageStudentModal').classList.remove('hidden');
+        }
+
+        if (e.target.closest('#manageSaveDetailsBtn')) {
+            const saveBtn = e.target.closest('#manageSaveDetailsBtn');
+            const val = (id) => document.getElementById(id)?.value.trim() || '';
+            const studentId = document.getElementById('manageStudentId').value;
+            const courseId = window.location.hash.replace('#class-', '');
+            const payload = {
+                lecturerId: AppState.user?.User_ID,
+                courseId,
+                studentId,
+                name: val('manageNameInput'),
+                studentNumber: val('manageStudentNumberInput'),
+                email: val('manageEmailInput'),
+                contact: val('manageContactInput'),
+                course: val('manageClassCourseInput'),
+                year: val('manageClassYearInput'),
+                section: val('manageClassSectionInput'),
+                programCourse: val('manageProgramCourseInput'),
+                programYear: val('manageProgramYearInput'),
+                programSection: val('manageProgramSectionInput')
+            };
+            const originalHtml = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
+            try {
+                const res = await apiFetch('/api/update-student-details', { method: 'POST', body: JSON.stringify(payload) });
+                const stu = (CourseClass.currentStudents || []).find(x => x.User_ID === studentId);
+                if (stu && res.student) {
+                    stu.Name = res.student.Name;
+                    stu.Student_Number = res.student.Student_Number;
+                    stu.Email = res.student.Email;
+                    stu.Contact_Number = res.student.Contact_Number;
+                    stu.course = res.student.course;
+                    stu.year = res.student.year;
+                    stu.section = res.student.section;
+                    stu.Program_Course = res.student.Program_Course;
+                    stu.Program_Year = res.student.Program_Year;
+                    stu.Program_Section = res.student.Program_Section;
+                }
+                document.getElementById('manageStudentName').textContent = payload.name;
+                UI.success('Student details updated.');
+            } catch (err) {
+                UI.error(err.message || 'Failed to update student details.');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalHtml;
+            }
         }
 
         if (e.target.closest('#closeManageStudentModalBtn') || e.target.id === 'closeManageStudentModalBg') {

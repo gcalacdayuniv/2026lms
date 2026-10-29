@@ -138,6 +138,12 @@ export const AuthModule = {
                 studentNumber: document.getElementById('udStudentNumber').value.trim()
             };
 
+            if (document.getElementById('udProgramCourse')) {
+                payload.programCourse = document.getElementById('udProgramCourse').value.trim();
+                payload.programYear = document.getElementById('udProgramYear').value.trim();
+                payload.programSection = document.getElementById('udProgramSection').value.trim();
+            }
+
             try {
                 await apiFetch('/api/update-details', {
                     method: 'POST',
@@ -149,6 +155,13 @@ export const AuthModule = {
                 AppState.user.Email = payload.email;
                 AppState.user.Contact_Number = payload.contact;
                 AppState.user.Student_Number = payload.studentNumber;
+                if (payload.programCourse !== undefined) {
+                    AppState.user.Program_Course = payload.programCourse || null;
+                    AppState.user.Program_Year = payload.programYear || null;
+                    AppState.user.Program_Section = payload.programSection || null;
+                    const progEl = document.getElementById('profileProgramText');
+                    if (progEl) progEl.textContent = [payload.programCourse, payload.programYear, payload.programSection].filter(Boolean).join(' ') || 'Not assigned';
+                }
                 
                 localStorage.setItem('user', JSON.stringify(AppState.user));
                 localStorage.setItem('portal_user', JSON.stringify(AppState.user));
@@ -525,6 +538,7 @@ export const AuthModule = {
                         </div>
                         
                         <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${u.course || 'N/A'} ${u.year || ''} ${u.section || ''}</div>
+                        ${(u.Program_Course || u.Program_Year || u.Program_Section) ? `<div class="text-[10px] sm:text-[11px] text-blue-700 mt-1 truncate"><i class="fa-solid fa-book-open mr-1.5"></i>Program: ${u.Program_Course || ''} ${u.Program_Year || ''} ${u.Program_Section || ''}</div>` : ''}
                         <div class="text-[9px] sm:text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-wider"><i class="fa-regular fa-clock mr-1"></i>Reg: ${regDate}</div>
                     </div>
                 </div>

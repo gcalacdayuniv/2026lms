@@ -120,6 +120,11 @@ const DashboardUI = {
                         </div>
                     </div>
 
+                    <div id="profileProgramRow" class="${(user.role || '').toLowerCase() === 'student' ? '' : 'hidden'} border-b border-gray-200 pb-4 text-center">
+                        <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Program</span>
+                        <span id="profileProgramText" class="block text-xs sm:text-sm font-medium text-blue-700">${[user.Program_Course, user.Program_Year, user.Program_Section].filter(Boolean).join(' ') || 'Not assigned'}</span>
+                    </div>
+
                     <div class="flex flex-col sm:flex-row justify-between items-start space-y-2 sm:space-y-0">
                         <div class="flex-1 pr-2 w-full">
                             <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Email || 'N/A'}</span>
@@ -286,6 +291,26 @@ const DashboardUI = {
                                 <input type="text" id="udStudentNumber" required value="${user.Student_Number || ''}" maxlength="7" placeholder="00-0000" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
                             </div>
                         </div>
+
+                        ${(user.role || '').toLowerCase() === 'student' ? `
+                        <div>
+                            <div class="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2"><i class="fa-solid fa-graduation-cap mr-1"></i>Program</div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Course</label>
+                                <input type="text" id="udProgramCourse" value="${user.Program_Course || ''}" placeholder="e.g. BSCS" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Year</label>
+                                <input type="text" id="udProgramYear" value="${user.Program_Year || ''}" placeholder="e.g. 2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Section</label>
+                                <input type="text" id="udProgramSection" value="${user.Program_Section || ''}" placeholder="e.g. A" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                            </div>
+                            </div>
+                        </div>
+                        ` : ''}
 
                         <div class="border-t border-gray-200 mt-4 pt-4">
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Verify Password</label>
