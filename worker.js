@@ -1,0 +1,1901 @@
+// worker/worker.js
+import {
+    MAX_SINGLE_BODY_BYTES,
+    MAX_CHUNK_BODY_BYTES,
+    UploadError,
+    checkContentLength,
+    validateMeta,
+    verifyUploader,
+    validateChunkMeta
+} from './upload-guard.js';
+
+// ---------- Attendance date management and timezone-aware dates ----------
+// Attendance date management: list, change, delete and merge dates that have records.
+// Also exports a timezone-aware "today" helper so the server never falls back to UTC.
+
+const DEFAULT_TIMEZONE = 'Asia/Manila';
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Status priority when merging two records for the same student (higher wins).
+const STATUS_PRIORITY = { Absent: 4, Late: 3, Excused: 2, Present: 1 };
+
+// Returns YYYY-MM-DD for "today" in the visitor's timezone (Cloudflare supplies it),
+// falling back to Asia/Manila. Never uses the UTC date.
+function getRequestDate(request) {
+    const requested = request && request.cf && request.cf.timezone;
+    const zones = [requested, DEFAULT_TIMEZONE];
+    for (const timeZone of zones) {
+        if (!timeZone) continue;
+        try {
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone, year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(new Date());
+        } catch (e) {
+            // Invalid timezone name: try the next one.
+        }
+    }
+    return new Date().toISOString().split('T')[0];
+}
+
+const json = (corsHeaders, body, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: corsHeaders });
+
+const pickStatus = (a, b) =>
+    (STATUS_PRIORITY[a] || 0) >= (STATUS_PRIORITY[b] || 0) ? a : b;
+
+const insertStmt = (env, courseId, studentId, date, status, points) =>
+    env.DB.prepare(
+        "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(crypto.randomUUID(), courseId, studentId, date, status, points);
+
+// Returns a Response when the request is handled here, otherwise null.
+async function handleAttendanceDates(request, env, path, url, corsHeaders) {
+    if (!path.startsWith('/api/attendance-dates')) return null;
+    const method = request.method;
+
+    // List every date that has records for a course.
+    if (method === 'GET' && path === '/api/attendance-dates') {
+        const courseId = url.searchParams.get('courseId');
+        if (!courseId) return json(corsHeaders, { error: 'Missing courseId' }, 400);
+
+        const rows = await env.DB.prepare(
+            `SELECT Date,
+                    COUNT(*) AS Total,
+                    SUM(CASE WHEN Status = 'Present' THEN 1 ELSE 0 END) AS Present,
+                    SUM(CASE WHEN Status = 'Late' THEN 1 ELSE 0 END) AS Late,
+                    SUM(CASE WHEN Status = 'Excused' THEN 1 ELSE 0 END) AS Excused,
+                    SUM(CASE WHEN Status = 'Absent' THEN 1 ELSE 0 END) AS Absent,
+                    SUM(COALESCE(Performance_Points, 0)) AS Points
+             FROM Attendance WHERE Course_ID = ?
+             GROUP BY Date ORDER BY Date DESC`
+        ).bind(courseId).all();
+
+        const noClass = await env.DB.prepare(
+            "SELECT Date FROM Course_Sessions WHERE Course_ID = ? AND Is_No_Class = 1"
+        ).bind(courseId).all();
+        const noClassDates = new Set((noClass.results || []).map(r => r.Date));
+
+        const dates = (rows.results || []).map(r => ({ ...r, Is_No_Class: noClassDates.has(r.Date) }));
+        return json(corsHeaders, { success: true, dates });
+    }
+
+    // Change the date of all records on a date.
+    if (method === 'POST' && path === '/api/attendance-dates/change') {
+        const { courseId, oldDate, newDate } = await request.json();
+        if (!courseId || !DATE_RE.test(oldDate || '') || !DATE_RE.test(newDate || '')) {
+            return json(corsHeaders, { error: 'Invalid parameters' }, 400);
+        }
+        if (oldDate === newDate) return json(corsHeaders, { success: true, unchanged: true });
+
+        const source = await env.DB.prepare(
+            "SELECT COUNT(*) AS c FROM Attendance WHERE Course_ID = ? AND Date = ?"
+        ).bind(courseId, oldDate).first();
+        if (!source || !source.c) return json(corsHeaders, { error: 'No records found on that date.' }, 404);
+
+        const target = await env.DB.prepare(
+            "SELECT COUNT(*) AS c FROM Attendance WHERE Course_ID = ? AND Date = ?"
+        ).bind(courseId, newDate).first();
+        if (target && target.c > 0) {
+            return json(corsHeaders, {
+                error: 'The new date already has records. Use Merge instead.',
+                code: 'DATE_HAS_RECORDS'
+            }, 409);
+        }
+
+        const noClass = await env.DB.prepare(
+            "SELECT Session_ID FROM Course_Sessions WHERE Course_ID = ? AND Date = ? AND Is_No_Class = 1"
+        ).bind(courseId, newDate).first();
+        if (noClass) {
+            return json(corsHeaders, { error: 'The new date is marked as No Class.', code: 'NO_CLASS_DATE' }, 409);
+        }
+
+        await env.DB.prepare(
+            "UPDATE Attendance SET Date = ? WHERE Course_ID = ? AND Date = ?"
+        ).bind(newDate, courseId, oldDate).run();
+
+        return json(corsHeaders, { success: true });
+    }
+
+    // Delete all records on a date.
+    if (method === 'DELETE' && path === '/api/attendance-dates') {
+        const { courseId, date } = await request.json();
+        if (!courseId || !DATE_RE.test(date || '')) {
+            return json(corsHeaders, { error: 'Invalid parameters' }, 400);
+        }
+        await env.DB.prepare(
+            "DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?"
+        ).bind(courseId, date).run();
+        return json(corsHeaders, { success: true });
+    }
+
+    // Merge two dates into one. Points are added; status priority is Absent > Late > Excused > Present.
+    if (method === 'POST' && path === '/api/attendance-dates/merge') {
+        const { courseId, dateA, dateB, keepDate } = await request.json();
+        if (!courseId || !DATE_RE.test(dateA || '') || !DATE_RE.test(dateB || '') || dateA === dateB) {
+            return json(corsHeaders, { error: 'Two different dates are required.' }, 400);
+        }
+        if (keepDate !== dateA && keepDate !== dateB) {
+            return json(corsHeaders, { error: 'keepDate must be one of the two dates.' }, 400);
+        }
+
+        const rows = await env.DB.prepare(
+            `SELECT Student_ID, Date, Status, Performance_Points
+             FROM Attendance WHERE Course_ID = ? AND Date IN (?, ?)`
+        ).bind(courseId, dateA, dateB).all();
+
+        const merged = new Map();
+        for (const r of (rows.results || [])) {
+            const points = parseInt(r.Performance_Points, 10) || 0;
+            const existing = merged.get(r.Student_ID);
+            if (!existing) {
+                merged.set(r.Student_ID, { status: r.Status, points });
+            } else {
+                existing.status = pickStatus(existing.status, r.Status);
+                existing.points += points;
+            }
+        }
+        if (merged.size === 0) return json(corsHeaders, { error: 'No records to merge.' }, 404);
+
+        const statements = [
+            env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date IN (?, ?)")
+                .bind(courseId, dateA, dateB)
+        ];
+        for (const [studentId, v] of merged) {
+            statements.push(insertStmt(env, courseId, studentId, keepDate, v.status, v.points));
+        }
+        await env.DB.batch(statements);
+
+        return json(corsHeaders, { success: true, merged: merged.size, keepDate });
+    }
+
+    return null;
+}
+// ---------- End attendance date management ----------
+
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const ASSESSMENT_TERMS = ['MidTerm', 'FinalTerm'];
+const ASSESSMENT_CATEGORIES = ['Written', 'Narrative', 'Individual', 'Performance', 'Report', 'MajorExam'];
+
+async function ensureAccessibleExamTables(env) {
+    await env.DB.batch([
+        env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS Class_Exams (
+                Class_Exam_ID TEXT PRIMARY KEY,
+                Course_ID TEXT NOT NULL,
+                Exam_ID TEXT NOT NULL,
+                Assessment_ID TEXT NOT NULL,
+                Term TEXT DEFAULT 'MidTerm',
+                Category TEXT DEFAULT 'MajorExam',
+                Is_Active INTEGER DEFAULT 1,
+                From_Date TEXT,
+                To_Date TEXT,
+                Created_At DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `),
+        env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS Exam_Assignments (
+                Assignment_ID TEXT PRIMARY KEY,
+                Class_Exam_ID TEXT NOT NULL,
+                Student_ID TEXT NOT NULL,
+                Is_Enabled INTEGER DEFAULT 1,
+                Status TEXT DEFAULT 'Pending',
+                Raw_Score REAL,
+                Bonus_Score REAL,
+                Final_Score REAL,
+                Max_Score REAL,
+                Answers_JSON TEXT,
+                Submitted_At DATETIME
+            )
+        `)
+    ]);
+}
+
+function isWithinScheduleWindow(fromDate, toDate) {
+    const now = new Date();
+    if (fromDate) {
+        const start = new Date(fromDate.length === 10 ? `${fromDate}T00:00:00` : fromDate);
+        if (!isNaN(start.getTime()) && now < start) return false;
+    }
+    if (toDate) {
+        const end = new Date(toDate.length === 10 ? `${toDate}T23:59:59` : toDate);
+        if (!isNaN(end.getTime()) && now > end) return false;
+    }
+    return true;
+}
+
+async function getStudentAccessibleExamsList(env, studentId) {
+    await ensureAccessibleExamTables(env);
+
+    const rows = await env.DB.prepare(
+        `SELECT ea.Assignment_ID, ea.Class_Exam_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score as Recorded_Max,
+                ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date,
+                e.Title as Exam_Title, e.ExamData,
+                c.CourseCode, c.CourseTitle
+         FROM Exam_Assignments ea
+         JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
+         JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+         JOIN Courses c ON ce.Course_ID = c.Course_ID
+         WHERE ea.Student_ID = ? AND ea.Is_Enabled = 1 AND ce.Is_Active = 1
+         ORDER BY ce.Created_At DESC`
+    ).bind(studentId).all();
+
+    const availableExams = [];
+
+    for (const r of (rows.results || [])) {
+        if (!isWithinScheduleWindow(r.From_Date, r.To_Date)) {
+            continue;
+        }
+
+        let parsed = [];
+        try {
+            parsed = JSON.parse(r.ExamData || "[]");
+        } catch (e) {
+            parsed = [];
+        }
+
+        const questions = parsed.map((q, idx) => ({
+            index: idx,
+            part: q[0],
+            question: q[1],
+            choices: Array.isArray(q[2]) ? q[2] : [],
+            isBonus: Boolean(q[5])
+        }));
+
+        const regularCount = questions.filter(q => !q.isBonus).length;
+        const bonusCount = questions.filter(q => q.isBonus).length;
+
+        availableExams.push({
+            assignmentId: r.Assignment_ID,
+            classExamId: r.Class_Exam_ID,
+            examId: r.Exam_ID,
+            courseId: r.Course_ID,
+            courseCode: r.CourseCode,
+            courseTitle: r.CourseTitle,
+            examTitle: r.Exam_Title,
+            term: r.Term,
+            category: r.Category,
+            fromDate: r.From_Date,
+            toDate: r.To_Date,
+            status: r.Status,
+            finalScore: r.Final_Score,
+            maxScore: r.Recorded_Max || (regularCount > 0 ? regularCount : questions.length),
+            regularCount,
+            bonusCount,
+            questions
+        });
+    }
+
+    return availableExams;
+}
+
+const MAX_UPLOAD_CHUNKS = 10; // keep in sync with gas/Code.gs
+const MAX_LEGACY_JSON_BYTES = 8 * 1024 * 1024; // old whole-JSON upload path (small files only)
+
+// ---- Submission upload helpers -------------------------------------------------
+// Sends a body to the Google Apps Script web app and returns its parsed JSON answer.
+// Throws an Error with a user-readable message on failure.
+async function callGas(env, body) {
+    if (!env.GAS_WEBHOOK_URL) {
+        throw new Error("Server Configuration Error: GAS_WEBHOOK_URL is missing.");
+    }
+
+    let gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body,
+        redirect: 'manual'
+    });
+
+    if (gasResponse.status === 302 || gasResponse.status === 303) {
+        const redirectUrl = gasResponse.headers.get('Location');
+        gasResponse = await fetch(redirectUrl);
+    }
+
+    const gasText = await gasResponse.text();
+    let gasData;
+    try {
+        gasData = JSON.parse(gasText);
+    } catch (parseError) {
+        throw new Error(`Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...`);
+    }
+
+    if (!gasData.success) {
+        throw new Error("Google Drive Error: " + gasData.error);
+    }
+    return gasData;
+}
+
+// Streams  prefix + <client request body, untouched> + suffix  to Google Apps Script.
+// The (large) base64 body is never decoded or parsed in the Worker, which keeps CPU
+// and memory use tiny and fits the free plan.
+async function streamToGas(env, request, prefix, suffix, maxBytes) {
+    if (!request.body) {
+        throw new Error("Upload body is missing.");
+    }
+
+    // Browsers send Content-Length, so the body can be piped straight through.
+    // If it is missing, fall back to buffering the bytes (still no decoding/parsing).
+    let contentLength = parseInt(request.headers.get('Content-Length') || '', 10);
+    let buffered = null;
+    if (!Number.isFinite(contentLength) || contentLength <= 0) {
+        buffered = new Uint8Array(await request.arrayBuffer());
+        contentLength = buffered.byteLength;
+    }
+    if (contentLength <= 0) {
+        throw new Error("Upload body is empty.");
+    }
+    if (maxBytes && contentLength > maxBytes) {
+        throw new UploadError(`File is too large. Maximum upload is ${Math.round(maxBytes / (1024 * 1024))} MB per request.`, 413);
+    }
+
+    const encoder = new TextEncoder();
+    const pre = encoder.encode(prefix);
+    const suf = encoder.encode(suffix);
+
+    const { readable, writable } = new FixedLengthStream(pre.length + contentLength + suf.length);
+    const writer = writable.getWriter();
+    const pump = (async () => {
+        await writer.write(pre);
+        if (buffered) {
+            await writer.write(buffered);
+        } else {
+            const reader = request.body.getReader();
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                await writer.write(value);
+            }
+        }
+        await writer.write(suf);
+        await writer.close();
+    })();
+    pump.catch(() => {});
+
+    return callGas(env, readable);
+}
+
+// Saves the Submissions row(s) after the file reached Drive.
+async function recordSubmission(env, body, fileUrl) {
+    const isGroup = body.isGroup;
+    const includedMembers = body.includedMembers || [];
+
+    const uploader = await env.DB.prepare("SELECT Name FROM Users WHERE User_ID = ?").bind(body.studentId).first();
+    const uploaderName = uploader ? uploader.Name : "Student";
+
+    let memberNames = [];
+    if (isGroup && includedMembers.length > 0) {
+        const placeholders = includedMembers.map(() => '?').join(',');
+        const mems = await env.DB.prepare(`SELECT Name FROM Users WHERE User_ID IN (${placeholders})`).bind(...includedMembers).all();
+        memberNames = mems.results.map(m => m.Name);
+    }
+
+    let finalDescription = body.description;
+    if (isGroup) {
+        const allGroupText = memberNames.length > 0 ? memberNames.join(', ') : 'None';
+        finalDescription = `${body.description}\n\n[Group Upload by: ${uploaderName}]\n[Included Members: ${allGroupText}]`;
+    }
+
+    const subId = crypto.randomUUID();
+    await env.DB.prepare(
+        `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(subId, body.courseId, body.studentId, body.term, body.title, finalDescription, body.type, fileUrl).run();
+
+    if (isGroup && includedMembers.length > 0) {
+        const statements = [];
+        for (const memberId of includedMembers) {
+            const mSubId = crypto.randomUUID();
+            statements.push(
+                env.DB.prepare(
+                    `INSERT INTO Submissions (Submission_ID, Course_ID, Student_ID, Term, Title, Description, Type, File_URL, Timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+                ).bind(mSubId, body.courseId, memberId, body.term, body.title, finalDescription, body.type, fileUrl)
+            );
+        }
+        await env.DB.batch(statements);
+    }
+}
+
+// Origins allowed to call this API. ALLOWED_ORIGIN may hold several origins separated by commas.
+// Never falls back to "*": an unknown origin simply receives the primary allowed origin,
+// which the browser then rejects.
+function resolveAllowedOrigin(env, requestOrigin) {
+    const configured = String(env.ALLOWED_ORIGIN || '')
+        .split(',')
+        .map(o => o.trim())
+        .filter(Boolean);
+    const list = [...configured, "https://plv.workers.dev", "https://www.plv.workers.dev"];
+    if (requestOrigin && list.includes(requestOrigin)) return requestOrigin;
+    return list[0];
+}
+
+export default {
+    async fetch(request, env, ctx) {
+        const url = new URL(request.url);
+        const path = url.pathname.replace(/\/$/, '');
+        const requestOrigin = request.headers.get("Origin");
+
+        const allowedOrigin = resolveAllowedOrigin(env, requestOrigin);
+
+        const corsHeaders = {
+            "Access-Control-Allow-Origin": allowedOrigin,
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+            "Access-Control-Allow-Headers": "Content-Type, X-Submission-Meta, X-Chunk-Meta",
+            "Access-Control-Max-Age": "86400",
+            "Vary": "Origin"
+        };
+
+        if (request.method === "OPTIONS") {
+            return new Response(null, { headers: corsHeaders });
+        }
+
+        try {
+            if (request.method === "GET" && path === "/api/exams") {
+                const lecturerId = url.searchParams.get("lecturerId");
+                const exams = await env.DB.prepare("SELECT Exam_ID, Title, ExamData, Created_At FROM Exams WHERE Lecturer_ID = ? ORDER BY Created_At DESC").bind(lecturerId).all();
+                return new Response(JSON.stringify({ success: true, exams: exams.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/exam-data") {
+                const examId = url.searchParams.get("examId");
+                const exam = await env.DB.prepare("SELECT * FROM Exams WHERE Exam_ID = ?").bind(examId).first();
+                return new Response(JSON.stringify({ success: true, exam }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/exams") {
+                const body = await request.json();
+                const id = crypto.randomUUID();
+                await env.DB.prepare("INSERT INTO Exams (Exam_ID, Lecturer_ID, Title, ExamData) VALUES (?, ?, ?, ?)").bind(id, body.lecturerId, body.title, JSON.stringify(body.examData)).run();
+                return new Response(JSON.stringify({ success: true, examId: id }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/exams/update") {
+                const body = await request.json();
+                const { examId, title, examData } = body;
+                if (!examId || !Array.isArray(examData)) {
+                    return new Response(JSON.stringify({ error: "Missing examId or examData." }), { status: 400, headers: corsHeaders });
+                }
+
+                if (title && String(title).trim()) {
+                    await env.DB.prepare("UPDATE Exams SET Title = ?, ExamData = ? WHERE Exam_ID = ?")
+                        .bind(String(title).trim(), JSON.stringify(examData), examId).run();
+                } else {
+                    await env.DB.prepare("UPDATE Exams SET ExamData = ? WHERE Exam_ID = ?")
+                        .bind(JSON.stringify(examData), examId).run();
+                }
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/class-exams") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                await ensureAccessibleExamTables(env);
+
+                const classExams = await env.DB.prepare(
+                    `SELECT ce.*, e.Title as ExamTitle, a.Title as AssessmentTitle, a.Max_Score
+                     FROM Class_Exams ce
+                     JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+                     LEFT JOIN Assessments a ON ce.Assessment_ID = a.Assessment_ID
+                     WHERE ce.Course_ID = ?`
+                ).bind(courseId).all();
+
+                const assignments = await env.DB.prepare(
+                    `SELECT ea.*
+                     FROM Exam_Assignments ea
+                     JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
+                     WHERE ce.Course_ID = ?`
+                ).bind(courseId).all();
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    classExams: classExams.results,
+                    assignments: assignments.results
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/class-exams") {
+                const body = await request.json();
+                const {
+                    courseId,
+                    examId,
+                    term,
+                    category,
+                    isActive,
+                    fromDate,
+                    toDate,
+                    assignments
+                } = body;
+
+                if (!courseId || !examId) {
+                    return new Response(JSON.stringify({ error: "Course and Exam are required." }), { status: 400, headers: corsHeaders });
+                }
+
+                await ensureAccessibleExamTables(env);
+
+                const exam = await env.DB.prepare("SELECT * FROM Exams WHERE Exam_ID = ?").bind(examId).first();
+                if (!exam) {
+                    return new Response(JSON.stringify({ error: "Exam not found." }), { status: 404, headers: corsHeaders });
+                }
+
+                let parsedQuestions = [];
+                try {
+                    parsedQuestions = JSON.parse(exam.ExamData || "[]");
+                } catch (e) {
+                    parsedQuestions = [];
+                }
+
+                const regularCount = parsedQuestions.filter(q => !q[5]).length;
+                const defaultMaxScore = regularCount > 0 ? regularCount : Math.max(1, parsedQuestions.length);
+                const selectedTerm = ASSESSMENT_TERMS.includes(term) ? term : 'MidTerm';
+                const selectedCategory = ASSESSMENT_CATEGORIES.includes(category) ? category : 'MajorExam';
+                const today = getRequestDate(request);
+
+                let existingClassExam = await env.DB.prepare(
+                    "SELECT * FROM Class_Exams WHERE Course_ID = ? AND Exam_ID = ?"
+                ).bind(courseId, examId).first();
+
+                let assessmentId = existingClassExam ? existingClassExam.Assessment_ID : null;
+                let existingAssessment = null;
+
+                if (assessmentId) {
+                    existingAssessment = await env.DB.prepare(
+                        "SELECT * FROM Assessments WHERE Assessment_ID = ? AND Course_ID = ?"
+                    ).bind(assessmentId, courseId).first();
+                }
+
+                if (!existingAssessment) {
+                    existingAssessment = await env.DB.prepare(
+                        "SELECT * FROM Assessments WHERE Course_ID = ? AND Title COLLATE NOCASE = ? AND Term = ?"
+                    ).bind(courseId, exam.Title.trim(), selectedTerm).first();
+                }
+
+                if (!existingAssessment) {
+                    assessmentId = crypto.randomUUID();
+                    await env.DB.prepare(
+                        `INSERT INTO Assessments (Assessment_ID, Course_ID, Term, Category, Title, Max_Score, Date)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`
+                    ).bind(assessmentId, courseId, selectedTerm, selectedCategory, exam.Title.trim(), defaultMaxScore, today).run();
+                } else {
+                    assessmentId = existingAssessment.Assessment_ID;
+                    await env.DB.prepare(
+                        `UPDATE Assessments SET Term = ?, Category = ?, Title = ?, Max_Score = ? WHERE Assessment_ID = ?`
+                    ).bind(selectedTerm, selectedCategory, exam.Title.trim(), defaultMaxScore, assessmentId).run();
+                }
+
+                let classExamId = existingClassExam ? existingClassExam.Class_Exam_ID : crypto.randomUUID();
+                const activeFlag = isActive ? 1 : 0;
+
+                if (existingClassExam) {
+                    await env.DB.prepare(
+                        `UPDATE Class_Exams
+                         SET Assessment_ID = ?, Term = ?, Category = ?, Is_Active = ?, From_Date = ?, To_Date = ?
+                         WHERE Class_Exam_ID = ?`
+                    ).bind(assessmentId, selectedTerm, selectedCategory, activeFlag, fromDate || null, toDate || null, classExamId).run();
+                } else {
+                    await env.DB.prepare(
+                        `INSERT INTO Class_Exams (Class_Exam_ID, Course_ID, Exam_ID, Assessment_ID, Term, Category, Is_Active, From_Date, To_Date)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                    ).bind(classExamId, courseId, examId, assessmentId, selectedTerm, selectedCategory, activeFlag, fromDate || null, toDate || null).run();
+                }
+
+                if (Array.isArray(assignments)) {
+                    const existingAssignRes = await env.DB.prepare(
+                        "SELECT * FROM Exam_Assignments WHERE Class_Exam_ID = ?"
+                    ).bind(classExamId).all();
+                    const existingMap = {};
+                    (existingAssignRes.results || []).forEach(a => {
+                        existingMap[a.Student_ID] = a;
+                    });
+
+                    const statements = [];
+                    for (const item of assignments) {
+                        if (!item.studentId) continue;
+                        const enabledFlag = item.isEnabled ? 1 : 0;
+                        const prev = existingMap[item.studentId];
+
+                        if (prev) {
+                            statements.push(
+                                env.DB.prepare(
+                                    "UPDATE Exam_Assignments SET Is_Enabled = ? WHERE Assignment_ID = ?"
+                                ).bind(enabledFlag, prev.Assignment_ID)
+                            );
+                        } else {
+                            statements.push(
+                                env.DB.prepare(
+                                    `INSERT INTO Exam_Assignments (Assignment_ID, Class_Exam_ID, Student_ID, Is_Enabled, Status)
+                                     VALUES (?, ?, ?, ?, 'Pending')`
+                                ).bind(crypto.randomUUID(), classExamId, item.studentId, enabledFlag)
+                            );
+                        }
+                    }
+
+                    if (statements.length > 0) {
+                        await env.DB.batch(statements);
+                    }
+                }
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    classExamId,
+                    assessmentId
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/reset-exam-attempt") {
+                const body = await request.json();
+                const { classExamId, studentId } = body;
+
+                if (!classExamId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Missing classExamId or studentId." }), { status: 400, headers: corsHeaders });
+                }
+
+                await ensureAccessibleExamTables(env);
+
+                await env.DB.prepare(
+                    `UPDATE Exam_Assignments
+                     SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Submitted_At = NULL
+                     WHERE Class_Exam_ID = ? AND Student_ID = ?`
+                ).bind(classExamId, studentId).run();
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/student-accessible-exams") {
+                const studentId = url.searchParams.get("studentId");
+                if (!studentId) {
+                    return new Response(JSON.stringify({ error: "Missing studentId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const user = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition
+                     FROM Users WHERE User_ID = ?`
+                ).bind(studentId).first();
+
+                if (!user) {
+                    return new Response(JSON.stringify({ error: "Student not found." }), { status: 404, headers: corsHeaders });
+                }
+
+                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID);
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    student: user,
+                    exams: availableExams
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/student-accessible-exams") {
+                const body = await request.json();
+                const hashedPassword = await hashPassword(body.password || "");
+                const id = (body.identifier || "").trim();
+
+                if (!id || !body.password) {
+                    return new Response(JSON.stringify({ error: "Please enter your identifier and password." }), { status: 400, headers: corsHeaders });
+                }
+
+                const user = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Student_Number, account_status, role, course, year, section, eye_condition
+                     FROM Users
+                     WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?)
+                     AND Password = ?`
+                ).bind(id, id, id, id, hashedPassword).first();
+
+                if (!user) {
+                    return new Response(JSON.stringify({ error: "Invalid credentials." }), { status: 401, headers: corsHeaders });
+                }
+
+                if (user.account_status.toLowerCase() !== 'active') {
+                    return new Response(JSON.stringify({ error: `Account is ${user.account_status}.` }), { status: 403, headers: corsHeaders });
+                }
+
+                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID);
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    student: user,
+                    exams: availableExams
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/submit-accessible-exam") {
+                const body = await request.json();
+                const { assignmentId, studentId, answers } = body;
+
+                if (!assignmentId || !studentId || !Array.isArray(answers)) {
+                    return new Response(JSON.stringify({ error: "Invalid submission payload." }), { status: 400, headers: corsHeaders });
+                }
+
+                await ensureAccessibleExamTables(env);
+
+                const record = await env.DB.prepare(
+                    `SELECT ea.*, ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date,
+                            e.Title as Exam_Title, e.ExamData
+                     FROM Exam_Assignments ea
+                     JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
+                     JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+                     WHERE ea.Assignment_ID = ? AND ea.Student_ID = ?`
+                ).bind(assignmentId, studentId).first();
+
+                if (!record) {
+                    return new Response(JSON.stringify({ error: "Exam assignment not found." }), { status: 404, headers: corsHeaders });
+                }
+
+                if (!record.Is_Enabled || !record.Is_Active) {
+                    return new Response(JSON.stringify({ error: "This exam is no longer enabled." }), { status: 403, headers: corsHeaders });
+                }
+
+                if (record.Status === 'Completed') {
+                    return new Response(JSON.stringify({ error: "You have already submitted this exam." }), { status: 400, headers: corsHeaders });
+                }
+
+                if (!isWithinScheduleWindow(record.From_Date, record.To_Date)) {
+                    return new Response(JSON.stringify({ error: "This exam is outside the scheduled date window and is closed." }), { status: 403, headers: corsHeaders });
+                }
+
+                let quizData = [];
+                try {
+                    quizData = JSON.parse(record.ExamData || "[]");
+                } catch (e) {
+                    quizData = [];
+                }
+
+                let rawScore = 0;
+                let bonusScore = 0;
+                let regularCount = 0;
+
+                quizData.forEach((q, idx) => {
+                    const correctAns = String(q[3] ?? "").trim().toLowerCase();
+                    const studentAns = String(answers[idx] ?? "").trim().toLowerCase();
+                    const isBonus = Boolean(q[5]);
+
+                    if (!isBonus) {
+                        regularCount++;
+                        if (studentAns !== "" && studentAns === correctAns) {
+                            rawScore += 1;
+                        }
+                    } else {
+                        if (studentAns !== "" && studentAns === correctAns) {
+                            bonusScore += 1;
+                        }
+                    }
+                });
+
+                let maxScore = regularCount > 0 ? regularCount : Math.max(1, quizData.length);
+
+                let assessment = null;
+                if (record.Assessment_ID) {
+                    assessment = await env.DB.prepare(
+                        "SELECT * FROM Assessments WHERE Assessment_ID = ?"
+                    ).bind(record.Assessment_ID).first();
+                }
+
+                const today = getRequestDate(request);
+                let targetAssessmentId = record.Assessment_ID;
+
+                if (!assessment) {
+                    targetAssessmentId = crypto.randomUUID();
+                    await env.DB.prepare(
+                        `INSERT INTO Assessments (Assessment_ID, Course_ID, Term, Category, Title, Max_Score, Date)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)`
+                    ).bind(
+                        targetAssessmentId,
+                        record.Course_ID,
+                        record.Term || 'MidTerm',
+                        record.Category || 'MajorExam',
+                        record.Exam_Title.trim(),
+                        maxScore,
+                        today
+                    ).run();
+
+                    await env.DB.prepare(
+                        "UPDATE Class_Exams SET Assessment_ID = ? WHERE Class_Exam_ID = ?"
+                    ).bind(targetAssessmentId, record.Class_Exam_ID).run();
+                } else {
+                    maxScore = assessment.Max_Score > 0 ? assessment.Max_Score : maxScore;
+                }
+
+                const finalScore = Math.min(maxScore, rawScore + bonusScore);
+
+                await env.DB.batch([
+                    env.DB.prepare(
+                        `UPDATE Exam_Assignments
+                         SET Status = 'Completed', Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Max_Score = ?, Answers_JSON = ?, Submitted_At = CURRENT_TIMESTAMP
+                         WHERE Assignment_ID = ?`
+                    ).bind(rawScore, bonusScore, finalScore, maxScore, JSON.stringify(answers), assignmentId),
+                    env.DB.prepare(
+                        "DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?"
+                    ).bind(targetAssessmentId, studentId),
+                    env.DB.prepare(
+                        "INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)"
+                    ).bind(crypto.randomUUID(), targetAssessmentId, studentId, finalScore)
+                ]);
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    rawScore,
+                    bonusScore,
+                    finalScore,
+                    maxScore,
+                    examTitle: record.Exam_Title
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/upload-submission") {
+                try {
+                    const metaHeader = request.headers.get("X-Submission-Meta");
+                    let body, gasData;
+
+                    if (metaHeader) {
+                        // New path: metadata in a header, raw base64 file in the body (streamed, never parsed here).
+                        checkContentLength(request, MAX_SINGLE_BODY_BYTES);
+                        body = JSON.parse(decodeURIComponent(metaHeader));
+                        validateMeta(body);
+                        await verifyUploader(env, body);
+
+                        const gasMeta = JSON.stringify({
+                            filename: body.filename,
+                            mimeType: body.mimeType,
+                            pathParts: body.pathParts || []
+                        });
+                        const prefix = gasMeta.slice(0, -1) + ',"base64":"';
+                        gasData = await streamToGas(env, request, prefix, '"}', MAX_SINGLE_BODY_BYTES);
+                    } else {
+                        // Legacy path: whole payload as JSON (small files only).
+                        checkContentLength(request, MAX_LEGACY_JSON_BYTES);
+                        body = await request.json();
+                        validateMeta(body);
+                        await verifyUploader(env, body);
+                        gasData = await callGas(env, JSON.stringify(body));
+                    }
+
+                    await recordSubmission(env, body, gasData.fileUrl);
+                    return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
+                } catch (err) {
+                    const msg = err && err.message ? err.message : "Upload failed.";
+                    const status = err instanceof UploadError ? err.status : 500;
+                    return new Response(JSON.stringify({ error: msg }), { status, headers: corsHeaders });
+                }
+            }
+
+            // Large files: the browser sends the base64 text in pieces (each piece is streamed to
+            // Google Drive untouched), then asks the Worker to join them and record the submission.
+            if (request.method === "POST" && path === "/api/upload-chunk") {
+                try {
+                    const metaHeader = request.headers.get("X-Chunk-Meta");
+                    if (!metaHeader) {
+                        return new Response(JSON.stringify({ error: "Missing X-Chunk-Meta header." }), { status: 400, headers: corsHeaders });
+                    }
+                    checkContentLength(request, MAX_CHUNK_BODY_BYTES);
+                    const info = JSON.parse(decodeURIComponent(metaHeader));
+                    const { uploadId, index, total } = validateChunkMeta(info, MAX_UPLOAD_CHUNKS);
+
+                    if (!info.courseId || !info.studentId) {
+                        throw new UploadError("Missing course or student.");
+                    }
+                    await verifyUploader(env, { courseId: info.courseId, studentId: info.studentId });
+
+                    const prefix = JSON.stringify({ action: "chunk", uploadId, index, total }).slice(0, -1) + ',"data":"';
+                    await streamToGas(env, request, prefix, '"}', MAX_CHUNK_BODY_BYTES);
+                    return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+                } catch (err) {
+                    const status = err instanceof UploadError ? err.status : 500;
+                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Chunk upload failed." }), { status, headers: corsHeaders });
+                }
+            }
+
+            if (request.method === "POST" && path === "/api/finish-chunked-upload") {
+                try {
+                    const body = await request.json();
+                    const total = body.total;
+                    if (!/^[A-Za-z0-9-]{8,64}$/.test(String(body.uploadId || "")) ||
+                        !Number.isInteger(total) || total < 1 || total > MAX_UPLOAD_CHUNKS) {
+                        return new Response(JSON.stringify({ error: "Invalid upload details." }), { status: 400, headers: corsHeaders });
+                    }
+                    validateMeta(body);
+                    await verifyUploader(env, body);
+
+                    const gasData = await callGas(env, JSON.stringify({
+                        action: "finish",
+                        uploadId: body.uploadId,
+                        total,
+                        filename: body.filename,
+                        mimeType: body.mimeType,
+                        pathParts: body.pathParts || []
+                    }));
+                    await recordSubmission(env, body, gasData.fileUrl);
+                    return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
+                } catch (err) {
+                    const status = err instanceof UploadError ? err.status : 500;
+                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Upload failed." }), { status, headers: corsHeaders });
+                }
+            }
+
+            if (request.method === "POST" && path === "/api/register") {
+                const body = await request.json();
+
+                const studentNoFormat = /^\d{2}-\d{4}$/;
+                if (!studentNoFormat.test(body.student_number)) {
+                    return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+                }
+                if (studentNoFormat.test(body.username)) {
+                    return new Response(JSON.stringify({ error: "Username cannot match the Student Number format (00-0000)" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare(
+                    `SELECT Username, Student_Number, Email, Contact_Number FROM Users
+                     WHERE Username COLLATE NOCASE = ?
+                     OR Student_Number COLLATE NOCASE = ?
+                     OR Email COLLATE NOCASE = ?
+                     OR Contact_Number = ?`
+                ).bind(body.username, body.student_number, body.email, body.contact_number).first();
+
+                if (existing) {
+                    const conflicts = [];
+                    if (existing.Username && body.username && existing.Username.toLowerCase() === body.username.toLowerCase()) conflicts.push("Username");
+                    if (existing.Student_Number && body.student_number && existing.Student_Number.toLowerCase() === body.student_number.toLowerCase()) conflicts.push("Student Number");
+                    if (existing.Email && body.email && existing.Email.toLowerCase() === body.email.toLowerCase()) conflicts.push("Email");
+                    if (existing.Contact_Number && body.contact_number && existing.Contact_Number === body.contact_number) conflicts.push("Contact Number");
+
+                    return new Response(JSON.stringify({ error: `The following is already registered to another account: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
+                }
+
+                let finalAvatarUrl = null;
+                if (body.avatarBase64) {
+                    if (!env.GAS_WEBHOOK_URL) {
+                        return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
+                    }
+
+                    const courseVal = body.course ? body.course.trim() : "";
+                    const yearVal = body.year ? body.year.trim() : "";
+                    const sectionVal = body.section ? body.section.trim() : "";
+                    const courseYearSection = [courseVal, yearVal, sectionVal].filter(Boolean).join(" ") || "General";
+                    const formattedFilename = `${body.student_number}_${body.name}.jpg`;
+
+                    const gasPayload = {
+                        filename: formattedFilename,
+                        mimeType: "image/jpeg",
+                        base64: body.avatarBase64,
+                        pathParts: [courseYearSection, "Profile Picture"]
+                    };
+
+                    let gasResponse = await fetch(env.GAS_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify(gasPayload),
+                        redirect: 'manual'
+                    });
+
+                    if (gasResponse.status === 302 || gasResponse.status === 303) {
+                        const redirectUrl = gasResponse.headers.get('Location');
+                        gasResponse = await fetch(redirectUrl);
+                    }
+
+                    const gasText = await gasResponse.text();
+                    let gasData;
+                    try {
+                        gasData = JSON.parse(gasText);
+                    } catch (parseError) {
+                        return new Response(JSON.stringify({
+                            error: `Google created the file, but intercepted the JSON response. Raw Google Output: ${gasText.substring(0, 150)}...`
+                        }), { status: 500, headers: corsHeaders });
+                    }
+
+                    if (!gasData.success) {
+                        return new Response(JSON.stringify({ error: "Google Drive Error: " + gasData.error }), { status: 500, headers: corsHeaders });
+                    }
+                    finalAvatarUrl = gasData.fileUrl;
+                }
+
+                const userId = crypto.randomUUID();
+                const hashedPassword = await hashPassword(body.password);
+
+                await env.DB.prepare(
+                    `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, registration_timestamp)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+                ).bind(
+                    userId, body.username, hashedPassword, body.name, finalAvatarUrl,
+                    body.email, body.contact_number, body.student_number,
+                    'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, body.eye_condition ? body.eye_condition.trim() : null, 'Student'
+                ).run();
+
+                return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/login") {
+                const body = await request.json();
+                const hashedPassword = await hashPassword(body.password);
+                const id = body.identifier;
+
+                const user = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition
+                     FROM Users
+                     WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?)
+                     AND Password = ?`
+                ).bind(id, id, id, id, hashedPassword).first();
+
+                if (!user) {
+                    return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: corsHeaders });
+                }
+
+                if (user.account_status.toLowerCase() !== 'active') {
+                    let errorMessage = "";
+                    const statusLower = user.account_status.toLowerCase();
+
+                    if (statusLower === 'inactive') {
+                        errorMessage = "Account is pending approval. Please wait for an admin or lecturer to activate your account.";
+                    } else if (statusLower === 'suspended') {
+                        errorMessage = "Account is Suspended";
+                    } else if (statusLower === 'ud') {
+                        errorMessage = "Account is Unofficially Dropped";
+                    } else if (statusLower === 'dropped') {
+                        errorMessage = "Account is Dropped";
+                    } else {
+                        errorMessage = `Account is ${user.account_status}`;
+                    }
+
+                    return new Response(JSON.stringify({
+                        error: errorMessage
+                    }), { status: 403, headers: corsHeaders });
+                }
+
+                return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/change-password") {
+                const body = await request.json();
+                const { userId, currentPassword, newPassword } = body;
+
+                const currentHash = await hashPassword(currentPassword);
+                const user = await env.DB.prepare("SELECT Password FROM Users WHERE User_ID = ?").bind(userId).first();
+
+                if (!user || user.Password !== currentHash) {
+                    return new Response(JSON.stringify({ error: "Incorrect current password" }), { status: 400, headers: corsHeaders });
+                }
+
+                const newHash = await hashPassword(newPassword);
+                await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, userId).run();
+
+                return new Response(JSON.stringify({ success: true, message: "Password updated successfully" }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/update-details") {
+                const body = await request.json();
+                const { userId, password, name, username, email, contact, studentNumber, programCourse, programYear, programSection } = body;
+
+                const studentNoFormat = /^\d{2}-\d{4}$/;
+                if (!studentNoFormat.test(studentNumber)) {
+                    return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+                }
+
+                const currentHash = await hashPassword(password);
+                const user = await env.DB.prepare("SELECT Password FROM Users WHERE User_ID = ?").bind(userId).first();
+
+                if (!user || user.Password !== currentHash) {
+                    return new Response(JSON.stringify({ error: "Incorrect password" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare(
+                    `SELECT Username, Student_Number, Email, Contact_Number FROM Users
+                     WHERE (Username COLLATE NOCASE = ?
+                     OR Student_Number COLLATE NOCASE = ?
+                     OR Email COLLATE NOCASE = ?
+                     OR Contact_Number = ?)
+                     AND User_ID != ?`
+                ).bind(username, studentNumber, email, contact, userId).first();
+
+                if (existing) {
+                    const conflicts = [];
+                    if (existing.Username && username && existing.Username.toLowerCase() === username.toLowerCase()) conflicts.push("Username");
+                    if (existing.Student_Number && studentNumber && existing.Student_Number.toLowerCase() === studentNumber.toLowerCase()) conflicts.push("Student Number");
+                    if (existing.Email && email && existing.Email.toLowerCase() === email.toLowerCase()) conflicts.push("Email");
+                    if (existing.Contact_Number && contact && existing.Contact_Number === contact) conflicts.push("Contact Number");
+
+                    return new Response(JSON.stringify({ error: `The following information is already taken by another account: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare(
+                    `UPDATE Users SET Name = ?, Username = ?, Email = ?, Contact_Number = ?, Student_Number = ? WHERE User_ID = ?`
+                ).bind(name, username, email, contact, studentNumber, userId).run();
+
+                // Optional: the student's own Program Course / Year / Section
+                if (programCourse !== undefined || programYear !== undefined || programSection !== undefined) {
+                    const cleanProg = (v) => (v === undefined || v === null) ? null : (String(v).trim() || null);
+                    await env.DB.prepare(
+                        `UPDATE Users SET Program_Course = ?, Program_Year = ?, Program_Section = ? WHERE User_ID = ?`
+                    ).bind(cleanProg(programCourse), cleanProg(programYear), cleanProg(programSection), userId).run();
+                }
+
+                return new Response(JSON.stringify({ success: true, message: "Details updated successfully" }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/grade-submission") {
+                const body = await request.json();
+                const { submissionId, fileUrl, gradeNarrative, gradeIndividual, gradeReport } = body;
+
+                if (!submissionId) {
+                    return new Response(JSON.stringify({ error: "Missing submissionId" }), { status: 400, headers: corsHeaders });
+                }
+
+                if (fileUrl) {
+                    await env.DB.prepare(
+                        `UPDATE Submissions SET Grade_Narrative = ?, Grade_Individual = ?, Grade_Report = ? WHERE File_URL = ?`
+                    ).bind(gradeNarrative, gradeIndividual, gradeReport, fileUrl).run();
+                } else {
+                    await env.DB.prepare(
+                        `UPDATE Submissions SET Grade_Narrative = ?, Grade_Individual = ?, Grade_Report = ? WHERE Submission_ID = ?`
+                    ).bind(gradeNarrative, gradeIndividual, gradeReport, submissionId).run();
+                }
+
+                return new Response(JSON.stringify({ success: true, message: "Grade saved successfully" }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/reset-student-password") {
+                const body = await request.json();
+                const { studentId } = body;
+
+                if (!studentId) {
+                    return new Response(JSON.stringify({ error: "Missing studentId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const newHash = await hashPassword("123456");
+                await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, studentId).run();
+
+                return new Response(JSON.stringify({ success: true, message: "Password reset successfully" }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/users") {
+                const users = await env.DB.prepare(
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, role, registration_timestamp
+                     FROM Users ORDER BY Name ASC`
+                ).all();
+                return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/update-user-status") {
+                const body = await request.json();
+                if (!body.studentId || !body.status) {
+                    return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400, headers: corsHeaders });
+                }
+                await env.DB.prepare(
+                    `UPDATE Users SET account_status = ? WHERE User_ID = ?`
+                ).bind(body.status, body.studentId).run();
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/programs") {
+                const body = await request.json();
+                const code = body.programCode ? body.programCode.trim().toUpperCase() : "";
+
+                if (!code) {
+                    return new Response(JSON.stringify({ error: "Program code is required" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare("SELECT Program_ID FROM Programs WHERE ProgramCode = ?").bind(code).first();
+                if (existing) {
+                    return new Response(JSON.stringify({ error: "Course (Program) already exists in the list." }), { status: 400, headers: corsHeaders });
+                }
+
+                const id = crypto.randomUUID();
+                await env.DB.prepare("INSERT INTO Programs (Program_ID, ProgramCode) VALUES (?, ?)").bind(id, code).run();
+
+                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/programs") {
+                try {
+                    const programs = await env.DB.prepare("SELECT * FROM Programs ORDER BY ProgramCode ASC").all();
+                    return new Response(JSON.stringify({ success: true, programs: programs.results }), { status: 200, headers: corsHeaders });
+                } catch (err) {
+                    return new Response(JSON.stringify({ success: true, programs: [] }), { status: 200, headers: corsHeaders });
+                }
+            }
+
+            if (request.method === "POST" && path === "/api/courses") {
+                const body = await request.json();
+                const courseId = crypto.randomUUID();
+
+                const targetCourse = body.targetCourse ? body.targetCourse.trim() : "";
+                const targetYear = body.targetYear ? body.targetYear.trim() : "";
+                const targetSection = body.targetSection ? body.targetSection.trim() : "";
+
+                await env.DB.prepare(
+                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId, targetCourse, targetYear, targetSection).run();
+
+                return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/update-course-terms") {
+                const body = await request.json();
+
+                await env.DB.prepare(
+                    `UPDATE Courses SET Midterm_Start = ?, Midterm_End = ?, Final_Start = ?, Final_End = ? WHERE Course_ID = ?`
+                ).bind(
+                    body.midtermStart || null,
+                    body.midtermEnd || null,
+                    body.finalStart || null,
+                    body.finalEnd || null,
+                    body.courseId
+                ).run();
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/courses") {
+                const studentId = url.searchParams.get("studentId");
+
+                let courses;
+
+                if (studentId) {
+                    const student = await env.DB.prepare("SELECT course, year, section FROM Users WHERE User_ID = ?").bind(studentId).first();
+
+                    if (!student) {
+                        return new Response(JSON.stringify({ error: "Student not found" }), { status: 404, headers: corsHeaders });
+                    }
+
+                    const sCourse = student.course ? student.course.trim() : "";
+                    const sYear = student.year ? student.year.trim() : "";
+                    const sSection = student.section ? student.section.trim() : "";
+
+                    courses = await env.DB.prepare(
+                        `SELECT c.*, u.Name as LecturerName
+                         FROM Courses c
+                         JOIN Users u ON c.Lecturer_ID = u.User_ID
+                         WHERE (c.Target_Course IS NULL OR TRIM(c.Target_Course) = '' OR TRIM(c.Target_Course) COLLATE NOCASE = ?)
+                           AND (c.Target_Year IS NULL OR TRIM(c.Target_Year) = '' OR TRIM(c.Target_Year) COLLATE NOCASE = ?)
+                           AND (c.Target_Section IS NULL OR TRIM(c.Target_Section) = '' OR TRIM(c.Target_Section) COLLATE NOCASE = ?)`
+                    ).bind(sCourse, sYear, sSection).all();
+                } else {
+                    courses = await env.DB.prepare(
+                        `SELECT c.*, u.Name as LecturerName
+                         FROM Courses c
+                         JOIN Users u ON c.Lecturer_ID = u.User_ID`
+                    ).all();
+                }
+
+                return new Response(JSON.stringify({ success: true, courses: courses.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/enroll") {
+                const body = await request.json();
+
+                const existing = await env.DB.prepare(
+                    `SELECT Enrollment_ID FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.courseId, body.studentId).first();
+
+                if (existing) {
+                    return new Response(JSON.stringify({ error: "You are already enrolled in this course." }), { status: 400, headers: corsHeaders });
+                }
+
+                const enrollId = crypto.randomUUID();
+                await env.DB.prepare(
+                    `INSERT INTO Enrollments (Enrollment_ID, Course_ID, Student_ID) VALUES (?, ?, ?)`
+                ).bind(enrollId, body.courseId, body.studentId).run();
+
+                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/unenroll") {
+                const body = await request.json();
+
+                if (!body.courseId || !body.studentId) {
+                    return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare(
+                    `DELETE FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.courseId, body.studentId).run();
+
+                await env.DB.prepare(
+                    `DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.courseId, body.studentId).run();
+
+                try {
+                    await env.DB.prepare(
+                        `DELETE FROM Assessment_Scores WHERE Student_ID = ? AND Assessment_ID IN (SELECT Assessment_ID FROM Assessments WHERE Course_ID = ?)`
+                    ).bind(body.studentId, body.courseId).run();
+                } catch (err) {
+                    // Assessment tables not created yet; nothing to clean up.
+                }
+
+                try {
+                    await env.DB.prepare(
+                        `DELETE FROM Exam_Assignments WHERE Student_ID = ? AND Class_Exam_ID IN (SELECT Class_Exam_ID FROM Class_Exams WHERE Course_ID = ?)`
+                    ).bind(body.studentId, body.courseId).run();
+                } catch (err) {
+                    // Exam assignment tables not created yet; nothing to clean up.
+                }
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/my-courses") {
+                const userId = url.searchParams.get("userId");
+                const role = url.searchParams.get("role");
+
+                if (role === 'lecturer') {
+                    const myCourses = await env.DB.prepare(
+                        `SELECT * FROM Courses WHERE Lecturer_ID = ?`
+                    ).bind(userId).all();
+                    return new Response(JSON.stringify({ success: true, courses: myCourses.results }), { status: 200, headers: corsHeaders });
+                } else {
+                    const enrolled = await env.DB.prepare(
+                        `SELECT c.*, u.Name as LecturerName, e.Seat_Number
+                         FROM Enrollments e
+                         JOIN Courses c ON e.Course_ID = c.Course_ID
+                         JOIN Users u ON c.Lecturer_ID = u.User_ID
+                         WHERE e.Student_ID = ?`
+                    ).bind(userId).all();
+                    return new Response(JSON.stringify({ success: true, courses: enrolled.results }), { status: 200, headers: corsHeaders });
+                }
+            }
+
+            if (request.method === "GET" && path === "/api/course-details") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const course = await env.DB.prepare("SELECT * FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+
+                const students = await env.DB.prepare(
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name, e.Assigned_Topic
+                     FROM Enrollments e
+                     JOIN Users u ON e.Student_ID = u.User_ID
+                     WHERE e.Course_ID = ?`
+                ).bind(courseId).all();
+
+                return new Response(JSON.stringify({ success: true, course: course, students: students.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/unenrolled-students") {
+                const courseId = url.searchParams.get("courseId");
+                const courseFilter = url.searchParams.get("courseFilter");
+                const yearFilter = url.searchParams.get("yearFilter");
+                const sectionFilter = url.searchParams.get("sectionFilter");
+                const statusFilter = url.searchParams.get("statusFilter");
+
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                let query = `SELECT User_ID, Student_Number, Name, course, year, section, Program_Course, Program_Year, Program_Section, account_status
+                             FROM Users
+                             WHERE role COLLATE NOCASE = 'student'
+                             AND User_ID NOT IN (SELECT Student_ID FROM Enrollments WHERE Course_ID = ?)`;
+                const params = [courseId];
+
+                if (statusFilter) {
+                    query += ` AND account_status COLLATE NOCASE = ?`;
+                    params.push(statusFilter);
+                }
+                if (courseFilter) {
+                    query += ` AND course COLLATE NOCASE = ?`;
+                    params.push(courseFilter);
+                }
+                if (yearFilter) {
+                    query += ` AND year COLLATE NOCASE = ?`;
+                    params.push(yearFilter);
+                }
+                if (sectionFilter) {
+                    query += ` AND section COLLATE NOCASE = ?`;
+                    params.push(sectionFilter);
+                }
+
+                query += ` ORDER BY Name ASC`;
+                const students = await env.DB.prepare(query).bind(...params).all();
+
+                return new Response(JSON.stringify({ success: true, students: students.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/update-student-info") {
+                const body = await request.json();
+
+                await env.DB.prepare(
+                    `UPDATE Enrollments SET Seat_Number = ?, Group_Name = ?, Assigned_Topic = ? WHERE Course_ID = ? AND Student_ID = ?`
+                ).bind(body.seatNumber, body.groupName, body.assignedTopic, body.courseId, body.studentId).run();
+
+                if (body.eyeCondition !== undefined) {
+                    await env.DB.prepare(
+                        `UPDATE Users SET eye_condition = ? WHERE User_ID = ?`
+                    ).bind(body.eyeCondition, body.studentId).run();
+                }
+
+                // Lecturer-assigned Program Course / Year / Section (separate from class course/year/section).
+                // Only touched when at least one field is sent, so older clients keep working.
+                if (body.programCourse !== undefined || body.programYear !== undefined || body.programSection !== undefined) {
+                    const clean = (v) => (v === undefined || v === null) ? null : (String(v).trim() || null);
+                    await env.DB.prepare(
+                        `UPDATE Users SET Program_Course = ?, Program_Year = ?, Program_Section = ? WHERE User_ID = ?`
+                    ).bind(clean(body.programCourse), clean(body.programYear), clean(body.programSection), body.studentId).run();
+                }
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            // Lecturer edits a student's profile details. Only the lecturer who owns the course,
+            // and only for a student enrolled in that course.
+            if (request.method === "POST" && path === "/api/update-student-details") {
+                const body = await request.json();
+                const { lecturerId, courseId, studentId } = body;
+
+                if (!lecturerId || !courseId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Missing lecturerId, courseId or studentId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const course = await env.DB.prepare("SELECT Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!course || course.Lecturer_ID !== lecturerId) {
+                    return new Response(JSON.stringify({ error: "You can only edit students of your own classes" }), { status: 403, headers: corsHeaders });
+                }
+
+                const enrolled = await env.DB.prepare("SELECT 1 AS ok FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?").bind(courseId, studentId).first();
+                if (!enrolled) {
+                    return new Response(JSON.stringify({ error: "Student is not enrolled in this class" }), { status: 403, headers: corsHeaders });
+                }
+
+                const clean = (v) => (v === undefined || v === null) ? "" : String(v).trim();
+                const opt = (v) => clean(v) || null;
+                const name = clean(body.name);
+                const studentNumber = clean(body.studentNumber);
+                const email = clean(body.email);
+                const contact = clean(body.contact);
+
+                if (!name) {
+                    return new Response(JSON.stringify({ error: "Name is required" }), { status: 400, headers: corsHeaders });
+                }
+                if (!/^\d{2}-\d{4}$/.test(studentNumber)) {
+                    return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare(
+                    `SELECT Student_Number, Email, Contact_Number FROM Users
+                     WHERE (Student_Number COLLATE NOCASE = ?
+                     OR (? != '' AND Email COLLATE NOCASE = ?)
+                     OR (? != '' AND Contact_Number = ?))
+                     AND User_ID != ?`
+                ).bind(studentNumber, email, email, contact, contact, studentId).first();
+
+                if (existing) {
+                    const conflicts = [];
+                    if (existing.Student_Number && existing.Student_Number.toLowerCase() === studentNumber.toLowerCase()) conflicts.push("Student Number");
+                    if (email && existing.Email && existing.Email.toLowerCase() === email.toLowerCase()) conflicts.push("Email");
+                    if (contact && existing.Contact_Number && existing.Contact_Number === contact) conflicts.push("Contact Number");
+                    return new Response(JSON.stringify({ error: `Already used by another account: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare(
+                    `UPDATE Users SET Name = ?, Student_Number = ?, Email = ?, Contact_Number = ?,
+                            course = ?, year = ?, section = ?,
+                            Program_Course = ?, Program_Year = ?, Program_Section = ?
+                     WHERE User_ID = ?`
+                ).bind(
+                    name, studentNumber, opt(email), opt(contact),
+                    opt(body.course), opt(body.year), opt(body.section),
+                    opt(body.programCourse), opt(body.programYear), opt(body.programSection),
+                    studentId
+                ).run();
+
+                const student = await env.DB.prepare(
+                    `SELECT User_ID, Name, Student_Number, Email, Contact_Number, course, year, section, Program_Course, Program_Year, Program_Section
+                     FROM Users WHERE User_ID = ?`
+                ).bind(studentId).first();
+
+                return new Response(JSON.stringify({ success: true, student }), { status: 200, headers: corsHeaders });
+            }
+
+            const attendanceDatesResponse = await handleAttendanceDates(request, env, path, url, corsHeaders);
+            if (attendanceDatesResponse) return attendanceDatesResponse;
+
+            if (request.method === "GET" && path === "/api/no-class") {
+                const courseId = url.searchParams.get("courseId");
+                const sessions = await env.DB.prepare(
+                    "SELECT Date FROM Course_Sessions WHERE Course_ID = ? AND Is_No_Class = 1 ORDER BY Date DESC"
+                ).bind(courseId).all();
+                return new Response(JSON.stringify({ success: true, dates: sessions.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/no-class") {
+                const body = await request.json();
+                const { courseId, date } = body;
+
+                if (!courseId || !date) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare("SELECT Session_ID FROM Course_Sessions WHERE Course_ID = ? AND Date = ?").bind(courseId, date).first();
+                if (!existing) {
+                    const sessionId = crypto.randomUUID();
+                    await env.DB.prepare("INSERT INTO Course_Sessions (Session_ID, Course_ID, Date, Is_No_Class) VALUES (?, ?, ?, 1)").bind(sessionId, courseId, date).run();
+
+                    await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+                }
+
+                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "DELETE" && path === "/api/no-class") {
+                const body = await request.json();
+                const { courseId, date } = body;
+
+                await env.DB.prepare("DELETE FROM Course_Sessions WHERE Course_ID = ? AND Date = ? AND Is_No_Class = 1").bind(courseId, date).run();
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/attendance") {
+                const courseId = url.searchParams.get("courseId");
+                const date = url.searchParams.get("date");
+
+                if (!courseId || !date) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const session = await env.DB.prepare(
+                    "SELECT Is_No_Class FROM Course_Sessions WHERE Course_ID = ? AND Date = ?"
+                ).bind(courseId, date).first();
+
+                const isNoClass = session ? session.Is_No_Class === 1 : false;
+
+                const records = await env.DB.prepare(
+                    "SELECT Student_ID, Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Date = ?"
+                ).bind(courseId, date).all();
+
+                return new Response(JSON.stringify({ success: true, records: records.results, isNoClass: isNoClass }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/attendance") {
+                const body = await request.json();
+                const { courseId, date, records } = body;
+
+                if (!courseId || !date) {
+                    return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: corsHeaders });
+                }
+
+                if (records && Array.isArray(records)) {
+                    await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
+
+                    if (records.length > 0) {
+                        const statements = [];
+                        for (const record of records) {
+                            const attId = crypto.randomUUID();
+                            statements.push(
+                                env.DB.prepare(
+                                    "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
+                                ).bind(attId, courseId, record.studentId, date, record.status, record.points)
+                            );
+                        }
+                        await env.DB.batch(statements);
+                    }
+                }
+
+                return new Response(JSON.stringify({ success: true, message: "Attendance saved" }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/attendance/single") {
+                const body = await request.json();
+                const { courseId, studentId, date, status, points } = body;
+
+                if (!courseId || !studentId || !date) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?").bind(courseId, studentId, date).run();
+
+                if (status) {
+                    const attId = crypto.randomUUID();
+                    await env.DB.prepare(
+                        "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
+                    ).bind(attId, courseId, studentId, date, status, points || 0).run();
+                }
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/add-participation-points") {
+                const body = await request.json();
+                const { courseId, studentId, date, points } = body;
+
+                if (!courseId || !studentId || !date || typeof points !== 'number') {
+                    return new Response(JSON.stringify({ error: "Missing required parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const existing = await env.DB.prepare(
+                    "SELECT Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?"
+                ).bind(courseId, studentId, date).first();
+
+                if (existing) {
+                    const newTotal = (parseInt(existing.Performance_Points) || 0) + points;
+                    await env.DB.prepare(
+                        "UPDATE Attendance SET Performance_Points = ? WHERE Course_ID = ? AND Student_ID = ? AND Date = ?"
+                    ).bind(newTotal, courseId, studentId, date).run();
+                } else {
+                    const attId = crypto.randomUUID();
+                    await env.DB.prepare(
+                        "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, 'Present', ?)"
+                    ).bind(attId, courseId, studentId, date, points).run();
+                }
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/assessments") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const list = await env.DB.prepare(
+                    `SELECT Assessment_ID, Course_ID, Term, Category, Title, Max_Score, Date
+                     FROM Assessments WHERE Course_ID = ? ORDER BY Date DESC, Created_At DESC`
+                ).bind(courseId).all();
+
+                return new Response(JSON.stringify({ success: true, assessments: list.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/assessments") {
+                const body = await request.json();
+                const { assessmentId, courseId, term, category, title, maxScore, date } = body;
+
+                const cleanTitle = title ? String(title).trim() : "";
+                const max = parseFloat(maxScore);
+
+                if (!courseId || !cleanTitle) {
+                    return new Response(JSON.stringify({ error: "Course and title are required." }), { status: 400, headers: corsHeaders });
+                }
+                if (!ASSESSMENT_TERMS.includes(term)) {
+                    return new Response(JSON.stringify({ error: "Invalid term." }), { status: 400, headers: corsHeaders });
+                }
+                if (!ASSESSMENT_CATEGORIES.includes(category)) {
+                    return new Response(JSON.stringify({ error: "Invalid category." }), { status: 400, headers: corsHeaders });
+                }
+                if (!(max > 0)) {
+                    return new Response(JSON.stringify({ error: "Maximum score must be greater than 0." }), { status: 400, headers: corsHeaders });
+                }
+
+                if (assessmentId) {
+                    const existing = await env.DB.prepare(
+                        "SELECT Assessment_ID FROM Assessments WHERE Assessment_ID = ? AND Course_ID = ?"
+                    ).bind(assessmentId, courseId).first();
+                    if (!existing) {
+                        return new Response(JSON.stringify({ error: "Assessment not found." }), { status: 404, headers: corsHeaders });
+                    }
+
+                    await env.DB.prepare(
+                        `UPDATE Assessments SET Term = ?, Category = ?, Title = ?, Max_Score = ?, Date = ? WHERE Assessment_ID = ?`
+                    ).bind(term, category, cleanTitle, max, date || null, assessmentId).run();
+
+                    return new Response(JSON.stringify({ success: true, assessmentId }), { status: 200, headers: corsHeaders });
+                }
+
+                const newId = crypto.randomUUID();
+                await env.DB.prepare(
+                    `INSERT INTO Assessments (Assessment_ID, Course_ID, Term, Category, Title, Max_Score, Date) VALUES (?, ?, ?, ?, ?, ?, ?)`
+                ).bind(newId, courseId, term, category, cleanTitle, max, date || null).run();
+
+                return new Response(JSON.stringify({ success: true, assessmentId: newId }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "DELETE" && path === "/api/assessments") {
+                const body = await request.json();
+                const { assessmentId } = body;
+
+                if (!assessmentId) {
+                    return new Response(JSON.stringify({ error: "Missing assessmentId" }), { status: 400, headers: corsHeaders });
+                }
+
+                await env.DB.batch([
+                    env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ?").bind(assessmentId),
+                    env.DB.prepare("DELETE FROM Assessments WHERE Assessment_ID = ?").bind(assessmentId)
+                ]);
+
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/assessment-scores") {
+                const assessmentId = url.searchParams.get("assessmentId");
+                if (!assessmentId) {
+                    return new Response(JSON.stringify({ error: "Missing assessmentId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const scores = await env.DB.prepare(
+                    "SELECT Student_ID, Score FROM Assessment_Scores WHERE Assessment_ID = ?"
+                ).bind(assessmentId).all();
+
+                return new Response(JSON.stringify({ success: true, scores: scores.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/assessment-scores") {
+                const body = await request.json();
+                const { assessmentId, scores } = body;
+
+                if (!assessmentId || !Array.isArray(scores)) {
+                    return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: corsHeaders });
+                }
+
+                const assessment = await env.DB.prepare(
+                    "SELECT Max_Score FROM Assessments WHERE Assessment_ID = ?"
+                ).bind(assessmentId).first();
+                if (!assessment) {
+                    return new Response(JSON.stringify({ error: "Assessment not found." }), { status: 404, headers: corsHeaders });
+                }
+
+                const statements = [
+                    env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ?").bind(assessmentId)
+                ];
+
+                for (const entry of scores) {
+                    const value = parseFloat(entry.score);
+                    if (!entry.studentId || isNaN(value) || value < 0 || value > assessment.Max_Score) {
+                        return new Response(JSON.stringify({ error: `Invalid score. Scores must be between 0 and ${assessment.Max_Score}.` }), { status: 400, headers: corsHeaders });
+                    }
+                    statements.push(
+                        env.DB.prepare(
+                            "INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)"
+                        ).bind(crypto.randomUUID(), assessmentId, entry.studentId, value)
+                    );
+                }
+
+                await env.DB.batch(statements);
+
+                return new Response(JSON.stringify({ success: true, saved: scores.length }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/student-summary") {
+                const courseId = url.searchParams.get("courseId");
+                const studentId = url.searchParams.get("studentId");
+
+                if (!courseId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const course = await env.DB.prepare("SELECT Midterm_Start, Midterm_End, Final_Start, Final_End, ScheduleDay FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+
+                const sessions = await env.DB.prepare("SELECT Date, Is_No_Class FROM Course_Sessions WHERE Course_ID = ?").bind(courseId).all();
+
+                const records = await env.DB.prepare(
+                    "SELECT Date, Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ? ORDER BY Date ASC"
+                ).bind(courseId, studentId).all();
+
+                const enrollment = await env.DB.prepare(
+                    "SELECT Seat_Number, Group_Name, Assigned_Topic FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?"
+                ).bind(courseId, studentId).first();
+
+                const submissions = await env.DB.prepare(
+                    "SELECT * FROM Submissions WHERE Course_ID = ? AND Student_ID = ? ORDER BY Timestamp DESC"
+                ).bind(courseId, studentId).all();
+
+                let assessments = [];
+                try {
+                    const assessmentRes = await env.DB.prepare(
+                        `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, s.Score
+                         FROM Assessments a
+                         LEFT JOIN Assessment_Scores s ON s.Assessment_ID = a.Assessment_ID AND s.Student_ID = ?
+                         WHERE a.Course_ID = ?
+                         ORDER BY a.Date ASC, a.Created_At ASC`
+                    ).bind(studentId, courseId).all();
+                    assessments = assessmentRes.results;
+                } catch (err) {
+                    assessments = [];
+                }
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    course: course,
+                    sessions: sessions.results,
+                    records: records.results,
+                    enrollment: enrollment || {},
+                    submissions: submissions.results,
+                    assessments: assessments
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/recitation-pool") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const pool = await env.DB.prepare(`
+                    SELECT u.User_ID, u.Name, u.Avatar, e.Seat_Number, COALESCE(SUM(a.Performance_Points), 0) as Total_Points
+                    FROM Enrollments e
+                    JOIN Users u ON e.Student_ID = u.User_ID
+                    LEFT JOIN Attendance a ON e.Student_ID = a.Student_ID AND e.Course_ID = a.Course_ID
+                    WHERE e.Course_ID = ?
+                    GROUP BY u.User_ID, u.Name, u.Avatar, e.Seat_Number
+                `).bind(courseId).all();
+
+                return new Response(JSON.stringify({ success: true, students: pool.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "GET" && path === "/api/group-members") {
+                const courseId = url.searchParams.get("courseId");
+                const studentId = url.searchParams.get("studentId");
+                const groupName = url.searchParams.get("groupName");
+
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                if (groupName) {
+                    const members = await env.DB.prepare(
+                        `SELECT u.User_ID, u.Name, u.Student_Number, u.Avatar
+                         FROM Enrollments e
+                         JOIN Users u ON e.Student_ID = u.User_ID
+                         WHERE e.Course_ID = ? AND e.Group_Name = ?`
+                    ).bind(courseId, groupName).all();
+
+                    return new Response(JSON.stringify({
+                        success: true,
+                        groupName: groupName,
+                        members: members.results
+                    }), { status: 200, headers: corsHeaders });
+                }
+
+                if (!studentId) {
+                    return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
+                }
+
+                const enrollment = await env.DB.prepare(
+                    "SELECT Group_Name FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?"
+                ).bind(courseId, studentId).first();
+
+                if (!enrollment || !enrollment.Group_Name) {
+                    return new Response(JSON.stringify({ success: true, groupName: null, members: [] }), { status: 200, headers: corsHeaders });
+                }
+
+                const members = await env.DB.prepare(
+                    `SELECT u.User_ID, u.Name, u.Student_Number
+                     FROM Enrollments e
+                     JOIN Users u ON e.Student_ID = u.User_ID
+                     WHERE e.Course_ID = ? AND e.Group_Name = ? AND u.User_ID != ?`
+                ).bind(courseId, enrollment.Group_Name, studentId).all();
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    groupName: enrollment.Group_Name,
+                    members: members.results
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
+
+        } catch (err) {
+            return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        }
+    }
+};
