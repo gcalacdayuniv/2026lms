@@ -1,4 +1,119 @@
 // worker/worker.js
+// worker/upload-guard.js
+// Cheap checks that run BEFORE any upload bytes are streamed to Google Drive.
+// Uses a few small D1 queries and no heavy CPU work, so it fits the free Workers plan.
+
+// A 25 MB file is about 33.4 MB of base64 text. Leave a little room for the wrapper.
+const MAX_SINGLE_BODY_BYTES = 36 * 1024 * 1024;
+// One piece of a chunked upload (the browser sends about 3.6 MB pieces).
+const MAX_CHUNK_BODY_BYTES = 4 * 1024 * 1024;
+// Largest total base64 size accepted across all pieces (25 MB file).
+const MAX_TOTAL_BASE64_CHARS = 36 * 1024 * 1024;
+
+const ALLOWED_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt']);
+const TERMS = ['MidTerm', 'FinalTerm'];
+const TYPES = ['file', 'url'];
+const MIME_RE = /^[A-Za-z0-9][\w.+-]*\/[A-Za-z0-9][\w.+-]*$/;
+
+class UploadError extends Error {
+    constructor(message, status = 400) {
+        super(message);
+        this.status = status;
+    }
+}
+
+// Rejects a request whose declared size is missing or too large.
+function checkContentLength(request, maxBytes) {
+    const len = parseInt(request.headers.get('Content-Length') || '', 10);
+    if (Number.isFinite(len) && len > maxBytes) {
+        throw new UploadError(`File is too large. Maximum upload is ${Math.round(maxBytes / (1024 * 1024))} MB per request.`, 413);
+    }
+}
+
+// Validates the submission details (the same fields recordSubmission() uses).
+function validateMeta(meta) {
+    if (!meta || typeof meta !== 'object') throw new UploadError('Missing submission details.');
+
+    const { courseId, studentId, term, title, description, type, filename, mimeType } = meta;
+
+    if (!courseId || typeof courseId !== 'string' || !studentId || typeof studentId !== 'string') {
+        throw new UploadError('Missing course or student.');
+    }
+    if (!TERMS.includes(term)) throw new UploadError('Invalid term.');
+    if (!TYPES.includes(type)) throw new UploadError('Invalid submission type.');
+
+    if (typeof title !== 'string' || !title.trim() || title.length > 150) {
+        throw new UploadError('Title is required (150 characters maximum).');
+    }
+    if (description != null && (typeof description !== 'string' || description.length > 2000)) {
+        throw new UploadError('Description is too long (2000 characters maximum).');
+    }
+
+    if (typeof filename !== 'string' || !filename.trim() || filename.length > 220 || /[\\/]/.test(filename)) {
+        throw new UploadError('Invalid file name.');
+    }
+    const ext = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+        throw new UploadError('File type not allowed. Use PDF, Word or PowerPoint files.');
+    }
+    if (type === 'url' && ext !== 'txt') throw new UploadError('Invalid link submission.');
+    if (type === 'file' && ext === 'txt') throw new UploadError('File type not allowed. Use PDF, Word or PowerPoint files.');
+
+    if (mimeType != null && mimeType !== '' && (typeof mimeType !== 'string' || mimeType.length > 100 || !MIME_RE.test(mimeType))) {
+        throw new UploadError('Invalid file type.');
+    }
+
+    if (meta.pathParts != null) {
+        if (!Array.isArray(meta.pathParts) || meta.pathParts.length > 5 ||
+            meta.pathParts.some(p => typeof p !== 'string' || p.length > 100)) {
+            throw new UploadError('Invalid folder path.');
+        }
+    }
+
+    if (meta.includedMembers != null) {
+        if (!Array.isArray(meta.includedMembers) || meta.includedMembers.length > 20 ||
+            meta.includedMembers.some(m => typeof m !== 'string')) {
+            throw new UploadError('Invalid group members.');
+        }
+    }
+}
+
+// The uploader must be an Active user enrolled in the course, and so must every group member.
+async function verifyUploader(env, meta) {
+    const ids = [meta.studentId];
+    if (meta.isGroup && Array.isArray(meta.includedMembers)) {
+        for (const m of meta.includedMembers) if (!ids.includes(m)) ids.push(m);
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = await env.DB.prepare(
+        `SELECT u.User_ID
+         FROM Users u
+         JOIN Enrollments e ON e.Student_ID = u.User_ID AND e.Course_ID = ?
+         WHERE u.User_ID IN (${placeholders}) AND u.account_status COLLATE NOCASE = 'active'`
+    ).bind(meta.courseId, ...ids).all();
+
+    const ok = new Set((rows.results || []).map(r => r.User_ID));
+    if (!ok.has(meta.studentId)) {
+        throw new UploadError('You are not enrolled in this course, or your account is not active.', 403);
+    }
+    if (ids.some(id => !ok.has(id))) {
+        throw new UploadError('A selected group member is not an active student of this course.', 403);
+    }
+}
+
+// Validates the chunk details sent in the X-Chunk-Meta header.
+function validateChunkMeta(info, maxChunks) {
+    const { uploadId, index, total } = info || {};
+    if (!/^[A-Za-z0-9-]{8,64}$/.test(String(uploadId || '')) ||
+        !Number.isInteger(index) || !Number.isInteger(total) ||
+        total < 1 || total > maxChunks || index < 0 || index >= total) {
+        throw new UploadError('Invalid chunk details.');
+    }
+    return { uploadId, index, total };
+}
+
+
 // ---------- Attendance date management and timezone-aware dates ----------
 // Attendance date management: list, change, delete and merge dates that have records.
 // Also exports a timezone-aware "today" helper so the server never falls back to UTC.
@@ -286,6 +401,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
 }
 
 const MAX_UPLOAD_CHUNKS = 10; // keep in sync with gas/Code.gs
+const MAX_LEGACY_JSON_BYTES = 8 * 1024 * 1024; // old whole-JSON upload path (small files only)
 
 // ---- Submission upload helpers -------------------------------------------------
 // Sends a body to the Google Apps Script web app and returns its parsed JSON answer.
@@ -324,7 +440,7 @@ async function callGas(env, body) {
 // Streams  prefix + <client request body, untouched> + suffix  to Google Apps Script.
 // The (large) base64 body is never decoded or parsed in the Worker, which keeps CPU
 // and memory use tiny and fits the free plan.
-async function streamToGas(env, request, prefix, suffix) {
+async function streamToGas(env, request, prefix, suffix, maxBytes) {
     if (!request.body) {
         throw new Error("Upload body is missing.");
     }
@@ -339,6 +455,9 @@ async function streamToGas(env, request, prefix, suffix) {
     }
     if (contentLength <= 0) {
         throw new Error("Upload body is empty.");
+    }
+    if (maxBytes && contentLength > maxBytes) {
+        throw new UploadError(`File is too large. Maximum upload is ${Math.round(maxBytes / (1024 * 1024))} MB per request.`, 413);
     }
 
     const encoder = new TextEncoder();
@@ -407,21 +526,33 @@ async function recordSubmission(env, body, fileUrl) {
     }
 }
 
+// Origins allowed to call this API. ALLOWED_ORIGIN may hold several origins separated by commas.
+// Never falls back to "*": an unknown origin simply receives the primary allowed origin,
+// which the browser then rejects.
+function resolveAllowedOrigin(env, requestOrigin) {
+    const configured = String(env.ALLOWED_ORIGIN || '')
+        .split(',')
+        .map(o => o.trim())
+        .filter(Boolean);
+    const list = [...configured, "https://plv.workers.dev", "https://www.plv.workers.dev"];
+    if (requestOrigin && list.includes(requestOrigin)) return requestOrigin;
+    return list[0];
+}
+
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
         const path = url.pathname.replace(/\/$/, '');
         const requestOrigin = request.headers.get("Origin");
 
-        let allowedOrigin = env.ALLOWED_ORIGIN || "*";
-        if (requestOrigin === "https://plv.workers.dev" || requestOrigin === "https://www.plv.workers.dev") {
-            allowedOrigin = requestOrigin;
-        }
+        const allowedOrigin = resolveAllowedOrigin(env, requestOrigin);
 
         const corsHeaders = {
             "Access-Control-Allow-Origin": allowedOrigin,
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
-            "Access-Control-Allow-Headers": "Content-Type, X-Submission-Meta, X-Chunk-Meta"
+            "Access-Control-Allow-Headers": "Content-Type, X-Submission-Meta, X-Chunk-Meta",
+            "Access-Control-Max-Age": "86400",
+            "Vary": "Origin"
         };
 
         if (request.method === "OPTIONS") {
@@ -830,17 +961,24 @@ export default {
 
                     if (metaHeader) {
                         // New path: metadata in a header, raw base64 file in the body (streamed, never parsed here).
+                        checkContentLength(request, MAX_SINGLE_BODY_BYTES);
                         body = JSON.parse(decodeURIComponent(metaHeader));
+                        validateMeta(body);
+                        await verifyUploader(env, body);
+
                         const gasMeta = JSON.stringify({
                             filename: body.filename,
                             mimeType: body.mimeType,
                             pathParts: body.pathParts || []
                         });
                         const prefix = gasMeta.slice(0, -1) + ',"base64":"';
-                        gasData = await streamToGas(env, request, prefix, '"}');
+                        gasData = await streamToGas(env, request, prefix, '"}', MAX_SINGLE_BODY_BYTES);
                     } else {
-                        // Legacy path: whole payload as JSON.
+                        // Legacy path: whole payload as JSON (small files only).
+                        checkContentLength(request, MAX_LEGACY_JSON_BYTES);
                         body = await request.json();
+                        validateMeta(body);
+                        await verifyUploader(env, body);
                         gasData = await callGas(env, JSON.stringify(body));
                     }
 
@@ -848,7 +986,8 @@ export default {
                     return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
                 } catch (err) {
                     const msg = err && err.message ? err.message : "Upload failed.";
-                    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: corsHeaders });
+                    const status = err instanceof UploadError ? err.status : 500;
+                    return new Response(JSON.stringify({ error: msg }), { status, headers: corsHeaders });
                 }
             }
 
@@ -860,17 +999,21 @@ export default {
                     if (!metaHeader) {
                         return new Response(JSON.stringify({ error: "Missing X-Chunk-Meta header." }), { status: 400, headers: corsHeaders });
                     }
-                    const { uploadId, index, total } = JSON.parse(decodeURIComponent(metaHeader));
-                    if (!/^[A-Za-z0-9-]{8,64}$/.test(String(uploadId || "")) ||
-                        !Number.isInteger(index) || !Number.isInteger(total) ||
-                        total < 1 || total > MAX_UPLOAD_CHUNKS || index < 0 || index >= total) {
-                        return new Response(JSON.stringify({ error: "Invalid chunk details." }), { status: 400, headers: corsHeaders });
+                    checkContentLength(request, MAX_CHUNK_BODY_BYTES);
+                    const info = JSON.parse(decodeURIComponent(metaHeader));
+                    const { uploadId, index, total } = validateChunkMeta(info, MAX_UPLOAD_CHUNKS);
+
+                    if (!info.courseId || !info.studentId) {
+                        throw new UploadError("Missing course or student.");
                     }
+                    await verifyUploader(env, { courseId: info.courseId, studentId: info.studentId });
+
                     const prefix = JSON.stringify({ action: "chunk", uploadId, index, total }).slice(0, -1) + ',"data":"';
-                    await streamToGas(env, request, prefix, '"}');
+                    await streamToGas(env, request, prefix, '"}', MAX_CHUNK_BODY_BYTES);
                     return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
                 } catch (err) {
-                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Chunk upload failed." }), { status: 500, headers: corsHeaders });
+                    const status = err instanceof UploadError ? err.status : 500;
+                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Chunk upload failed." }), { status, headers: corsHeaders });
                 }
             }
 
@@ -882,6 +1025,9 @@ export default {
                         !Number.isInteger(total) || total < 1 || total > MAX_UPLOAD_CHUNKS) {
                         return new Response(JSON.stringify({ error: "Invalid upload details." }), { status: 400, headers: corsHeaders });
                     }
+                    validateMeta(body);
+                    await verifyUploader(env, body);
+
                     const gasData = await callGas(env, JSON.stringify({
                         action: "finish",
                         uploadId: body.uploadId,
@@ -893,7 +1039,8 @@ export default {
                     await recordSubmission(env, body, gasData.fileUrl);
                     return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
                 } catch (err) {
-                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Upload failed." }), { status: 500, headers: corsHeaders });
+                    const status = err instanceof UploadError ? err.status : 500;
+                    return new Response(JSON.stringify({ error: err && err.message ? err.message : "Upload failed." }), { status, headers: corsHeaders });
                 }
             }
 
