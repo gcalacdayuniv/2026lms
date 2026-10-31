@@ -1,6 +1,7 @@
 // js/components-dashboard.js
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { ExamUI } from './components-exam.js';
+import { escapeHtml, safeUrl } from './html-utils.js';
 
 const TERM_THEMES = {
     midterm: {
@@ -85,8 +86,8 @@ const DashboardUI = {
                     <div class="flex items-center">
                         <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight"><i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard</h1>
                     </div>
-                    <button type="button" id="profileToggleBtn" aria-haspopup="dialog" aria-label="Open profile menu for ${user.Name}" class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-                        <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${user.Name}</span>${headerAvatar}
+                    <button type="button" id="profileToggleBtn" aria-haspopup="dialog" aria-label="Open profile menu for ${escapeHtml(user.Name)}" class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${escapeHtml(user.Name)}</span>${headerAvatar}
                     </button>
                 </div>
             </div>
@@ -103,20 +104,20 @@ const DashboardUI = {
 
                 <div class="text-center mt-6">
                     ${panelAvatar}
-                    <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${user.Name}</h2>
-                    <p class="text-sm font-medium text-gray-500">@${user.Username || 'N/A'}</p>
+                    <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${escapeHtml(user.Name)}</h2>
+                    <p class="text-sm font-medium text-gray-500">@${escapeHtml(user.Username || 'N/A')}</p>
                 </div>
 
                 <div class="mt-8 px-2 space-y-4">
                     <div class="flex justify-between items-start border-b border-gray-200 pb-4">
                         <div class="flex-1 pr-1">
-                            <span class="block text-xs sm:text-sm font-bold text-blue-600">${user.role || 'N/A'}</span>
+                            <span class="block text-xs sm:text-sm font-bold text-blue-600">${escapeHtml(user.role || 'N/A')}</span>
                         </div>
                         <div class="flex-1 text-center border-x border-gray-200 px-1">
-                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Student_Number || 'N/A'}</span>
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${escapeHtml(user.Student_Number || 'N/A')}</span>
                         </div>
                         <div class="flex-1 text-right pl-1">
-                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${displayCourse}</span>
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${escapeHtml(displayCourse)}</span>
                         </div>
                     </div>
 
@@ -127,10 +128,10 @@ const DashboardUI = {
 
                     <div class="flex flex-col sm:flex-row justify-between items-start space-y-2 sm:space-y-0">
                         <div class="flex-1 pr-2 w-full">
-                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${user.Email || 'N/A'}</span>
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${escapeHtml(user.Email || 'N/A')}</span>
                         </div>
                         <div class="flex-1 text-left sm:text-right sm:border-l border-gray-200 sm:pl-2 w-full">
-                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${user.Contact_Number || 'N/A'}</span>
+                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${escapeHtml(user.Contact_Number || 'N/A')}</span>
                         </div>
                     </div>
                 </div>
@@ -258,37 +259,37 @@ const DashboardUI = {
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Given Name</label>
-                                <input type="text" id="udGivenName" required value="${givenName}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udGivenName" required value="${escapeHtml(givenName)}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Last Name</label>
-                                <input type="text" id="udLastName" required value="${lastName}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udLastName" required value="${escapeHtml(lastName)}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Suffix</label>
-                                <input type="text" id="udSuffix" value="${suffix}" placeholder="e.g. Jr. (Optional)" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udSuffix" value="${escapeHtml(suffix)}" placeholder="e.g. Jr. (Optional)" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Username</label>
-                                <input type="text" id="udUsername" required value="${user.Username || ''}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udUsername" required value="${escapeHtml(user.Username || '')}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
-                                <input type="email" id="udEmail" required value="${user.Email || ''}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="email" id="udEmail" required value="${escapeHtml(user.Email || '')}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Number</label>
-                                <input type="text" id="udContact" value="${user.Contact_Number || ''}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udContact" value="${escapeHtml(user.Contact_Number || '')}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Student Number</label>
-                                <input type="text" id="udStudentNumber" required value="${user.Student_Number || ''}" maxlength="7" placeholder="00-0000" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
+                                <input type="text" id="udStudentNumber" required value="${escapeHtml(user.Student_Number || '')}" maxlength="7" placeholder="00-0000" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
                             </div>
                         </div>
 
@@ -298,15 +299,15 @@ const DashboardUI = {
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Course</label>
-                                <input type="text" id="udProgramCourse" value="${user.Program_Course || ''}" placeholder="e.g. BSCS" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udProgramCourse" value="${escapeHtml(user.Program_Course || '')}" placeholder="e.g. BSCS" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Year</label>
-                                <input type="text" id="udProgramYear" value="${user.Program_Year || ''}" placeholder="e.g. 2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udProgramYear" value="${escapeHtml(user.Program_Year || '')}" placeholder="e.g. 2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Section</label>
-                                <input type="text" id="udProgramSection" value="${user.Program_Section || ''}" placeholder="e.g. A" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udProgramSection" value="${escapeHtml(user.Program_Section || '')}" placeholder="e.g. A" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             </div>
                         </div>
@@ -605,14 +606,14 @@ const DashboardUI = {
 export const DashboardComponents = {
     renderDashboard: (user) => {
         const avatarSrc = getLoadableAvatarSrc(user.Avatar);
-        const headerAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
+        const headerAvatar = avatarSrc ? `<img src="${safeUrl(avatarSrc)}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
 
         let displayCourse = 'N/A';
         if (user.course) {
             displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
         }
 
-        const panelAvatar = avatarSrc ? `<img src="${avatarSrc}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${user.Name}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
+        const panelAvatar = avatarSrc ? `<img src="${safeUrl(avatarSrc)}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(user.Name)}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
 
         let lecturerBtns = '';
         if (user.role.toLowerCase() === 'lecturer') {

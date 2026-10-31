@@ -4,6 +4,7 @@ import { Components, getLoadableAvatarSrc } from './components.js';
 import { CourseAttendance } from './course-attendance.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
+import { escapeHtml, safeUrl } from './html-utils.js';
 
 export const CourseClass = {
     currentSummaryData: null,
@@ -59,7 +60,7 @@ export const CourseClass = {
         const isLecturer = AppState.user && AppState.user.role.toLowerCase() === 'lecturer';
 
         container.innerHTML = submissions.map(sub => {
-            let descHtml = sub.Description || '';
+            let descHtml = escapeHtml(sub.Description || '');
             descHtml = descHtml.replace(/\n/g, '<br>');
             descHtml = descHtml.replace(/\[Group Upload by: (.*?)\]/g, '<span class="block mt-1.5 text-[10px] text-purple-700 font-bold bg-purple-50 border border-purple-100 rounded px-1.5 py-0.5 inline-block"><i class="fa-solid fa-users mr-1"></i>Uploaded by: $1</span>');
             descHtml = descHtml.replace(/\[Included Members: (.*?)\]/g, '<span class="block text-gray-500 italic text-[9px] mt-0.5 leading-tight">Members: $1</span>');
@@ -107,11 +108,11 @@ export const CourseClass = {
             <div class="flex flex-col p-3 bg-white border border-gray-200 rounded hover:border-blue-300 transition shadow-sm">
                 <div class="flex justify-between items-start">
                     <div class="flex-1 pr-2">
-                        <div class="text-xs font-bold text-blue-700 break-words">${sub.Title} <span class="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded ml-1">${sub.Term}</span></div>
+                        <div class="text-xs font-bold text-blue-700 break-words">${escapeHtml(sub.Title)} <span class="text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded ml-1">${escapeHtml(sub.Term)}</span></div>
                         <div class="text-[10px] text-gray-600 mt-1">${descHtml}</div>
                         <div class="text-[9px] text-gray-400 mt-1.5 font-medium uppercase"><i class="fa-regular fa-clock"></i> ${new Date(sub.Timestamp + 'Z').toLocaleString()}</div>
                     </div>
-                    <a href="${sub.File_URL}" target="_blank" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
+                    <a href="${safeUrl(sub.File_URL)}" target="_blank" rel="noopener noreferrer" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
                         <i class="fa-solid ${sub.Type === 'url' ? 'fa-link' : 'fa-download'} block text-sm mb-0.5"></i> View
                     </a>
                 </div>
@@ -176,7 +177,7 @@ export const CourseClass = {
             tbody.innerHTML = termSubmissions.map(s => `
                 <tr class="hover:bg-gray-50 transition">
                     <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${new Date(s.Timestamp + 'Z').toLocaleDateString()}</td>
-                    <td class="px-3 py-2 text-center text-gray-600 truncate max-w-[150px]" title="${s.Title}">${s.Title}</td>
+                    <td class="px-3 py-2 text-center text-gray-600 truncate max-w-[150px]" title="${escapeHtml(s.Title)}">${escapeHtml(s.Title)}</td>
                     <td class="px-3 py-2 text-center font-mono font-bold text-blue-600">${s[colName]}</td>
                 </tr>
             `).join('');
@@ -285,8 +286,8 @@ export const CourseClass = {
                 </head>
                 <body>
                     <div class="header">
-                        <h1>${data.course.CourseCode} | ${data.course.CourseTitle}</h1>
-                        <h3>Schedule: ${data.course.ScheduleDay} | ${data.course.TimePeriod}</h3>
+                        <h1>${escapeHtml(data.course.CourseCode)} | ${escapeHtml(data.course.CourseTitle)}</h1>
+                        <h3>Schedule: ${escapeHtml(data.course.ScheduleDay)} | ${escapeHtml(data.course.TimePeriod)}</h3>
                     </div>
                     <table>
                         <thead>
@@ -310,11 +311,11 @@ export const CourseClass = {
                                 <tr>
                                     <td class="photo-cell">${imgTag}</td>
                                     <td class="center"><strong>${s.Seat_Number || ''}</strong></td>
-                                    <td>${s.Student_Number || ''}</td>
-                                    <td><strong>${s.Name}</strong></td>
+                                    <td>${escapeHtml(s.Student_Number)}</td>
+                                    <td><strong>${escapeHtml(s.Name)}</strong></td>
                                     <td>${`${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim()}</td>
-                                    <td><a href="mailto:${s.Email || ''}" style="color: #000; text-decoration: none;">${s.Email || ''}</a></td>
-                                    <td>${s.Group_Name || ''}</td>
+                                    <td><a href="mailto:${escapeHtml(s.Email)}" style="color: #000; text-decoration: none;">${escapeHtml(s.Email)}</a></td>
+                                    <td>${escapeHtml(s.Group_Name)}</td>
                                     <td>${s.Assigned_Topic || ''}</td>
                                     <td>${s.Contact_Number || ''}</td>
                                 </tr>
@@ -382,10 +383,10 @@ export const CourseClass = {
                     <div class="student-enroll-item flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md shadow-sm hover:border-blue-300 transition">
                         <div>
                             <div class="font-bold text-gray-800 text-sm flex items-center gap-2">
-                                ${s.Name} ${statusBadge}
+                                ${escapeHtml(s.Name)} ${statusBadge}
                             </div>
                             <div class="text-[11px] text-gray-500 mt-0.5">
-                                <span class="font-bold text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'}
+                                <span class="font-bold text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayCourse || 'N/A')}
                             </div>
                             ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${displayProgram}</div>` : ''}
                         </div>

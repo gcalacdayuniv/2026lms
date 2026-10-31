@@ -2,6 +2,7 @@
 import { apiFetch } from './globals.js';
 import { getLoadableAvatarSrc } from './components.js';
 import { getLocalDateString } from './date-utils.js';
+import { escapeHtml, safeUrl } from './html-utils.js';
 
 // Storage key for today's called list (local date, not UTC).
 const getCalledKey = () => {
@@ -17,10 +18,17 @@ const readCalled = (key) => {
     }
 };
 
+// The student's row in the class list on screen (it holds the "Pts" box for the attendance date).
+const getStudentRow = (userId) => {
+    const safeId = window.CSS && CSS.escape ? CSS.escape(userId) : String(userId).replace(/"/g, '\\"');
+    return document.querySelector(`.student-row[data-student-id="${safeId}"]`);
+};
+
 export const CourseRecitation = {
     students: [],
     isSpinning: false,
     currentSelectedStudentId: null,
+    shownPoints: 0,   // the points value last shown for the selected student
 
     openModal: async (courseId) => {
         document.getElementById('recitationModal').classList.remove('hidden');
@@ -85,13 +93,55 @@ export const CourseRecitation = {
             if (!student) return '';
             return `
                 <div class="flex justify-between items-center bg-white p-2 border border-gray-200 rounded shadow-sm">
-                    <span class="text-xs font-bold text-gray-800">${student.Name}</span>
+                    <span class="text-xs font-bold text-gray-800">${escapeHtml(student.Name)}</span>
                     <button type="button" class="remove-called-student text-red-500 hover:text-red-700 text-xs font-bold px-1.5 py-0.5 bg-red-50 hover:bg-red-100 rounded transition" data-user-id="${student.User_ID}">
                         <i class="fa-solid fa-xmark"></i> Remove
                     </button>
                 </div>
             `;
         }).join('');
+    },
+
+    // Fills the points box with the student's current points from the class list.
+    showPoints: (userId) => {
+        const input = document.getElementById('recitationPointsInput');
+        const hint = document.getElementById('recitationPointsHint');
+        if (!input || !hint) return;
+
+        const rowInput = getStudentRow(userId)?.querySelector('.points-input');
+        if (!rowInput) {
+            input.value = '';
+            input.disabled = true;
+            hint.textContent = 'This student is not in the class list on screen.';
+            return;
+        }
+
+        const current = parseInt(rowInput.value, 10) || 0;
+        CourseRecitation.shownPoints = current;
+        input.disabled = false;
+        input.value = String(current);
+
+        const date = document.getElementById('attendanceDate')?.value;
+        hint.textContent = (date ? `Points for ${date}. ` : '') + 'Changes show in the student list. Press Save Attendance to keep them.';
+    },
+
+    // Called when the points box is edited: copies the value into the student list.
+    updatePoints: (rawValue) => {
+        const userId = CourseRecitation.currentSelectedStudentId;
+        if (!userId || rawValue === '') return;
+
+        const value = Math.min(999, Math.max(0, parseInt(rawValue, 10) || 0));
+        const rowInput = getStudentRow(userId)?.querySelector('.points-input');
+        if (!rowInput) return;
+
+        rowInput.value = String(value);
+        // Lets the attendance screen notice the change (unsaved-changes dot, draft saving).
+        rowInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Keep the wheel's weighting in step with the edit.
+        const student = CourseRecitation.students.find(s => s.User_ID === userId);
+        if (student) student.Total_Points = (Number(student.Total_Points) || 0) + (value - CourseRecitation.shownPoints);
+        CourseRecitation.shownPoints = value;
     },
 
     removeCalledStudent: (userId) => {
@@ -218,6 +268,7 @@ export const CourseRecitation = {
             }
 
             CourseRecitation.currentSelectedStudentId = selectedStudent.User_ID;
+            CourseRecitation.showPoints(selectedStudent.User_ID);
 
             const seatDisplay = document.getElementById('recitationResultSeat');
             if (seatDisplay) {
@@ -226,7 +277,7 @@ export const CourseRecitation = {
 
             const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
             const avatarImg = avatarSrc
-                ? `<img src="${avatarSrc}" class="w-32 h-32 rounded-full object-cover border-4 border-purple-500 mx-auto shadow-md">`
+                ? `<img src="${safeUrl(avatarSrc)}" class="w-32 h-32 rounded-full object-cover border-4 border-purple-500 mx-auto shadow-md">`
                 : `<i class="fa-solid fa-circle-user text-[128px] text-gray-300"></i>`;
 
             document.getElementById('recitationResultAvatar').innerHTML = avatarImg;

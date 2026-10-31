@@ -3,6 +3,7 @@ import { getLoadableAvatarSrc } from './components-utils.js';
 import { ExamUI } from './components-exam.js';
 import { Skeleton } from './skeletons.js';
 import { getLocalDateString } from './date-utils.js';
+import { escapeHtml, safeUrl } from './html-utils.js';
 
 // Class summary columns. The first two are pinned while scrolling sideways
 // (on phones only the Student column is pinned, to leave room to scroll).
@@ -665,6 +666,12 @@ const ClassUI = {
                         </div>
                     </div>
 
+                    <div class="flex flex-col items-center mb-6 w-full px-4">
+                        <label for="recitationPointsInput" class="text-xs font-bold text-purple-700 uppercase tracking-wider mb-1">Participation Points</label>
+                        <input id="recitationPointsInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0" class="w-28 px-3 py-2 text-center text-lg font-black text-gray-900 border-2 border-purple-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:text-gray-400 transition">
+                        <p id="recitationPointsHint" class="text-[11px] text-purple-700 mt-1.5 leading-snug"></p>
+                    </div>
+
                     <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
                         Next Student
                     </button>
@@ -730,18 +737,18 @@ export const ClassComponents = {
             const displayProgram = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
 
             const avatarImg = avatarSrc
-                ? `<img src="${avatarSrc}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${avatarSrc}" data-name="${s.Name}" data-info="${displayCourse}" alt="${s.Name}">`
+                ? `<img src="${safeUrl(avatarSrc)}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(s.Name)}" data-info="${displayCourse}" alt="${escapeHtml(s.Name)}">`
                 : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
 
             let eyeConditionBadge = '';
             if (s.eye_condition === 'Legally Blind') {
                 eyeConditionBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300"><i class="fa-solid fa-universal-access mr-1"></i> Legally Blind</span>`;
             } else if (s.eye_condition) {
-                eyeConditionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${s.eye_condition}</span>`;
+                eyeConditionBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-regular fa-eye mr-1"></i> ${escapeHtml(s.eye_condition)}</span>`;
             }
 
             const groupDisplay = s.Group_Name
-                ? `<span class="group-name-trigger text-blue-600 cursor-pointer hover:underline font-black" data-group="${s.Group_Name}" data-course-id="${course.Course_ID}">${s.Group_Name}</span>`
+                ? `<span class="group-name-trigger text-blue-600 cursor-pointer hover:underline font-black" data-group="${escapeHtml(s.Group_Name)}" data-course-id="${course.Course_ID}">${escapeHtml(s.Group_Name)}</span>`
                 : `<span class="text-gray-800">None</span>`;
 
             return `
@@ -754,15 +761,15 @@ export const ClassComponents = {
                                 ${avatarImg}
                             </div>
                             <div>
-                                <div class="font-bold text-blue-600 text-sm sm:text-base cursor-pointer view-summary-trigger hover:underline hover:text-blue-800 transition inline-block" data-name="${s.Name}" title="View Performance Summary">${s.Name}</div>
+                                <div class="font-bold text-blue-600 text-sm sm:text-base cursor-pointer view-summary-trigger hover:underline hover:text-blue-800 transition inline-block" data-name="${escapeHtml(s.Name)}" title="View Performance Summary">${escapeHtml(s.Name)}</div>
                                 <div class="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
-                                    <span class="font-medium text-gray-700">${s.Student_Number || 'N/A'}</span> &bull; ${displayCourse || 'N/A'} ${eyeConditionBadge}
+                                    <span class="font-medium text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayCourse || 'N/A')} ${eyeConditionBadge}
                                 </div>
-                                ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${displayProgram}</div>` : ''}
+                                ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${escapeHtml(displayProgram)}</div>` : ''}
                                 <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
-                                    Seat: <span class="text-gray-800">${s.Seat_Number || ''}</span>
+                                    Seat: <span class="text-gray-800">${escapeHtml(s.Seat_Number || '')}</span>
                                     &nbsp;|&nbsp; Group: ${groupDisplay}
-                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${s.Assigned_Topic || ''}</span>
+                                    &nbsp;|&nbsp; Topic: <span class="text-gray-800">${escapeHtml(s.Assigned_Topic || '')}</span>
                                 </div>
                             </div>
                         </div>
@@ -770,11 +777,11 @@ export const ClassComponents = {
                         <div class="lg:hidden">
                             <button type="button" class="manage-student-btn px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm"
                                 data-student-id="${s.User_ID}"
-                                data-name="${s.Name}"
-                                data-seat="${s.Seat_Number || ''}"
-                                data-group="${s.Group_Name || ''}"
-                                data-topic="${s.Assigned_Topic || ''}"
-                                data-eye="${s.eye_condition || 'No Eye Condition'}"
+                                data-name="${escapeHtml(s.Name)}"
+                                data-seat="${escapeHtml(s.Seat_Number || '')}"
+                                data-group="${escapeHtml(s.Group_Name || '')}"
+                                data-topic="${escapeHtml(s.Assigned_Topic || '')}"
+                                data-eye="${escapeHtml(s.eye_condition || 'No Eye Condition')}"
                                 data-status="${s.account_status || 'Inactive'}">
                                 <i class="fa-solid fa-gear"></i>
                             </button>
@@ -784,11 +791,11 @@ export const ClassComponents = {
                     <div class="hidden lg:flex items-center justify-center w-auto px-2">
                         <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm"
                             data-student-id="${s.User_ID}"
-                            data-name="${s.Name}"
-                            data-seat="${s.Seat_Number || ''}"
-                            data-group="${s.Group_Name || ''}"
-                            data-topic="${s.Assigned_Topic || ''}"
-                            data-eye="${s.eye_condition || 'No Eye Condition'}"
+                            data-name="${escapeHtml(s.Name)}"
+                            data-seat="${escapeHtml(s.Seat_Number || '')}"
+                            data-group="${escapeHtml(s.Group_Name || '')}"
+                            data-topic="${escapeHtml(s.Assigned_Topic || '')}"
+                            data-eye="${escapeHtml(s.eye_condition || 'No Eye Condition')}"
                             data-status="${s.account_status || 'Inactive'}">
                             <i class="fa-solid fa-gear mr-1"></i> Manage
                         </button>
@@ -822,7 +829,7 @@ export const ClassComponents = {
 
         const targetDisplay = [course.Target_Course, course.Target_Year, course.Target_Section].filter(Boolean).join(' ');
         const audienceBadge = targetDisplay
-            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-blue-200 uppercase align-middle ml-2 sm:ml-3">${targetDisplay} Only</span>`
+            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-blue-200 uppercase align-middle ml-2 sm:ml-3">${escapeHtml(targetDisplay)} Only</span>`
             : `<span class="inline-block bg-gray-100 text-gray-600 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-gray-200 uppercase align-middle ml-2 sm:ml-3">All Students</span>`;
 
         return `
@@ -833,8 +840,8 @@ export const ClassComponents = {
                             <i class="fa-solid fa-arrow-left text-xl"></i>
                         </a>
                         <div class="overflow-hidden">
-                            <h1 class="text-base sm:text-lg font-bold text-white truncate">${course.CourseCode}</h1>
-                            <p class="text-[11px] sm:text-xs text-blue-200 truncate">${course.CourseTitle}</p>
+                            <h1 class="text-base sm:text-lg font-bold text-white truncate">${escapeHtml(course.CourseCode)}</h1>
+                            <p class="text-[11px] sm:text-xs text-blue-200 truncate">${escapeHtml(course.CourseTitle)}</p>
                         </div>
                     </div>
                 </div>
@@ -846,13 +853,13 @@ export const ClassComponents = {
                         <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
                             Class Roster & Attendance ${audienceBadge}
                         </h2>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${course.ScheduleDay} | ${course.TimePeriod}</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(course.ScheduleDay)} | ${escapeHtml(course.TimePeriod)}</p>
                     </div>
                 </div>
 
                 <div id="attendanceBar" data-dirty="false" class="sticky top-16 z-30 mb-4 px-2 sm:px-3 py-2 bg-gray-50/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
                     <div class="flex items-center gap-2">
-                        <input type="date" id="attendanceDate" data-schedule-day="${course.ScheduleDay || ''}" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
+                        <input type="date" id="attendanceDate" data-schedule-day="${escapeHtml(course.ScheduleDay || '')}" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
                         <span id="attendanceDirtyLabel" class="ml-auto text-xs font-bold text-orange-600 whitespace-nowrap"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>Unsaved changes</span>
                         <span id="attendanceDirtyStatus" class="sr-only" role="status"></span>
                         <div class="relative flex-shrink-0 sm:ml-0">

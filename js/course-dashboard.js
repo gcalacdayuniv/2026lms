@@ -1,8 +1,9 @@
 // js/course-dashboard.js
-import { apiFetch, AppState, CONFIG } from './globals.js';
+import { apiFetch, AppState, CONFIG, handleSessionExpired } from './globals.js';
 import { CourseExam } from './course-exam.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
+import { escapeHtml } from './html-utils.js';
 
 // Maximum size of an uploaded submission file.
 const MAX_UPLOAD_MB = 25;
@@ -25,6 +26,7 @@ const xhrPost = (path, { headers = {}, body, timeoutMs, onProgress }) => new Pro
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${CONFIG.API_URL}${path}`, true);
     Object.keys(headers).forEach(k => xhr.setRequestHeader(k, headers[k]));
+    if (AppState.token) xhr.setRequestHeader('Authorization', `Bearer ${AppState.token}`);
     xhr.timeout = timeoutMs;
 
     const fail = (message, retryable) => {
@@ -44,6 +46,7 @@ const xhrPost = (path, { headers = {}, body, timeoutMs, onProgress }) => new Pro
             else fail("Failed to parse server response", true);
             return;
         }
+        if (xhr.status === 401) handleSessionExpired();
         const message = (data && data.error) || `Upload failed with status ${xhr.status}`;
         // Client errors (bad file, not enrolled, too large) will not succeed on a retry.
         const retryable = xhr.status >= 500 || xhr.status === 408 || xhr.status === 429 || xhr.status === 0;
@@ -140,6 +143,144 @@ const uploadChunked = async (meta, base64Data, setStatus) => {
     }
 };
 
+
+// ---- Dashboard templates (pure functions: data in, HTML out) ----
+// Reloads the program list into the "target course" dropdown of the Create Course form.
+const refreshProgramOptions = async () => {
+    const programsData = await apiFetch(`/api/programs?_t=${new Date().getTime()}`);
+    const targetCourseSelect = document.getElementById('targetCourse');
+    if (targetCourseSelect && programsData.programs) {
+        targetCourseSelect.innerHTML = '<option value="">All Courses</option>' +
+            programsData.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
+    }
+};
+
+const DAY_ORDER = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+
+const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return 0;
+    let [ , h, m, period ] = match;
+    h = parseInt(h);
+    if (period.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (period.toUpperCase() === 'AM' && h === 12) h = 0;
+    return h * 60 + parseInt(m);
+};
+
+// Sorts in place by weekday, then start time.
+const sortCoursesBySchedule = (courses) => courses.sort((a, b) => {
+    const dayDiff = (DAY_ORDER[a.ScheduleDay] || 8) - (DAY_ORDER[b.ScheduleDay] || 8);
+    if (dayDiff !== 0) return dayDiff;
+    return parseTimeToMinutes(a.TimePeriod) - parseTimeToMinutes(b.TimePeriod);
+});
+
+const loadErrorHtml = (err) =>
+    `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${escapeHtml(err && err.message)}</div>`;
+
+const lecturerCourseCardHtml = (c) => `
+                <a href="#class-${c.Course_ID}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
+                    <div class="flex justify-between items-start mb-1">
+                        <div class="font-bold text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
+                        ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
+                            `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
+                                ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
+                            </span>` :
+                            `<span class="bg-blue-50 text-blue-500 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
+                        }
+                    </div>
+                    <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
+                    <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
+                        <i class="fa-regular fa-calendar mr-1"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(c.TimePeriod)}
+                    </div>
+                </a>
+            `;
+
+const enrolledCourseCardHtml = (c) => `
+                <div class="cursor-pointer student-active-course p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md hover:border-green-400 transform hover:-translate-y-1" data-course-id="${c.Course_ID}" data-course-title="${escapeHtml(c.CourseCode)} | ${escapeHtml(c.CourseTitle)}">
+                    <div class="absolute top-0 right-0 bg-green-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold shadow-sm tracking-widest uppercase">Enrolled</div>
+                    <div class="font-black text-xl text-green-800 pr-16">${escapeHtml(c.CourseCode)}</div>
+                    <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
+                    <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
+                    <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
+                    <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${escapeHtml(c.Seat_Number || 'Unassigned')}</span></div>
+                </div>
+            `;
+
+const availableCourseCardHtml = (c) => `
+                <div class="p-5 border rounded-xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start md:items-center transition hover:border-blue-300 gap-4">
+                    <div>
+                        <div class="font-black text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
+                        <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
+                        <div class="text-sm text-gray-600 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
+                        <div class="text-sm text-gray-600 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
+                    </div>
+                    <button data-id="${c.Course_ID}" class="enroll-btn w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-bold transition-colors">
+                        Enroll Now
+                    </button>
+                </div>
+            `;
+
+const buildAssignedExamsSection = (assignedExams, isBlind) => {
+    if (!(assignedExams.length > 0 || isBlind)) return '';
+    let assignedExamsSectionHtml = '';
+                const examCardsHtml = assignedExams.length > 0
+                    ? assignedExams.map(ex => {
+                        const isDone = ex.status === 'Completed';
+                        return `
+                            <div class="dash-exam-card p-5 rounded-xl border-2 ${isDone ? 'bg-indigo-900/70 border-indigo-700' : 'bg-indigo-900 border-yellow-400'} flex flex-col justify-between gap-4 shadow-md transition hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-yellow-400 cursor-pointer" tabindex="0">
+                                <div>
+                                    <div class="flex justify-between items-start gap-2">
+                                        <span class="px-2.5 py-0.5 bg-yellow-400 text-gray-950 font-black text-[10px] rounded uppercase tracking-wider">${escapeHtml(ex.courseCode)} &bull; ${ex.term}</span>
+                                        ${ex.toDate ? `<span class="text-[10px] text-indigo-200 font-mono">Open until: ${ex.toDate}</span>` : ''}
+                                    </div>
+                                    <h3 class="text-lg sm:text-xl font-black text-white mt-2">${escapeHtml(ex.examTitle)}</h3>
+                                    <p class="text-xs text-indigo-200 font-medium mt-0.5">${escapeHtml(ex.courseTitle)}</p>
+                                    <div class="text-xs text-yellow-300 font-bold mt-2">
+                                        Questions: ${ex.regularCount}${ex.bonusCount > 0 ? ` + ${ex.bonusCount} Bonus` : ''} &nbsp;|&nbsp; Max Score: ${ex.maxScore}
+                                    </div>
+                                </div>
+                                ${isDone ? `
+                                    <div class="w-full py-3 px-4 bg-green-700 text-white font-black text-sm rounded-lg text-center border border-green-400">
+                                        <i class="fa-solid fa-circle-check mr-1.5"></i> Completed - Score: ${ex.finalScore} /${ex.maxScore}
+                                    </div>
+                                ` : `
+                                    <button type="button" class="start-accessible-exam-btn w-full py-3.5 px-4 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-sm sm:text-base rounded-lg shadow-md transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}">
+                                        <i class="fa-solid ${isBlind ? 'fa-headphones' : 'fa-pen-to-square'} mr-2 text-lg"></i> Enter Exam: ${escapeHtml(ex.examTitle)}
+                                    </button>
+                                `}
+                            </div>
+                        `;
+                    }).join('')
+                    : `<div class="col-span-full p-6 text-center text-indigo-200 border-2 border-dashed border-indigo-700 rounded-xl font-bold text-sm">You have no active assigned exams at this moment.</div>`;
+
+                const readAloudBtnHtml = isBlind ? `
+                            <button type="button" id="readDashboardExamsBtn" class="w-full sm:w-auto px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-xs sm:text-sm rounded-lg shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white">
+                                <i class="fa-solid fa-volume-high mr-2"></i> Read Aloud Assigned Exams
+                            </button>` : '';
+
+                assignedExamsSectionHtml = `
+                    <section class="bg-indigo-950 text-white p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-yellow-400">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-indigo-800">
+                            <div class="flex items-center">
+                                <div class="bg-yellow-400 text-gray-950 p-2.5 rounded-xl mr-3">
+                                    <i class="fa-solid ${isBlind ? 'fa-universal-access' : 'fa-file-pen'} text-xl"></i>
+                                </div>
+                                <div>
+                                    <h2 class="text-xl sm:text-2xl font-black text-white">${isBlind ? 'Assigned Accessible Exams' : 'Assigned Exams'}</h2>
+                                    <p class="text-xs text-indigo-200">${isBlind ? 'Full-screen exam mode with voice read-aloud and automatic score recording' : 'Full-screen exam mode with automatic score recording'}</p>
+                                </div>
+                            </div>
+                            ${readAloudBtnHtml}
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${examCardsHtml}
+                        </div>
+                    </section>
+                `;
+    return assignedExamsSectionHtml;
+};
+
 export const CourseDashboard = {
     loadGroupMembersForUpload: async (courseId) => {
         const section = document.getElementById('groupUploadSection');
@@ -160,7 +301,7 @@ export const CourseDashboard = {
                 list.innerHTML = data.members.map(m => `
                     <label class="flex items-center space-x-2 text-[10px] font-medium text-gray-700 cursor-pointer">
                         <input type="checkbox" class="group-member-checkbox rounded text-purple-600 focus:ring-purple-500" value="${m.User_ID}" checked>
-                        <span>${m.Name} (${m.Student_Number || 'N/A'})</span>
+                        <span>${escapeHtml(m.Name)} (${escapeHtml(m.Student_Number || 'N/A')})</span>
                     </label>
                 `).join('');
             }
@@ -340,13 +481,7 @@ export const CourseDashboard = {
             successDiv.classList.remove('hidden');
             document.getElementById('addProgramForm').reset();
 
-            const ts = new Date().getTime();
-            const programsData = await apiFetch(`/api/programs?_t=${ts}`);
-            const targetCourseSelect = document.getElementById('targetCourse');
-            if (targetCourseSelect && programsData.programs) {
-                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' +
-                    programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-            }
+            await refreshProgramOptions();
 
             setTimeout(() => {
                 successDiv.classList.add('hidden');
@@ -409,50 +544,13 @@ export const CourseDashboard = {
     renderLecturerDashboard: async (container) => {
         try {
             const ts = new Date().getTime();
-            const programsData = await apiFetch(`/api/programs?_t=${ts}`);
-            const targetCourseSelect = document.getElementById('targetCourse');
-            if (targetCourseSelect && programsData.programs) {
-                targetCourseSelect.innerHTML = '<option value="">All Courses</option>' +
-                    programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
-            }
+            await refreshProgramOptions();
 
             const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&_t=${ts}`);
 
-            const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
-            const parseTime = (timeStr) => {
-                if (!timeStr) return 0;
-                const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                if (!match) return 0;
-                let [ , h, m, period ] = match;
-                h = parseInt(h);
-                if (period.toUpperCase() === 'PM' && h !== 12) h += 12;
-                if (period.toUpperCase() === 'AM' && h === 12) h = 0;
-                return h * 60 + parseInt(m);
-            };
+            sortCoursesBySchedule(data.courses);
 
-            data.courses.sort((a, b) => {
-                const dayDiff = (dayMap[a.ScheduleDay] || 8) - (dayMap[b.ScheduleDay] || 8);
-                if (dayDiff !== 0) return dayDiff;
-                return parseTime(a.TimePeriod) - parseTime(b.TimePeriod);
-            });
-
-            let coursesHtml = data.courses.map(c => `
-                <a href="#class-${c.Course_ID}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
-                    <div class="flex justify-between items-start mb-1">
-                        <div class="font-bold text-xl text-blue-700">${c.CourseCode}</div>
-                        ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
-                            `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
-                                ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
-                            </span>` :
-                            `<span class="bg-blue-50 text-blue-500 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
-                        }
-                    </div>
-                    <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
-                    <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
-                        <i class="fa-regular fa-calendar mr-1"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${c.TimePeriod}
-                    </div>
-                </a>
-            `).join('');
+            let coursesHtml = data.courses.map(lecturerCourseCardHtml).join('');
 
             if (!coursesHtml) {
                 coursesHtml = `<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><p class="mb-4">No courses created yet.</p><button type="button" id="emptyNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button></div>`;
@@ -470,7 +568,7 @@ export const CourseDashboard = {
                 </div>
             `;
         } catch (err) {
-            container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${err.message}</div>`;
+            container.innerHTML = loadErrorHtml(err);
         }
     },
 
@@ -495,96 +593,19 @@ export const CourseDashboard = {
             }
 
             const isBlind = AppState.user.eye_condition === 'Legally Blind';
-            let assignedExamsSectionHtml = '';
 
-            if (assignedExams.length > 0 || isBlind) {
-                const examCardsHtml = assignedExams.length > 0
-                    ? assignedExams.map(ex => {
-                        const isDone = ex.status === 'Completed';
-                        return `
-                            <div class="dash-exam-card p-5 rounded-xl border-2 ${isDone ? 'bg-indigo-900/70 border-indigo-700' : 'bg-indigo-900 border-yellow-400'} flex flex-col justify-between gap-4 shadow-md transition hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-yellow-400 cursor-pointer" tabindex="0">
-                                <div>
-                                    <div class="flex justify-between items-start gap-2">
-                                        <span class="px-2.5 py-0.5 bg-yellow-400 text-gray-950 font-black text-[10px] rounded uppercase tracking-wider">${ex.courseCode} &bull; ${ex.term}</span>
-                                        ${ex.toDate ? `<span class="text-[10px] text-indigo-200 font-mono">Open until: ${ex.toDate}</span>` : ''}
-                                    </div>
-                                    <h3 class="text-lg sm:text-xl font-black text-white mt-2">${ex.examTitle}</h3>
-                                    <p class="text-xs text-indigo-200 font-medium mt-0.5">${ex.courseTitle}</p>
-                                    <div class="text-xs text-yellow-300 font-bold mt-2">
-                                        Questions: ${ex.regularCount}${ex.bonusCount > 0 ? ` + ${ex.bonusCount} Bonus` : ''} &nbsp;|&nbsp; Max Score: ${ex.maxScore}
-                                    </div>
-                                </div>
-                                ${isDone ? `
-                                    <div class="w-full py-3 px-4 bg-green-700 text-white font-black text-sm rounded-lg text-center border border-green-400">
-                                        <i class="fa-solid fa-circle-check mr-1.5"></i> Completed - Score: ${ex.finalScore} /${ex.maxScore}
-                                    </div>
-                                ` : `
-                                    <button type="button" class="start-accessible-exam-btn w-full py-3.5 px-4 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-sm sm:text-base rounded-lg shadow-md transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}">
-                                        <i class="fa-solid ${isBlind ? 'fa-headphones' : 'fa-pen-to-square'} mr-2 text-lg"></i> Enter Exam: ${ex.examTitle}
-                                    </button>
-                                `}
-                            </div>
-                        `;
-                    }).join('')
-                    : `<div class="col-span-full p-6 text-center text-indigo-200 border-2 border-dashed border-indigo-700 rounded-xl font-bold text-sm">You have no active assigned exams at this moment.</div>`;
-
-                const readAloudBtnHtml = isBlind ? `
-                            <button type="button" id="readDashboardExamsBtn" class="w-full sm:w-auto px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-xs sm:text-sm rounded-lg shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white">
-                                <i class="fa-solid fa-volume-high mr-2"></i> Read Aloud Assigned Exams
-                            </button>` : '';
-
-                assignedExamsSectionHtml = `
-                    <section class="bg-indigo-950 text-white p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-yellow-400">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-indigo-800">
-                            <div class="flex items-center">
-                                <div class="bg-yellow-400 text-gray-950 p-2.5 rounded-xl mr-3">
-                                    <i class="fa-solid ${isBlind ? 'fa-universal-access' : 'fa-file-pen'} text-xl"></i>
-                                </div>
-                                <div>
-                                    <h2 class="text-xl sm:text-2xl font-black text-white">${isBlind ? 'Assigned Accessible Exams' : 'Assigned Exams'}</h2>
-                                    <p class="text-xs text-indigo-200">${isBlind ? 'Full-screen exam mode with voice read-aloud and automatic score recording' : 'Full-screen exam mode with automatic score recording'}</p>
-                                </div>
-                            </div>
-                            ${readAloudBtnHtml}
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            ${examCardsHtml}
-                        </div>
-                    </section>
-                `;
-            }
+            const assignedExamsSectionHtml = buildAssignedExamsSection(assignedExams, isBlind);
 
             const enrolledIds = myCoursesRes.courses.map(c => c.Course_ID);
 
-            let enrolledHtml = myCoursesRes.courses.map(c => `
-                <div class="cursor-pointer student-active-course p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md hover:border-green-400 transform hover:-translate-y-1" data-course-id="${c.Course_ID}" data-course-title="${c.CourseCode} | ${c.CourseTitle}">
-                    <div class="absolute top-0 right-0 bg-green-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold shadow-sm tracking-widest uppercase">Enrolled</div>
-                    <div class="font-black text-xl text-green-800 pr-16">${c.CourseCode}</div>
-                    <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
-                    <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${c.LecturerName}</div>
-                    <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${c.TimePeriod}</div>
-                    <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${c.Seat_Number || 'Unassigned'}</span></div>
-                </div>
-            `).join('');
+            let enrolledHtml = myCoursesRes.courses.map(enrolledCourseCardHtml).join('');
 
             if (!enrolledHtml) {
                 enrolledHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">You are not enrolled in any courses yet.</div>';
             }
 
             const availableCourses = allCoursesRes.courses.filter(c => !enrolledIds.includes(c.Course_ID));
-            let availableHtml = availableCourses.map(c => `
-                <div class="p-5 border rounded-xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start md:items-center transition hover:border-blue-300 gap-4">
-                    <div>
-                        <div class="font-black text-xl text-blue-700">${c.CourseCode}</div>
-                        <div class="text-gray-800 font-bold mb-2">${c.CourseTitle}</div>
-                        <div class="text-sm text-gray-600 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${c.LecturerName}</div>
-                        <div class="text-sm text-gray-600 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${c.ScheduleDay} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${c.TimePeriod}</div>
-                    </div>
-                    <button data-id="${c.Course_ID}" class="enroll-btn w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-bold transition-colors">
-                        Enroll Now
-                    </button>
-                </div>
-            `).join('');
+            let availableHtml = availableCourses.map(availableCourseCardHtml).join('');
 
             if (!availableHtml) {
                 availableHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No new courses available for enrollment.</div>';
@@ -613,7 +634,7 @@ export const CourseDashboard = {
                 CourseExam.announceDashboardExams();
             }
         } catch (err) {
-            container.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${err.message}</div>`;
+            container.innerHTML = loadErrorHtml(err);
         }
     },
 

@@ -2,6 +2,7 @@
 import { apiFetch, AppState } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
+import { escapeHtml, safeUrl } from './html-utils.js';
 
 export const AuthModule = {
     usersList: [],
@@ -34,6 +35,7 @@ export const AuthModule = {
                 });
                 
                 AppState.setUser(data.user);
+                AppState.setToken(data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
                 window.location.hash = 'dashboard';
             } catch (err) {
@@ -472,7 +474,7 @@ export const AuthModule = {
             
             if (data.programs && data.programs.length > 0) {
                 courseSelect.innerHTML = '<option value="" disabled selected>Select Course</option>' + 
-                    data.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+                    data.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
             } else {
                 courseSelect.innerHTML = '<option value="" disabled selected>No courses available</option>';
             }
@@ -515,7 +517,7 @@ export const AuthModule = {
         list.innerHTML = filtered.map(u => {
             const avatarSrc = u.Avatar ? getLoadableAvatarSrc(u.Avatar) : null;
             const avatarImg = avatarSrc 
-                ? `<img src="${avatarSrc}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${avatarSrc}" data-name="${u.Name}" data-info="${u.course || ''} ${u.year || ''} ${u.section || ''}">` 
+                ? `<img src="${safeUrl(avatarSrc)}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(u.Name)}" data-info="${escapeHtml(u.course || '')} ${escapeHtml(u.year || '')} ${escapeHtml(u.section || '')}">` 
                 : `<i class="fa-solid fa-circle-user text-[48px] sm:text-[56px] text-gray-300"></i>`;
                 
             const regDate = u.registration_timestamp ? new Date(u.registration_timestamp + 'Z').toLocaleString() : 'N/A';
@@ -530,15 +532,15 @@ export const AuthModule = {
                         ${avatarImg}
                     </div>
                     <div class="overflow-hidden min-w-0">
-                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${u.Name} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${u.role}</span>${disabilityBadge}</div>
+                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${escapeHtml(u.Name)} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${escapeHtml(u.role)}</span>${disabilityBadge}</div>
                         
                         <div class="text-[11px] sm:text-xs text-gray-600 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span class="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">${u.Student_Number || 'N/A'}</span>
-                            <a href="mailto:${u.Email || ''}" class="text-blue-600 hover:underline truncate bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition inline-flex items-center" title="Send Email"><i class="fa-regular fa-envelope mr-1.5"></i>${u.Email || 'No Email Provided'}</a>
+                            <span class="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">${escapeHtml(u.Student_Number || 'N/A')}</span>
+                            <a href="mailto:${escapeHtml(u.Email || '')}" class="text-blue-600 hover:underline truncate bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition inline-flex items-center" title="Send Email"><i class="fa-regular fa-envelope mr-1.5"></i>${escapeHtml(u.Email || 'No Email Provided')}</a>
                         </div>
                         
-                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${u.course || 'N/A'} ${u.year || ''} ${u.section || ''}</div>
-                        ${(u.Program_Course || u.Program_Year || u.Program_Section) ? `<div class="text-[10px] sm:text-[11px] text-blue-700 mt-1 truncate"><i class="fa-solid fa-book-open mr-1.5"></i>Program: ${u.Program_Course || ''} ${u.Program_Year || ''} ${u.Program_Section || ''}</div>` : ''}
+                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${escapeHtml(u.course || 'N/A')} ${escapeHtml(u.year || '')} ${escapeHtml(u.section || '')}</div>
+                        ${(u.Program_Course || u.Program_Year || u.Program_Section) ? `<div class="text-[10px] sm:text-[11px] text-blue-700 mt-1 truncate"><i class="fa-solid fa-book-open mr-1.5"></i>Program: ${escapeHtml(u.Program_Course || '')} ${escapeHtml(u.Program_Year || '')} ${escapeHtml(u.Program_Section || '')}</div>` : ''}
                         <div class="text-[9px] sm:text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-wider"><i class="fa-regular fa-clock mr-1"></i>Reg: ${regDate}</div>
                     </div>
                 </div>

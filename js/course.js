@@ -7,6 +7,7 @@ import { CourseRecitation } from './course-recitation.js';
 import { CourseExam } from './course-exam.js';
 import { getLoadableAvatarSrc } from './components.js';
 import { UI } from './ui-feedback.js';
+import { escapeHtml, safeUrl } from './html-utils.js';
 
 export const CourseModule = {
     lastTap: 0,
@@ -70,6 +71,11 @@ export const CourseModule = {
     },
 
     handleInput: async (e) => {
+        if (e.target.id === 'recitationPointsInput') {
+            CourseRecitation.updatePoints(e.target.value);
+            return;
+        }
+
         if (e.target.id === 'studentSearchInput') {
             const searchTerm = e.target.value.toLowerCase();
             const items = document.querySelectorAll('.student-enroll-item');
@@ -216,13 +222,13 @@ export const CourseModule = {
                 if (data.members && data.members.length > 0) {
                     content.innerHTML = data.members.map(m => {
                         const avatarSrc = getLoadableAvatarSrc(m.Avatar);
-                        const avatarImg = avatarSrc ? `<img src="${avatarSrc}" class="w-10 h-10 rounded-full object-cover border border-gray-200">` : `<i class="fa-solid fa-circle-user text-[40px] text-gray-300"></i>`;
+                        const avatarImg = avatarSrc ? `<img src="${safeUrl(avatarSrc)}" class="w-10 h-10 rounded-full object-cover border border-gray-200">` : `<i class="fa-solid fa-circle-user text-[40px] text-gray-300"></i>`;
                         return `
                             <div class="flex items-center space-x-3 p-2 bg-gray-50 border border-gray-200 rounded">
                                 <div class="flex-shrink-0">${avatarImg}</div>
                                 <div>
-                                    <div class="text-sm font-bold text-gray-800">${m.Name}</div>
-                                    <div class="text-[10px] text-gray-500">${m.Student_Number || 'N/A'}</div>
+                                    <div class="text-sm font-bold text-gray-800">${escapeHtml(m.Name)}</div>
+                                    <div class="text-[10px] text-gray-500">${escapeHtml(m.Student_Number || 'N/A')}</div>
                                 </div>
                             </div>
                         `;
@@ -607,7 +613,7 @@ export const CourseModule = {
                 const programsData = await apiFetch(`/api/programs?_t=${ts}`);
                 if (programsData.programs) {
                     filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' +
-                        programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+                        programsData.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
                 }
             } catch(e) {}
 
