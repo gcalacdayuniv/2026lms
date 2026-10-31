@@ -4,6 +4,142 @@ import { CourseExam } from './course-exam.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 
+// Maximum size of an uploaded submission file.
+const MAX_UPLOAD_MB = 25;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
+// Large files are sent in pieces. Keep in sync with MAX_UPLOAD_CHUNKS (worker.js) and MAX_CHUNKS (Code.gs).
+// A 25 MB file is about 35 million base64 characters, which fits in 10 pieces of 3.6 million.
+const CHUNK_CHARS = 3600000;            // must be a multiple of 4 so every piece is valid base64
+const MAX_CHUNKS = 10;
+const PARALLEL_CHUNKS = 3;
+const CHUNK_RETRIES = 3;                // attempts per piece
+const CHUNK_TIMEOUT_MS = 120000;        // per piece
+const SINGLE_TIMEOUT_MS = 90000;        // small files sent in one request
+const FINISH_TIMEOUT_MS = 180000;       // Google joins the pieces and saves the file
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// One XMLHttpRequest with a timeout. Errors carry `retryable` so callers know whether to try again.
+const xhrPost = (path, { headers = {}, body, timeoutMs, onProgress }) => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${CONFIG.API_URL}${path}`, true);
+    Object.keys(headers).forEach(k => xhr.setRequestHeader(k, headers[k]));
+    xhr.timeout = timeoutMs;
+
+    const fail = (message, retryable) => {
+        const err = new Error(message);
+        err.retryable = retryable;
+        reject(err);
+    };
+
+    if (onProgress) xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded); };
+
+    xhr.onload = () => {
+        let data = null;
+        try { data = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+            if (data) resolve(data);
+            else fail("Failed to parse server response", true);
+            return;
+        }
+        const message = (data && data.error) || `Upload failed with status ${xhr.status}`;
+        // Client errors (bad file, not enrolled, too large) will not succeed on a retry.
+        const retryable = xhr.status >= 500 || xhr.status === 408 || xhr.status === 429 || xhr.status === 0;
+        fail(message, retryable);
+    };
+    xhr.onerror = () => fail("Network error occurred during upload. Please check your connection.", true);
+    xhr.ontimeout = () => fail("The upload timed out. Please check your connection and try again.", true);
+    xhr.send(body);
+});
+
+// Sends one piece, retrying with a short pause between attempts.
+const sendChunk = async (info, body, onProgress) => {
+    let lastErr;
+    for (let attempt = 1; attempt <= CHUNK_RETRIES; attempt++) {
+        try {
+            onProgress(0);
+            return await xhrPost('/api/upload-chunk', {
+                headers: {
+                    'Content-Type': 'text/plain',
+                    'X-Chunk-Meta': encodeURIComponent(JSON.stringify(info))
+                },
+                body,
+                timeoutMs: CHUNK_TIMEOUT_MS,
+                onProgress
+            });
+        } catch (err) {
+            lastErr = err;
+            if (!err.retryable || attempt === CHUNK_RETRIES) break;
+            await sleep(attempt * 1000);
+        }
+    }
+    throw lastErr;
+};
+
+// Sends all pieces (a few at a time), then asks the Worker to join them and record the submission.
+const uploadChunked = async (meta, base64Data, setStatus) => {
+    const total = Math.ceil(base64Data.length / CHUNK_CHARS);
+    if (total > MAX_CHUNKS) {
+        throw new Error(`File is too large. Maximum size is ${MAX_UPLOAD_MB}MB.`);
+    }
+
+    const uploadId = crypto.randomUUID();
+    const sentChars = new Array(total).fill(0);   // progress per piece
+    const sizes = [];
+    for (let i = 0; i < total; i++) {
+        sizes.push(Math.min(CHUNK_CHARS, base64Data.length - i * CHUNK_CHARS));
+    }
+    let doneParts = 0;
+    let failed = null;
+    let next = 0;
+
+    const report = () => {
+        const sent = sentChars.reduce((a, b) => a + b, 0);
+        const pct = Math.min(99, Math.floor((sent / base64Data.length) * 100));
+        setStatus(`Uploading to Portal... ${pct}% (part ${Math.min(doneParts + 1, total)} of ${total})`);
+    };
+
+    const worker = async () => {
+        while (!failed && next < total) {
+            const i = next++;
+            const piece = base64Data.slice(i * CHUNK_CHARS, i * CHUNK_CHARS + CHUNK_CHARS);
+            try {
+                await sendChunk(
+                    { uploadId, index: i, total, courseId: meta.courseId, studentId: meta.studentId },
+                    piece,
+                    (loaded) => { sentChars[i] = Math.min(sizes[i], loaded); report(); }
+                );
+                sentChars[i] = sizes[i];
+                doneParts++;
+                report();
+            } catch (err) {
+                failed = failed || err;
+            }
+        }
+    };
+
+    report();
+    await Promise.all(Array.from({ length: Math.min(PARALLEL_CHUNKS, total) }, worker));
+    if (failed) throw failed;
+
+    setStatus('Joining parts and saving to Google Drive... please wait.');
+    try {
+        return await xhrPost('/api/finish-chunked-upload', {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...meta, uploadId, total }),
+            timeoutMs: FINISH_TIMEOUT_MS
+        });
+    } catch (err) {
+        // The final step is not retried automatically: it may already have been saved.
+        if (err.retryable) {
+            throw new Error(err.message + " Your file may already have been saved, so check View History before uploading again.");
+        }
+        throw err;
+    }
+};
+
 export const CourseDashboard = {
     loadGroupMembersForUpload: async (courseId) => {
         const section = document.getElementById('groupUploadSection');
@@ -94,8 +230,8 @@ export const CourseDashboard = {
                 if (!fileInput.files || fileInput.files.length === 0) throw new Error("Please select a file.");
                 const file = fileInput.files[0];
 
-                if (file.size > 5 * 1024 * 1024) {
-                    throw new Error("File size exceeds 5MB. Please upload your document to Google Drive, set the sharing access to 'Anyone with the link', and submit it here as a URL Link instead.");
+                if (file.size > MAX_UPLOAD_BYTES) {
+                    throw new Error(`File size exceeds ${MAX_UPLOAD_MB}MB. Please upload your document to Google Drive, set the sharing access to 'Anyone with the link', and submit it here as a URL Link instead.`);
                 }
 
                 mimeType = file.type;
@@ -118,7 +254,10 @@ export const CourseDashboard = {
                 finalFilename = `${baseFilename}.txt`;
             }
 
-            const payload = {
+            // Details travel in a header; the raw base64 file is the request body.
+            // The Worker streams the body straight to Google Drive without parsing it,
+            // which is what allows large files.
+            const meta = {
                 courseId: courseId,
                 studentId: user.User_ID,
                 term: term,
@@ -127,7 +266,6 @@ export const CourseDashboard = {
                 type: type,
                 filename: finalFilename,
                 mimeType: mimeType,
-                base64: base64Data,
                 pathParts: [courseYearSection, "Submitted"],
                 isGroup: isGroup,
                 includedMembers: includedMembers
@@ -135,39 +273,25 @@ export const CourseDashboard = {
 
             progressText.textContent = 'Starting upload...';
 
-            const dbData = await new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', `${CONFIG.API_URL}/api/upload-submission`, true);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-
-                xhr.upload.onprogress = (event) => {
-                    if (event.lengthComputable) {
-                        const uploadedMB = (event.loaded / (1024 * 1024)).toFixed(2);
-                        const totalMB = (event.total / (1024 * 1024)).toFixed(2);
-                        progressText.textContent = `Uploading to Portal... ${uploadedMB} MB / ${totalMB} MB`;
+            let dbData;
+            if (base64Data.length <= CHUNK_CHARS) {
+                // Small file or link: one request.
+                dbData = await xhrPost('/api/upload-submission', {
+                    headers: {
+                        'Content-Type': 'text/plain',
+                        'X-Submission-Meta': encodeURIComponent(JSON.stringify(meta))
+                    },
+                    body: base64Data,
+                    timeoutMs: SINGLE_TIMEOUT_MS,
+                    onProgress: (loaded) => {
+                        const pct = Math.min(99, Math.floor((loaded / base64Data.length) * 100));
+                        progressText.textContent = `Uploading to Portal... ${pct}%`;
                     }
-                };
-
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            resolve(JSON.parse(xhr.responseText));
-                        } catch (e) {
-                            reject(new Error("Failed to parse server response"));
-                        }
-                    } else {
-                        try {
-                            const err = JSON.parse(xhr.responseText);
-                            reject(new Error(err.error || `Upload failed with status ${xhr.status}`));
-                        } catch (e) {
-                            reject(new Error(`Upload failed with status ${xhr.status}`));
-                        }
-                    }
-                };
-
-                xhr.onerror = () => reject(new Error("Network error occurred during upload."));
-                xhr.send(JSON.stringify(payload));
-            });
+                });
+            } else {
+                // Large file: pieces with retries.
+                dbData = await uploadChunked(meta, base64Data, (text) => { progressText.textContent = text; });
+            }
 
             if (!dbData.success) {
                 throw new Error("Server Error: " + (dbData.error || "Unknown error occurred"));
