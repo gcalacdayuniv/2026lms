@@ -98,7 +98,7 @@ const uploadChunked = async (meta, base64Data, setStatus) => {
     const report = () => {
         const sent = sentChars.reduce((a, b) => a + b, 0);
         const pct = Math.min(99, Math.floor((sent / base64Data.length) * 100));
-        setStatus(`Uploading to Portal... ${pct}% (part ${Math.min(doneParts + 1, total)} of ${total})`);
+        setStatus(`Uploading to Portal... ${pct}%`);
     };
 
     const worker = async () => {
@@ -124,7 +124,7 @@ const uploadChunked = async (meta, base64Data, setStatus) => {
     await Promise.all(Array.from({ length: Math.min(PARALLEL_CHUNKS, total) }, worker));
     if (failed) throw failed;
 
-    setStatus('Joining parts and saving to Google Drive... please wait.');
+    setStatus('Finishing upload... please wait.');
     try {
         return await xhrPost('/api/finish-chunked-upload', {
             headers: { 'Content-Type': 'application/json' },
