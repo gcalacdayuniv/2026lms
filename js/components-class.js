@@ -5,6 +5,12 @@ import { Skeleton } from './skeletons.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
+// Remembers whether the Present/Late/Excused/Absent buttons are collapsed in the class list.
+export const STATUS_COLLAPSED_KEY = 'attendance_status_collapsed';
+const isStatusCollapsed = () => {
+    try { return localStorage.getItem(STATUS_COLLAPSED_KEY) === '1'; } catch (e) { return false; }
+};
+
 // Class summary columns. The first two are pinned while scrolling sideways
 // (on phones only the Student column is pinned, to leave room to scroll).
 const SUMMARY_COLUMNS = [
@@ -668,8 +674,13 @@ const ClassUI = {
 
                     <div class="flex flex-col items-center mb-6 w-full px-4">
                         <label for="recitationPointsInput" class="text-xs font-bold text-purple-700 uppercase tracking-wider mb-1">Participation Points</label>
-                        <input id="recitationPointsInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0" class="w-28 px-3 py-2 text-center text-lg font-black text-gray-900 border-2 border-purple-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:text-gray-400 transition">
+                        <div class="flex items-center justify-center gap-3">
+                            <button type="button" id="recitationPointsMinus" aria-label="Subtract 1 point" class="w-12 h-12 flex items-center justify-center rounded-full bg-white border-2 border-purple-300 text-purple-700 text-2xl font-black leading-none hover:bg-purple-100 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition">&minus;</button>
+                            <input id="recitationPointsInput" type="number" min="0" max="999" step="1" inputmode="numeric" placeholder="0" class="w-24 px-3 py-2 text-center text-2xl font-black text-gray-900 border-2 border-purple-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:text-gray-400 transition">
+                            <button type="button" id="recitationPointsPlus" aria-label="Add 1 point" class="w-12 h-12 flex items-center justify-center rounded-full bg-purple-600 border-2 border-purple-600 text-white text-2xl font-black leading-none hover:bg-purple-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed transition">+</button>
+                        </div>
                         <p id="recitationPointsHint" class="text-[11px] text-purple-700 mt-1.5 leading-snug"></p>
+                        <p id="recitationPointsStatus" role="status" aria-live="polite" class="text-[11px] font-bold mt-1 min-h-[16px]"></p>
                     </div>
 
                     <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
@@ -885,10 +896,17 @@ export const ClassComponents = {
                             ${students.length} Enrolled Students
                         </span>
                         <div class="space-x-2">
+                            <button type="button" id="toggleStatusButtons" aria-controls="rosterListContainer" aria-expanded="${isStatusCollapsed() ? 'false' : 'true'}" class="text-[10px] sm:text-xs font-bold text-gray-600 hover:text-gray-900 underline">
+                                <i class="fa-solid ${isStatusCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'} mr-1" aria-hidden="true"></i><span>${isStatusCollapsed() ? 'Expand Status' : 'Collapse Status'}</span>
+                            </button>
                             <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
                         </div>
                     </div>
-                    <div id="rosterListContainer">
+                    <style>
+                        /* Collapsed: each student shows only the status that is currently selected. */
+                        #rosterListContainer.status-collapsed .attendance-btn:not([data-selected="true"]) { display: none; }
+                    </style>
+                    <div id="rosterListContainer" class="${isStatusCollapsed() ? 'status-collapsed' : ''}">
                         ${students.length > 0 ? studentList : emptyState}
                     </div>
                 </div>

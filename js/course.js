@@ -684,6 +684,23 @@ export const CourseModule = {
             if (courseId && dateVal) CourseAttendance.saveDraft(courseId, dateVal);
         }
 
+        if (e.target.closest('#toggleStatusButtons')) {
+            const list = document.getElementById('rosterListContainer');
+            const toggle = document.getElementById('toggleStatusButtons');
+            if (list && toggle) {
+                const collapsed = list.classList.toggle('status-collapsed');
+                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                toggle.querySelector('span').textContent = collapsed ? 'Expand Status' : 'Collapse Status';
+                const icon = toggle.querySelector('i');
+                icon.classList.toggle('fa-chevron-down', collapsed);
+                icon.classList.toggle('fa-chevron-up', !collapsed);
+                try { localStorage.setItem('attendance_status_collapsed', collapsed ? '1' : '0'); } catch (err) { /* storage unavailable */ }
+            }
+        }
+
+        if (e.target.closest('#recitationPointsMinus')) CourseRecitation.stepPoints(-1);
+        if (e.target.closest('#recitationPointsPlus')) CourseRecitation.stepPoints(1);
+
         if (e.target.closest('#markAllPresent')) {
             const rows = document.querySelectorAll('.student-row');
             rows.forEach(row => {

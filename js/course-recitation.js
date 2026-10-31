@@ -1,5 +1,6 @@
 // js/course-recitation.js
 import { apiFetch } from './globals.js';
+import { CourseAttendance } from './course-attendance.js';
 import { getLoadableAvatarSrc } from './components.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
@@ -28,7 +29,10 @@ export const CourseRecitation = {
     students: [],
     isSpinning: false,
     currentSelectedStudentId: null,
-    shownPoints: 0,   // the points value last shown for the selected student
+    savedPoints: {},  // points the server holds for each student on the shown date, by student id
+    pendingSave: null,
+    saveTimer: null,
+    saveChain: Promise.resolve(),
 
     openModal: async (courseId) => {
         document.getElementById('recitationModal').classList.remove('hidden');
@@ -63,6 +67,7 @@ export const CourseRecitation = {
 
     closeModal: () => {
         if (CourseRecitation.isSpinning) return;
+        CourseRecitation.flushPoints();
         document.getElementById('recitationModal').classList.add('hidden');
         document.getElementById('recitationResult').classList.add('hidden');
         document.getElementById('wheelContainer').classList.remove('hidden');
@@ -71,6 +76,7 @@ export const CourseRecitation = {
     },
 
     resetToWheel: () => {
+        CourseRecitation.flushPoints();
         document.getElementById('recitationResult').classList.add('hidden');
         document.getElementById('wheelContainer').classList.remove('hidden');
         document.getElementById('spinWheelBtn').classList.remove('hidden');
@@ -111,18 +117,64 @@ export const CourseRecitation = {
         const rowInput = getStudentRow(userId)?.querySelector('.points-input');
         if (!rowInput) {
             input.value = '';
-            input.disabled = true;
+            CourseRecitation.setPointsLocked(true);
             hint.textContent = 'This student is not in the class list on screen.';
             return;
         }
 
         const current = parseInt(rowInput.value, 10) || 0;
-        CourseRecitation.shownPoints = current;
-        input.disabled = false;
+        // What is already saved: the attendance screen's saved copy if it has one, else what the list shows.
+        const base = CourseAttendance.baselineReady ? CourseAttendance.baseline[userId] : null;
+        CourseRecitation.savedPoints[userId] = base ? base.points : current;
+
         input.value = String(current);
+        CourseRecitation.setPointsStatus('');
+
+        // Absent or Excused students do not earn participation points, so the box stays locked.
+        const status = getStudentRow(userId).querySelector('.attendance-btn[data-selected="true"]')?.dataset.status;
+        if (status === 'Absent' || status === 'Excused') {
+            CourseRecitation.setPointsLocked(true);
+            hint.textContent = `Marked ${status} in the list. Change the status first to give points.`;
+            return;
+        }
+        CourseRecitation.setPointsLocked(false);
 
         const date = document.getElementById('attendanceDate')?.value;
-        hint.textContent = (date ? `Points for ${date}. ` : '') + 'Changes show in the student list. Press Save Attendance to keep them.';
+        hint.textContent = (date ? `Points for ${date}. ` : '') + 'Saved automatically when you stop typing.';
+    },
+
+    // Locks or unlocks the points box and its minus / plus buttons together.
+    setPointsLocked: (locked) => {
+        const input = document.getElementById('recitationPointsInput');
+        if (input) input.disabled = locked;
+        CourseRecitation.syncStepButtons();
+    },
+
+    // Minus is off at 0, plus is off at 999, both are off while locked.
+    syncStepButtons: () => {
+        const input = document.getElementById('recitationPointsInput');
+        const minus = document.getElementById('recitationPointsMinus');
+        const plus = document.getElementById('recitationPointsPlus');
+        if (!input || !minus || !plus) return;
+        const value = parseInt(input.value, 10) || 0;
+        minus.disabled = input.disabled || value <= 0;
+        plus.disabled = input.disabled || value >= 999;
+    },
+
+    // The minus / plus buttons: change the points by one and save like a typed change.
+    stepPoints: (step) => {
+        const input = document.getElementById('recitationPointsInput');
+        if (!input || input.disabled) return;
+        const next = Math.min(999, Math.max(0, (parseInt(input.value, 10) || 0) + step));
+        input.value = String(next);
+        CourseRecitation.updatePoints(String(next));
+    },
+
+    setPointsStatus: (text, isError = false) => {
+        const el = document.getElementById('recitationPointsStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.className = `text-[11px] font-bold mt-1 min-h-[16px] ${isError ? 'text-red-600' : 'text-green-700'}`;
     },
 
     // Called when the points box is edited: copies the value into the student list.
@@ -133,15 +185,77 @@ export const CourseRecitation = {
         const value = Math.min(999, Math.max(0, parseInt(rawValue, 10) || 0));
         const rowInput = getStudentRow(userId)?.querySelector('.points-input');
         if (!rowInput) return;
+        CourseRecitation.syncStepButtons();
 
         rowInput.value = String(value);
         // Lets the attendance screen notice the change (unsaved-changes dot, draft saving).
         rowInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-        // Keep the wheel's weighting in step with the edit.
+        // Save shortly after the last keystroke.
+        CourseRecitation.pendingSave = {
+            userId,
+            value,
+            courseId: window.location.hash.replace('#class-', ''),
+            date: document.getElementById('attendanceDate')?.value
+        };
+        CourseRecitation.setPointsStatus('Saving...');
+        clearTimeout(CourseRecitation.saveTimer);
+        CourseRecitation.saveTimer = setTimeout(CourseRecitation.flushPoints, 700);
+    },
+
+    // Sends any waiting points change now. Safe to call at any time (Next Student, closing the window).
+    flushPoints: () => {
+        clearTimeout(CourseRecitation.saveTimer);
+        const job = CourseRecitation.pendingSave;
+        CourseRecitation.pendingSave = null;
+        if (!job) return CourseRecitation.saveChain;
+        // Jobs run one after another so the amounts added never overlap.
+        CourseRecitation.saveChain = CourseRecitation.saveChain.then(() => CourseRecitation.savePoints(job));
+        return CourseRecitation.saveChain;
+    },
+
+    savePoints: async (job) => {
+        const { userId, value, courseId, date } = job;
+        const before = CourseRecitation.savedPoints[userId] ?? 0;
+        const delta = value - before;
+        const isShown = () => CourseRecitation.currentSelectedStudentId === userId;
+
+        if (delta === 0) {
+            if (isShown() && !CourseRecitation.pendingSave) CourseRecitation.setPointsStatus('Saved');
+            return;
+        }
+        if (!courseId || !date) {
+            if (isShown()) CourseRecitation.setPointsStatus('Pick an attendance date first.', true);
+            return;
+        }
+
+        try {
+            await apiFetch('/api/add-participation-points', {
+                method: 'POST',
+                body: JSON.stringify({ courseId, studentId: userId, date, points: delta })
+            });
+        } catch (err) {
+            if (isShown() && !CourseRecitation.pendingSave) {
+                CourseRecitation.setPointsStatus(`Not saved: ${err.message}. It stays in the list; press Save Attendance to retry.`, true);
+            }
+            return;
+        }
+
+        CourseRecitation.savedPoints[userId] = value;
+
+        // The wheel's weighting follows the saved change.
         const student = CourseRecitation.students.find(s => s.User_ID === userId);
-        if (student) student.Total_Points = (Number(student.Total_Points) || 0) + (value - CourseRecitation.shownPoints);
-        CourseRecitation.shownPoints = value;
+        if (student) student.Total_Points = (Number(student.Total_Points) || 0) + delta;
+
+        // Tell the attendance screen these points are now saved (only the points, not the status).
+        const row = document.querySelector(`.student-row[data-student-id="${userId}"]`);
+        if (CourseAttendance.baselineReady && row) {
+            const base = CourseAttendance.baseline[userId] || CourseAttendance.snapshotRow(row);
+            CourseAttendance.baseline[userId] = { ...base, points: value };
+            if (!CourseAttendance.updateDirty()) CourseAttendance.clearDraft(courseId, date);
+        }
+
+        if (isShown() && !CourseRecitation.pendingSave) CourseRecitation.setPointsStatus('Saved');
     },
 
     removeCalledStudent: (userId) => {
