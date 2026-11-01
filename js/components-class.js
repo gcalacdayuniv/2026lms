@@ -812,7 +812,7 @@ export const ClassComponents = {
                         </button>
                     </div>
 
-                    <div class="flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto">
+                    <div class="row-points-area flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto">
                         <div class="flex items-center lg:items-start lg:flex-col gap-2 lg:gap-0">
                             <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider lg:mb-0.5 text-center">Pts</label>
                             <div class="flex items-center gap-1">
@@ -910,6 +910,11 @@ export const ClassComponents = {
                     <style>
                         /* Collapsed: all status buttons are hidden so the list stays short. */
                         #rosterListContainer.status-collapsed .status-btn-group { display: none; }
+                        /* Collapsed: the points controls take over the freed space, centred on phones and at the right on wide screens. */
+                        #rosterListContainer.status-collapsed .row-points-area { justify-content: center; padding-top: .5rem; }
+                        @media (min-width: 1024px) { #rosterListContainer.status-collapsed .row-points-area { justify-content: flex-end; padding-top: 0; } }
+                        #rosterListContainer.status-collapsed .row-points-area .pts-step { width: 2.75rem; height: 2.75rem; font-size: 1.5rem; }
+                        #rosterListContainer.status-collapsed .row-points-area .points-input { width: 4rem; font-size: 1.25rem; padding: .5rem .25rem; }
                         /* Absent and Excused students cannot be given points. */
                         .student-row:has(.attendance-btn[data-selected="true"][data-status="Absent"]) .pts-step,
                         .student-row:has(.attendance-btn[data-selected="true"][data-status="Excused"]) .pts-step { opacity: .35; cursor: not-allowed; }
