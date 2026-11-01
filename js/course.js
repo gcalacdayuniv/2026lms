@@ -698,6 +698,21 @@ export const CourseModule = {
             }
         }
 
+        // Minus / plus buttons beside each student's points box in the class list.
+        if (e.target.closest('.pts-step')) {
+            const stepBtn = e.target.closest('.pts-step');
+            const row = stepBtn.closest('.student-row');
+            const pointsInput = row && row.querySelector('.points-input');
+            const status = row && row.querySelector('.attendance-btn[data-selected="true"]')?.dataset.status;
+            // Absent and Excused students keep 0 points.
+            if (pointsInput && status !== 'Absent' && status !== 'Excused') {
+                const next = Math.min(999, Math.max(0, (parseInt(pointsInput.value, 10) || 0) + parseInt(stepBtn.dataset.step, 10)));
+                pointsInput.value = String(next);
+                // Same signal as typing: the attendance screen marks the change as unsaved and keeps a draft.
+                pointsInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+
         if (e.target.closest('#recitationPointsMinus')) CourseRecitation.stepPoints(-1);
         if (e.target.closest('#recitationPointsPlus')) CourseRecitation.stepPoints(1);
 

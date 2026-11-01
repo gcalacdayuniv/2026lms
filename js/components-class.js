@@ -815,9 +815,14 @@ export const ClassComponents = {
                     <div class="flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto">
                         <div class="flex items-center lg:items-start lg:flex-col gap-2 lg:gap-0">
                             <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider lg:mb-0.5 text-center">Pts</label>
-                            <input type="number" placeholder="0" class="points-input w-16 px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono" value="0">
+                            <div class="flex items-center gap-1">
+                                <button type="button" class="pts-step w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-gray-300 text-gray-700 text-lg font-black leading-none hover:bg-gray-100 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-step="-1" aria-label="Subtract 1 participation point for ${escapeHtml(s.Name)}">&minus;</button>
+                                <input type="number" min="0" max="999" placeholder="0" aria-label="Participation points for ${escapeHtml(s.Name)}" class="points-input w-12 px-1 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono font-bold" value="0">
+                                <button type="button" class="pts-step w-9 h-9 flex items-center justify-center rounded-lg bg-blue-600 border border-blue-600 text-white text-lg font-black leading-none hover:bg-blue-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition" data-step="1" aria-label="Add 1 participation point for ${escapeHtml(s.Name)}">+</button>
+                                <span class="row-status-note"></span>
+                            </div>
                         </div>
-                        <div class="flex space-x-1 flex-1 lg:flex-initial justify-end items-center min-w-max">
+                        <div class="status-btn-group flex space-x-1 flex-1 lg:flex-initial justify-end items-center min-w-max">
                             <button type="button" data-status="Present" data-selected="true" class="attendance-btn flex-1 lg:flex-initial px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold border border-green-400 text-green-800 bg-green-100 hover:bg-green-50 hover:text-green-700 transition text-center">
                                 Present
                             </button>
@@ -903,8 +908,17 @@ export const ClassComponents = {
                         </div>
                     </div>
                     <style>
-                        /* Collapsed: each student shows only the status that is currently selected. */
-                        #rosterListContainer.status-collapsed .attendance-btn:not([data-selected="true"]) { display: none; }
+                        /* Collapsed: all status buttons are hidden so the list stays short. */
+                        #rosterListContainer.status-collapsed .status-btn-group { display: none; }
+                        /* Absent and Excused students cannot be given points. */
+                        .student-row:has(.attendance-btn[data-selected="true"][data-status="Absent"]) .pts-step,
+                        .student-row:has(.attendance-btn[data-selected="true"][data-status="Excused"]) .pts-step { opacity: .35; cursor: not-allowed; }
+                        /* While collapsed, a short note still shows when a student is not simply Present. */
+                        .row-status-note { display: none; }
+                        #rosterListContainer.status-collapsed .row-status-note { display: inline; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; margin-left: .25rem; }
+                        #rosterListContainer.status-collapsed .student-row:has(.attendance-btn[data-selected="true"][data-status="Late"]) .row-status-note::after { content: "Late"; color: #a16207; }
+                        #rosterListContainer.status-collapsed .student-row:has(.attendance-btn[data-selected="true"][data-status="Excused"]) .row-status-note::after { content: "Excused"; color: #7e22ce; }
+                        #rosterListContainer.status-collapsed .student-row:has(.attendance-btn[data-selected="true"][data-status="Absent"]) .row-status-note::after { content: "Absent"; color: #b91c1c; }
                     </style>
                     <div id="rosterListContainer" class="${isStatusCollapsed() ? 'status-collapsed' : ''}">
                         ${students.length > 0 ? studentList : emptyState}
