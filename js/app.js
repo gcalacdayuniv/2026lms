@@ -5,6 +5,7 @@ import { CourseModule } from './course.js';
 import { CourseSummary } from './course-summary.js';
 import { CourseScores } from './course-scores.js';
 import { CourseExam } from './course-exam.js';
+import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
 import { A11y } from './a11y.js';
@@ -13,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     AppState.init();
     AuthModule.init();
     CourseModule.init();
+    // Must come after CourseModule.init(): the row is updated first, then saved.
+    CourseAttendance.init();
     CourseSummary.init();
     CourseScores.init();
     CourseExam.init();

@@ -4,11 +4,61 @@ import { CourseScores } from './course-scores.js';
 import { UI } from './ui-feedback.js';
 import { parseLocalDate, getWeekdayName, matchesScheduleDay } from './date-utils.js';
 
+const getCourseId = () => window.location.hash.replace('#class-', '');
+const getDate = () => document.getElementById('attendanceDate')?.value || '';
+const dateKey = (courseId, date) => `${courseId}_${date}`;
+
 export const CourseAttendance = {
     // What the server currently has for the selected date. The roster is "dirty"
     // (unsaved changes) whenever the on-screen state differs from this.
     baseline: {},
     baselineReady: false,
+
+    // Direct-save state
+    dateHasRecords: false,      // the server already holds records for the shown date
+    confirmedDates: new Set(),  // dates the lecturer already confirmed/saved in this session
+    gate: null,                 // confirmation in progress: { key, promise }
+    chains: {},                 // per-student save queue
+    timers: {},                 // per-student debounce timers
+    bulkTimer: null,
+
+    // Must be registered AFTER CourseModule.init() so the row is already updated when this runs.
+    init: () => {
+        document.addEventListener('click', CourseAttendance.handleAutoSaveClicks);
+        document.addEventListener('input', CourseAttendance.handleAutoSaveInput);
+    },
+
+    handleAutoSaveClicks: (e) => {
+        // Clicks fired by code (Mark All Present clicks every row) are ignored; #markAllPresent saves once.
+        if (!e.isTrusted) return;
+
+        const statusBtn = e.target.closest('.attendance-btn');
+        if (statusBtn) {
+            const row = statusBtn.closest('.student-row');
+            if (row) CourseAttendance.queueAutoSave(row.dataset.studentId, 0);
+            return;
+        }
+
+        const step = e.target.closest('.pts-step');
+        if (step) {
+            const row = step.closest('.student-row');
+            if (row) CourseAttendance.queueAutoSave(row.dataset.studentId, 600);
+            return;
+        }
+
+        if (e.target.closest('#markAllPresent')) {
+            clearTimeout(CourseAttendance.bulkTimer);
+            CourseAttendance.bulkTimer = setTimeout(CourseAttendance.autoSaveAll, 0);
+        }
+    },
+
+    // Real keystrokes in a points box (code-made events are ignored).
+    handleAutoSaveInput: (e) => {
+        if (!e.isTrusted) return;
+        if (!e.target.classList || !e.target.classList.contains('points-input')) return;
+        const row = e.target.closest('.student-row');
+        if (row) CourseAttendance.queueAutoSave(row.dataset.studentId, 700);
+    },
 
     snapshotRow: (row) => {
         const selected = row.querySelector('.attendance-btn[data-selected="true"]');
@@ -114,6 +164,161 @@ export const CourseAttendance = {
         });
     },
 
+    // ---------- Direct saving ----------
+
+    isKnownDate: (courseId, date) =>
+        CourseAttendance.dateHasRecords || CourseAttendance.confirmedDates.has(dateKey(courseId, date)),
+
+    // Layer 1: first save for a date asks "new date?". Layer 2: a different weekday asks again.
+    // Dates that already hold records skip both.
+    confirmDateForSave: async (courseId, date) => {
+        if (CourseAttendance.isKnownDate(courseId, date)) return true;
+
+        const okNew = await UI.confirm({
+            title: 'Save attendance for a new date?',
+            message: `No attendance has been saved for ${CourseAttendance.describeDate(date)} yet. Save attendance for this new date?`,
+            confirmText: 'Yes, save'
+        });
+        if (!okNew) return false;
+
+        return CourseAttendance.confirmScheduleDay(date);
+    },
+
+    // Makes sure the shown date may be saved. For a brand-new date this confirms, then saves
+    // the whole roster once. Returns false (declined/failed), 'saved' or 'known'.
+    ensureDateReady: async (courseId, date) => {
+        if (CourseAttendance.isKnownDate(courseId, date)) return 'known';
+
+        const key = dateKey(courseId, date);
+        if (CourseAttendance.gate && CourseAttendance.gate.key === key) return CourseAttendance.gate.promise;
+
+        const promise = (async () => {
+            if (!(await CourseAttendance.confirmDateForSave(courseId, date))) return false;
+            const ok = await CourseAttendance.saveAllRows(courseId, date);
+            return ok ? 'saved' : false;
+        })();
+
+        CourseAttendance.gate = { key, promise };
+        try {
+            return await promise;
+        } finally {
+            if (CourseAttendance.gate && CourseAttendance.gate.promise === promise) CourseAttendance.gate = null;
+        }
+    },
+
+    // Declined confirmation: drop the unsaved edits and show what the server has.
+    revertDate: async (courseId, date) => {
+        CourseAttendance.clearDraft(courseId, date);
+        UI.info('Not saved. Changes were discarded.');
+        await CourseAttendance.loadAttendanceData(courseId, date);
+    },
+
+    queueAutoSave: (studentId, delay = 0) => {
+        clearTimeout(CourseAttendance.timers[studentId]);
+        CourseAttendance.timers[studentId] = setTimeout(() => CourseAttendance.autoSaveStudent(studentId), delay);
+    },
+
+    autoSaveStudent: async (studentId) => {
+        const courseId = getCourseId();
+        const date = getDate();
+        if (!courseId || !date) return;
+
+        const banner = document.getElementById('noClassBanner');
+        if (banner && !banner.classList.contains('hidden')) return;
+
+        const row = document.querySelector(`.student-row[data-student-id="${studentId}"]`);
+        if (!row) return;
+
+        // Nothing changed for a date that is already saved.
+        if (CourseAttendance.dateHasRecords && CourseAttendance.baselineReady) {
+            const base = CourseAttendance.baseline[studentId];
+            const cur = CourseAttendance.snapshotRow(row);
+            if (base && base.status === cur.status && base.points === cur.points) return;
+        }
+
+        const ready = await CourseAttendance.ensureDateReady(courseId, date);
+        if (!ready) {
+            if (getDate() === date) await CourseAttendance.revertDate(courseId, date);
+            return;
+        }
+        await CourseAttendance.saveStudentNow(courseId, date, studentId);
+    },
+
+    // Saves one student's row. Saves for the same student run one after another.
+    saveStudentNow: (courseId, date, studentId) => {
+        const prev = CourseAttendance.chains[studentId] || Promise.resolve();
+        const run = prev.then(async () => {
+            if (getDate() !== date) return; // the screen moved to another date
+            const row = document.querySelector(`.student-row[data-student-id="${studentId}"]`);
+            if (!row) return;
+            const snap = CourseAttendance.snapshotRow(row);
+            try {
+                await apiFetch('/api/attendance/single', {
+                    method: 'POST',
+                    body: JSON.stringify({ courseId, studentId, date, status: snap.status, points: snap.points })
+                });
+                CourseAttendance.baseline[studentId] = snap;
+                CourseAttendance.baselineReady = true;
+                if (snap.status) {
+                    CourseAttendance.dateHasRecords = true;
+                    CourseAttendance.confirmedDates.add(dateKey(courseId, date));
+                }
+                if (!CourseAttendance.updateDirty()) CourseAttendance.clearDraft(courseId, date);
+            } catch (err) {
+                const name = row.querySelector('.view-summary-trigger')?.dataset.name || 'student';
+                UI.error(`Not saved for ${name}: ${err.message}`);
+            }
+        });
+        CourseAttendance.chains[studentId] = run.catch(() => {});
+        return run;
+    },
+
+    // Mark All Present: confirm if the date is new, then save the whole roster once.
+    autoSaveAll: async () => {
+        const courseId = getCourseId();
+        const date = getDate();
+        if (!courseId || !date) return;
+
+        const banner = document.getElementById('noClassBanner');
+        if (banner && !banner.classList.contains('hidden')) return;
+
+        const ready = await CourseAttendance.ensureDateReady(courseId, date);
+        if (!ready) {
+            if (getDate() === date) await CourseAttendance.revertDate(courseId, date);
+            return;
+        }
+        if (ready === 'known') await CourseAttendance.saveAllRows(courseId, date);
+    },
+
+    // Sends every marked row for the date in one request (replaces that date's records).
+    saveAllRows: async (courseId, date) => {
+        await Promise.all(Object.values(CourseAttendance.chains));
+
+        const records = [];
+        document.querySelectorAll('.student-row').forEach(row => {
+            const snap = CourseAttendance.snapshotRow(row);
+            if (snap.status) records.push({ studentId: row.dataset.studentId, status: snap.status, points: snap.points });
+        });
+        if (records.length === 0) return false;
+
+        try {
+            await apiFetch('/api/attendance', {
+                method: 'POST',
+                body: JSON.stringify({ courseId, date, records })
+            });
+        } catch (err) {
+            UI.error(`Not saved: ${err.message}`);
+            return false;
+        }
+
+        CourseAttendance.clearDraft(courseId, date);
+        CourseAttendance.setBaseline();
+        CourseAttendance.updateDirty();
+        CourseAttendance.dateHasRecords = true;
+        CourseAttendance.confirmedDates.add(dateKey(courseId, date));
+        return true;
+    },
+
     getDraftKey: (courseId, date) => `attendance_draft_${courseId}_${date}`,
 
     saveDraft: (courseId, date) => {
@@ -166,6 +371,7 @@ export const CourseAttendance = {
         }
     },
 
+    // Save All button: saves every marked row (also the retry path if a direct save failed).
     saveAttendance: async () => {
         const btn = document.getElementById('saveAttendanceBtn');
         const alertBox = document.getElementById('attendanceAlert');
@@ -185,7 +391,8 @@ export const CourseAttendance = {
             return;
         }
 
-        if (!(await CourseAttendance.confirmScheduleDay(dateVal))) return;
+        // New date: confirm, then weekday check. Dates that already have records skip both.
+        if (!(await CourseAttendance.confirmDateForSave(courseId, dateVal))) return;
 
         const rows = document.querySelectorAll('.student-row');
         const attendanceData = [];
@@ -227,6 +434,8 @@ export const CourseAttendance = {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
 
         try {
+            await Promise.all(Object.values(CourseAttendance.chains));
+
             const payload = {
                 courseId: courseId,
                 date: dateVal,
@@ -238,6 +447,8 @@ export const CourseAttendance = {
             CourseAttendance.clearDraft(courseId, dateVal);
             CourseAttendance.setBaseline();
             CourseAttendance.updateDirty();
+            CourseAttendance.dateHasRecords = true;
+            CourseAttendance.confirmedDates.add(dateKey(courseId, dateVal));
 
             alertBox.textContent = "All Attendance saved successfully!";
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
@@ -254,9 +465,14 @@ export const CourseAttendance = {
 
     loadAttendanceData: async (courseId, date) => {
         CourseAttendance.baselineReady = false;
+        CourseAttendance.dateHasRecords = false;
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}&_t=${ts}`);
+
+            // Remember whether this date is already saved on the server (drives the new-date confirmation).
+            CourseAttendance.dateHasRecords = !!(data.records && data.records.length > 0) && !data.isNoClass;
+            if (!CourseAttendance.dateHasRecords) CourseAttendance.confirmedDates.delete(dateKey(courseId, date));
 
             const noClassBanner = document.getElementById('noClassBanner');
             const container = document.getElementById('rosterListContainer');
