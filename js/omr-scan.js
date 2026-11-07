@@ -212,7 +212,34 @@ export const decodeGray = (gray, w, h, n, c) => {
     return { ok: true, w, h, H, markers, studentFills, studentDigits: digits, studentNo, fills, answers };
 };
 
-// Reads a photo file. Adds result.canvas (the shrunken photo) for the preview.
+// Quick check used by the live camera: the 4 marker centres, or null. Cheap enough to run on a small frame.
+export const detectMarkers = (gray, w, h) => findMarkers(findBlobs(adaptiveBinary(gray, w, h), w, h), w, h);
+
+export const meanBrightness = (gray) => {
+    let sum = 0;
+    for (let i = 0; i < gray.length; i += 7) sum += gray[i];
+    return sum / Math.ceil(gray.length / 7);
+};
+
+// Reads any drawable (image, canvas or live <video>) of size sw x sh.
+// Adds result.canvas (the shrunken picture) for the preview.
+export const scanSource = (source, sw, sh, n, c) => {
+    const scale = Math.min(1, MAX_SIDE / Math.max(sw, sh));
+    const w = Math.max(1, Math.round(sw * scale));
+    const h = Math.max(1, Math.round(sh * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(source, 0, 0, w, h);
+
+    const gray = toGray(ctx.getImageData(0, 0, w, h).data, w, h);
+    const result = decodeGray(gray, w, h, n, c);
+    result.canvas = canvas;
+    return result;
+};
+
+// Reads a photo file.
 export const scanImage = async (file, n, c) => {
     let bmp;
     try {
@@ -220,19 +247,8 @@ export const scanImage = async (file, n, c) => {
     } catch (e) {
         bmp = await createImageBitmap(file);
     }
-    const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
-    const w = Math.max(1, Math.round(bmp.width * scale));
-    const h = Math.max(1, Math.round(bmp.height * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(bmp, 0, 0, w, h);
+    const result = scanSource(bmp, bmp.width, bmp.height, n, c);
     if (bmp.close) bmp.close();
-
-    const gray = toGray(ctx.getImageData(0, 0, w, h).data, w, h);
-    const result = decodeGray(gray, w, h, n, c);
-    result.canvas = canvas;
     return result;
 };
 

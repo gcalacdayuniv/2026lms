@@ -8,7 +8,16 @@ import { UI } from './ui-feedback.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
-import { scanImage, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
+import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
+
+// Live camera settings
+const LIVE_TICK_MS = 250;      // how often a frame is checked
+const LIVE_DETECT_SIDE = 640;  // frames are shrunk to this size for the quick check
+const STEADY_TICKS = 4;        // about 1 second of a still, fully visible sheet triggers the capture
+const MOVE_TOL = 0.012;        // corner movement (share of the frame) that still counts as steady
+const REARM_MOVE = 0.06;       // after a capture, the sheet must move this much (or leave) before the next one
+const MIN_SPAN = 0.5;          // the sheet must fill at least this share of the frame
+const MIN_BRIGHT = 70;         // average brightness (0-255) below this is "too dark"
 
 const LETTERS = 'ABCDE';
 const TERM_LABELS = { MidTerm: 'Mid Term', FinalTerm: 'Final Term' };
@@ -55,11 +64,15 @@ export const CourseScanner = {
     createdExamId: null,
     busy: false,
     saving: false,
+    live: { stream: null, timer: null, canvas: null, prev: null, shot: null, steady: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 },
 
     init: () => {
         document.addEventListener('click', CourseScanner.handleClicks);
         document.addEventListener('change', CourseScanner.handleChanges);
         document.addEventListener('input', CourseScanner.handleInputs);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) CourseScanner.stopLive();
+        });
     },
 
     // ---------- Small helpers ----------
@@ -129,6 +142,7 @@ export const CourseScanner = {
     },
 
     close: () => {
+        CourseScanner.stopLive();
         $('scannerModal')?.classList.add('hidden');
     },
 
@@ -417,9 +431,14 @@ export const CourseScanner = {
     buildRow: async (file) => {
         const cfg = CourseScanner.cfg;
         const result = await scanImage(file, cfg.n, cfg.c);
+        return CourseScanner.rowFromResult(file.name || 'Photo', result);
+    },
+
+    // Turns a reading (from a photo or a live frame) into a review row.
+    rowFromResult: async (name, result) => {
         const row = {
             id: CourseScanner.nextRowId++,
-            fileName: file.name || 'Photo',
+            fileName: name,
             ok: result.ok,
             error: result.error || '',
             saved: false,
@@ -466,6 +485,231 @@ export const CourseScanner = {
         canvas.width = 0;
         if (row.overlayUrl) URL.revokeObjectURL(row.overlayUrl);
         row.overlayUrl = url;
+    },
+
+    // ---------- Live camera ----------
+    // Every 250 ms a small copy of the video frame is checked for the 4 corner squares. When the sheet
+    // fills the frame, is bright enough and has stayed still for about a second, the frame is read
+    // and added to the review list. The sheet must then leave or move before the next capture.
+
+    setLiveStatus: (text, tone = 'gray', progress = 0) => {
+        const el = $('scnLiveStatus');
+        if (!el) return;
+        const tones = {
+            gray: 'bg-gray-700 text-white',
+            amber: 'bg-amber-500 text-white',
+            green: 'bg-green-600 text-white',
+            red: 'bg-red-600 text-white'
+        };
+        el.className = `mt-2 text-center text-sm font-bold rounded px-3 py-2 ${tones[tone] || tones.gray}`;
+        el.textContent = text;
+        const bar = $('scnLiveBar');
+        if (bar) bar.style.width = `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`;
+    },
+
+    startLive: async () => {
+        const live = CourseScanner.live;
+        if (!CourseScanner.cfg || live.stream) return;
+        const devices = navigator.mediaDevices;
+        if (!devices || !devices.getUserMedia) {
+            CourseScanner.setAlert('The live camera needs a secure (https) connection and a browser that supports it. Use Take Photo instead.', false);
+            return;
+        }
+
+        let stream;
+        try {
+            stream = await devices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                audio: false
+            });
+        } catch (err) {
+            const messages = {
+                NotAllowedError: 'Camera permission was denied. Allow camera access for this site, then try again.',
+                NotFoundError: 'No camera was found on this device.',
+                NotReadableError: 'The camera is being used by another app.'
+            };
+            CourseScanner.setAlert(messages[err.name] || 'The camera could not be started. Use Take Photo instead.', false);
+            return;
+        }
+
+        const video = $('scnLiveVideo');
+        video.srcObject = stream;
+        try { await video.play(); } catch (e) { /* autoplay is already on */ }
+
+        Object.assign(live, { stream, prev: null, shot: null, steady: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 });
+        CourseScanner.setAlert('');
+        $('scnLivePanel').classList.remove('hidden');
+        CourseScanner.setLiveStatus('Starting camera...', 'gray', 0);
+        live.timer = setTimeout(CourseScanner.liveTick, LIVE_TICK_MS);
+    },
+
+    stopLive: () => {
+        const live = CourseScanner.live;
+        clearTimeout(live.timer);
+        live.timer = null;
+        if (live.stream) live.stream.getTracks().forEach(t => t.stop());
+        live.stream = null;
+        const video = $('scnLiveVideo');
+        if (video) video.srcObject = null;
+        $('scnLivePanel')?.classList.add('hidden');
+    },
+
+    // Sizes the preview box to the camera's real shape so the green outline lines up with the video.
+    fitLiveBox: (vw, vh) => {
+        const box = $('scnLiveBox');
+        if (!box) return;
+        box.style.aspectRatio = `${vw} / ${vh}`;
+        box.style.width = `min(100%, calc(55vh * ${(vw / vh).toFixed(4)}))`;
+    },
+
+    liveTick: async () => {
+        const live = CourseScanner.live;
+        if (!live.stream) return;
+        try {
+            if (!live.capturing) await CourseScanner.liveFrame();
+        } catch (err) {
+            console.error(err);
+        }
+        if (live.stream) live.timer = setTimeout(CourseScanner.liveTick, LIVE_TICK_MS);
+    },
+
+    liveFrame: async () => {
+        const live = CourseScanner.live;
+        const video = $('scnLiveVideo');
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (!vw || !vh) return;
+        if (live.vw !== vw || live.vh !== vh) {
+            live.vw = vw;
+            live.vh = vh;
+            CourseScanner.fitLiveBox(vw, vh);
+        }
+
+        const scale = Math.min(1, LIVE_DETECT_SIDE / Math.max(vw, vh));
+        const w = Math.max(1, Math.round(vw * scale));
+        const h = Math.max(1, Math.round(vh * scale));
+        if (!live.canvas) live.canvas = document.createElement('canvas');
+        if (live.canvas.width !== w || live.canvas.height !== h) {
+            live.canvas.width = w;
+            live.canvas.height = h;
+        }
+        const ctx = live.canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, w, h);
+        const gray = toGray(ctx.getImageData(0, 0, w, h).data, w, h);
+        const bright = meanBrightness(gray);
+        const markers = detectMarkers(gray, w, h);
+
+        const overlay = $('scnLiveOverlay');
+        overlay.width = w;
+        overlay.height = h;
+        const octx = overlay.getContext('2d');
+        const outline = (color) => {
+            octx.lineWidth = Math.max(3, w / 160);
+            octx.strokeStyle = color;
+            octx.beginPath();
+            markers.forEach(([x, y], i) => (i ? octx.lineTo(x, y) : octx.moveTo(x, y)));
+            octx.closePath();
+            octx.stroke();
+        };
+
+        if (!markers) {
+            live.lost++;
+            live.steady = 0;
+            live.prev = null;
+            if (live.lost >= 2) live.armed = true;
+            CourseScanner.setLiveStatus(
+                bright < MIN_BRIGHT ? 'Too dark - add more light' : 'Looking for the sheet - show all 4 black corner squares',
+                'amber', 0
+            );
+            return;
+        }
+        live.lost = 0;
+
+        const norm = markers.map(([x, y]) => [x / w, y / h]);
+        const xs = norm.map(m => m[0]);
+        const ys = norm.map(m => m[1]);
+        const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+        const dist = (a, b) => Math.max(...a.map((p, i) => Math.max(Math.abs(p[0] - b[i][0]), Math.abs(p[1] - b[i][1]))));
+        const move = live.prev ? dist(norm, live.prev) : 1;
+        live.prev = norm;
+
+        if (!live.armed) {
+            if (live.shot && live.shot.length === 4 && dist(norm, live.shot) > REARM_MOVE) {
+                live.armed = true;
+            } else {
+                outline('#22c55e');
+                CourseScanner.setLiveStatus('Captured. Remove the sheet or show the next one.', 'green', 1);
+                return;
+            }
+        }
+
+        if (bright < MIN_BRIGHT) {
+            live.steady = 0;
+            outline('#f59e0b');
+            CourseScanner.setLiveStatus('Too dark - add more light', 'amber', 0);
+            return;
+        }
+        if (span < MIN_SPAN) {
+            live.steady = 0;
+            outline('#f59e0b');
+            CourseScanner.setLiveStatus('Move closer - fill the screen with the sheet', 'amber', 0);
+            return;
+        }
+
+        live.steady = move < MOVE_TOL ? live.steady + 1 : 0;
+        outline(live.steady > 0 ? '#22c55e' : '#f59e0b');
+        if (live.steady < STEADY_TICKS) {
+            CourseScanner.setLiveStatus('Hold steady...', live.steady > 0 ? 'green' : 'amber', live.steady / STEADY_TICKS);
+            return;
+        }
+        await CourseScanner.liveCapture(norm);
+    },
+
+    liveCapture: async (norm) => {
+        const live = CourseScanner.live;
+        const cfg = CourseScanner.cfg;
+        if (!live.stream || live.capturing || !cfg) return;
+        live.capturing = true;
+        CourseScanner.setLiveStatus('Reading the sheet...', 'gray', 1);
+
+        const flash = $('scnLiveFlash');
+        if (flash) {
+            flash.style.opacity = '0.8';
+            setTimeout(() => { flash.style.opacity = '0'; }, 120);
+        }
+
+        try {
+            const video = $('scnLiveVideo');
+            const result = scanSource(video, video.videoWidth, video.videoHeight, cfg.n, cfg.c);
+            if (!result.ok) {
+                result.canvas.width = 0;
+                live.steady = 0;
+                CourseScanner.setLiveStatus('Could not read the sheet - hold steady and keep all 4 corners visible', 'amber', 0);
+                return;
+            }
+
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const row = await CourseScanner.rowFromResult(`Live scan ${time}`, result);
+            CourseScanner.rows.push(row);
+            CourseScanner.renderRows();
+            const list = $('scnRows');
+            if (list) list.scrollTop = list.scrollHeight;
+
+            live.armed = false;
+            live.shot = norm || null;
+            live.steady = 0;
+            if (navigator.vibrate) navigator.vibrate(60);
+
+            const student = CourseScanner.students.find(s => s.User_ID === row.studentId);
+            const s = CourseScanner.scoreRow(row, cfg.cap);
+            $('scnLiveLast').textContent = `${row.studentText} | ${student ? student.Name : 'No student matched'} | ${fmt(s.final)} / ${fmt(cfg.cap)}`;
+            CourseScanner.setLiveStatus('Captured! Show the next sheet.', 'green', 1);
+        } catch (err) {
+            console.error(err);
+            CourseScanner.setLiveStatus('Could not read the sheet. Try again.', 'red', 0);
+        } finally {
+            live.capturing = false;
+        }
     },
 
     // ---------- Scoring ----------
@@ -754,7 +998,13 @@ export const CourseScanner = {
         if (e.target.closest('#scnKeyQuickBtn')) CourseScanner.applyQuickKey();
         if (e.target.closest('#scnPrintBtn')) CourseScanner.printSheet();
         if (e.target.closest('#scnStartBtn')) await CourseScanner.startScanning();
-        if (e.target.closest('#scnBackBtn')) CourseScanner.showView('setup');
+        if (e.target.closest('#scnBackBtn')) {
+            CourseScanner.stopLive();
+            CourseScanner.showView('setup');
+        }
+        if (e.target.closest('#scnLiveBtn')) await CourseScanner.startLive();
+        if (e.target.closest('#scnLiveStopBtn')) CourseScanner.stopLive();
+        if (e.target.closest('#scnLiveCaptureBtn')) await CourseScanner.liveCapture(CourseScanner.live.prev);
         if (e.target.closest('#scnCameraBtn')) $('scnCameraInput').click();
         if (e.target.closest('#scnUploadBtn')) $('scnFileInput').click();
         if (e.target.closest('#scnSaveBtn')) await CourseScanner.save();
