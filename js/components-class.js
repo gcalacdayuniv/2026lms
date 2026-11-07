@@ -1,6 +1,7 @@
 // js/components-class.js
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { ExamUI } from './components-exam.js';
+import { ScannerUI } from './components-scanner.js';
 import { Skeleton } from './skeletons.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
@@ -70,6 +71,9 @@ const ClassUI = {
                     </button>
                     <button id="openExamManagerBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-file-contract mr-2"></i> Manage Exams
+                    </button>
+                    <button id="openScannerBtn" class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <i class="fa-solid fa-camera mr-2"></i> Scan Answer Sheets
                     </button>
                 </div>
 
@@ -948,6 +952,7 @@ export const ClassComponents = {
             ${ClassUI.renderRecitationModal()}
             ${ClassUI.renderGroupMembersModal()}
             ${ExamUI.renderManagerModal()}
+            ${ScannerUI.renderScannerModal()}
             ${ExamUI.renderPresentationOverlay()}
             ${ExamUI.renderAccessibleExamOverlay ? ExamUI.renderAccessibleExamOverlay() : ''}
         `;

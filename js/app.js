@@ -5,6 +5,7 @@ import { CourseModule } from './course.js';
 import { CourseSummary } from './course-summary.js';
 import { CourseScores } from './course-scores.js';
 import { CourseExam } from './course-exam.js';
+import { CourseScanner } from './course-scanner.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseSummary.init();
     CourseScores.init();
     CourseExam.init();
+    CourseScanner.init();
     CourseAttendanceDates.init();
     AppRouter.init();
     A11y.init();
