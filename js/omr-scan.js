@@ -5,7 +5,7 @@
 //   2. find the 4 square corner markers (the big top-left one tells which way is up)
 //   3. build a perspective map from sheet millimetres to photo pixels
 //   4. measure how dark each circle's centre is and pick the shaded one per question
-import { FRAME, BUBBLE_D, answerRows, studentCols } from './omr-sheet.js';
+import { FRAME, BUBBLE_D, STU_BUBBLE_D, answerRows, studentCols } from './omr-sheet.js';
 
 const MAX_SIDE = 1600;     // the photo is shrunk to this size before reading
 const MARK_MIN = 0.40;     // share of dark pixels in a circle that counts as shaded
@@ -260,12 +260,12 @@ export const drawOverlay = (result, answers, key, digits) => {
     const ctx = canvas.getContext('2d');
     const [ax, ay] = applyH(result.H, 0, 0);
     const [bx, by] = applyH(result.H, 1, 0);
-    const r = (BUBBLE_D / 2) * 1.15 * Math.hypot(bx - ax, by - ay);
+    const pxPerMm = Math.hypot(bx - ax, by - ay);
 
-    const ring = (u, v, color, width = 3) => {
+    const ring = (u, v, color, width = 3, d = BUBBLE_D) => {
         const [x, y] = applyH(result.H, u, v);
         ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.arc(x, y, (d / 2) * 1.15 * pxPerMm, 0, Math.PI * 2);
         ctx.lineWidth = width;
         ctx.strokeStyle = color;
         ctx.stroke();
@@ -278,7 +278,7 @@ export const drawOverlay = (result, answers, key, digits) => {
 
     studentCols().forEach((col, i) => {
         const dg = digits ? digits[i] : result.studentDigits[i];
-        if (dg >= 0) ring(col.bubbles[dg].u, col.bubbles[dg].v, '#16a34a');
+        if (dg >= 0) ring(col.bubbles[dg].u, col.bubbles[dg].v, '#16a34a', 2, STU_BUBBLE_D);
     });
 
     answerRows(answers.length, result.fills[0] ? result.fills[0].length : 0).forEach(row => {

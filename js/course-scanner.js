@@ -350,16 +350,65 @@ export const CourseScanner = {
         }
     },
 
-    printSheet: () => {
+    // Small dialog asking what to print at the top of the sheet. Resolves with the text ('' = no header)
+    // or null when cancelled. The last header used is remembered on this device.
+    askHeader: () => new Promise((resolve) => {
+        let remembered = '';
+        try { remembered = localStorage.getItem('omr_sheet_header') || ''; } catch (e) { /* storage unavailable */ }
+        const previousFocus = document.activeElement;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[310] flex items-center justify-center p-4 fade-in';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Answer sheet header');
+        overlay.innerHTML = `
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-5 relative z-10">
+                <h4 class="text-base font-bold text-gray-800 mb-1">Answer sheet header</h4>
+                <p class="text-xs text-gray-500 mb-3">What should be printed at the top of the sheet? Leave it blank for no header.</p>
+                <input type="text" id="scnHeaderInput" maxlength="80" value="${esc(remembered)}" placeholder="e.g. Midterm Examination - Prof. Dela Cruz" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" aria-label="Header text">
+                <div class="mt-4 flex gap-2 justify-end">
+                    <button type="button" id="closeScnHeaderBtn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition">Cancel</button>
+                    <button type="button" id="scnHeaderOkBtn" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-md text-sm font-bold transition"><i class="fa-solid fa-print mr-2"></i>Print</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        const input = overlay.querySelector('#scnHeaderInput');
+        let finished = false;
+        const finish = (value) => {
+            if (finished) return;
+            finished = true;
+            overlay.remove();
+            if (previousFocus && previousFocus.focus) previousFocus.focus();
+            resolve(value);
+        };
+        overlay.querySelector('#scnHeaderOkBtn').addEventListener('click', () => finish(input.value.trim()));
+        overlay.querySelector('#closeScnHeaderBtn').addEventListener('click', () => finish(null));
+        overlay.firstElementChild.addEventListener('click', () => finish(null));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); finish(input.value.trim()); }
+            if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+        });
+        input.focus();
+        input.select();
+    }),
+
+    printSheet: async () => {
         const cfg = CourseScanner.getConfig();
         if (!cfg.ok) {
             CourseScanner.setAlert(cfg.error, false);
             return;
         }
         CourseScanner.setAlert('');
+
+        const header = await CourseScanner.askHeader();
+        if (header === null) return;
+        try { localStorage.setItem('omr_sheet_header', header); } catch (e) { /* storage unavailable */ }
+
         const html = buildSheetHtml({
-            title: cfg.title,
-            subtitle: CourseScanner.courseLabel(),
+            title: header,
             n: cfg.n,
             c: cfg.c,
             paper: val('scnPaper') || 'letter'
@@ -996,7 +1045,7 @@ export const CourseScanner = {
         if (keyBtn) CourseScanner.setKey(Number(keyBtn.dataset.q), Number(keyBtn.dataset.k));
 
         if (e.target.closest('#scnKeyQuickBtn')) CourseScanner.applyQuickKey();
-        if (e.target.closest('#scnPrintBtn')) CourseScanner.printSheet();
+        if (e.target.closest('#scnPrintBtn')) await CourseScanner.printSheet();
         if (e.target.closest('#scnStartBtn')) await CourseScanner.startScanning();
         if (e.target.closest('#scnBackBtn')) {
             CourseScanner.stopLive();
