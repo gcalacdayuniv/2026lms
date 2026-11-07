@@ -5,6 +5,10 @@
 // Coordinates are in millimetres inside the "frame": a 180 x 240 mm rectangle whose four
 // corners hold the alignment markers. (0,0) is the centre of the top-left marker.
 // The top-left marker is larger than the others so the scanner can tell which way is up.
+//
+// Page flow: header, one line for name / year and section / date, instructions, then four columns.
+// The first column starts with the student number grid and question 1 follows right below it;
+// the other columns hold only questions.
 import { escapeHtml } from './html-utils.js';
 
 export const FRAME = { w: 180, h: 240 };
@@ -14,25 +18,44 @@ export const STU_BUBBLE_D = 3.8;      // student number circles (smaller so the 
 export const BUBBLE_BORDER = 0.35;
 export const MAX_QUESTIONS = 100;
 export const MAX_CHOICES = 5;
-export const ROWS_PER_BLOCK = 25;
 export const STUDENT_DIGITS = 6;
 
-const ANS = { top: 82, pitch: 5.8, left: 4, blockW: 44.5, firstK: 12, kPitch: 6.4 };
-const STU = { left: 134, colPitch: 6, gap: 3, top: 27, rowPitch: 4.4 };
+// Answer columns. Column 0 sits under the student number grid, so it starts lower and holds fewer rows.
+const ANS = { left: 4, blockW: 44.5, firstK: 12, kPitch: 6.4, pitch: 5.8 };
+const COLUMNS = [
+    { top: 90, rows: 24 },
+    { top: 41, rows: 32 },
+    { top: 41, rows: 32 },
+    { top: 41, rows: 32 }
+];
+const LETTER_GAP = 7;   // letters A-E are printed this far above the first row of a column
+
+// Student number grid, inside column 0.
+const STU = { left: 14, colPitch: 6, gap: 3, top: 38, rowPitch: 4.4 };
 
 const PAPERS = {
     letter: { w: 215.9, h: 279.4, label: 'Letter' },
     a4: { w: 210, h: 297, label: 'A4' }
 };
 
+// Which column and row question i (0-based) goes in; questions fill column 0, then 1, 2, 3.
+const slotOf = (i) => {
+    let rest = i;
+    for (let b = 0; b < COLUMNS.length; b++) {
+        if (rest < COLUMNS[b].rows) return { block: b, row: rest };
+        rest -= COLUMNS[b].rows;
+    }
+    return null;
+};
+
 // One entry per question: where each choice bubble is.
 export const answerRows = (n, c) => {
     const rows = [];
     for (let i = 0; i < n; i++) {
-        const block = Math.floor(i / ROWS_PER_BLOCK);
-        const row = i % ROWS_PER_BLOCK;
-        const u0 = ANS.left + block * ANS.blockW;
-        const v = ANS.top + row * ANS.pitch;
+        const slot = slotOf(i);
+        if (!slot) break;
+        const u0 = ANS.left + slot.block * ANS.blockW;
+        const v = COLUMNS[slot.block].top + slot.row * ANS.pitch;
         rows.push({
             q: i, u0, v,
             bubbles: Array.from({ length: c }, (_, k) => ({ k, u: u0 + ANS.firstK + k * ANS.kPitch, v }))
@@ -80,27 +103,27 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter' }) => {
         '<span>Name:</span><span class="ul" style="flex:3"></span>' +
         '<span>Year &amp; Section:</span><span class="ul" style="flex:1.3"></span>' +
         '<span>Date:</span><span class="ul" style="flex:1.1"></span></div>');
-    parts.push(textHtml(9, 22, 114,
+    parts.push(textHtml(9, 22, 162,
         'Use a black or blue pen, or a dark pencil. Shade the circle completely. ' +
         'Do not fold or stain this sheet. Erase fully if you change an answer. ' +
         'Shade ONE circle per number.', 'note'));
 
-    // Student number grid
-    parts.push(textHtml(STU.left - 7, 20.5, 46, 'STUDENT NO. (00-0000)', 'cap'));
+    // Student number grid (top of column 0)
+    parts.push(textHtml(ANS.left + 2, STU.top - 6.5, 42, 'STUDENT NO. (00-0000)', 'cap'));
     const cols = studentCols();
     for (let d = 0; d < 10; d++) {
-        parts.push(textHtml(STU.left - 7, STU.top + d * STU.rowPitch - 1.4, 4, String(d), 'num'));
+        parts.push(textHtml(ANS.left + 2, STU.top + d * STU.rowPitch - 1.4, 4, String(d), 'num'));
     }
     cols.forEach(col => col.bubbles.forEach(b => parts.push(bubbleHtml(b.u, b.v, STU_BUBBLE_D))));
     parts.push(textHtml(STU.left + 1.5 * STU.colPitch + STU.gap / 2 - 2, STU.top + 4.5 * STU.rowPitch - 2, 4, '-', 'hyphen center'));
 
-    // Answer blocks
+    // Answers: letters above the first row of every column in use, then the rows
     const rows = answerRows(n, c);
-    const blocks = Math.ceil(n / ROWS_PER_BLOCK);
-    for (let b = 0; b < blocks; b++) {
+    const lastBlock = rows.length ? slotOf(rows[rows.length - 1].q).block : 0;
+    for (let b = 0; b <= lastBlock; b++) {
         const u0 = ANS.left + b * ANS.blockW;
         for (let k = 0; k < c; k++) {
-            parts.push(textHtml(u0 + ANS.firstK + k * ANS.kPitch - 3, ANS.top - 9, 6, String.fromCharCode(65 + k), 'cap center'));
+            parts.push(textHtml(u0 + ANS.firstK + k * ANS.kPitch - 3, COLUMNS[b].top - LETTER_GAP, 6, String.fromCharCode(65 + k), 'cap center'));
         }
     }
     rows.forEach(r => {
