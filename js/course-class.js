@@ -470,7 +470,7 @@ export const CourseClass = {
                 CourseClass.loadUnenrolledStudents(courseId);
             }
 
-            const fab = document.getElementById('openRecitationBtn');
+            const fab = document.getElementById('classFab');
             if (fab) {
                 if (CourseClass.fabIdleTimer) clearTimeout(CourseClass.fabIdleTimer);
                 if (CourseClass.resetFabOpacity) {
@@ -480,13 +480,13 @@ export const CourseClass = {
                 }
 
                 CourseClass.resetFabOpacity = () => {
-                    const currentFab = document.getElementById('openRecitationBtn');
+                    const currentFab = document.getElementById('classFab');
                     if (currentFab) {
                         currentFab.style.opacity = '1';
                         clearTimeout(CourseClass.fabIdleTimer);
                         CourseClass.fabIdleTimer = setTimeout(() => {
-                            if (document.getElementById('openRecitationBtn')) {
-                                document.getElementById('openRecitationBtn').style.opacity = '0.5';
+                            if (document.getElementById('classFab')) {
+                                document.getElementById('classFab').style.opacity = '0.5';
                             }
                         }, 10000);
                     }

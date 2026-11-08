@@ -184,10 +184,11 @@ export const ScannerUI = {
                     <div id="scnProgress" class="hidden mb-2 text-xs font-bold text-blue-700"></div>
                     <div id="scnRows" class="flex-1 overflow-y-auto min-h-[160px] space-y-2 bg-gray-50 p-2 rounded border border-gray-200"></div>
 
+                    <div id="scnSyncActions" class="hidden flex flex-wrap gap-2 mt-3"></div>
                     <div class="mt-3 flex flex-col sm:flex-row gap-2">
                         <div id="scnSaveInfo" class="flex-1 text-xs text-gray-600 self-center"></div>
                         <button type="button" id="scnSaveBtn" class="sm:w-72 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center disabled:opacity-50">
-                            <i class="fa-solid fa-floppy-disk mr-2"></i> Save Scores
+                            <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Upload now
                         </button>
                     </div>
                 </div>

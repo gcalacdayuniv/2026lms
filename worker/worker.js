@@ -338,6 +338,13 @@ async function ensureScanTables(env) {
         env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_sheets_student ON Scan_Sheets (Session_ID, Student_ID)"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_scan_sessions_course ON Scan_Sessions (Course_ID)")
     ]);
+    // Scan_ID = the id the app gave one captured sheet. It makes a retried upload harmless and tells a
+    // re-upload of the same capture apart from a different sheet of the same student.
+    try {
+        await env.DB.prepare("ALTER TABLE Scan_Sheets ADD COLUMN Scan_ID TEXT").run();
+    } catch (err) {
+        if (!/duplicate column/i.test(String(err && err.message))) throw err;
+    }
     scanTablesReady = true;
 }
 
@@ -444,6 +451,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
     if (method === 'POST' && path === '/api/scan-sheets/save') {
         const body = await request.json();
         const { courseId, assessmentId, title, term, category, numQuestions, numChoices, answerKey, bonus, sheets, allowRegrade } = body;
+        const removals = Array.isArray(body.removals) ? body.removals.filter(r => r && r.studentId && r.scanId) : [];
 
         const n = Number(numQuestions);
         const c = Number(numChoices);
@@ -474,6 +482,9 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             }
             if (seen.has(sheet.studentId)) return json(corsHeaders, { error: 'Two sheets belong to the same student.' }, 400);
             seen.add(sheet.studentId);
+            if (sheet.scanId != null && (typeof sheet.scanId !== 'string' || sheet.scanId.length > 64)) {
+                return json(corsHeaders, { error: 'A sheet has an invalid scan id.' }, 400);
+            }
             if (!isAnswerList(sheet.answers, n, c)) return json(corsHeaders, { error: 'A sheet has invalid answers.' }, 400);
             if (sheet.originalAnswers != null && !isAnswerList(sheet.originalAnswers, n, c)) {
                 return json(corsHeaders, { error: 'A sheet has invalid original answers.' }, 400);
@@ -489,6 +500,13 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         let keyChanged = false;
         const statements = [];
         const regradeStatements = [];
+        const savedBefore = new Map();
+        if (existing) {
+            const prior = await env.DB.prepare(
+                "SELECT Student_ID, Scan_ID, Answers, Score, Updated_At FROM Scan_Sheets WHERE Session_ID = ?"
+            ).bind(existing.Session_ID).all();
+            (prior.results || []).forEach(r => savedBefore.set(r.Student_ID, r));
+        }
         if (existing) {
             sessionId = existing.Session_ID;
             const oldKey = parseJsonList(existing.Answer_Key);
@@ -515,20 +533,59 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             ).bind(sessionId, courseId, assessmentId, cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags)));
         }
 
+        // One sheet per student per assessment. A second, different sheet for a student who already has one
+        // is not written unless the caller says replace: it comes back as a conflict instead.
+        const written = new Set();
+        const conflicts = [];
+        let unchanged = 0;
         for (const sheet of sheets) {
+            const before = savedBefore.get(sheet.studentId);
+            if (before) {
+                const sameCapture = before.Scan_ID && before.Scan_ID === sheet.scanId;
+                if (!sameCapture) {
+                    if (sameList(parseJsonList(before.Answers), sheet.answers)) {
+                        unchanged++;
+                        continue;
+                    }
+                    if (sheet.replace !== true) {
+                        conflicts.push({
+                            studentId: sheet.studentId, scanId: sheet.scanId || null,
+                            existingScore: before.Score, existingUpdated: before.Updated_At,
+                            newScore: gradeScan(sheet.answers, key, bonusFlags, assessment.Max_Score).score
+                        });
+                        continue;
+                    }
+                }
+            }
+            written.add(sheet.studentId);
             const original = sheet.originalAnswers || sheet.answers;
             const graded = gradeScan(sheet.answers, key, bonusFlags, assessment.Max_Score);
             statements.push(env.DB.prepare(
-                `INSERT INTO Scan_Sheets (Sheet_ID, Session_ID, Student_ID, Student_No_Read, Original_Answers, Answers, Score, Edited)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO Scan_Sheets (Sheet_ID, Session_ID, Student_ID, Student_No_Read, Original_Answers, Answers, Score, Edited, Scan_ID)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(Session_ID, Student_ID) DO UPDATE SET
                     Student_No_Read = excluded.Student_No_Read, Original_Answers = excluded.Original_Answers,
-                    Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited, Updated_At = CURRENT_TIMESTAMP`
+                    Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited, Scan_ID = excluded.Scan_ID,
+                    Updated_At = CURRENT_TIMESTAMP`
             ).bind(
                 crypto.randomUUID(), sessionId, sheet.studentId, String(sheet.studentNo || '').slice(0, 20),
-                JSON.stringify(original), JSON.stringify(sheet.answers), graded.score, sameList(original, sheet.answers) ? 0 : 1
+                JSON.stringify(original), JSON.stringify(sheet.answers), graded.score, sameList(original, sheet.answers) ? 0 : 1,
+                sheet.scanId || null
             ));
             statements.push(...scanScoreStatements(env, assessmentId, sheet.studentId, graded.score));
+        }
+
+        // Undo: the app assigned a captured sheet to a different student after it was uploaded. Only the
+        // sheet that carries that capture's id is removed, together with the score it recorded.
+        let removed = 0;
+        const removedIds = new Set();
+        for (const r of removals) {
+            const before = savedBefore.get(r.studentId);
+            if (!before || before.Scan_ID !== r.scanId || written.has(r.studentId)) continue;
+            statements.push(env.DB.prepare("DELETE FROM Scan_Sheets WHERE Session_ID = ? AND Student_ID = ? AND Scan_ID = ?").bind(sessionId, r.studentId, r.scanId));
+            statements.push(env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?").bind(assessmentId, r.studentId));
+            removedIds.add(r.studentId);
+            removed++;
         }
 
         // The key changed: sheets saved earlier in this assessment must be graded again with the new key.
@@ -537,7 +594,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (keyChanged) {
             const old = await env.DB.prepare("SELECT Student_ID, Answers FROM Scan_Sheets WHERE Session_ID = ?").bind(sessionId).all();
             for (const row of old.results || []) {
-                if (seen.has(row.Student_ID)) continue;
+                if (written.has(row.Student_ID) || removedIds.has(row.Student_ID)) continue;
                 const answers = parseJsonList(row.Answers);
                 if (!isAnswerList(answers, n, c)) continue;
                 const graded = gradeScan(answers, key, bonusFlags, assessment.Max_Score);
@@ -553,7 +610,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         }
 
         await runInChunks(env, statements.concat(regradeStatements));
-        return json(corsHeaders, { success: true, sessionId, saved: sheets.length, regraded }, 201);
+        return json(corsHeaders, { success: true, sessionId, saved: written.size, unchanged, conflicts, removed, regraded }, 201);
     }
 
     // Corrects one student's answers later; the score in the assessment is updated too.

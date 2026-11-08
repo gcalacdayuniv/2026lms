@@ -639,9 +639,11 @@ export const DashboardComponents = {
         return `
             ${DashboardUI.renderHeader(user, headerAvatar)}
 
-            <main class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full fade-in">
+            <main class="pt-24 pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full fade-in">
                 <div id="courseContainer" class="w-full"></div>
             </main>
+
+            ${user.role.toLowerCase() === 'lecturer' ? `<button type="button" class="open-create-course-btn fixed bottom-6 right-6 z-30 h-14 pl-4 pr-5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center gap-2 text-sm font-bold focus:outline-none focus-visible:ring-4 ring-blue-300 transition-colors" aria-label="Create new course"><i class="fa-solid fa-plus text-lg" aria-hidden="true"></i><span class="hidden sm:inline">New Course</span></button>` : ''}
 
             ${DashboardUI.renderProfilePanel(user, panelAvatar, displayCourse, lecturerBtns)}
             ${DashboardUI.renderUpdateDetailsModal(user)}

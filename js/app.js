@@ -7,6 +7,7 @@ import { CourseScores } from './course-scores.js';
 import { CourseExam } from './course-exam.js';
 import { CourseScanner } from './course-scanner.js';
 import { CourseScanRecords } from './course-scan-records.js';
+import { CourseFab } from './course-fab.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseExam.init();
     CourseScanner.init();
     CourseScanRecords.init();
+    CourseFab.init();
     CourseAttendanceDates.init();
     AppRouter.init();
     A11y.init();

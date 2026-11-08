@@ -8,12 +8,18 @@ import { UI } from './ui-feedback.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { CourseScanRecords } from './course-scan-records.js';
+import { ScanQueue } from './course-scan-queue.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
 import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
 
 // Live camera settings
 const LIVE_TICK_MS = 250;      // how often a frame is checked
 const LIVE_DETECT_SIDE = 640;  // frames are shrunk to this size for the quick check
+const AUTO_SAVE_MS = 3000;         // a sheet is uploaded this long after the last edit
+const LIVE_REVIEW_HOLD_MS = 20000; // while a live review is open the lecturer gets longer to check it
+const RETRY_MS = 15000;
+const MAX_ATTEMPTS = 6;
+const UPLOAD_CHUNK = 100;
 const STEADY_MS = 2000;        // the sheet must stay still and fully visible this long before it is captured
 const MOVE_TOL = 0.012;        // corner movement (share of the frame) that still counts as steady
 const REARM_MOVE = 0.06;       // after a capture, the sheet must move this much (or leave) before the next one
@@ -65,12 +71,21 @@ export const CourseScanner = {
     createdExamId: null,
     busy: false,
     saving: false,
+    flushing: false,
+    flushAgain: false,
+    flushTimer: null,
+    lastChange: 0,
+    targets: new Map(),     // assessment already resolved for a setup, so it is looked up or created once
+    examsMade: new Set(),
     live: { stream: null, timer: null, canvas: null, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 },
 
     init: () => {
         document.addEventListener('click', CourseScanner.handleClicks);
         document.addEventListener('change', CourseScanner.handleChanges);
         document.addEventListener('input', CourseScanner.handleInputs);
+        // Sheets that could not be uploaded stay in the cache and are sent again when the connection is back.
+        window.addEventListener('online', () => { if (AppState.user) CourseScanner.flush(true); });
+        setInterval(() => { if (AppState.user && ScanQueue.all().length) CourseScanner.flush(); }, 20000);
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) CourseScanner.stopLive();
         });
@@ -153,6 +168,7 @@ export const CourseScanner = {
         CourseScanner.setAlert('');
         if (!val('scnDate')) $('scnDate').value = getLocalDateString();
         CourseScanner.showView('setup');
+        CourseScanner.flush();
         await CourseScanner.load();
     },
 
@@ -220,13 +236,13 @@ export const CourseScanner = {
     },
 
     // The existing assessment the scores would go into, or null when a new one is needed.
-    findAssessment: (cfg) => {
+    findAssessment: (cfg, assessments = CourseScanner.assessments, classExams = CourseScanner.classExams) => {
         if (cfg.mode === 'exam') {
-            const link = CourseScanner.classExams.find(ce => ce.Exam_ID === cfg.examId && ce.Assessment_ID);
-            const linked = link ? CourseScanner.assessments.find(a => a.Assessment_ID === link.Assessment_ID) : null;
+            const link = classExams.find(ce => ce.Exam_ID === cfg.examId && ce.Assessment_ID);
+            const linked = link ? assessments.find(a => a.Assessment_ID === link.Assessment_ID) : null;
             if (linked) return linked;
         }
-        return CourseScanner.assessments.find(a => norm(a.Title) === norm(cfg.title) && a.Term === cfg.term) || null;
+        return assessments.find(a => norm(a.Title) === norm(cfg.title) && a.Term === cfg.term) || null;
     },
 
     // Validates the setup form and returns the scanning settings, or { ok: false, error }.
@@ -486,6 +502,7 @@ export const CourseScanner = {
             }
             CourseScanner.rows.push(row);
             CourseScanner.renderRows();
+            CourseScanner.markChange();
         }
 
         progress.classList.add('hidden');
@@ -505,7 +522,9 @@ export const CourseScanner = {
             fileName: name,
             ok: result.ok,
             error: result.error || '',
-            saved: false,
+            saveState: '',     // '' | pending | saving | saved | dirty | conflict | key | error
+            scanId: '',
+            savedStudentId: '',
             answers: [],
             original: [],
             studentText: '',
@@ -623,6 +642,8 @@ export const CourseScanner = {
         if (CourseScanner.liveReviewRow) {
             CourseScanner.liveReviewRow = null;
             CourseScanner.renderRows();   // the list shows any edit made in the full-screen review
+            CourseScanner.markChange();
+            CourseScanner.flush();
         }
     },
 
@@ -814,6 +835,7 @@ export const CourseScanner = {
             const row = await CourseScanner.rowFromResult(`Live scan ${time}`, result);
             CourseScanner.rows.push(row);
             CourseScanner.renderRows();
+            CourseScanner.markChange();
 
             live.steady = 0;
             if (navigator.vibrate) navigator.vibrate(60);
@@ -871,7 +893,20 @@ export const CourseScanner = {
         else if (dups.has(row.studentId)) out.push(badge('bg-red-50 text-red-700 border-red-300', 'Duplicate - another sheet has this student'));
         if (s.multi) out.push(badge('bg-amber-50 text-amber-800 border-amber-300', `${s.multi} double-shaded`));
         if (s.blank) out.push(badge('bg-gray-100 text-gray-600 border-gray-300', `${s.blank} blank`));
-        if (row.saved) out.push(badge('bg-green-50 text-green-800 border-green-300', 'Saved'));
+        const st = row.saveState;
+        if (st === 'saved') out.push(badge('bg-green-50 text-green-800 border-green-300', '<i class="fa-solid fa-cloud-arrow-up mr-1"></i>Saved'));
+        else if (st === 'saving') out.push(badge('bg-blue-50 text-blue-700 border-blue-300', '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Saving...'));
+        else if (st === 'pending' || st === 'dirty') out.push(badge('bg-blue-50 text-blue-700 border-blue-300', 'Saves in a moment'));
+        else if (st === 'error') out.push(badge('bg-amber-50 text-amber-800 border-amber-300', 'Not uploaded yet - kept on this device, retrying'));
+        else if (st === 'key') out.push(badge('bg-amber-50 text-amber-800 border-amber-300', 'Waiting: answer key changed'));
+        else if (st === 'conflict' && row.conflict) {
+            out.push(`<div class="w-full mt-1 p-2 rounded border border-red-300 bg-red-50 text-[11px] text-red-800">
+                <div class="font-bold">This student already has a different saved sheet (score ${fmt(row.conflict.existingScore)}). This sheet would give ${fmt(row.conflict.newScore)}.</div>
+                <div class="mt-1.5 flex flex-wrap gap-2">
+                    <button type="button" class="scn-replace-btn px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-bold" data-row="${row.id}">Replace the saved sheet</button>
+                    <button type="button" class="scn-keep-btn px-2 py-1 rounded bg-white hover:bg-gray-50 border border-gray-300 text-gray-800 font-bold" data-row="${row.id}">Keep saved, discard this</button>
+                </div></div>`);
+        }
         return out.join(' ');
     },
 
@@ -968,162 +1003,315 @@ export const CourseScanner = {
         CourseScanner.updateSaveInfo();
     },
 
-    readyRows: () => {
-        const dups = CourseScanner.duplicateIds();
-        return CourseScanner.rows.filter(r => r.ok && r.studentId && !dups.has(r.studentId));
-    },
-
     updateSaveInfo: () => {
         const info = $('scnSaveInfo');
         const btn = $('scnSaveBtn');
         if (!info || !btn) return;
         const okRows = CourseScanner.rows.filter(r => r.ok);
         const dups = CourseScanner.duplicateIds();
-        const noStudent = okRows.filter(r => !r.studentId).length;
-        const dupRows = okRows.filter(r => dups.has(r.studentId)).length;
-        const ready = okRows.length - noStudent - dupRows;
-        const parts = [`${ready} ready to save`];
+        const count = (fn) => okRows.filter(fn).length;
+        const saved = count(r => r.saveState === 'saved');
+        const waiting = count(r => ['pending', 'saving', 'dirty', 'error', 'key'].includes(r.saveState));
+        const conflicts = count(r => r.saveState === 'conflict');
+        const noStudent = count(r => !r.studentId);
+        const dupRows = count(r => r.studentId && dups.has(r.studentId));
+        const parts = [`${saved} saved to the database`];
+        if (waiting) parts.push(`${waiting} waiting to upload`);
+        if (conflicts) parts.push(`${conflicts} already saved earlier - choose`);
         if (noStudent) parts.push(`${noStudent} need a student`);
         if (dupRows) parts.push(`${dupRows} duplicate (remove or reassign)`);
+        if (navigator.onLine === false) parts.push('offline - will upload when back online');
+        const orphans = CourseScanner.orphans();
+        if (orphans.length) parts.push(`${orphans.length} unsent from an earlier visit`);
         info.textContent = parts.join(' | ');
-        btn.disabled = CourseScanner.saving || ready === 0 || dupRows > 0;
+
+        const queued = ScanQueue.forCourse(CourseScanner.courseId).filter(e => !e.conflict && !e.needsKey).length;
+        btn.disabled = CourseScanner.flushing || queued === 0;
+        btn.innerHTML = CourseScanner.flushing
+            ? '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Uploading...'
+            : `<i class="fa-solid fa-cloud-arrow-up mr-2"></i> Upload now${queued ? ` (${queued})` : ''}`;
+
+        // Decisions that cannot be shown on a sheet card.
+        const box = $('scnSyncActions');
+        if (box) {
+            const keyWait = ScanQueue.forCourse(CourseScanner.courseId).filter(e => e.needsKey);
+            const orphanConflicts = orphans.filter(e => e.conflict);
+            const html = [];
+            if (keyWait.length) {
+                html.push(`<div class="w-full p-2 rounded border border-amber-300 bg-amber-50 text-xs text-amber-900"><b>The answer key is different from the one saved before.</b> ${keyWait[0].needsKey} earlier sheet(s) would be graded again with the new key.
+                    <button type="button" id="scnRegradeBtn" class="ml-2 px-2 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold">Grade earlier sheets again</button></div>`);
+            }
+            if (orphanConflicts.length) {
+                html.push(`<div class="w-full p-2 rounded border border-red-300 bg-red-50 text-xs text-red-800"><b>${orphanConflicts.length} sheet(s) from an earlier visit already have a different saved sheet.</b>
+                    <button type="button" id="scnOrphanReplaceBtn" class="ml-2 px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-bold">Replace saved</button>
+                    <button type="button" id="scnOrphanKeepBtn" class="ml-1 px-2 py-1 rounded bg-white border border-gray-300 text-gray-800 font-bold">Keep saved, discard these</button></div>`);
+            }
+            box.innerHTML = html.join('');
+            box.classList.toggle('hidden', html.length === 0);
+        }
     },
 
     // ---------- Saving ----------
 
-    save: async () => {
-        const cfg = CourseScanner.cfg;
-        if (!cfg || CourseScanner.saving) return;
-        const rows = CourseScanner.readyRows();
-        const skipped = CourseScanner.rows.filter(r => r.ok).length - rows.length;
-        if (!rows.length) return;
+    // Sheets are saved by themselves: each ready sheet goes into the cache (ScanQueue) and is uploaded a few
+    // seconds later. The cache entry is deleted only when the server confirms the save.
+    save: async () => { await CourseScanner.flush(true); },
 
-        if (skipped > 0) {
-            const ok = await UI.confirm({
-                title: 'Some sheets will not be saved',
-                message: `${skipped} sheet${skipped === 1 ? ' has' : 's have'} no student selected and will be left out. Save the other ${rows.length}?`,
-                confirmText: 'Save'
+    snapshot: (cfg) => ({
+        mode: cfg.mode, examId: cfg.examId || '', title: cfg.title, term: cfg.term, category: cfg.category,
+        date: cfg.date, n: cfg.n, c: cfg.c, key: cfg.key.slice(), bonus: cfg.bonus.slice(), maxRegular: cfg.maxRegular
+    }),
+
+    groupKey: (e) => JSON.stringify([e.courseId, e.cfg.mode, e.cfg.examId, e.cfg.title, e.cfg.term, e.cfg.category, e.cfg.n, e.cfg.c, e.cfg.key, e.cfg.bonus]),
+
+    rowByScan: (scanId) => CourseScanner.rows.find(r => r.scanId === scanId),
+
+    // Puts every ready sheet that is new or edited into the cache.
+    syncQueue: () => {
+        const cfg = CourseScanner.cfg;
+        if (!cfg) return;
+        const dups = CourseScanner.duplicateIds();
+        CourseScanner.rows.forEach(row => {
+            if (!row.ok || (row.saveState && row.saveState !== 'dirty')) return;
+            if (!row.scanId) row.scanId = crypto.randomUUID();
+            if (!row.studentId || dups.has(row.studentId)) {
+                if (row.saveState === 'dirty') {
+                    ScanQueue.remove([row.scanId]);
+                    row.saveState = '';
+                }
+                return;
+            }
+            ScanQueue.put({
+                scanId: row.scanId,
+                courseId: CourseScanner.courseId,
+                cfg: CourseScanner.snapshot(row.cfg || cfg),
+                studentId: row.studentId,
+                studentNo: row.studentText,
+                originalAnswers: row.original && row.original.length ? row.original : row.answers.slice(),
+                answers: row.answers.slice(),
+                replace: Boolean(row.replace),
+                // The sheet was uploaded for another student first: that earlier upload is undone.
+                removeStudent: row.savedStudentId && row.savedStudentId !== row.studentId ? row.savedStudentId : null
             });
-            if (!ok) return;
+            row.cfg = row.cfg || cfg;
+            row.saveState = 'pending';
+            row.attempts = 0;
+        });
+    },
+
+    // Called after any change: waits until the lecturer stops editing, longer while a live review is open.
+    markChange: () => {
+        CourseScanner.lastChange = Date.now();
+        CourseScanner.syncQueue();
+        CourseScanner.refreshCards();
+        CourseScanner.scheduleFlush();
+    },
+
+    scheduleFlush: () => {
+        clearTimeout(CourseScanner.flushTimer);
+        const wait = (CourseScanner.liveReviewRow ? LIVE_REVIEW_HOLD_MS : AUTO_SAVE_MS) - (Date.now() - CourseScanner.lastChange);
+        CourseScanner.flushTimer = setTimeout(() => CourseScanner.autoFlush(), Math.max(300, wait));
+    },
+
+    // Timer callback: holds back while a live review is still open and being edited.
+    autoFlush: () => {
+        if (CourseScanner.liveReviewRow && Date.now() - CourseScanner.lastChange < LIVE_REVIEW_HOLD_MS) {
+            CourseScanner.scheduleFlush();
+            return;
+        }
+        CourseScanner.flush();
+    },
+
+    // The assessment for this setup: found, or created (and for a typed key also added to Manage Exams).
+    ensureTarget: async (courseId, cfg) => {
+        const tkey = JSON.stringify([courseId, cfg.mode, cfg.examId, cfg.title, cfg.term, cfg.category]);
+        const ts = new Date().getTime();
+        const [assessRes, classExamRes] = await Promise.all([
+            apiFetch(`/api/assessments?courseId=${courseId}&_t=${ts}`),
+            apiFetch(`/api/class-exams?courseId=${courseId}&_t=${ts}`)
+        ]);
+        const assessments = assessRes.assessments || [];
+        if (courseId === CourseScanner.courseId) {
+            CourseScanner.assessments = assessments;
+            CourseScanner.classExams = classExamRes.classExams || [];
+        }
+        let found = CourseScanner.findAssessment(cfg, assessments, classExamRes.classExams || []);
+        if (found) {
+            CourseScanner.targets.set(tkey, found.Assessment_ID);
+            return { id: found.Assessment_ID, max: Number(found.Max_Score) };
         }
 
-        const btn = $('scnSaveBtn');
-        const originalHtml = btn.innerHTML;
-        CourseScanner.saving = true;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
-        CourseScanner.setAlert('');
+        if (cfg.mode === 'typed' && !CourseScanner.examsMade.has(tkey)) {
+            const choices = LETTERS.slice(0, cfg.c).split('');
+            const examData = cfg.key.map((k, i) => [0, `Question ${i + 1}`, choices, choices[k], '', false]);
+            await apiFetch('/api/exams', {
+                method: 'POST',
+                body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: cfg.title, examData })
+            });
+            CourseScanner.examsMade.add(tkey);
+        }
+        const res = await apiFetch('/api/assessments', {
+            method: 'POST',
+            body: JSON.stringify({
+                assessmentId: null, courseId, term: cfg.term, category: cfg.category,
+                title: cfg.title, maxScore: cfg.maxRegular, date: cfg.date
+            })
+        });
+        CourseScanner.targets.set(tkey, res.assessmentId);
+        return { id: res.assessmentId, max: Number(cfg.maxRegular) };
+    },
 
+    setSaveState: (entries, state, extra = {}) => {
+        entries.forEach(e => {
+            const row = CourseScanner.rowByScan(e.scanId);
+            if (row) Object.assign(row, { saveState: state }, extra);
+        });
+    },
+
+    // Uploads one group of cached sheets that share the same answer key and assessment.
+    uploadGroup: async (group) => {
+        const first = group[0];
+        const { courseId, cfg } = first;
         try {
-            const ts = new Date().getTime();
-            const [assessRes, classExamRes] = await Promise.all([
-                apiFetch(`/api/assessments?courseId=${CourseScanner.courseId}&_t=${ts}`),
-                apiFetch(`/api/class-exams?courseId=${CourseScanner.courseId}&_t=${ts}`)
-            ]);
-            CourseScanner.assessments = assessRes.assessments || [];
-            CourseScanner.classExams = classExamRes.classExams || [];
+            const target = await CourseScanner.ensureTarget(courseId, cfg);
+            const res = await apiFetch('/api/scan-sheets/save', {
+                method: 'POST',
+                body: JSON.stringify({
+                    courseId,
+                    assessmentId: target.id,
+                    title: cfg.title,
+                    term: cfg.term,
+                    category: cfg.category,
+                    numQuestions: cfg.n,
+                    numChoices: cfg.c,
+                    answerKey: cfg.key,
+                    bonus: cfg.bonus,
+                    allowRegrade: group.some(e => e.allowRegrade),
+                    removals: group.filter(e => e.removeStudent).map(e => ({ studentId: e.removeStudent, scanId: e.scanId })),
+                    sheets: group.map(e => ({
+                        scanId: e.scanId, studentId: e.studentId, studentNo: e.studentNo,
+                        originalAnswers: e.originalAnswers, answers: e.answers, replace: Boolean(e.replace)
+                    }))
+                })
+            });
 
-            // Scores already recorded for this assessment are kept; scanned ones are added or replace.
-            let assessment = CourseScanner.findAssessment(cfg);
-            const existing = new Map();
-            if (assessment) {
-                const data = await apiFetch(`/api/assessment-scores?assessmentId=${assessment.Assessment_ID}&_t=${ts}`);
-                (data.scores || []).forEach(s => existing.set(s.Student_ID, Number(s.Score)));
+            if (res.needsConfirm) {
+                group.forEach(e => ScanQueue.update(e.scanId, { needsKey: res.regradeCount }));
+                CourseScanner.setSaveState(group, 'key');
+                return;
             }
-            const max = assessment ? Number(assessment.Max_Score) : cfg.maxRegular;
-            const incoming = rows.map(r => ({ studentId: r.studentId, score: CourseScanner.scoreRow(r, max).final }));
-            const replaced = incoming.filter(i => existing.has(i.studentId) && existing.get(i.studentId) !== i.score).length;
-            if (replaced > 0) {
-                const ok = await UI.confirm({
-                    title: 'Replace existing scores?',
-                    message: `${replaced} student${replaced === 1 ? ' already has a different score' : 's already have different scores'} in "${assessment.Title}". The scanned score${replaced === 1 ? '' : 's'} will replace ${replaced === 1 ? 'it' : 'them'}.`,
-                    confirmText: 'Replace and save',
-                    danger: true
-                });
-                if (!ok) return;
+            if (!res.success) throw new Error(res.error || 'Failed to save.');
+
+            const conflicts = new Map((res.conflicts || []).map(c => [c.studentId, c]));
+            const done = [];
+            group.forEach(e => {
+                const c = conflicts.get(e.studentId);
+                if (c) {
+                    ScanQueue.update(e.scanId, { conflict: c });
+                    CourseScanner.setSaveState([e], 'conflict', { conflict: c });
+                } else {
+                    done.push(e);
+                }
+            });
+            // The server confirmed these: the cached copies are deleted now (unless edited again meanwhile).
+            ScanQueue.removeIfSame(done);
+            done.forEach(e => {
+                const row = CourseScanner.rowByScan(e.scanId);
+                if (!row) return;
+                Object.assign(row, { replace: false, savedStudentId: e.studentId, conflict: null, error: '' });
+                if (row.saveState !== 'dirty') row.saveState = 'saved';
+            });
+            if (courseId === CourseScanner.courseId && CourseScanner.cfg && CourseScanner.cfg.title === cfg.title && Number.isFinite(target.max)) {
+                CourseScanner.cfg.cap = target.max;
             }
-
-            // A typed answer key is also stored as an exam in Manage Exams (once).
-            if (cfg.mode === 'typed' && !CourseScanner.createdExamId) {
-                const choices = LETTERS.slice(0, cfg.c).split('');
-                const examData = cfg.key.map((k, i) => [0, `Question ${i + 1}`, choices, choices[k], '', false]);
-                const res = await apiFetch('/api/exams', {
-                    method: 'POST',
-                    body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: cfg.title, examData })
-                });
-                CourseScanner.createdExamId = res.examId || true;
-            }
-
-            let assessmentId;
-            if (assessment) {
-                assessmentId = assessment.Assessment_ID;
-            } else {
-                const res = await apiFetch('/api/assessments', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        assessmentId: null,
-                        courseId: CourseScanner.courseId,
-                        term: cfg.term,
-                        category: cfg.category,
-                        title: cfg.title,
-                        maxScore: cfg.maxRegular,
-                        date: cfg.date
-                    })
-                });
-                assessmentId = res.assessmentId;
-            }
-
-            // The server stores every sheet (what the reader saw and the current answers), grades it with the
-            // saved key and records the score for these students only, so other students' scores stay.
-            const payload = {
-                courseId: CourseScanner.courseId,
-                assessmentId,
-                title: cfg.title,
-                term: cfg.term,
-                category: cfg.category,
-                numQuestions: cfg.n,
-                numChoices: cfg.c,
-                answerKey: cfg.key,
-                bonus: cfg.bonus,
-                sheets: rows.map(r => ({
-                    studentId: r.studentId,
-                    studentNo: r.studentText,
-                    originalAnswers: r.original && r.original.length ? r.original : r.answers,
-                    answers: r.answers
-                }))
-            };
-            const send = (extra) => apiFetch('/api/scan-sheets/save', { method: 'POST', body: JSON.stringify({ ...payload, ...extra }) });
-            let saveRes = await send({});
-            if (saveRes.needsConfirm) {
-                const ok = await UI.confirm({
-                    title: 'Grade earlier sheets again?',
-                    message: `The answer key is different from the one saved earlier for "${cfg.title}". ${saveRes.regradeCount} sheet${saveRes.regradeCount === 1 ? '' : 's'} saved earlier will be graded again with the new key and their scores updated.`,
-                    confirmText: 'Update and save',
-                    danger: true
-                });
-                if (!ok) return;
-                saveRes = await send({ allowRegrade: true });
-            }
-            if (!saveRes.success) throw new Error(saveRes.error || 'Failed to save the sheets.');
-
-            rows.forEach(r => { r.saved = true; });
-            const list = await apiFetch(`/api/assessments?courseId=${CourseScanner.courseId}&_t=${new Date().getTime()}`);
-            CourseScanner.assessments = list.assessments || [];
-            const fresh = CourseScanner.findAssessment(cfg);
-            if (fresh) cfg.cap = Number(fresh.Max_Score);
-            CourseScanner.refreshCards();
-
-            const regradedNote = saveRes.regraded ? ` ${saveRes.regraded} earlier sheet${saveRes.regraded === 1 ? ' was' : 's were'} graded again.` : '';
-            const msg = `Saved ${incoming.length} sheet${incoming.length === 1 ? '' : 's'} and score${incoming.length === 1 ? '' : 's'} to "${cfg.title}".${regradedNote}`;
-            CourseScanner.setAlert(msg, true);
-            UI.success(msg);
         } catch (err) {
-            CourseScanner.setAlert(err.message || 'Failed to save scores.', false);
+            group.forEach(e => {
+                const attempts = (e.attempts || 0) + 1;
+                ScanQueue.update(e.scanId, { attempts, lastError: err.message || 'Upload failed' });
+            });
+            CourseScanner.setSaveState(group, 'error', { error: err.message || 'Upload failed' });
+        }
+    },
+
+    // Uploads everything waiting in the cache. force = the lecturer pressed Upload now: try again even if
+    // earlier attempts failed.
+    flush: async (force = false) => {
+        if (CourseScanner.flushing) {
+            CourseScanner.flushAgain = true;
+            return;
+        }
+        CourseScanner.flushing = true;
+        CourseScanner.saving = true;
+        CourseScanner.updateSaveInfo();
+        try {
+            do {
+                CourseScanner.flushAgain = false;
+                CourseScanner.syncQueue();
+                if (force) ScanQueue.all().filter(e => e.attempts).forEach(e => ScanQueue.update(e.scanId, { attempts: 0 }));
+                const waiting = ScanQueue.all().filter(e => !e.conflict && !e.needsKey && (e.attempts || 0) < MAX_ATTEMPTS);
+                const groups = new Map();
+                waiting.forEach(e => {
+                    const k = CourseScanner.groupKey(e);
+                    if (!groups.has(k)) groups.set(k, []);
+                    groups.get(k).push(e);
+                });
+                for (const group of groups.values()) {
+                    for (let i = 0; i < group.length; i += UPLOAD_CHUNK) {
+                        CourseScanner.setSaveState(group.slice(i, i + UPLOAD_CHUNK), 'saving');
+                        CourseScanner.refreshCards();
+                        await CourseScanner.uploadGroup(group.slice(i, i + UPLOAD_CHUNK));
+                    }
+                }
+                force = false;
+                if (CourseScanner.rows.some(r => r.saveState === 'dirty')) CourseScanner.flushAgain = true;
+            } while (CourseScanner.flushAgain);
         } finally {
+            CourseScanner.flushing = false;
             CourseScanner.saving = false;
-            btn.innerHTML = originalHtml;
+            CourseScanner.refreshCards();
             CourseScanner.updateSaveInfo();
         }
+        // Failed uploads are tried again by themselves.
+        const retry = ScanQueue.all().some(e => !e.conflict && !e.needsKey && (e.attempts || 0) > 0 && (e.attempts || 0) < MAX_ATTEMPTS);
+        if (retry) {
+            clearTimeout(CourseScanner.flushTimer);
+            CourseScanner.flushTimer = setTimeout(() => CourseScanner.flush(), RETRY_MS);
+        }
+    },
+
+    // Lecturer's choice for a sheet that has a saved twin: replace the saved one, or drop this scan.
+    resolveConflict: async (row, replace) => {
+        if (!row || !row.scanId) return;
+        if (replace) {
+            row.replace = true;
+            row.saveState = 'dirty';
+            CourseScanner.syncQueue();
+            await CourseScanner.flush(true);
+        } else {
+            ScanQueue.remove([row.scanId]);
+            CourseScanner.revokeRow(row);
+            CourseScanner.rows = CourseScanner.rows.filter(r => r !== row);
+            CourseScanner.renderRows();
+            CourseScanner.markChange();
+        }
+    },
+
+    // Sheets in the cache that no longer have a row on screen (from an earlier visit).
+    orphans: () => ScanQueue.forCourse(CourseScanner.courseId).filter(e => !CourseScanner.rowByScan(e.scanId)),
+
+    resolveOrphans: async (replace) => {
+        const list = CourseScanner.orphans().filter(e => e.conflict);
+        if (!replace) ScanQueue.remove(list.map(e => e.scanId));
+        else list.forEach(e => ScanQueue.update(e.scanId, { conflict: null, replace: true, attempts: 0 }));
+        await CourseScanner.flush(true);
+    },
+
+    // The answer key of this assessment differs from the one saved earlier: earlier sheets get graded again.
+    allowRegrade: async () => {
+        ScanQueue.forCourse(CourseScanner.courseId).filter(e => e.needsKey)
+            .forEach(e => ScanQueue.update(e.scanId, { needsKey: null, allowRegrade: true, attempts: 0 }));
+        CourseScanner.rows.filter(r => r.saveState === 'key').forEach(r => { r.saveState = 'pending'; });
+        await CourseScanner.flush(true);
     },
 
     // ---------- Events ----------
@@ -1163,6 +1351,8 @@ export const CourseScanner = {
         if (e.target.closest('#scnLiveStopBtn')) CourseScanner.stopLive();
         if (e.target.closest('#scnCaptureAgainBtn')) {
             CourseScanner.renderRows();
+            CourseScanner.liveReviewRow = null;
+            CourseScanner.flush();
             await CourseScanner.startLive();
         }
         if (e.target.closest('#scnAfterDoneBtn')) CourseScanner.stopLive();
@@ -1170,14 +1360,23 @@ export const CourseScanner = {
         if (e.target.closest('#scnCameraBtn')) $('scnCameraInput').click();
         if (e.target.closest('#scnUploadBtn')) $('scnFileInput').click();
         if (e.target.closest('#scnSaveBtn')) await CourseScanner.save();
+        if (e.target.closest('#scnRegradeBtn')) await CourseScanner.allowRegrade();
+        if (e.target.closest('#scnOrphanReplaceBtn')) await CourseScanner.resolveOrphans(true);
+        if (e.target.closest('#scnOrphanKeepBtn')) await CourseScanner.resolveOrphans(false);
+        const replaceBtn = e.target.closest('.scn-replace-btn');
+        if (replaceBtn) await CourseScanner.resolveConflict(CourseScanner.getRow(replaceBtn), true);
+        const keepBtn = e.target.closest('.scn-keep-btn');
+        if (keepBtn) await CourseScanner.resolveConflict(CourseScanner.getRow(keepBtn), false);
 
         const removeBtn = e.target.closest('.scn-remove-btn');
         if (removeBtn) {
             const row = CourseScanner.getRow(removeBtn);
             if (row) {
+                if (row.scanId && row.saveState !== 'saved') ScanQueue.remove([row.scanId]);
                 CourseScanner.revokeRow(row);
                 CourseScanner.rows = CourseScanner.rows.filter(r => r !== row);
                 CourseScanner.renderRows();
+                CourseScanner.markChange();   // a sheet that was a duplicate may be ready now
             }
         }
     },
@@ -1221,20 +1420,20 @@ export const CourseScanner = {
 
         if (t.classList.contains('scn-student-select')) {
             row.studentId = t.value;
-            row.saved = false;
-            CourseScanner.refreshCards();
+            row.saveState = row.saveState ? 'dirty' : '';
+            CourseScanner.markChange();
         } else if (t.classList.contains('scn-stuno-input')) {
             row.studentText = t.value.trim();
             row.studentId = CourseScanner.matchStudent(row.studentText);
-            row.saved = false;
+            row.saveState = row.saveState ? 'dirty' : '';
             document.querySelectorAll(`.scn-student-select[data-row="${row.id}"]`).forEach(sel => { sel.value = row.studentId; });
-            CourseScanner.refreshCards();
+            CourseScanner.markChange();
         } else if (t.classList.contains('scn-answer-select')) {
             const q = Number(t.dataset.q);
             row.answers[q] = parseInt(t.value, 10);
-            row.saved = false;
+            row.saveState = row.saveState ? 'dirty' : '';
             t.outerHTML = CourseScanner.answerSelectHtml(row, q).match(/<select[\s\S]*<\/select>/)[0];
-            CourseScanner.refreshCards();
+            CourseScanner.markChange();
             try {
                 await CourseScanner.renderPreview(row);
                 document.querySelectorAll(`[data-card="${row.id}"] [data-role="img"]`).forEach(img => { img.src = row.overlayUrl; });
