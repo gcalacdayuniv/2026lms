@@ -1,5 +1,5 @@
 // js/course-fab.js
-// Speed-dial floating action button on the class page (markup: components-class.js).
+// Speed-dial floating action button and bottom tab bar (phones) on the class page (markup: components-class.js).
 // The main button opens a small menu: Student Caller, Scan Answer Sheets, Record Scores, Enroll Student.
 // Items with data-fab-target press the matching button of the Course Actions menu, so each action keeps
 // a single implementation. Student Caller keeps its own id and is handled in course.js.
@@ -28,6 +28,15 @@ export const CourseFab = {
             if (!t.closest) return;
             if (t.closest('#fabMainBtn')) {
                 CourseFab.set(!CourseFab.isOpen());
+                return;
+            }
+            const tab = t.closest('.class-tab');
+            if (tab) {
+                if (CourseFab.isOpen()) CourseFab.set(false);
+                if (navigator.vibrate) navigator.vibrate(8);
+                const target = tab.dataset.tabTarget;
+                if (target === 'top') window.scrollTo({ top: 0, behavior: 'smooth' });
+                else document.getElementById(target)?.click();
                 return;
             }
             const item = t.closest('.fab-item');

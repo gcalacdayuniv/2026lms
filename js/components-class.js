@@ -891,7 +891,7 @@ export const ClassComponents = {
                 </div>
             </header>
 
-            <main class="pt-20 pb-28 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in relative">
+            <main class="pt-20 pb-36 sm:pb-28 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in relative">
                 <div class="mb-4 mt-2 sm:mt-4 px-2 sm:px-0">
                     <div>
                         <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
@@ -912,7 +912,7 @@ export const ClassComponents = {
                             </button>
                             <span id="attendanceDirtyDot" title="Unsaved changes" aria-hidden="true" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-400 border-2 border-white pointer-events-none"></span>
                         </div>
-                        <button id="openCourseMenuBtn" aria-label="Menu" class="flex-shrink-0 bg-gray-800 hover:bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <button id="openCourseMenuBtn" aria-label="Menu" class="tabbar-hide flex-shrink-0 bg-gray-800 hover:bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                             <i class="fa-solid fa-bars sm:mr-2"></i><span class="hidden sm:inline">Menu</span>
                         </button>
                     </div>
@@ -965,11 +965,11 @@ export const ClassComponents = {
                             <span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">Student Caller</span>
                             <span class="w-11 h-11 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid fa-bullhorn text-lg" aria-hidden="true"></i></span>
                         </button>
-                        <button type="button" role="menuitem" data-fab-target="openScannerBtn" class="fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
+                        <button type="button" role="menuitem" data-fab-target="openScannerBtn" class="fab-dup fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
                             <span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">Scan Answer Sheets</span>
                             <span class="w-11 h-11 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid fa-camera text-lg" aria-hidden="true"></i></span>
                         </button>
-                        <button type="button" role="menuitem" data-fab-target="openScoresModalBtn" class="fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
+                        <button type="button" role="menuitem" data-fab-target="openScoresModalBtn" class="fab-dup fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
                             <span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">Record Scores</span>
                             <span class="w-11 h-11 rounded-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid fa-pen-to-square text-lg" aria-hidden="true"></i></span>
                         </button>
@@ -982,6 +982,14 @@ export const ClassComponents = {
                         <i id="fabMainIcon" class="fa-solid fa-plus text-2xl transition-transform duration-200" aria-hidden="true"></i>
                     </button>
                 </div>
+
+                <nav id="classTabBar" class="class-tabbar" aria-label="Class sections">
+                    <button type="button" class="class-tab is-active" aria-current="page" data-tab-target="top" aria-label="Roster"><i class="fa-solid fa-users" aria-hidden="true"></i><span>Roster</span></button>
+                    <button type="button" class="class-tab" data-tab-target="openScoresModalBtn" aria-label="Scores"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span>Scores</span></button>
+                    <button type="button" class="class-tab" data-tab-target="openScannerBtn" aria-label="Scan"><i class="fa-solid fa-camera" aria-hidden="true"></i><span>Scan</span></button>
+                    <button type="button" class="class-tab" data-tab-target="openExamManagerBtn" aria-label="Exams"><i class="fa-solid fa-file-contract" aria-hidden="true"></i><span>Exams</span></button>
+                    <button type="button" class="class-tab" data-tab-target="openCourseMenuBtn" aria-label="More"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>More</span></button>
+                </nav>
             </main>
 
             ${ClassUI.renderCourseMenuModal(course)}

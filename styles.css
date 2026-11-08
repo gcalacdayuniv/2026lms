@@ -53,3 +53,28 @@ html.dialog-open body {
     .fixed:not(.hidden) > .sheet-panel { animation: none; }
     .menu-tile { transition: none; }
 }
+
+
+/* ---------- Bottom tab bar (class page, phones only) ---------- */
+.class-tabbar { display: none; }
+@media (max-width: 639px) {
+    .class-tabbar {
+        display: grid; grid-template-columns: repeat(5, 1fr);
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+        background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
+        border-top: 1px solid #e5e7eb; box-shadow: 0 -2px 10px rgba(0,0,0,.05);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .class-tab {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+        min-height: 3.5rem; color: #6b7280; font-size: .65rem; font-weight: 700;
+        -webkit-tap-highlight-color: transparent; transition: color .12s ease, transform .12s ease;
+    }
+    .class-tab i { font-size: 1.15rem; }
+    .class-tab:active { transform: scale(.92); }
+    .class-tab.is-active { color: #1d4ed8; }
+    .class-tab:focus-visible { outline: 3px solid #93c5fd; outline-offset: -3px; border-radius: .75rem; }
+    /* The tab bar replaces the Menu button, and its Scan / Scores shortcuts replace those speed-dial items. */
+    .tabbar-hide, .fab-dup { display: none !important; }
+    #classFab { bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important; }
+}
