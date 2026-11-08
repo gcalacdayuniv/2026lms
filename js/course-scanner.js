@@ -7,6 +7,7 @@ import { CourseSummary } from './course-summary.js';
 import { UI } from './ui-feedback.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
+import { CourseScanRecords } from './course-scan-records.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
 import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
 
@@ -116,9 +117,23 @@ export const CourseScanner = {
         CourseScanner.typed = { n: 20, c: 4, key: Array(20).fill(-1) };
     },
 
+    view: 'setup',
+    lastWork: 'setup',   // 'setup' or 'scan': where the Scan tab returns to
+
     showView: (name) => {
+        CourseScanner.view = name;
+        if (name !== 'saved') CourseScanner.lastWork = name;
         $('scnSetupView')?.classList.toggle('hidden', name !== 'setup');
         $('scnScanView')?.classList.toggle('hidden', name !== 'scan');
+        $('scnSavedView')?.classList.toggle('hidden', name !== 'saved');
+        [['scnTabScan', name !== 'saved'], ['scnTabSaved', name === 'saved']].forEach(([id, active]) => {
+            const tab = $(id);
+            if (!tab) return;
+            tab.setAttribute('aria-selected', String(active));
+            tab.className = 'px-4 py-2 text-sm font-bold border-b-2 -mb-px ' + (active
+                ? 'border-rose-600 text-rose-700'
+                : 'border-transparent text-gray-500 hover:text-gray-800');
+        });
     },
 
     courseLabel: () => {
@@ -492,6 +507,7 @@ export const CourseScanner = {
             error: result.error || '',
             saved: false,
             answers: [],
+            original: [],
             studentText: '',
             studentId: '',
             photoUrl: '',
@@ -504,6 +520,7 @@ export const CourseScanner = {
             return row;
         }
         row.answers = result.answers.slice();
+        row.original = result.answers.slice();
         row.studentText = result.studentNo;
         row.studentId = CourseScanner.matchStudent(row.studentText);
         row.result = { H: result.H, markers: result.markers, fills: result.fills, studentDigits: result.studentDigits };
@@ -1002,12 +1019,38 @@ export const CourseScanner = {
                 assessmentId = res.assessmentId;
             }
 
-            incoming.forEach(i => existing.set(i.studentId, i.score));
-            const scores = Array.from(existing, ([studentId, score]) => ({ studentId, score }));
-            await apiFetch('/api/assessment-scores', {
-                method: 'POST',
-                body: JSON.stringify({ assessmentId, scores })
-            });
+            // The server stores every sheet (what the reader saw and the current answers), grades it with the
+            // saved key and records the score for these students only, so other students' scores stay.
+            const payload = {
+                courseId: CourseScanner.courseId,
+                assessmentId,
+                title: cfg.title,
+                term: cfg.term,
+                category: cfg.category,
+                numQuestions: cfg.n,
+                numChoices: cfg.c,
+                answerKey: cfg.key,
+                bonus: cfg.bonus,
+                sheets: rows.map(r => ({
+                    studentId: r.studentId,
+                    studentNo: r.studentText,
+                    originalAnswers: r.original && r.original.length ? r.original : r.answers,
+                    answers: r.answers
+                }))
+            };
+            const send = (extra) => apiFetch('/api/scan-sheets/save', { method: 'POST', body: JSON.stringify({ ...payload, ...extra }) });
+            let saveRes = await send({});
+            if (saveRes.needsConfirm) {
+                const ok = await UI.confirm({
+                    title: 'Grade earlier sheets again?',
+                    message: `The answer key is different from the one saved earlier for "${cfg.title}". ${saveRes.regradeCount} sheet${saveRes.regradeCount === 1 ? '' : 's'} saved earlier will be graded again with the new key and their scores updated.`,
+                    confirmText: 'Update and save',
+                    danger: true
+                });
+                if (!ok) return;
+                saveRes = await send({ allowRegrade: true });
+            }
+            if (!saveRes.success) throw new Error(saveRes.error || 'Failed to save the sheets.');
 
             rows.forEach(r => { r.saved = true; });
             const list = await apiFetch(`/api/assessments?courseId=${CourseScanner.courseId}&_t=${new Date().getTime()}`);
@@ -1016,7 +1059,8 @@ export const CourseScanner = {
             if (fresh) cfg.cap = Number(fresh.Max_Score);
             CourseScanner.refreshCards();
 
-            const msg = `Saved ${incoming.length} score${incoming.length === 1 ? '' : 's'} to "${cfg.title}".`;
+            const regradedNote = saveRes.regraded ? ` ${saveRes.regraded} earlier sheet${saveRes.regraded === 1 ? ' was' : 's were'} graded again.` : '';
+            const msg = `Saved ${incoming.length} sheet${incoming.length === 1 ? '' : 's'} and score${incoming.length === 1 ? '' : 's'} to "${cfg.title}".${regradedNote}`;
             CourseScanner.setAlert(msg, true);
             UI.success(msg);
         } catch (err) {
@@ -1050,6 +1094,16 @@ export const CourseScanner = {
         if (e.target.closest('#scnBackBtn')) {
             CourseScanner.stopLive();
             CourseScanner.showView('setup');
+        }
+        if (e.target.closest('#scnTabScan')) {
+            CourseScanner.setAlert('');
+            CourseScanner.showView(CourseScanner.lastWork || 'setup');
+        }
+        if (e.target.closest('#scnTabSaved')) {
+            CourseScanner.stopLive();
+            CourseScanner.setAlert('');
+            CourseScanner.showView('saved');
+            await CourseScanRecords.load();
         }
         if (e.target.closest('#scnLiveBtn')) await CourseScanner.startLive();
         if (e.target.closest('#scnLiveStopBtn')) CourseScanner.stopLive();

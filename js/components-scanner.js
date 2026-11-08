@@ -20,6 +20,15 @@ export const ScannerUI = {
                     </button>
                 </div>
 
+                <div class="flex gap-1 mb-3 border-b border-gray-200" role="tablist" aria-label="Scanner sections">
+                    <button type="button" id="scnTabScan" role="tab" aria-selected="true" class="px-4 py-2 text-sm font-bold border-b-2 border-rose-600 text-rose-700 -mb-px">
+                        <i class="fa-solid fa-camera mr-1"></i> Scan
+                    </button>
+                    <button type="button" id="scnTabSaved" role="tab" aria-selected="false" class="px-4 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 -mb-px">
+                        <i class="fa-solid fa-clipboard-check mr-1"></i> Saved Scans
+                    </button>
+                </div>
+
                 <div id="scnAlert" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
 
                 <!-- Step 1: Setup -->
@@ -166,6 +175,11 @@ export const ScannerUI = {
                             <i class="fa-solid fa-floppy-disk mr-2"></i> Save Scores
                         </button>
                     </div>
+                </div>
+
+                <!-- Saved scans: review, statistics and later corrections (see course-scan-records.js) -->
+                <div id="scnSavedView" class="hidden flex-1 flex flex-col min-h-0">
+                    <div id="scnSavedBody" class="flex-1 overflow-y-auto min-h-[200px] pr-1"></div>
                 </div>
             </div>
         </div>

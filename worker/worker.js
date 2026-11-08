@@ -288,6 +288,321 @@ async function hashPassword(password) {
 const ASSESSMENT_TERMS = ['MidTerm', 'FinalTerm'];
 const ASSESSMENT_CATEGORIES = ['Written', 'Narrative', 'Individual', 'Performance', 'Report', 'MajorExam'];
 
+// ---- Scanned answer sheets (OMR) ---------------------------------------------------------------
+// Every scanned sheet is stored so it can be reviewed, counted (correct / wrong / blank / double) and
+// corrected later. Answers are lists with one entry per question: 0.. = the shaded choice,
+// -1 = blank, -2 = more than one circle shaded. Original_Answers is what the reader saw; Answers is
+// the current (possibly corrected) version. The score is always recalculated here from the saved key.
+const SCAN_BLANK = -1;
+const SCAN_MULTIPLE = -2;
+const SCAN_MAX_QUESTIONS = 100;
+const SCAN_MAX_CHOICES = 5;
+const SCAN_MAX_SHEETS = 300;
+const SCAN_BATCH_SIZE = 90;
+let scanTablesReady = false;
+
+async function ensureScanTables(env) {
+    if (scanTablesReady) return;
+    await env.DB.batch([
+        env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS Scan_Sessions (
+                Session_ID TEXT PRIMARY KEY,
+                Course_ID TEXT NOT NULL,
+                Assessment_ID TEXT NOT NULL,
+                Title TEXT,
+                Term TEXT,
+                Category TEXT,
+                Num_Questions INTEGER NOT NULL,
+                Num_Choices INTEGER NOT NULL,
+                Answer_Key TEXT NOT NULL,
+                Bonus_Flags TEXT NOT NULL,
+                Created_At DATETIME DEFAULT CURRENT_TIMESTAMP,
+                Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `),
+        env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS Scan_Sheets (
+                Sheet_ID TEXT PRIMARY KEY,
+                Session_ID TEXT NOT NULL,
+                Student_ID TEXT NOT NULL,
+                Student_No_Read TEXT,
+                Original_Answers TEXT NOT NULL,
+                Answers TEXT NOT NULL,
+                Score REAL,
+                Edited INTEGER DEFAULT 0,
+                Created_At DATETIME DEFAULT CURRENT_TIMESTAMP,
+                Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `),
+        env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_sessions_assessment ON Scan_Sessions (Course_ID, Assessment_ID)"),
+        env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_sheets_student ON Scan_Sheets (Session_ID, Student_ID)"),
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_scan_sessions_course ON Scan_Sessions (Course_ID)")
+    ]);
+    scanTablesReady = true;
+}
+
+const parseJsonList = (text) => {
+    try {
+        const value = JSON.parse(text);
+        return Array.isArray(value) ? value : [];
+    } catch (e) {
+        return [];
+    }
+};
+
+const isAnswerList = (list, n, c) =>
+    Array.isArray(list) && list.length === n && list.every(a => Number.isInteger(a) && a >= SCAN_MULTIPLE && a < c);
+
+const sameList = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+// Counts and score for one sheet. Bonus questions add points; the total never goes above the max.
+function gradeScan(answers, key, bonus, max) {
+    let raw = 0, bonusPoints = 0, wrong = 0, blank = 0, multiple = 0;
+    answers.forEach((a, i) => {
+        if (a === SCAN_BLANK) blank++;
+        else if (a === SCAN_MULTIPLE) multiple++;
+        else if (a === key[i]) {
+            if (bonus[i]) bonusPoints++;
+            else raw++;
+        } else wrong++;
+    });
+    return { raw, bonus: bonusPoints, wrong, blank, multiple, score: Math.min(Number(max), raw + bonusPoints) };
+}
+
+// Replaces ONE student's score in an assessment without touching anyone else's.
+const scanScoreStatements = (env, assessmentId, studentId, score) => [
+    env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?").bind(assessmentId, studentId),
+    env.DB.prepare("INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)")
+        .bind(crypto.randomUUID(), assessmentId, studentId, score)
+];
+
+async function runInChunks(env, statements) {
+    for (let i = 0; i < statements.length; i += SCAN_BATCH_SIZE) {
+        await env.DB.batch(statements.slice(i, i + SCAN_BATCH_SIZE));
+    }
+}
+
+// Returns a Response when the request is handled here, otherwise null.
+async function handleScanSheets(request, env, path, url, corsHeaders) {
+    if (path !== '/api/scan-sessions' && !path.startsWith('/api/scan-sheets')) return null;
+    await ensureScanTables(env);
+    const method = request.method;
+
+    // Saved scans of a course, newest first, with simple counts.
+    if (method === 'GET' && path === '/api/scan-sessions') {
+        const courseId = url.searchParams.get('courseId');
+        if (!courseId) return json(corsHeaders, { error: 'Missing courseId' }, 400);
+
+        const rows = await env.DB.prepare(
+            `SELECT s.Session_ID, s.Assessment_ID, s.Title, s.Term, s.Category, s.Num_Questions, s.Num_Choices,
+                    s.Created_At, s.Updated_At, a.Max_Score,
+                    (SELECT COUNT(*) FROM Scan_Sheets h WHERE h.Session_ID = s.Session_ID) AS Sheets,
+                    (SELECT COUNT(*) FROM Scan_Sheets h WHERE h.Session_ID = s.Session_ID AND h.Edited = 1) AS Edited
+             FROM Scan_Sessions s
+             LEFT JOIN Assessments a ON a.Assessment_ID = s.Assessment_ID
+             WHERE s.Course_ID = ?
+             ORDER BY s.Updated_At DESC`
+        ).bind(courseId).all();
+        return json(corsHeaders, { success: true, sessions: rows.results || [] });
+    }
+
+    // One saved scan: the key and every student's saved answers.
+    if (method === 'GET' && path === '/api/scan-sheets') {
+        const sessionId = url.searchParams.get('sessionId');
+        if (!sessionId) return json(corsHeaders, { error: 'Missing sessionId' }, 400);
+
+        const session = await env.DB.prepare(
+            `SELECT s.Session_ID, s.Course_ID, s.Assessment_ID, s.Title, s.Term, s.Category, s.Num_Questions, s.Num_Choices,
+                    s.Answer_Key, s.Bonus_Flags, s.Created_At, s.Updated_At, a.Max_Score
+             FROM Scan_Sessions s LEFT JOIN Assessments a ON a.Assessment_ID = s.Assessment_ID
+             WHERE s.Session_ID = ?`
+        ).bind(sessionId).first();
+        if (!session) return json(corsHeaders, { error: 'Saved scan not found.' }, 404);
+
+        const rows = await env.DB.prepare(
+            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At,
+                    u.Name, u.Student_Number
+             FROM Scan_Sheets h LEFT JOIN Users u ON u.User_ID = h.Student_ID
+             WHERE h.Session_ID = ?
+             ORDER BY u.Name ASC`
+        ).bind(sessionId).all();
+
+        const sheets = (rows.results || []).map(r => ({
+            ...r,
+            Original_Answers: parseJsonList(r.Original_Answers),
+            Answers: parseJsonList(r.Answers)
+        }));
+        const { Answer_Key, Bonus_Flags, ...rest } = session;
+        return json(corsHeaders, {
+            success: true,
+            session: { ...rest, Answer_Key: parseJsonList(Answer_Key), Bonus_Flags: parseJsonList(Bonus_Flags) },
+            sheets
+        });
+    }
+
+    // Saves a batch of scanned sheets and records each student's score in the assessment.
+    if (method === 'POST' && path === '/api/scan-sheets/save') {
+        const body = await request.json();
+        const { courseId, assessmentId, title, term, category, numQuestions, numChoices, answerKey, bonus, sheets, allowRegrade } = body;
+
+        const n = Number(numQuestions);
+        const c = Number(numChoices);
+        if (!courseId || !assessmentId) return json(corsHeaders, { error: 'Missing course or assessment.' }, 400);
+        if (!Number.isInteger(n) || n < 1 || n > SCAN_MAX_QUESTIONS) return json(corsHeaders, { error: `Questions must be 1 to ${SCAN_MAX_QUESTIONS}.` }, 400);
+        if (!Number.isInteger(c) || c < 2 || c > SCAN_MAX_CHOICES) return json(corsHeaders, { error: `Choices must be 2 to ${SCAN_MAX_CHOICES}.` }, 400);
+        if (!Array.isArray(answerKey) || answerKey.length !== n || !answerKey.every(k => Number.isInteger(k) && k >= 0 && k < c)) {
+            return json(corsHeaders, { error: 'Invalid answer key.' }, 400);
+        }
+        if (!Array.isArray(bonus) || bonus.length !== n) return json(corsHeaders, { error: 'Invalid bonus flags.' }, 400);
+        if (!Array.isArray(sheets) || sheets.length < 1 || sheets.length > SCAN_MAX_SHEETS) {
+            return json(corsHeaders, { error: `Send 1 to ${SCAN_MAX_SHEETS} sheets at a time.` }, 400);
+        }
+        const key = answerKey;
+        const bonusFlags = bonus.map(Boolean);
+
+        const assessment = await env.DB.prepare(
+            "SELECT Assessment_ID, Max_Score FROM Assessments WHERE Assessment_ID = ? AND Course_ID = ?"
+        ).bind(assessmentId, courseId).first();
+        if (!assessment) return json(corsHeaders, { error: 'Assessment not found.' }, 404);
+
+        const enrolled = await env.DB.prepare("SELECT Student_ID FROM Enrollments WHERE Course_ID = ?").bind(courseId).all();
+        const enrolledIds = new Set((enrolled.results || []).map(r => r.Student_ID));
+        const seen = new Set();
+        for (const sheet of sheets) {
+            if (!sheet || !sheet.studentId || !enrolledIds.has(sheet.studentId)) {
+                return json(corsHeaders, { error: 'A sheet belongs to a student who is not enrolled in this course.' }, 400);
+            }
+            if (seen.has(sheet.studentId)) return json(corsHeaders, { error: 'Two sheets belong to the same student.' }, 400);
+            seen.add(sheet.studentId);
+            if (!isAnswerList(sheet.answers, n, c)) return json(corsHeaders, { error: 'A sheet has invalid answers.' }, 400);
+            if (sheet.originalAnswers != null && !isAnswerList(sheet.originalAnswers, n, c)) {
+                return json(corsHeaders, { error: 'A sheet has invalid original answers.' }, 400);
+            }
+        }
+
+        const cleanTitle = String(title || '').trim().slice(0, 150);
+        const existing = await env.DB.prepare(
+            "SELECT * FROM Scan_Sessions WHERE Course_ID = ? AND Assessment_ID = ?"
+        ).bind(courseId, assessmentId).first();
+
+        let sessionId;
+        let keyChanged = false;
+        const statements = [];
+        const regradeStatements = [];
+        if (existing) {
+            sessionId = existing.Session_ID;
+            const oldKey = parseJsonList(existing.Answer_Key);
+            const oldBonus = parseJsonList(existing.Bonus_Flags).map(Boolean);
+            keyChanged = !sameList(oldKey, key) || !sameList(oldBonus, bonusFlags);
+
+            const others = await env.DB.prepare(
+                "SELECT COUNT(*) AS cnt FROM Scan_Sheets WHERE Session_ID = ?" + (seen.size ? ` AND Student_ID NOT IN (${[...seen].map(() => '?').join(',')})` : '')
+            ).bind(sessionId, ...seen).first();
+            if (others && others.cnt > 0 && (existing.Num_Questions !== n || existing.Num_Choices !== c)) {
+                return json(corsHeaders, {
+                    error: `This assessment already has saved sheets for a ${existing.Num_Questions}-question sheet with ${existing.Num_Choices} choices. Use the same sheet size, or delete the saved scan first.`
+                }, 409);
+            }
+            statements.push(env.DB.prepare(
+                `UPDATE Scan_Sessions SET Title = ?, Term = ?, Category = ?, Num_Questions = ?, Num_Choices = ?,
+                        Answer_Key = ?, Bonus_Flags = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ?`
+            ).bind(cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), sessionId));
+        } else {
+            sessionId = crypto.randomUUID();
+            statements.push(env.DB.prepare(
+                `INSERT INTO Scan_Sessions (Session_ID, Course_ID, Assessment_ID, Title, Term, Category, Num_Questions, Num_Choices, Answer_Key, Bonus_Flags)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(sessionId, courseId, assessmentId, cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags)));
+        }
+
+        for (const sheet of sheets) {
+            const original = sheet.originalAnswers || sheet.answers;
+            const graded = gradeScan(sheet.answers, key, bonusFlags, assessment.Max_Score);
+            statements.push(env.DB.prepare(
+                `INSERT INTO Scan_Sheets (Sheet_ID, Session_ID, Student_ID, Student_No_Read, Original_Answers, Answers, Score, Edited)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(Session_ID, Student_ID) DO UPDATE SET
+                    Student_No_Read = excluded.Student_No_Read, Original_Answers = excluded.Original_Answers,
+                    Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited, Updated_At = CURRENT_TIMESTAMP`
+            ).bind(
+                crypto.randomUUID(), sessionId, sheet.studentId, String(sheet.studentNo || '').slice(0, 20),
+                JSON.stringify(original), JSON.stringify(sheet.answers), graded.score, sameList(original, sheet.answers) ? 0 : 1
+            ));
+            statements.push(...scanScoreStatements(env, assessmentId, sheet.studentId, graded.score));
+        }
+
+        // The key changed: sheets saved earlier in this assessment must be graded again with the new key.
+        // Nothing is written until the caller confirms (allowRegrade), because other students' scores change.
+        let regraded = 0;
+        if (keyChanged) {
+            const old = await env.DB.prepare("SELECT Student_ID, Answers FROM Scan_Sheets WHERE Session_ID = ?").bind(sessionId).all();
+            for (const row of old.results || []) {
+                if (seen.has(row.Student_ID)) continue;
+                const answers = parseJsonList(row.Answers);
+                if (!isAnswerList(answers, n, c)) continue;
+                const graded = gradeScan(answers, key, bonusFlags, assessment.Max_Score);
+                regradeStatements.push(env.DB.prepare(
+                    "UPDATE Scan_Sheets SET Score = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ? AND Student_ID = ?"
+                ).bind(graded.score, sessionId, row.Student_ID));
+                regradeStatements.push(...scanScoreStatements(env, assessmentId, row.Student_ID, graded.score));
+                regraded++;
+            }
+            if (regraded > 0 && !allowRegrade) {
+                return json(corsHeaders, { success: false, needsConfirm: true, regradeCount: regraded });
+            }
+        }
+
+        await runInChunks(env, statements.concat(regradeStatements));
+        return json(corsHeaders, { success: true, sessionId, saved: sheets.length, regraded }, 201);
+    }
+
+    // Corrects one student's answers later; the score in the assessment is updated too.
+    if (method === 'POST' && path === '/api/scan-sheets/correct') {
+        const { sheetId, answers } = await request.json();
+        if (!sheetId) return json(corsHeaders, { error: 'Missing sheetId' }, 400);
+
+        const sheet = await env.DB.prepare(
+            `SELECT h.Sheet_ID, h.Student_ID, h.Original_Answers, s.Assessment_ID, s.Num_Questions, s.Num_Choices, s.Answer_Key, s.Bonus_Flags
+             FROM Scan_Sheets h JOIN Scan_Sessions s ON s.Session_ID = h.Session_ID
+             WHERE h.Sheet_ID = ?`
+        ).bind(sheetId).first();
+        if (!sheet) return json(corsHeaders, { error: 'Saved sheet not found.' }, 404);
+
+        const assessment = await env.DB.prepare("SELECT Max_Score FROM Assessments WHERE Assessment_ID = ?").bind(sheet.Assessment_ID).first();
+        if (!assessment) return json(corsHeaders, { error: 'The assessment of this scan no longer exists.' }, 404);
+
+        if (!isAnswerList(answers, sheet.Num_Questions, sheet.Num_Choices)) {
+            return json(corsHeaders, { error: 'Invalid answers.' }, 400);
+        }
+
+        const key = parseJsonList(sheet.Answer_Key);
+        const bonusFlags = parseJsonList(sheet.Bonus_Flags).map(Boolean);
+        const graded = gradeScan(answers, key, bonusFlags, assessment.Max_Score);
+        const edited = sameList(parseJsonList(sheet.Original_Answers), answers) ? 0 : 1;
+
+        await env.DB.batch([
+            env.DB.prepare(
+                "UPDATE Scan_Sheets SET Answers = ?, Score = ?, Edited = ?, Updated_At = CURRENT_TIMESTAMP WHERE Sheet_ID = ?"
+            ).bind(JSON.stringify(answers), graded.score, edited, sheetId),
+            ...scanScoreStatements(env, sheet.Assessment_ID, sheet.Student_ID, graded.score)
+        ]);
+        return json(corsHeaders, { success: true, score: graded.score, edited: Boolean(edited), counts: graded });
+    }
+
+    // Removes a saved scan (its stored answers only; scores already recorded stay).
+    if (method === 'DELETE' && path === '/api/scan-sessions') {
+        const { sessionId } = await request.json();
+        if (!sessionId) return json(corsHeaders, { error: 'Missing sessionId' }, 400);
+        await env.DB.batch([
+            env.DB.prepare("DELETE FROM Scan_Sheets WHERE Session_ID = ?").bind(sessionId),
+            env.DB.prepare("DELETE FROM Scan_Sessions WHERE Session_ID = ?").bind(sessionId)
+        ]);
+        return json(corsHeaders, { success: true });
+    }
+
+    return null;
+}
+
 async function ensureAccessibleExamTables(env) {
     await env.DB.batch([
         env.DB.prepare(`
@@ -1623,6 +1938,9 @@ export default {
             const attendanceDatesResponse = await handleAttendanceDates(request, env, path, url, corsHeaders);
             if (attendanceDatesResponse) return attendanceDatesResponse;
 
+            const scanSheetsResponse = await handleScanSheets(request, env, path, url, corsHeaders);
+            if (scanSheetsResponse) return scanSheetsResponse;
+
             if (request.method === "GET" && path === "/api/no-class") {
                 const courseId = url.searchParams.get("courseId");
                 const sessions = await env.DB.prepare(
@@ -1820,7 +2138,10 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing assessmentId" }), { status: 400, headers: corsHeaders });
                 }
 
+                await ensureScanTables(env);
                 await env.DB.batch([
+                    env.DB.prepare("DELETE FROM Scan_Sheets WHERE Session_ID IN (SELECT Session_ID FROM Scan_Sessions WHERE Assessment_ID = ?)").bind(assessmentId),
+                    env.DB.prepare("DELETE FROM Scan_Sessions WHERE Assessment_ID = ?").bind(assessmentId),
                     env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ?").bind(assessmentId),
                     env.DB.prepare("DELETE FROM Assessments WHERE Assessment_ID = ?").bind(assessmentId)
                 ]);
