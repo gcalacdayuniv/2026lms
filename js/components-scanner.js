@@ -135,34 +135,49 @@ export const ScannerUI = {
                         </button>
                     </div>
 
-                    <div class="flex flex-col sm:flex-row gap-2 mb-3">
-                        <button type="button" id="scnLiveBtn" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                            <i class="fa-solid fa-video mr-2"></i> Live Scan
+                    <div class="flex flex-nowrap gap-2 mb-2">
+                        <button type="button" id="scnLiveBtn" class="flex-1 whitespace-nowrap bg-rose-600 hover:bg-rose-700 text-white px-2 py-1.5 rounded-md text-xs font-bold shadow-sm transition flex items-center justify-center">
+                            <i class="fa-solid fa-video mr-1.5"></i> Live Scan
                         </button>
-                        <button type="button" id="scnCameraBtn" class="flex-1 bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                            <i class="fa-solid fa-camera mr-2"></i> Take Photo
+                        <button type="button" id="scnCameraBtn" class="flex-1 whitespace-nowrap bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 px-2 py-1.5 rounded-md text-xs font-bold shadow-sm transition flex items-center justify-center">
+                            <i class="fa-solid fa-camera mr-1.5"></i> Take Photo
                         </button>
-                        <button type="button" id="scnUploadBtn" class="flex-1 bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                            <i class="fa-solid fa-images mr-2"></i> Choose Photos
+                        <button type="button" id="scnUploadBtn" class="flex-1 whitespace-nowrap bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 px-2 py-1.5 rounded-md text-xs font-bold shadow-sm transition flex items-center justify-center">
+                            <i class="fa-solid fa-images mr-1.5"></i> Choose Photos
                         </button>
                         <input type="file" id="scnCameraInput" accept="image/*" capture="environment" class="hidden">
                         <input type="file" id="scnFileInput" accept="image/*" multiple class="hidden">
                     </div>
                     <p class="text-[11px] text-gray-500 mb-2">Tip: lay the sheet flat in good light, keep all 4 black corner squares in view, and shoot from directly above.</p>
 
-                    <!-- Live camera: checks the sheet on every frame and captures by itself when it is steady -->
-                    <div id="scnLivePanel" class="hidden mb-3 bg-gray-900 rounded-lg p-2 sm:p-3">
-                        <div id="scnLiveBox" class="relative mx-auto overflow-hidden rounded bg-black" style="width:100%;aspect-ratio:3/4;max-height:55vh">
-                            <video id="scnLiveVideo" class="absolute inset-0 w-full h-full" style="object-fit:fill" playsinline muted autoplay></video>
-                            <canvas id="scnLiveOverlay" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
-                            <div id="scnLiveFlash" class="absolute inset-0 bg-white opacity-0 pointer-events-none" style="transition:opacity .25s"></div>
+                    <!-- Live camera: full screen. Checks every frame and captures once the sheet has been still for 2 seconds -->
+                    <div id="scnLivePanel" class="hidden fixed inset-0 z-[80] flex flex-col bg-gray-900 text-white" role="dialog" aria-modal="true" aria-label="Live scan">
+                        <div class="flex items-center justify-between gap-2 px-3 py-2 shrink-0" style="padding-top:max(0.5rem,env(safe-area-inset-top))">
+                            <div id="scnLiveTitle" class="text-sm font-black"><i class="fa-solid fa-video mr-1"></i> Live Scan</div>
+                            <button type="button" id="scnLiveStopBtn" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-xs font-bold transition"><i class="fa-solid fa-xmark mr-1"></i> Close camera</button>
                         </div>
-                        <div id="scnLiveStatus" role="status" aria-live="polite" class="mt-2 text-center text-sm font-bold rounded px-3 py-2 bg-gray-700 text-white">Starting camera...</div>
-                        <div class="mt-2 h-1.5 rounded bg-gray-700 overflow-hidden"><div id="scnLiveBar" class="h-full bg-green-500" style="width:0;transition:width .2s"></div></div>
-                        <div id="scnLiveLast" class="mt-2 text-center text-xs text-gray-300 min-h-[1rem]"></div>
-                        <div class="mt-2 flex gap-2">
-                            <button type="button" id="scnLiveCaptureBtn" class="flex-1 bg-white hover:bg-gray-100 text-gray-800 px-3 py-2 rounded-md text-xs font-bold transition">Capture now</button>
-                            <button type="button" id="scnLiveStopBtn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-md text-xs font-bold transition">Stop camera</button>
+                        <div id="scnLiveStage" class="flex-1 min-h-0 flex items-center justify-center px-2">
+                            <div id="scnLiveBox" class="relative overflow-hidden rounded bg-black" style="width:100%;aspect-ratio:3/4">
+                                <video id="scnLiveVideo" class="absolute inset-0 w-full h-full" style="object-fit:fill" playsinline muted autoplay></video>
+                                <canvas id="scnLiveOverlay" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                                <div id="scnLiveFlash" class="absolute inset-0 bg-white opacity-0 pointer-events-none" style="transition:opacity .25s"></div>
+                            </div>
+                        </div>
+                        <div id="scnLiveReview" class="hidden flex-1 min-h-0 overflow-y-auto bg-gray-100 text-gray-800 px-3 py-2"></div>
+                        <div class="shrink-0 px-3 pt-2" style="padding-bottom:max(0.75rem,env(safe-area-inset-bottom))">
+                            <div id="scnLiveLiveControls">
+                                <div id="scnLiveStatus" role="status" aria-live="polite" class="text-center text-sm font-bold rounded px-3 py-2 bg-gray-700 text-white">Starting camera...</div>
+                                <div class="mt-2 h-1.5 rounded bg-gray-700 overflow-hidden"><div id="scnLiveBar" class="h-full bg-green-500" style="width:0;transition:width .2s"></div></div>
+                                <div class="mt-2">
+                                    <button type="button" id="scnLiveCaptureBtn" class="w-full bg-white hover:bg-gray-100 text-gray-800 px-3 py-2 rounded-md text-xs font-bold transition">Capture now</button>
+                                </div>
+                            </div>
+                            <div id="scnLiveDone" class="hidden">
+                                <div class="flex gap-2">
+                                    <button type="button" id="scnCaptureAgainBtn" class="flex-1 whitespace-nowrap bg-rose-600 hover:bg-rose-700 text-white px-2 py-2 rounded-md text-xs font-bold transition"><i class="fa-solid fa-rotate-right mr-1"></i> Capture again</button>
+                                    <button type="button" id="scnAfterDoneBtn" class="flex-1 whitespace-nowrap bg-white hover:bg-gray-100 text-gray-800 px-2 py-2 rounded-md text-xs font-bold transition">Back to scan menu</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

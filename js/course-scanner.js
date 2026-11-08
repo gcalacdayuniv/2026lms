@@ -14,7 +14,7 @@ import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverl
 // Live camera settings
 const LIVE_TICK_MS = 250;      // how often a frame is checked
 const LIVE_DETECT_SIDE = 640;  // frames are shrunk to this size for the quick check
-const STEADY_TICKS = 4;        // about 1 second of a still, fully visible sheet triggers the capture
+const STEADY_MS = 2000;        // the sheet must stay still and fully visible this long before it is captured
 const MOVE_TOL = 0.012;        // corner movement (share of the frame) that still counts as steady
 const REARM_MOVE = 0.06;       // after a capture, the sheet must move this much (or leave) before the next one
 const MIN_SPAN = 0.5;          // the sheet must fill at least this share of the frame
@@ -65,7 +65,7 @@ export const CourseScanner = {
     createdExamId: null,
     busy: false,
     saving: false,
-    live: { stream: null, timer: null, canvas: null, prev: null, shot: null, steady: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 },
+    live: { stream: null, timer: null, canvas: null, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 },
 
     init: () => {
         document.addEventListener('click', CourseScanner.handleClicks);
@@ -567,7 +567,7 @@ export const CourseScanner = {
             green: 'bg-green-600 text-white',
             red: 'bg-red-600 text-white'
         };
-        el.className = `mt-2 text-center text-sm font-bold rounded px-3 py-2 ${tones[tone] || tones.gray}`;
+        el.className = `text-center text-sm font-bold rounded px-3 py-2 ${tones[tone] || tones.gray}`;
         el.textContent = text;
         const bar = $('scnLiveBar');
         if (bar) bar.style.width = `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`;
@@ -602,14 +602,15 @@ export const CourseScanner = {
         video.srcObject = stream;
         try { await video.play(); } catch (e) { /* autoplay is already on */ }
 
-        Object.assign(live, { stream, prev: null, shot: null, steady: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 });
+        Object.assign(live, { stream, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 });
         CourseScanner.setAlert('');
+        CourseScanner.liveMode('camera');
         $('scnLivePanel').classList.remove('hidden');
         CourseScanner.setLiveStatus('Starting camera...', 'gray', 0);
         live.timer = setTimeout(CourseScanner.liveTick, LIVE_TICK_MS);
     },
 
-    stopLive: () => {
+    stopLive: (keepPanel = false) => {
         const live = CourseScanner.live;
         clearTimeout(live.timer);
         live.timer = null;
@@ -617,15 +618,63 @@ export const CourseScanner = {
         live.stream = null;
         const video = $('scnLiveVideo');
         if (video) video.srcObject = null;
+        if (keepPanel === true) return;
         $('scnLivePanel')?.classList.add('hidden');
+        if (CourseScanner.liveReviewRow) {
+            CourseScanner.liveReviewRow = null;
+            CourseScanner.renderRows();   // the list shows any edit made in the full-screen review
+        }
+    },
+
+    liveReviewRow: null,
+
+    // 'camera' = camera view with its controls; 'review' = the captured sheet with Capture again / Back.
+    liveMode: (mode) => {
+        const review = mode === 'review';
+        $('scnLiveStage')?.classList.toggle('hidden', review);
+        $('scnLiveReview')?.classList.toggle('hidden', !review);
+        $('scnLiveLiveControls')?.classList.toggle('hidden', review);
+        $('scnLiveDone')?.classList.toggle('hidden', !review);
+        $('scnLiveStopBtn')?.classList.toggle('hidden', review);
+        const title = $('scnLiveTitle');
+        if (title) title.innerHTML = review
+            ? '<i class="fa-solid fa-circle-check mr-1 text-green-400"></i> Sheet captured - check it'
+            : '<i class="fa-solid fa-video mr-1"></i> Live Scan';
+        if (!review) {
+            const box = $('scnLiveReview');
+            if (box) box.innerHTML = '';
+            CourseScanner.liveReviewRow = null;
+        }
+    },
+
+    // Shows the sheet that was just read, right away, inside the full-screen view.
+    showLiveReview: (row) => {
+        CourseScanner.liveReviewRow = row;
+        const box = $('scnLiveReview');
+        box.innerHTML = CourseScanner.rowHtml(row, CourseScanner.duplicateIds(), 'scnLv');
+        box.querySelector('details')?.setAttribute('open', '');
+        CourseScanner.liveMode('review');
+        box.scrollTop = 0;
     },
 
     // Sizes the preview box to the camera's real shape so the green outline lines up with the video.
     fitLiveBox: (vw, vh) => {
         const box = $('scnLiveBox');
-        if (!box) return;
+        const stage = $('scnLiveStage');
+        if (!box || !stage) return;
+        const aw = stage.clientWidth - 16;
+        const ah = stage.clientHeight;
+        if (aw <= 0 || ah <= 0) return;
+        const ratio = vw / vh;
+        let w = aw;
+        let h = w / ratio;
+        if (h > ah) {
+            h = ah;
+            w = h * ratio;
+        }
         box.style.aspectRatio = `${vw} / ${vh}`;
-        box.style.width = `min(100%, calc(55vh * ${(vw / vh).toFixed(4)}))`;
+        box.style.width = `${Math.floor(w)}px`;
+        box.style.height = `${Math.floor(h)}px`;
     },
 
     liveTick: async () => {
@@ -722,10 +771,17 @@ export const CourseScanner = {
             return;
         }
 
-        live.steady = move < MOVE_TOL ? live.steady + 1 : 0;
+        const now = Date.now();
+        if (move < MOVE_TOL) {
+            if (!live.steady) live.steadySince = now;
+            live.steady++;
+        } else {
+            live.steady = 0;
+        }
         outline(live.steady > 0 ? '#22c55e' : '#f59e0b');
-        if (live.steady < STEADY_TICKS) {
-            CourseScanner.setLiveStatus('Hold steady...', live.steady > 0 ? 'green' : 'amber', live.steady / STEADY_TICKS);
+        const held = live.steady > 1 ? now - live.steadySince : 0;
+        if (held < STEADY_MS) {
+            CourseScanner.setLiveStatus('Hold steady...', live.steady > 0 ? 'green' : 'amber', held / STEADY_MS);
             return;
         }
         await CourseScanner.liveCapture(norm);
@@ -758,18 +814,14 @@ export const CourseScanner = {
             const row = await CourseScanner.rowFromResult(`Live scan ${time}`, result);
             CourseScanner.rows.push(row);
             CourseScanner.renderRows();
-            const list = $('scnRows');
-            if (list) list.scrollTop = list.scrollHeight;
 
-            live.armed = false;
-            live.shot = norm || null;
             live.steady = 0;
             if (navigator.vibrate) navigator.vibrate(60);
 
-            const student = CourseScanner.students.find(s => s.User_ID === row.studentId);
-            const s = CourseScanner.scoreRow(row, cfg.cap);
-            $('scnLiveLast').textContent = `${row.studentText} | ${student ? student.Name : 'No student matched'} | ${fmt(s.final)} / ${fmt(cfg.cap)}`;
-            CourseScanner.setLiveStatus('Captured! Show the next sheet.', 'green', 1);
+            // One sheet per live session: the camera stops and that sheet is shown for checking.
+            await new Promise(r => setTimeout(r, 300));
+            CourseScanner.stopLive(true);
+            CourseScanner.showLiveReview(row);
         } catch (err) {
             console.error(err);
             CourseScanner.setLiveStatus('Could not read the sheet. Try again.', 'red', 0);
@@ -844,11 +896,12 @@ export const CourseScanner = {
         </label>`;
     },
 
-    rowHtml: (row, dups) => {
+    rowHtml: (row, dups, idp = 'scn') => {
+        const live = idp !== 'scn';
         const head = `
             <div class="flex items-start justify-between gap-2">
                 <div class="text-[11px] font-bold text-gray-500 truncate">${esc(row.fileName)}</div>
-                <button type="button" class="scn-remove-btn text-gray-400 hover:text-red-600 transition" data-row="${row.id}" aria-label="Remove this sheet"><i class="fa-solid fa-trash"></i></button>
+                ${live ? '' : `<button type="button" class="scn-remove-btn text-gray-400 hover:text-red-600 transition" data-row="${row.id}" aria-label="Remove this sheet"><i class="fa-solid fa-trash"></i></button>`}
             </div>`;
 
         if (!row.ok) {
@@ -872,12 +925,12 @@ export const CourseScanner = {
             ${head}
             <div class="mt-2 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                 <div class="sm:col-span-3">
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1" for="scnStu${row.id}">Student No.</label>
-                    <input type="text" id="scnStu${row.id}" class="scn-stuno-input w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500" data-row="${row.id}" value="${esc(row.studentText)}" maxlength="12">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1" for="${idp}Stu${row.id}">Student No.</label>
+                    <input type="text" id="${idp}Stu${row.id}" class="scn-stuno-input w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500" data-row="${row.id}" value="${esc(row.studentText)}" maxlength="12">
                 </div>
                 <div class="sm:col-span-6">
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1" for="scnSel${row.id}">Student</label>
-                    <select id="scnSel${row.id}" class="scn-student-select w-full px-2 py-1.5 border border-gray-300 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" data-row="${row.id}">${studentOptions}</select>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1" for="${idp}Sel${row.id}">Student</label>
+                    <select id="${idp}Sel${row.id}" class="scn-student-select w-full px-2 py-1.5 border border-gray-300 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" data-row="${row.id}">${studentOptions}</select>
                 </div>
                 <div class="sm:col-span-3 sm:text-right" data-role="score">${CourseScanner.scoreHtml(row)}</div>
             </div>
@@ -905,11 +958,12 @@ export const CourseScanner = {
     refreshCards: () => {
         const dups = CourseScanner.duplicateIds();
         CourseScanner.rows.forEach(row => {
-            const card = document.querySelector(`[data-card="${row.id}"]`);
-            if (!card || !row.ok) return;
-            card.querySelector('[data-role="score"]').innerHTML = CourseScanner.scoreHtml(row);
-            card.querySelector('[data-role="flags"]').innerHTML = CourseScanner.flagsHtml(row, dups);
-            card.className = `bg-white border ${CourseScanner.rowBorder(row, dups)} rounded-lg p-3`;
+            if (!row.ok) return;
+            document.querySelectorAll(`[data-card="${row.id}"]`).forEach(card => {
+                card.querySelector('[data-role="score"]').innerHTML = CourseScanner.scoreHtml(row);
+                card.querySelector('[data-role="flags"]').innerHTML = CourseScanner.flagsHtml(row, dups);
+                card.className = `bg-white border ${CourseScanner.rowBorder(row, dups)} rounded-lg p-3`;
+            });
         });
         CourseScanner.updateSaveInfo();
     },
@@ -1107,6 +1161,11 @@ export const CourseScanner = {
         }
         if (e.target.closest('#scnLiveBtn')) await CourseScanner.startLive();
         if (e.target.closest('#scnLiveStopBtn')) CourseScanner.stopLive();
+        if (e.target.closest('#scnCaptureAgainBtn')) {
+            CourseScanner.renderRows();
+            await CourseScanner.startLive();
+        }
+        if (e.target.closest('#scnAfterDoneBtn')) CourseScanner.stopLive();
         if (e.target.closest('#scnLiveCaptureBtn')) await CourseScanner.liveCapture(CourseScanner.live.prev);
         if (e.target.closest('#scnCameraBtn')) $('scnCameraInput').click();
         if (e.target.closest('#scnUploadBtn')) $('scnFileInput').click();
@@ -1168,8 +1227,7 @@ export const CourseScanner = {
             row.studentText = t.value.trim();
             row.studentId = CourseScanner.matchStudent(row.studentText);
             row.saved = false;
-            const select = document.getElementById(`scnSel${row.id}`);
-            if (select) select.value = row.studentId;
+            document.querySelectorAll(`.scn-student-select[data-row="${row.id}"]`).forEach(sel => { sel.value = row.studentId; });
             CourseScanner.refreshCards();
         } else if (t.classList.contains('scn-answer-select')) {
             const q = Number(t.dataset.q);
@@ -1179,8 +1237,7 @@ export const CourseScanner = {
             CourseScanner.refreshCards();
             try {
                 await CourseScanner.renderPreview(row);
-                const img = document.querySelector(`[data-card="${row.id}"] [data-role="img"]`);
-                if (img) img.src = row.overlayUrl;
+                document.querySelectorAll(`[data-card="${row.id}"] [data-role="img"]`).forEach(img => { img.src = row.overlayUrl; });
             } catch (err) {
                 console.error(err);
             }
