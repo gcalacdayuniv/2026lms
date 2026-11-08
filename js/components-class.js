@@ -41,45 +41,69 @@ const ClassUI = {
             <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[90vh] overflow-y-auto">
                 <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-5 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-layer-group text-blue-600 mr-2"></i>Course Actions</h3>
+                    <div class="min-w-0"><h3 class="text-lg font-bold text-gray-800 truncate"><i class="fa-solid fa-layer-group text-blue-600 mr-2"></i>Course Actions</h3><p class="text-xs text-gray-500 truncate">${escapeHtml(course.CourseCode || '')} ${escapeHtml(course.CourseTitle || '')}</p></div>
                     <button id="closeCourseMenuBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
 
-                <div class="space-y-3 mb-6">
-                    <button id="openAddStudentModalBtn" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-user-plus mr-2"></i> Enroll Student
-                    </button>
-                    <button id="copyEmailsBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-regular fa-copy mr-2"></i> Copy Student Emails
-                    </button>
-                    <button id="exportRosterBtn" data-course-id="${course.Course_ID}" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-print mr-2"></i> Print Roster
-                    </button>
-                    <button id="openClassSummaryBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-table-list mr-2"></i> Class Summary
-                    </button>
-                    <button id="openScoresModalBtn" class="w-full bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-pen-to-square mr-2"></i> Record Scores
-                    </button>
-                    <button id="openAttendanceDatesBtn" class="w-full bg-sky-600 hover:bg-sky-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-calendar-check mr-2"></i> Attendance Dates
-                    </button>
-                    <button id="openNoClassModalBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-calendar-xmark mr-2"></i> Manage No Class Days
-                    </button>
-                    <button id="openExamManagerBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-file-contract mr-2"></i> Manage Exams
-                    </button>
-                    <button id="openScannerBtn" class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
-                        <i class="fa-solid fa-camera mr-2"></i> Scan Answer Sheets
-                    </button>
+                <div class="space-y-5 mb-5">
+                    <section aria-label="Students">
+                        <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Students</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                        <button type="button" id="openAddStudentModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-green-100 text-green-700"><i class="fa-solid fa-user-plus" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Enroll Student</span>
+                        </button>
+                        <button type="button" id="copyEmailsBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-blue-100 text-blue-700"><i class="fa-regular fa-copy" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Copy Emails</span>
+                        </button>
+                        <button type="button" id="exportRosterBtn" data-course-id="${course.Course_ID}" class="menu-tile">
+                            <span class="menu-tile-icon bg-gray-200 text-gray-800"><i class="fa-solid fa-print" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Print Roster</span>
+                        </button>
+                        <button type="button" id="openClassSummaryBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-purple-100 text-purple-700"><i class="fa-solid fa-table-list" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Class Summary</span>
+                        </button>
+                        </div>
+                    </section>
+                    <section aria-label="Grades & Exams">
+                        <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Grades & Exams</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                        <button type="button" id="openScoresModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-teal-100 text-teal-700"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Record Scores</span>
+                        </button>
+                        <button type="button" id="openExamManagerBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-indigo-100 text-indigo-700"><i class="fa-solid fa-file-contract" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Manage Exams</span>
+                        </button>
+                        <button type="button" id="openScannerBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-rose-100 text-rose-700"><i class="fa-solid fa-camera" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Scan Sheets</span>
+                        </button>
+                        </div>
+                    </section>
+                    <section aria-label="Calendar">
+                        <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Calendar</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                        <button type="button" id="openAttendanceDatesBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-sky-100 text-sky-700"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Attendance Dates</span>
+                        </button>
+                        <button type="button" id="openNoClassModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-orange-100 text-orange-700"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">No Class Days</span>
+                        </button>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="border-t border-gray-200 pt-5">
-                    <h4 class="text-sm font-bold text-gray-800 mb-3"><i class="fa-regular fa-calendar-days text-purple-600 mr-2"></i>Term Period Settings</h4>
-                    <div id="courseMenuAlert" class="hidden text-xs mb-3 p-2 rounded"></div>
+                <details class="border-t border-gray-200 pt-3 group">
+                    <summary class="menu-row"><span class="menu-tile-icon bg-purple-100 text-purple-700 !w-9 !h-9"><i class="fa-regular fa-calendar-days" aria-hidden="true"></i></span><span class="flex-1 text-sm font-bold text-gray-800">Term Period Settings</span><i class="fa-solid fa-chevron-down text-xs text-gray-400 transition-transform group-open:rotate-180" aria-hidden="true"></i></summary>
+                    <div id="courseMenuAlert" class="hidden text-xs my-3 p-2 rounded"></div>
 
                     <div class="space-y-4">
                         <div class="bg-gray-50 p-3 rounded border border-gray-200">
@@ -102,7 +126,7 @@ const ClassUI = {
                             Save Term Periods
                         </button>
                     </div>
-                </div>
+                </details>
             </div>
         </div>
     `,

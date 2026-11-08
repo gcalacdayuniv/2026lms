@@ -17,3 +17,39 @@ html.dialog-open body {
         touch-action: none;
     }
 }
+
+
+/* ---------- App-style sheets and action tiles ---------- */
+.menu-tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: .4rem;
+    padding: .65rem .25rem; border-radius: .9rem; background: #f9fafb; border: 1px solid #eef0f3;
+    min-height: 5.6rem; text-align: center; transition: transform .12s ease, background-color .12s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.menu-tile:hover { background: #f3f4f6; }
+.menu-tile:active { transform: scale(.94); background: #e5e7eb; }
+.menu-tile:focus-visible { outline: 3px solid #93c5fd; outline-offset: 1px; }
+.menu-tile-icon {
+    width: 2.75rem; height: 2.75rem; border-radius: 9999px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;
+}
+.menu-tile-label { font-size: .72rem; line-height: 1.15; font-weight: 700; color: #374151; }
+.menu-row {
+    display: flex; align-items: center; gap: .75rem; cursor: pointer; list-style: none;
+    padding: .35rem .25rem; min-height: 2.75rem;
+}
+.menu-row::-webkit-details-marker { display: none; }
+
+/* Sheets slide up from the bottom on phones and fade in on larger screens. */
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheetFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 639px) {
+    .fixed:not(.hidden) > .sheet-panel { animation: sheetUp .24s cubic-bezier(.2,.8,.2,1); }
+}
+@media (min-width: 640px) {
+    .fixed:not(.hidden) > .sheet-panel { animation: sheetFade .18s ease-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fixed:not(.hidden) > .sheet-panel { animation: none; }
+    .menu-tile { transition: none; }
+}
