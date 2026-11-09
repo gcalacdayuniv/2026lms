@@ -2,8 +2,8 @@
 
 export const AuthUI = {
     renderLogin: () => `
-        <div class="flex flex-col justify-center items-center min-h-screen p-4">
-            <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in">
+        <div class="flex flex-col justify-center items-center min-h-screen p-0 sm:p-4 auth-screen">
+            <div class="w-full max-w-md bg-white rounded-none sm:rounded-lg shadow-none sm:shadow-md p-6 sm:p-8 fade-in min-h-screen sm:min-h-0 flex flex-col justify-center">
                 <div class="text-center mb-8">
                     <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-4"></i>
                     <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
@@ -13,12 +13,12 @@ export const AuthUI = {
                     <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Username, Email, Contact, or Student No.</label>
-                        <input type="text" id="loginIdentifier" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="loginIdentifier" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Password</label>
                         <div class="relative">
-                            <input type="password" id="loginPassword" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
+                            <input type="password" id="loginPassword" autocomplete="current-password" enterkeyhint="go" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
                             <button type="button" id="toggleLoginPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600 mt-1 focus:outline-none">
                                 <i class="fa-solid fa-eye" id="loginPasswordEye"></i>
                             </button>
@@ -36,8 +36,8 @@ export const AuthUI = {
     `,
 
     renderRegister: () => `
-        <div class="flex flex-col justify-center items-center min-h-screen p-4">
-            <div class="w-full max-w-lg bg-white rounded-lg shadow-md p-6 sm:p-8 fade-in my-8">
+        <div class="flex flex-col justify-center items-center min-h-screen p-0 sm:p-4 auth-screen">
+            <div class="w-full max-w-lg bg-white rounded-none sm:rounded-lg shadow-none sm:shadow-md p-6 sm:p-8 fade-in sm:my-8 min-h-screen sm:min-h-0">
                 <div class="text-center mb-8">
                     <i class="fa-solid fa-user-plus text-4xl text-green-600 mb-4"></i>
                     <h2 class="text-2xl font-bold text-gray-800">Create Account</h2>
@@ -68,43 +68,43 @@ export const AuthUI = {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Given Name</label>
-                            <input type="text" id="regGivenName" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <input type="text" id="regGivenName" autocomplete="given-name" enterkeyhint="next" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Last Name</label>
-                            <input type="text" id="regLastName" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <input type="text" id="regLastName" autocomplete="family-name" enterkeyhint="next" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Suffix</label>
-                            <input type="text" id="regSuffix" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. Jr. (Optional)">
+                            <input type="text" id="regSuffix" autocomplete="honorific-suffix" enterkeyhint="next" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. Jr. (Optional)">
                         </div>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Username</label>
-                            <input type="text" id="regUsername" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <input type="text" id="regUsername" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Email</label>
-                            <input type="email" id="regEmail" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <input type="email" id="regEmail" autocomplete="email" inputmode="email" autocapitalize="none" enterkeyhint="next" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                         </div>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Student Number</label>
-                            <input type="text" id="regStudentNo" required placeholder="00-0000" maxlength="7" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono">
+                            <input type="text" id="regStudentNo" autocomplete="off" enterkeyhint="next" required placeholder="00-0000" maxlength="7" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Contact Number</label>
-                            <input type="text" id="regContact" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <input type="text" id="regContact" autocomplete="tel" inputmode="tel" enterkeyhint="next" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                         </div>
                     </div>
                     
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-gray-700">Password</label>
-                        <input type="password" id="regPassword" required minlength="6" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <input type="password" id="regPassword" autocomplete="new-password" enterkeyhint="done" required minlength="6" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">

@@ -128,6 +128,12 @@ We use the following environment variables strictly within the API (`worker/wran
 - **Snackbars:** creating a course, adding to the registration list, enrolling, uploading a submission, and updating details or password now also show a bottom toast (`UI.success`); the inline messages stay.
 - Logic lives in `js/dash-nav.js`; markup in `components-dashboard.js`; cards in `course-dashboard.js`; styles in `styles.css`.
 
+## Forms and Sign-in on Phones
+- Create Course, Registration List (`apModal`), Update Details and Change Password open as full-screen pages on phones (`sheet-panel app-page`, back arrow, sticky `.form-save` button above the keyboard). From 640 px up they stay centered dialogs. IDs and close buttons are unchanged.
+- Login and Register are full-screen on phones (`.auth-screen`), with `autocomplete`, `inputmode` and `enterkeyhint` set so password managers and keyboards behave.
+- Inputs inside pages, sheets and sign-in screens are 16 px on phones, because iOS Safari zooms the page into any smaller field.
+- `js/app-feel.js`: a light vibration on primary controls (touch only; iOS has no vibration API) and scrolling the focused field into view when the keyboard opens. Buttons get a small press animation (zero-specificity rule in `styles.css`).
+
 ## Development Directives
 When asked to add features, debug, or refactor, you must strictly adhere to the following rules:
 

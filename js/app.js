@@ -12,6 +12,7 @@ import { CourseSwipe } from './course-swipe.js';
 import { CoursePull } from './course-pull.js';
 import { PWA } from './pwa.js';
 import { DashNav } from './dash-nav.js';
+import { AppFeel } from './app-feel.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
@@ -33,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CoursePull.init();
     PWA.init();
     DashNav.init();
+    AppFeel.init();
     CourseAttendanceDates.init();
     AppRouter.init();
     A11y.init();

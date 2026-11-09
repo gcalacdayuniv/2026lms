@@ -178,3 +178,31 @@ body { overscroll-behavior-y: contain; }
 .overview-icon { width: 2rem; height: 2rem; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; font-size: .9rem; }
 .overview-value { font-size: 1.4rem; line-height: 1.1; font-weight: 900; color: #111827; }
 .overview-label { font-size: .68rem; font-weight: 700; color: #6b7280; text-align: center; }
+
+
+/* ---------- Forms and sign-in screens on phones ---------- */
+@media (max-width: 639px) {
+    /* 16px inputs: iOS Safari zooms the page when a smaller field gets focus. */
+    :is(.app-page, .sheet-panel, .auth-screen) :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+        font-size: 16px;
+    }
+    .auth-screen :is(input, select) { padding-top: .75rem; padding-bottom: .75rem; }
+    .auth-screen button[type="submit"] { padding-top: .85rem; padding-bottom: .85rem; font-size: 1rem; font-weight: 700; border-radius: .75rem; }
+    .auth-screen { background: #fff; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+    /* The Save button stays in view above the keyboard while the form scrolls. */
+    .form-save {
+        position: sticky; z-index: 5;
+        bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
+        min-height: 2.75rem; font-size: 1rem; border-radius: .75rem;
+        box-shadow: 0 6px 16px rgba(0,0,0,.18);
+    }
+
+    /* Press feedback for every button (zero specificity, so tabs and tiles keep their own). */
+    :where(button, [role="button"], a.card-action) { transition: transform .1s ease; }
+    :where(button:not(:disabled):active, [role="button"]:active, a.card-action:active) { transform: scale(.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+    :where(button, [role="button"], a.card-action) { transition: none; }
+    :where(button:not(:disabled):active, [role="button"]:active, a.card-action:active) { transform: none; }
+}
