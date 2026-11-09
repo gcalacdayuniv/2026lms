@@ -301,12 +301,12 @@ export const CourseSummary = {
 
             return `
                 <tr class="group hover:bg-gray-50 align-top">
-                    <td class="px-1 py-2 w-12 min-w-[3rem] text-center text-gray-400 font-bold sm:sticky sm:left-0 z-10 bg-white group-hover:bg-gray-50">${idx + 1}</td>
-                    <td class="px-3 py-2 min-w-[220px] sticky left-0 sm:left-12 z-10 bg-white group-hover:bg-gray-50 pin-edge">
+                    <td class="px-1 py-2 w-8 min-w-[2rem] sm:w-12 sm:min-w-[3rem] text-center text-gray-400 font-bold sm:sticky sm:left-0 z-10 bg-white group-hover:bg-gray-50">${idx + 1}</td>
+                    <td class="px-2 sm:px-3 py-2 min-w-[118px] max-w-[118px] sm:min-w-[220px] sm:max-w-none sticky left-0 sm:left-12 z-10 bg-white group-hover:bg-gray-50 pin-edge">
                         <div class="flex items-center gap-2">
-                            ${avatar}
-                            <div>
-                                <div class="font-bold text-gray-800">${esc(s.Name)}</div>
+                            <span class="hidden sm:block flex-shrink-0">${avatar}</span>
+                            <div class="min-w-0">
+                                <div class="font-bold text-gray-800 text-[11px] leading-tight sm:text-xs">${esc(s.Name)}</div>
                                 <div class="text-[10px] text-gray-500">${esc(s.Student_Number || 'N/A')}${(() => { const prog = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim(); return prog ? ' &bull; <span class="text-blue-700 font-medium" title="Program">' + esc(prog) + '</span>' : ''; })()}${r.failed ? ' <span class="text-red-500 font-bold">(failed to load records)</span>' : ''}</div>
                             </div>
                         </div>

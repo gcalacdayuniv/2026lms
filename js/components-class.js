@@ -15,8 +15,8 @@ const isStatusCollapsed = () => {
 // Class summary columns. The first two are pinned while scrolling sideways
 // (on phones only the Student column is pinned, to leave room to scroll).
 const SUMMARY_COLUMNS = [
-    { label: '#',             cls: 'px-1 w-12 min-w-[3rem] text-center sm:left-0 z-30' },
-    { label: 'Student',       cls: 'px-3 min-w-[220px] left-0 sm:left-12 z-30 pin-edge' },
+    { label: '#',             cls: 'px-1 w-8 min-w-[2rem] sm:w-12 sm:min-w-[3rem] text-center sm:left-0 z-30' },
+    { label: 'Student',       cls: 'px-2 sm:px-3 min-w-[118px] max-w-[118px] sm:min-w-[220px] sm:max-w-none left-0 sm:left-12 z-30 pin-edge' },
     { label: 'Seat',          cls: 'px-3 text-center z-20' },
     { label: 'Email',         cls: 'px-3 z-20' },
     { label: 'Contact',       cls: 'px-3 z-20' },
@@ -36,14 +36,13 @@ const SUMMARY_COLUMNS = [
 
 const ClassUI = {
     renderCourseMenuModal: (course) => `
-        <div id="courseMenuModal" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
+        <div id="courseMenuModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-0 sm:p-4">
             <div id="closeCourseMenuBg" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[90vh] overflow-y-auto">
-                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
-                <div class="flex justify-between items-center mb-5 border-b pb-3">
-                    <div class="min-w-0"><h3 class="text-lg font-bold text-gray-800 truncate"><i class="fa-solid fa-layer-group text-blue-600 mr-2"></i>Course Actions</h3><p class="text-xs text-gray-500 truncate">${escapeHtml(course.CourseCode || '')} ${escapeHtml(course.CourseTitle || '')}</p></div>
-                    <button id="closeCourseMenuBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-sm h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center gap-3 mb-5 border-b pb-3 app-page-header">
+                    <div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-gray-800 truncate"><i class="fa-solid fa-layer-group text-blue-600 mr-2"></i>Course Actions</h3><p class="keep-sub text-xs text-gray-500 truncate">${escapeHtml(course.CourseCode || '')} ${escapeHtml(course.CourseTitle || '')}</p></div>
+                    <button id="closeCourseMenuBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -134,14 +133,14 @@ const ClassUI = {
     renderAttendanceDatesModal: () => `
         <div id="attendanceDatesModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeAttendanceDatesBg"></div>
-            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel max-h-full sm:max-h-[95vh] flex flex-col">
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[95vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <div class="flex-1 min-w-0">
                         <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-check text-sky-600 mr-2"></i>Attendance Dates</h3>
                         <p class="text-xs text-gray-500">All dates with saved records. Change, delete, or merge two dates.</p>
                     </div>
-                    <button id="closeAttendanceDatesBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+                    <button id="closeAttendanceDatesBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -181,14 +180,14 @@ const ClassUI = {
     renderClassSummaryModal: () => `
         <div id="classSummaryModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeClassSummaryBg"></div>
-            <div class="bg-white rounded-none shadow-xl w-full h-full p-4 sm:p-6 relative z-10 fade-in flex flex-col">
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <div>
+            <div class="bg-white rounded-none shadow-xl w-full h-full p-4 sm:p-6 relative z-10 sheet-panel app-page flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <div class="flex-1 min-w-0">
                         <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-table-list text-purple-600 mr-2"></i>Class Summary</h3>
-                        <div id="csCourseTitle" class="text-xs font-bold text-blue-700 mt-0.5"></div>
+                        <div id="csCourseTitle" class="keep-sub text-xs font-bold text-blue-700 mt-0.5"></div>
                     </div>
-                    <button id="closeClassSummaryBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+                    <button id="closeClassSummaryBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -233,11 +232,11 @@ const ClassUI = {
     renderScoresModal: () => `
         <div id="scoresModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeScoresModalBg"></div>
-            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel max-h-full sm:max-h-[95vh] flex flex-col">
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-pen-to-square text-teal-600 mr-2"></i>Record Scores</h3>
-                    <button id="closeScoresModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[95vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="flex-1 min-w-0 text-lg font-bold text-gray-800"><i class="fa-solid fa-pen-to-square text-teal-600 mr-2"></i>Record Scores</h3>
+                    <button id="closeScoresModalBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -309,14 +308,13 @@ const ClassUI = {
     `,
 
     renderNoClassModal: () => `
-        <div id="noClassModal" class="hidden fixed inset-0 z-[70] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
+        <div id="noClassModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeNoClassModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[90vh] flex flex-col">
-                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-xmark text-orange-600 mr-2"></i>No Class Days</h3>
-                    <button id="closeNoClassModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-sm h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[90vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="flex-1 min-w-0 text-lg font-bold text-gray-800"><i class="fa-solid fa-calendar-xmark text-orange-600 mr-2"></i>No Class Days</h3>
+                    <button id="closeNoClassModalBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 

@@ -78,3 +78,61 @@ html.dialog-open body {
     .tabbar-hide, .fab-dup { display: none !important; }
     #classFab { bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important; }
 }
+
+
+/* ---------- Student rows on phones: bigger targets and swipe hint ---------- */
+.student-row { position: relative; }
+.student-row[data-swipe]::after {
+    position: absolute; top: 50%; transform: translateY(-50%); font-size: .8rem; font-weight: 800;
+    letter-spacing: .04em; text-transform: uppercase; pointer-events: none; opacity: .75;
+}
+.student-row[data-swipe="Present"]::after { content: "Present"; left: .75rem; color: #166534; }
+.student-row[data-swipe="Absent"]::after { content: "Absent"; right: .75rem; color: #991b1b; }
+.student-row[data-swipe-ready]::after { opacity: 1; }
+@media (max-width: 639px) {
+    .student-row .attendance-btn { min-height: 2.5rem; }
+    .student-row .pts-step { width: 2.5rem; height: 2.5rem; }
+}
+
+
+/* ---------- Full-screen pages on phones (Record Scores, Manage Exams, Scan Answer Sheets) ---------- */
+@keyframes pageIn { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+.app-page-close { min-width: 2.5rem; min-height: 2.5rem; display: inline-flex; align-items: center; justify-content: center; margin-left: -.5rem; border-radius: 9999px; }
+.app-page-close:focus-visible { outline: 3px solid #93c5fd; }
+@media (max-width: 639px) {
+    .fixed:not(.hidden) > .sheet-panel.app-page { animation: pageIn .2s ease-out; }
+    .app-page {
+        padding-top: calc(.75rem + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+    }
+    .app-page-header { margin-bottom: .75rem; padding-bottom: .5rem; }
+    .app-page-header h3 { font-size: 1.05rem; }
+    .app-page-header p { display: none; }
+}
+@media (min-width: 640px) { .app-page-close { margin-left: 0; margin-right: -.5rem; } }
+@media (prefers-reduced-motion: reduce) { .fixed:not(.hidden) > .sheet-panel.app-page { animation: none; } }
+
+
+/* ---------- Pull to refresh and bottom snackbars ---------- */
+body { overscroll-behavior-y: contain; }
+@keyframes snackUp { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 639px) {
+    #toastHost { top: auto !important; bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)); right: 5rem !important; }
+    #toastHost > div { animation: snackUp .2s ease-out; }
+}
+@media (prefers-reduced-motion: reduce) { #toastHost > div { animation: none; } }
+
+
+/* ---------- Phones: the bottom tab bar stays visible under the full-screen pages ---------- */
+.app-page-header .keep-sub { display: block; }
+@media (max-width: 639px) {
+    #scoresModal, #examManagerModal, #scannerModal, #courseMenuModal,
+    #attendanceDatesModal, #noClassModal, #classSummaryModal {
+        bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    #scoresModal .app-page, #examManagerModal .app-page, #scannerModal .app-page, #courseMenuModal .app-page,
+    #attendanceDatesModal .app-page, #noClassModal .app-page, #classSummaryModal .app-page {
+        padding-bottom: .75rem;
+    }
+    .class-tab.is-active { background: #eff6ff; border-radius: .75rem; }
+}

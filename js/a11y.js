@@ -24,6 +24,8 @@ const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NOSCR
 // Never made inert: toasts must still be announced, and the profile backdrop must stay
 // clickable (it closes the drawer). The backdrop has no content, so it is only aria-hidden.
 const EXEMPT_IDS = new Set(['toastHost', 'profilePanelOverlay']);
+// Full-screen pages that keep the bottom tab bar usable (phones).
+const TAB_PAGES = new Set(['scoresModal', 'examManagerModal', 'scannerModal', 'courseMenuModal', 'attendanceDatesModal', 'noClassModal', 'classSummaryModal']);
 // Icon-only buttons get a name from their Font Awesome icon.
 const ICON_LABELS = [
     ['fa-xmark', 'Close'],
@@ -122,6 +124,7 @@ export const A11y = {
             for (let node = top; node.parentElement && node !== document.body; node = node.parentElement) {
                 for (const sib of node.parentElement.children) {
                     if (sib === node || SKIP_TAGS.has(sib.tagName)) continue;
+                    if (sib.id === 'classTabBar' && TAB_PAGES.has(top.id)) continue;
                     if (EXEMPT_IDS.has(sib.id)) {
                         if (sib.id === 'profilePanelOverlay') sib.setAttribute('aria-hidden', 'true');
                         continue;

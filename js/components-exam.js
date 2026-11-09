@@ -4,14 +4,14 @@ export const ExamUI = {
     renderManagerModal: () => `
         <div id="examManagerModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeExamManagerBg"></div>
-            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-4xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel max-h-full sm:max-h-[92vh] flex flex-col">
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-4xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <div class="flex-1 min-w-0">
                         <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-file-contract text-blue-600 mr-2"></i>Manage Exams & Accessible Class Assignments</h3>
                         <p class="text-xs text-gray-500">Upload exams, add bonus questions, link exams to this class with date schedules, and assign students.</p>
                     </div>
-                    <button id="closeExamManagerBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+                    <button id="closeExamManagerBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 

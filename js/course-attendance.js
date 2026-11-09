@@ -34,6 +34,7 @@ export const CourseAttendance = {
 
         const statusBtn = e.target.closest('.attendance-btn');
         if (statusBtn) {
+            if (navigator.vibrate) navigator.vibrate(8);
             const row = statusBtn.closest('.student-row');
             if (row) CourseAttendance.queueAutoSave(row.dataset.studentId, 0);
             return;
@@ -453,6 +454,7 @@ export const CourseAttendance = {
             alertBox.textContent = "All Attendance saved successfully!";
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-green-100 text-green-700 block fade-in";
             UI.success('Attendance saved.');
+            if (navigator.vibrate) navigator.vibrate(15);
         } catch (err) {
             alertBox.textContent = err.message;
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
