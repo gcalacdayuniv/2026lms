@@ -6,6 +6,26 @@ import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
+// ---- Saved copy of the class screen, so reopening a class paints at once (see loadClassScreen). ----
+const CLASS_CACHE_PREFIX = 'class_cache:';
+const classCacheKey = (courseId) => `${CLASS_CACHE_PREFIX}${AppState.user.User_ID}:${courseId}`;
+const readClassCache = (courseId) => {
+    try { const raw = localStorage.getItem(classCacheKey(courseId)); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+};
+const writeClassCache = (courseId, data) => {
+    try { localStorage.setItem(classCacheKey(courseId), JSON.stringify({ course: data.course, students: data.students })); } catch (e) { /* storage full or blocked */ }
+};
+export const clearClassCache = () => {
+    try {
+        Object.keys(localStorage).filter(k => k.startsWith(CLASS_CACHE_PREFIX) || k.startsWith('dash_cache:')).forEach(k => localStorage.removeItem(k));
+    } catch (e) { /* storage blocked */ }
+};
+// A page, dialog or unsaved attendance would be lost if the screen were redrawn under the user.
+const safeToRedraw = () => {
+    if (CourseAttendance.isDirty()) return false;
+    return ![...document.querySelectorAll('.fixed.inset-0:not(.hidden)')].some(el => el.getClientRects().length);
+};
+
 export const CourseClass = {
     currentSummaryData: null,
     currentStudents: [],
@@ -430,20 +450,41 @@ export const CourseClass = {
             sectionVal = document.getElementById('filterSection')?.value || '';
         }
 
-        if (!skipSpinner) {
+        // Opening a class (not a refresh after an action): paint the saved copy at once, then update it.
+        const cached = (!skipSpinner && !modalWasOpen) ? readClassCache(courseId) : null;
+        let earlyAttendance = null;
+        if (cached) {
+            CourseClass.currentStudents = cached.students;
+            root.innerHTML = Components.renderClassScreen(cached.course, cached.students);
+            const d = document.getElementById('attendanceDate');
+            if (d) earlyAttendance = CourseAttendance.loadAttendanceData(courseId, d.value);
+        } else if (!skipSpinner) {
             root.innerHTML = Skeleton.classScreen();
         }
 
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/course-details?courseId=${courseId}&_t=${ts}`);
+            writeClassCache(courseId, data);
 
-            CourseClass.currentStudents = data.students;
-
-            root.innerHTML = Components.renderClassScreen(data.course, data.students);
+            let redrawn = true;
+            if (cached) {
+                const same = JSON.stringify({ course: data.course, students: data.students }) === JSON.stringify(cached);
+                if (same) redrawn = false;
+                else if (!safeToRedraw()) {
+                    redrawn = false;
+                    UI.info('Class was updated. Pull down to refresh.');
+                }
+            }
+            if (redrawn) {
+                CourseClass.currentStudents = data.students;
+                root.innerHTML = Components.renderClassScreen(data.course, data.students);
+            }
 
             const dateInput = document.getElementById('attendanceDate');
-            if (dateInput) {
+            if (earlyAttendance && !redrawn) {
+                await earlyAttendance;
+            } else if (dateInput) {
                 await CourseAttendance.loadAttendanceData(courseId, dateInput.value);
             }
 

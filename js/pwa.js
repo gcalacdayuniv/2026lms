@@ -3,6 +3,8 @@
 // .html/.css/.js files), the service worker (sw.js) keeps the last copy for a weak or missing connection,
 // and a small banner offers "Install" once the lecturer is logged in.
 import { AppState } from './globals.js';
+import { UI } from './ui-feedback.js';
+import { Theme } from './theme.js';
 
 const THEME = '#2563eb';
 const DISMISS_KEY = 'pwa_install_dismissed';
@@ -42,6 +44,29 @@ const drawIcon = (size, maskable) => {
     return c.toDataURL('image/png');
 };
 
+// iPhone launch image: Safari matches it by exact screen size, so it is made for this device only
+// (it takes effect the next time the app is added to the Home Screen).
+const addSplash = (icon) => {
+    if (!isIos()) return;
+    const w = window.screen.width, h = window.screen.height, r = window.devicePixelRatio || 1;
+    const c = document.createElement('canvas');
+    c.width = Math.round(w * r); c.height = Math.round(h * r);
+    const x = c.getContext('2d');
+    x.fillStyle = Theme.isDark() ? '#0b1220' : '#ffffff';
+    x.fillRect(0, 0, c.width, c.height);
+    const img = new Image();
+    img.onload = () => {
+        const size = Math.round(Math.min(c.width, c.height) * 0.28);
+        x.drawImage(img, (c.width - size) / 2, (c.height - size) / 2 - size * 0.1, size, size);
+        addHead('link', {
+            rel: 'apple-touch-startup-image',
+            href: c.toDataURL('image/png'),
+            media: `(device-width: ${Math.min(w, h)}px) and (device-height: ${Math.max(w, h)}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`
+        });
+    };
+    img.src = icon;
+};
+
 const addHead = (tag, attrs) => {
     const el = document.createElement(tag);
     Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
@@ -65,7 +90,7 @@ export const PWA = {
                 scope: base,
                 display: 'standalone',
                 orientation: 'portrait',
-                background_color: '#ffffff',
+                background_color: Theme.isDark() ? '#0b1220' : '#ffffff',
                 theme_color: THEME,
                 icons: [
                     { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -76,6 +101,7 @@ export const PWA = {
             const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
             addHead('link', { rel: 'manifest', href: url });
             addHead('link', { rel: 'apple-touch-icon', href: icon192 });
+            addSplash(icon512);
             addHead('meta', { name: 'theme-color', content: THEME });
             addHead('meta', { name: 'mobile-web-app-capable', content: 'yes' });
             addHead('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
@@ -101,6 +127,22 @@ export const PWA = {
             PWA.hide();
         });
         window.addEventListener('hashchange', () => setTimeout(PWA.maybeShow, 800));
+
+        // "Install app" in the profile panel stays available after the banner was dismissed.
+        document.addEventListener('click', async (e) => {
+            if (!e.target.closest || !e.target.closest('#installAppBtn')) return;
+            if (PWA.deferred) {
+                const prompt = PWA.deferred;
+                PWA.hide();
+                prompt.prompt();
+                await prompt.userChoice.catch(() => {});
+                PWA.deferred = null;
+            } else if (isIos()) {
+                UI.info('Tap the Share button, then Add to Home Screen.');
+            } else {
+                UI.info('Open your browser menu and choose Install app or Add to Home screen.');
+            }
+        });
         setTimeout(PWA.maybeShow, 3000);
     },
 

@@ -7,6 +7,7 @@ import { escapeHtml } from './html-utils.js';
 import { getLocalDateString } from './date-utils.js';
 
 // Maximum size of an uploaded submission file.
+const DASH_CACHE_PREFIX = 'dash_cache:';
 const MAX_UPLOAD_MB = 25;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
@@ -178,6 +179,55 @@ const sortCoursesBySchedule = (courses) => courses.sort((a, b) => {
 
 const loadErrorHtml = (err) =>
     `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${escapeHtml(err && err.message)}</div>`;
+
+// ---- Saved copy of the dashboard data: the screen opens at once from it, then refreshes from the server. ----
+// The copy lives only in this browser and is removed on log out (AppState.setUser(null)).
+const readSaved = (key) => {
+    try { const raw = localStorage.getItem(DASH_CACHE_PREFIX + key); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+};
+const writeSaved = (key, data) => {
+    try { localStorage.setItem(DASH_CACHE_PREFIX + key, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
+};
+
+// Repaints without losing what the person typed in the search box or picked in the day chips.
+const repaintKeepingFilters = (paint) => {
+    const q = document.getElementById('courseSearch')?.value || '';
+    const chip = document.querySelector('.day-chip.is-on')?.dataset.dayChip || 'All';
+    const y = window.scrollY;
+    paint();
+    const box = document.getElementById('courseSearch');
+    if (box && q) { box.value = q; box.dispatchEvent(new Event('input', { bubbles: true })); }
+    if (chip !== 'All') document.querySelector(`.day-chip[data-day-chip="${CSS.escape(chip)}"]`)?.click();
+    window.scrollTo(0, y);
+};
+
+// mode 'open'  : paint the saved copy at once (if any), then the fresh data when it differs.
+// mode 'fresh' : skeleton, then fresh data (after the person changed something).
+// mode 'quiet' : keep what is on screen, repaint only if the data changed (pull to refresh, back online).
+// Returns true when fresh data arrived.
+const loadWithSavedCopy = async ({ container, key, mode, paint, fetchFresh }) => {
+    const saved = mode === 'fresh' ? null : readSaved(key);
+    if (mode === 'open' && saved) paint(saved, false);
+    try {
+        const fresh = await fetchFresh();
+        writeSaved(key, fresh);
+        if (!saved || JSON.stringify(fresh) !== JSON.stringify(saved)) {
+            if (saved) repaintKeepingFilters(() => paint(fresh, true));
+            else paint(fresh, true);
+        } else if (mode === 'open') {
+            // Same data as the saved copy: nothing to repaint, but the one-time side effects of a fresh paint still apply.
+            if (paint.afterSame) paint.afterSame(fresh);
+        }
+        return true;
+    } catch (err) {
+        if (saved) {
+            if (mode === 'open') UI.warning('Could not refresh. Showing saved data.');
+        } else if (mode !== 'quiet') {
+            container.innerHTML = loadErrorHtml(err);
+        }
+        return false;
+    }
+};
 
 // Search box (and day chips for lecturers). Filtering is done by dash-nav.js.
 const searchBarHtml = (days = []) => `
@@ -628,7 +678,7 @@ export const CourseDashboard = {
             document.getElementById('addCourseForm').reset();
             document.getElementById('ccModal').classList.add('hidden');
             UI.success('Course created');
-            await CourseDashboard.loadDashboardData();
+            await CourseDashboard.loadDashboardData('fresh');
         } catch (err) {
             errorDiv.textContent = err.message;
             errorDiv.classList.remove('hidden');
@@ -645,20 +695,15 @@ export const CourseDashboard = {
                 body: JSON.stringify({ courseId: courseId, studentId: AppState.user.User_ID })
             });
             UI.success('Enrolled in course');
-            await CourseDashboard.loadDashboardData();
+            await CourseDashboard.loadDashboardData('fresh');
         } catch (err) {
             UI.error(err.message);
-            await CourseDashboard.loadDashboardData();
+            await CourseDashboard.loadDashboardData('fresh');
         }
     },
 
-    renderLecturerDashboard: async (container) => {
-        try {
-            const ts = new Date().getTime();
-            await refreshProgramOptions();
-
-            const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&today=${getLocalDateString()}&_t=${ts}`);
-
+    renderLecturerDashboard: async (container, mode = 'open') => {
+        const paint = (data) => {
             sortCoursesBySchedule(data.courses);
 
             let coursesHtml = data.courses.map(lecturerCourseCardHtml).join('');
@@ -673,26 +718,28 @@ export const CourseDashboard = {
                         <h2 class="text-xl font-bold text-gray-800 flex items-center"><div class="bg-gray-200 p-2 rounded-lg mr-3"><i class="fa-solid fa-chalkboard-user text-gray-600"></i></div>My Created Courses</h2>
                         <button type="button" id="headerNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button>
                     </div>
-                    ${data.courses.length >= 3 ? searchBarHtml([...new Set(data.courses.map(c => c.ScheduleDay).filter(Boolean))]) : ''}
+                    ${data.courses.length >= 3 ? searchBarHtml(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) : ''}
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         ${coursesHtml}
                     </div>
                 </div>
             `;
-        } catch (err) {
-            container.innerHTML = loadErrorHtml(err);
-        }
+        };
+        return loadWithSavedCopy({
+            container, mode, paint,
+            key: `${AppState.user.User_ID}:lecturer`,
+            fetchFresh: async () => {
+                const ts = new Date().getTime();
+                const programs = refreshProgramOptions();
+                const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&today=${getLocalDateString()}&_t=${ts}`);
+                await programs;
+                return data;
+            }
+        });
     },
 
-    renderStudentDashboard: async (container) => {
-        try {
-            const ts = new Date().getTime();
-            const [myCoursesRes, allCoursesRes, examsRes] = await Promise.all([
-                apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=student&_t=${ts}`),
-                apiFetch(`/api/courses?studentId=${AppState.user.User_ID}&_t=${ts}`),
-                apiFetch(`/api/student-accessible-exams?studentId=${AppState.user.User_ID}&_t=${ts}`).catch(() => ({ exams: [] }))
-            ]);
-
+    renderStudentDashboard: async (container, mode = 'open') => {
+        const paint = ({ myCoursesRes, allCoursesRes, examsRes }, isFresh = true) => {
             const assignedExams = examsRes.exams || [];
             CourseExam.studentAssignedExams = assignedExams;
             if (examsRes.student) {
@@ -744,24 +791,40 @@ export const CourseDashboard = {
                 </div>
             `;
 
-            if (isBlind && assignedExams.some(e => e.status !== 'Completed') && CourseExam.announceDashboardExams) {
+            if (isFresh && isBlind && assignedExams.some(e => e.status !== 'Completed') && CourseExam.announceDashboardExams) {
                 CourseExam.announceDashboardExams();
             }
-        } catch (err) {
-            container.innerHTML = loadErrorHtml(err);
-        }
+        };
+        return loadWithSavedCopy({
+            container, mode, paint,
+            key: `${AppState.user.User_ID}:student`,
+            fetchFresh: async () => {
+                const ts = new Date().getTime();
+                const [myCoursesRes, allCoursesRes, examsRes] = await Promise.all([
+                    apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=student&_t=${ts}`),
+                    apiFetch(`/api/courses?studentId=${AppState.user.User_ID}&_t=${ts}`),
+                    apiFetch(`/api/student-accessible-exams?studentId=${AppState.user.User_ID}&_t=${ts}`).catch(() => ({ exams: [] }))
+                ]);
+                return { myCoursesRes, allCoursesRes, examsRes };
+            }
+        });
     },
 
-    loadDashboardData: async () => {
+    // mode: 'open' (default, saved copy first), 'fresh' (skeleton, after a change) or 'quiet' (no flicker).
+    // Returns true when fresh data arrived.
+    loadDashboardData: async (mode = 'open') => {
         const container = document.getElementById('courseContainer');
-        if (!container || !AppState.user) return;
+        if (!container || !AppState.user) return false;
 
-        container.innerHTML = Skeleton.dashboard(AppState.user.role);
-
-        if (AppState.user.role.toLowerCase() === 'lecturer') {
-            await CourseDashboard.renderLecturerDashboard(container);
-        } else {
-            await CourseDashboard.renderStudentDashboard(container);
+        const isLecturer = AppState.user.role.toLowerCase() === 'lecturer';
+        const key = `${AppState.user.User_ID}:${isLecturer ? 'lecturer' : 'student'}`;
+        // With no saved copy to show, the first paint still needs the skeleton.
+        if (mode === 'fresh' || (mode === 'open' && !readSaved(key))) {
+            container.innerHTML = Skeleton.dashboard(AppState.user.role);
         }
+
+        return isLecturer
+            ? CourseDashboard.renderLecturerDashboard(container, mode)
+            : CourseDashboard.renderStudentDashboard(container, mode);
     }
 };

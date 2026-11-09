@@ -139,12 +139,12 @@ body { overscroll-behavior-y: contain; }
 
 
 /* ---------- Dashboard: bottom tabs, Admin page, course search ---------- */
-.day-chip {
+.day-chip, .mu-chip {
     padding: .35rem .85rem; border-radius: 9999px; border: 1px solid #d1d5db; background: #fff;
     color: #4b5563; font-size: .75rem; font-weight: 700; white-space: nowrap; transition: background .12s, color .12s;
 }
-.day-chip.is-on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
-.day-chip:focus-visible { outline: 3px solid #93c5fd; outline-offset: 1px; }
+.day-chip.is-on, .mu-chip.is-on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.day-chip:focus-visible, .mu-chip:focus-visible { outline: 3px solid #93c5fd; outline-offset: 1px; }
 @media (max-width: 639px) {
     .dash-tabbar { grid-template-columns: repeat(var(--cols, 4), 1fr); }
     .dash-fab { display: none !important; }
@@ -206,3 +206,53 @@ body { overscroll-behavior-y: contain; }
     :where(button, [role="button"], a.card-action) { transition: none; }
     :where(button:not(:disabled):active, [role="button"]:active, a.card-action:active) { transform: none; }
 }
+
+
+/* ---------- Offline pill and route slide ---------- */
+.offline-banner {
+    position: fixed; left: 50%; top: calc(.5rem + env(safe-area-inset-top, 0px));
+    transform: translate(-50%, -150%); opacity: 0; pointer-events: none;
+    background: #1f2937; color: #fff; font-size: .8rem; font-weight: 700; line-height: 1.2;
+    padding: .5rem .9rem; border-radius: 9999px; box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    max-width: calc(100vw - 1.5rem); text-align: center;
+    transition: transform .25s ease, opacity .25s ease;
+}
+.offline-banner.is-online { background: #15803d; }
+.offline-banner.is-shown { transform: translate(-50%, 0); opacity: 1; }
+
+/* Only opacity and `left` move: a transform here would re-anchor the fixed bars and pages inside. */
+@keyframes routeForward { from { opacity: 0; left: 28px; } to { opacity: 1; left: 0; } }
+@keyframes routeBack { from { opacity: 0; left: -28px; } to { opacity: 1; left: 0; } }
+@media (max-width: 639px) {
+    #app-root[data-route="forward"] > main { position: relative; animation: routeForward .24s ease-out; }
+    #app-root[data-route="back"] > main { position: relative; animation: routeBack .24s ease-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #app-root[data-route] > main { animation: none !important; }
+    .offline-banner { transition: none; }
+}
+
+
+/* ---------- Appearance buttons and the install button ---------- */
+.theme-choice {
+    padding: .5rem .25rem; border-radius: .6rem; border: 1px solid #d1d5db; background: #fff; color: #374151;
+    font-size: .8rem; font-weight: 700; transition: background .12s, color .12s;
+}
+.theme-choice.is-on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.theme-choice:focus-visible { outline: 3px solid #93c5fd; outline-offset: 1px; }
+@media (display-mode: standalone) { #installAppBtn { display: none; } }
+
+
+/* ---------- Dashboard pages keep the bottom tab bar visible and usable (phones) ---------- */
+@media (max-width: 639px) {
+    #adminPage, #profilePanel, #ccModal, #apModal, #muModal, #cpModal {
+        bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    :is(#adminPage, #ccModal, #apModal, #muModal, #cpModal) .app-page { padding-bottom: .75rem; }
+    :is(#profilePanel, #ccModal, #apModal, #cpModal) .form-save { bottom: .5rem; }
+    #profilePanel { padding-bottom: .5rem; }
+    /* The tabs replace the profile's close button. */
+    #closeProfilePanel { display: none; }
+}
+/* Edit mode of the profile details */
+#updateDetailsForm .ud-field[readonly] { background-color: #f9fafb; color: #374151; border-color: #e5e7eb; box-shadow: none; }

@@ -6,18 +6,35 @@ import { UI } from './ui-feedback.js';
 const $ = (id) => document.getElementById(id);
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const profileOpen = () => !!$('profilePanel') && $('profilePanel').classList.contains('translate-x-0');
-const adminOpen = () => !!$('adminPage') && !$('adminPage').classList.contains('hidden');
+// Every full-screen page of the dashboard. On phones each keeps the bottom tab bar visible and usable.
+// `tab` is the tab that lights up while the page is open.
+const PAGES = [
+    { id: 'cpModal', tab: 'profile', close: 'closeCpModalBtn' },
+    { id: 'muModal', tab: 'admin', close: 'closeMuModalBtn' },
+    { id: 'apModal', tab: 'admin', close: 'closeApModalBtn' },
+    { id: 'ccModal', tab: 'new', close: 'closeCcModalBtn' },
+    { id: 'adminPage', tab: 'admin', close: 'closeAdminPageBtn' },
+    { id: 'profilePanel', tab: 'profile', close: 'closeProfilePanel' }
+];
+
+const pageOpen = (p) => {
+    const el = $(p.id);
+    if (!el) return false;
+    return p.id === 'profilePanel' ? el.classList.contains('translate-x-0') : !el.classList.contains('hidden');
+};
+const openPages = () => PAGES.filter(pageOpen);
+const profileOpen = () => pageOpen(PAGES[5]);
+const adminOpen = () => pageOpen(PAGES[4]);
 
 let scrollTab = '';   // 'exams' or 'browse' after a student taps those tabs
 
-const closeAdmin = () => { if (adminOpen()) $('closeAdminPageBtn')?.click(); };
-const closeProfile = () => { if (profileOpen()) $('closeProfilePanel')?.click(); };
+const closeAllPages = () => openPages().forEach(p => $(p.close)?.click());
 
 const syncTabs = () => {
     const bar = $('dashTabBar');
     if (!bar) return;
-    const active = profileOpen() ? 'profile' : adminOpen() ? 'admin' : (scrollTab && window.scrollY > 80 ? scrollTab : 'courses');
+    const open = openPages();
+    const active = open.length ? open[0].tab : (scrollTab && window.scrollY > 80 ? scrollTab : 'courses');
     bar.querySelectorAll('.class-tab').forEach(tab => {
         const on = tab.dataset.dashTab === active;
         tab.classList.toggle('is-active', on);
@@ -32,8 +49,9 @@ const scrollToId = (id) => {
 };
 
 const openTab = (tab) => {
+    const open = openPages();
     if (tab === 'exams' || tab === 'browse') {
-        closeProfile();
+        closeAllPages();
         const found = scrollToId(tab === 'exams' ? 'studentExamsSection' : 'studentAvailableSection');
         if (!found && tab === 'exams') UI.info('No exams assigned to you right now');
         else scrollTab = tab;
@@ -42,18 +60,19 @@ const openTab = (tab) => {
     }
     scrollTab = '';
     if (tab === 'courses') {
-        closeAdmin(); closeProfile();
+        closeAllPages();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (tab === 'new') {
-        closeAdmin(); closeProfile();
+        if (open.length === 1 && open[0].id === 'ccModal') return;
+        closeAllPages();
         $('openCreateCourseModalBtn')?.click();
     } else if (tab === 'admin') {
-        if (adminOpen()) return;
-        closeProfile();
+        if (open.length === 1 && open[0].id === 'adminPage') return;
+        closeAllPages();
         $('adminPage')?.classList.remove('hidden');
     } else if (tab === 'profile') {
-        if (profileOpen()) return;
-        closeAdmin();
+        if (open.length === 1 && open[0].id === 'profilePanel') return;
+        closeAllPages();
         $('profileToggleBtn')?.click();
     }
     syncTabs();
@@ -111,12 +130,6 @@ export const DashNav = {
             if (!t.closest) return;
             const tab = t.closest('[data-dash-tab]');
             if (tab) { openTab(tab.dataset.dashTab); return; }
-            if (t.closest('#openAdminPageBtn')) {
-                closeProfile();
-                $('adminPage')?.classList.remove('hidden');
-                syncTabs();
-                return;
-            }
             if (t.closest('#closeAdminPageBtn') || t.id === 'closeAdminPageBg') {
                 $('adminPage')?.classList.add('hidden');
                 syncTabs();

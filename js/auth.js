@@ -1,4 +1,5 @@
 // js/auth.js
+import { clearClassCache } from './course-class.js';
 import { apiFetch, AppState } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
@@ -172,13 +173,11 @@ export const AuthModule = {
                 successDiv.textContent = "Details updated successfully.";
                 successDiv.classList.remove('hidden');
                 document.getElementById('udPassword').value = '';
-                
-                setTimeout(() => {
-                    successDiv.classList.add('hidden');
-                    document.getElementById('udModal').classList.add('hidden');
-                    window.dispatchEvent(new Event('hashchange'));
-                }, 1500);
+                // js/profile-edit.js leaves edit mode and refreshes the name shown on the profile page.
+                document.dispatchEvent(new CustomEvent('profile-saved'));
+                setTimeout(() => successDiv.classList.add('hidden'), 2500);
             } catch (err) {
+                document.getElementById('udPassword').value = '';   // the next Save asks for the password again
                 errorDiv.textContent = err.message;
                 errorDiv.classList.remove('hidden');
             } finally {
@@ -265,30 +264,59 @@ export const AuthModule = {
         }
         
         if (e.target.classList.contains('mu-status-select')) {
-            const studentId = e.target.dataset.userId;
-            const status = e.target.value;
-            
-            e.target.className = `mu-status-select w-full sm:w-32 px-2 py-1.5 text-xs font-bold border rounded outline-none cursor-pointer transition ${
-                status === 'Active' ? 'text-green-600 border-green-300 bg-green-50' : 
-                status === 'Inactive' ? 'text-gray-600 border-gray-300 bg-gray-50' :
-                status === 'Suspended' ? 'text-orange-600 border-orange-300 bg-orange-50' :
-                status === 'UD' ? 'text-red-600 border-red-300 bg-red-50' :
-                status === 'Dropped' ? 'text-red-800 border-red-400 bg-red-100' : 'text-gray-600 border-gray-300 bg-gray-50'
-            }`;
-
-            try {
-                await apiFetch('/api/update-user-status', {
-                    method: 'POST',
-                    body: JSON.stringify({ studentId, status })
-                });
-                
-                const user = AuthModule.usersList.find(u => u.User_ID === studentId);
-                if(user) user.account_status = status;
-                
-            } catch (err) {
-                UI.error('Failed to update status: ' + err.message);
-            }
+            await AuthModule.setUserStatus(e.target.dataset.userId, e.target.value);
         }
+    },
+
+    // Saves a status, then redraws the list. Used by the dropdown, the swipe-right shortcut and the action sheet.
+    setUserStatus: async (studentId, status) => {
+        const user = AuthModule.usersList.find(u => u.User_ID === studentId);
+        const previous = user ? user.account_status : null;
+        if (user) user.account_status = status;
+        AuthModule.renderManageUsers();
+        try {
+            await apiFetch('/api/update-user-status', {
+                method: 'POST',
+                body: JSON.stringify({ studentId, status })
+            });
+            if (user) UI.success(`${user.Name.split(',')[0]}: ${status}`);
+        } catch (err) {
+            if (user) user.account_status = previous;
+            AuthModule.renderManageUsers();
+            UI.error('Failed to update status: ' + err.message);
+        }
+    },
+
+    // Bottom sheet with every status, opened by swiping a card left.
+    openStatusSheet: (studentId) => {
+        const user = AuthModule.usersList.find(u => u.User_ID === studentId);
+        if (!user) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 flex items-end justify-center fade-in';
+        overlay.style.zIndex = '320';   // inline: see UI.confirm
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Change status');
+        const options = ['Active', 'Inactive', 'Suspended', 'UD', 'Dropped'];
+        overlay.innerHTML = `
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-50" data-sheet-close></div>
+            <div class="relative bg-white w-full max-w-md rounded-t-2xl p-4 sheet-panel" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px))">
+                <div class="text-center text-sm font-bold text-gray-800 mb-3 truncate">${escapeHtml(user.Name)}</div>
+                <div class="grid gap-2">
+                    ${options.map(o => `<button type="button" data-status="${o}" class="w-full py-3 rounded-xl border text-sm font-bold ${o === user.account_status ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-800 border-gray-300'}">${o}${o === user.account_status ? ' (current)' : ''}</button>`).join('')}
+                    <button type="button" data-sheet-close class="w-full py-3 rounded-xl text-sm font-bold text-gray-500">Cancel</button>
+                </div>
+            </div>`;
+        overlay.addEventListener('click', (ev) => {
+            const status = ev.target.closest('[data-status]');
+            if (status) {
+                if (status.dataset.status !== user.account_status) AuthModule.setUserStatus(studentId, status.dataset.status);
+                overlay.remove();
+            } else if (ev.target.closest('[data-sheet-close]')) {
+                overlay.remove();
+            }
+        });
+        document.body.appendChild(overlay);
     },
 
     updateGlobalImageUI: () => {
@@ -351,25 +379,20 @@ export const AuthModule = {
             panel.classList.remove('translate-x-0');
         }
 
+        const muChip = e.target.closest('.mu-chip');
+        if (muChip) {
+            const sel = document.getElementById('muFilterStatus');
+            if (sel) { sel.value = muChip.dataset.status; AuthModule.renderManageUsers(); }
+            return;
+        }
+
         if (e.target.closest('#logoutBtn')) {
             AppState.setUser(null);
             localStorage.removeItem('user');
+            clearClassCache();   // saved class rosters and dashboards must not outlive the sign-in
             window.location.hash = 'login';
         }
 
-        if (e.target.closest('#openUdModalBtn')) {
-            document.getElementById('profilePanelOverlay').classList.add('hidden');
-            document.getElementById('profilePanel').classList.add('translate-x-full');
-            document.getElementById('profilePanel').classList.remove('translate-x-0');
-            document.getElementById('udModal').classList.remove('hidden');
-        }
-
-        if (e.target.closest('#closeUdModalBtn') || e.target.id === 'udModalOverlay') {
-            document.getElementById('udModal').classList.add('hidden');
-            document.getElementById('updateDetailsForm').reset();
-            document.getElementById('udError').classList.add('hidden');
-            document.getElementById('udSuccess').classList.add('hidden');
-        }
 
         if (e.target.closest('#openCpModalBtn')) {
             document.getElementById('profilePanelOverlay').classList.add('hidden');
@@ -502,9 +525,19 @@ export const AuthModule = {
 
     renderManageUsers: () => {
         const list = document.getElementById('manageUsersList');
+        const keepScroll = list ? list.scrollTop : 0;
         const search = document.getElementById('muSearchInput')?.value.toLowerCase() || '';
         const filter = document.getElementById('muFilterStatus')?.value || '';
         
+        // Status chips with counts (the counts follow the search box).
+        const chipsEl = document.getElementById('muChips');
+        if (chipsEl) {
+            const searched = AuthModule.usersList.filter(u => u.Name.toLowerCase().includes(search) || (u.Student_Number && u.Student_Number.toLowerCase().includes(search)));
+            const chips = [['', 'All', searched.length], ...['Active', 'Inactive', 'Suspended', 'UD', 'Dropped'].map(st => [st, st, searched.filter(u => u.account_status === st).length])];
+            chipsEl.innerHTML = chips.map(([val, label, n]) =>
+                `<button type="button" class="mu-chip flex-shrink-0${val === filter ? ' is-on' : ''}" data-status="${val}" aria-pressed="${val === filter}">${label} ${n}</button>`).join('');
+        }
+
         const filtered = AuthModule.usersList.filter(u => {
             const matchSearch = u.Name.toLowerCase().includes(search) || (u.Student_Number && u.Student_Number.toLowerCase().includes(search));
             const matchFilter = filter === '' || u.account_status === filter;
@@ -528,7 +561,7 @@ export const AuthModule = {
                 : '';
             
             return `
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition gap-4">
+            <div class="mu-card flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 sm:p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition gap-4" data-user-id="${u.User_ID}">
                 <div class="flex items-center gap-4 w-full sm:w-auto overflow-hidden">
                     <div class="flex-shrink-0">
                         ${avatarImg}
@@ -565,5 +598,6 @@ export const AuthModule = {
             </div>
             `;
         }).join('');
+        list.scrollTop = keepScroll;
     }
 };

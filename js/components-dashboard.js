@@ -147,11 +147,11 @@ const DashboardUI = {
 
                 <div class="text-center mt-6">
                     ${panelAvatar}
-                    <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${escapeHtml(user.Name)}</h2>
-                    <p class="text-sm font-medium text-gray-500">@${escapeHtml(user.Username || 'N/A')}</p>
+                    <h2 id="profileNameText" class="text-xl sm:text-2xl font-bold text-gray-800 mt-4">${escapeHtml(user.Name)}</h2>
+                    <p class="text-sm font-medium text-gray-500">@<span id="profileUsernameText">${escapeHtml(user.Username || 'N/A')}</span></p>
                 </div>
 
-                <div class="mt-8 px-2 space-y-4">
+                <div class="mt-6 px-2">
                     <div class="flex justify-between items-start border-b border-gray-200 pb-4">
                         <div class="flex-1 pr-1">
                             <span class="block text-xs sm:text-sm font-bold text-blue-600">${escapeHtml(user.role || 'N/A')}</span>
@@ -163,28 +163,13 @@ const DashboardUI = {
                             <span class="block text-xs sm:text-sm font-medium text-gray-800">${escapeHtml(displayCourse)}</span>
                         </div>
                     </div>
-
-                    <div id="profileProgramRow" class="${(user.role || '').toLowerCase() === 'student' ? '' : 'hidden'} border-b border-gray-200 pb-4 text-center">
-                        <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Program</span>
-                        <span id="profileProgramText" class="block text-xs sm:text-sm font-medium text-blue-700">${[user.Program_Course, user.Program_Year, user.Program_Section].filter(Boolean).join(' ') || 'Not assigned'}</span>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row justify-between items-start space-y-2 sm:space-y-0">
-                        <div class="flex-1 pr-2 w-full">
-                            <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${escapeHtml(user.Email || 'N/A')}</span>
-                        </div>
-                        <div class="flex-1 text-left sm:text-right sm:border-l border-gray-200 sm:pl-2 w-full">
-                            <span class="block text-xs sm:text-sm font-medium text-gray-800">${escapeHtml(user.Contact_Number || 'N/A')}</span>
-                        </div>
-                    </div>
                 </div>
+
+                ${DashboardUI.renderProfileDetails(user)}
 
                 ${lecturerBtns}
 
                 <div class="mt-6 space-y-3">
-                    <button id="openUdModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
-                        <i class="fa-solid fa-user-pen text-gray-400 mr-2 mt-0.5"></i> Update Details
-                    </button>
                     <button id="openCpModalBtn" class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
                         <i class="fa-solid fa-lock text-gray-400 mr-2 mt-0.5"></i> Change Password
                     </button>
@@ -202,17 +187,18 @@ const DashboardUI = {
     renderManageUsersModal: () => `
         <div id="muModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-0 sm:p-4">
             <div id="muModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-4xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel max-h-full sm:max-h-[90vh] flex flex-col">
-                <div class="flex justify-between items-center mb-5 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users-gear text-green-600 mr-2"></i>Manage Users</h3>
-                    <button id="closeMuModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-4xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[90vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="min-w-0 flex-1 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-users-gear text-green-600 mr-2"></i>Manage Users</h3>
+                    <button id="closeMuModalBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 
-                <div class="mb-4 flex flex-col sm:flex-row gap-2">
-                    <input type="text" id="muSearchInput" placeholder="Search by Name or Student No..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
-                    <select id="muFilterStatus" class="w-full sm:w-40 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                <div class="mb-3">
+                    <input type="search" id="muSearchInput" autocomplete="off" placeholder="Search by Name or Student No..." class="w-full px-4 py-2.5 border border-gray-300 rounded-full text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <div id="muChips" class="flex gap-2 overflow-x-auto mt-3 pb-1 -mx-1 px-1" role="group" aria-label="Filter by status"></div>
+                    <select id="muFilterStatus" class="hidden" aria-hidden="true" tabindex="-1">
                         <option value="">All Statuses</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -220,6 +206,7 @@ const DashboardUI = {
                         <option value="UD">UD</option>
                         <option value="Dropped">Dropped</option>
                     </select>
+                    <p class="text-[11px] text-gray-400 mt-1 sm:hidden"><i class="fa-solid fa-hand-pointer mr-1" aria-hidden="true"></i>Swipe a card right to activate, left for more statuses.</p>
                 </div>
 
                 <div id="manageUsersList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
@@ -264,7 +251,9 @@ const DashboardUI = {
         </div>
     `,
 
-    renderUpdateDetailsModal: (user) => {
+    // Details shown inside the profile page. Fields are read-only until "Edit" is pressed (js/profile-edit.js);
+    // saving asks for the password (see the hidden #udPassword).
+    renderProfileDetails: (user) => {
         let lastName = '', givenName = '', suffix = '';
         if (user && user.Name) {
             if (user.Name.includes(',')) {
@@ -285,54 +274,49 @@ const DashboardUI = {
         }
 
         return `
-            <div id="udModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-0 sm:p-4">
-                <div id="udModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-                <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-lg h-full sm:h-auto p-4 sm:p-6 relative z-10 sm:scale-up sheet-panel app-page max-h-full sm:max-h-[90vh] overflow-y-auto">
-                    <div class="flex items-center gap-3 mb-5 border-b pb-3 app-page-header">
-                    <h3 class="min-w-0 flex-1 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-user-pen text-blue-600 mr-2"></i>Update Details</h3>
-                    <button id="closeUdModalBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
-                    </button>
-                    </div>
-
-                    <form id="updateDetailsForm" class="space-y-4">
+            <section class="mt-6" aria-label="Details">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Details</h3>
+                    <button type="button" id="udEditBtn" class="px-3 py-1 rounded-full border border-blue-300 text-blue-700 bg-blue-50 text-xs font-bold hover:bg-blue-100 focus:outline-none"><i class="fa-solid fa-pen mr-1" aria-hidden="true"></i>Edit</button>
+                </div>
+                <form id="updateDetailsForm" class="space-y-4" autocomplete="off">
                         <div id="udError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                         <div id="udSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
 
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Given Name</label>
-                                <input type="text" id="udGivenName" required value="${escapeHtml(givenName)}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udGivenName" readonly required value="${escapeHtml(givenName)}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Last Name</label>
-                                <input type="text" id="udLastName" required value="${escapeHtml(lastName)}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udLastName" readonly required value="${escapeHtml(lastName)}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Suffix</label>
-                                <input type="text" id="udSuffix" value="${escapeHtml(suffix)}" placeholder="e.g. Jr. (Optional)" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udSuffix" readonly value="${escapeHtml(suffix)}" placeholder="e.g. Jr. (Optional)" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Username</label>
-                                <input type="text" id="udUsername" required value="${escapeHtml(user.Username || '')}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udUsername" readonly required value="${escapeHtml(user.Username || '')}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
-                                <input type="email" id="udEmail" required value="${escapeHtml(user.Email || '')}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="email" id="udEmail" readonly required value="${escapeHtml(user.Email || '')}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Number</label>
-                                <input type="text" id="udContact" value="${escapeHtml(user.Contact_Number || '')}" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udContact" readonly value="${escapeHtml(user.Contact_Number || '')}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Student Number</label>
-                                <input type="text" id="udStudentNumber" required value="${escapeHtml(user.Student_Number || '')}" maxlength="7" placeholder="00-0000" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
+                                <input type="text" id="udStudentNumber" readonly required value="${escapeHtml(user.Student_Number || '')}" maxlength="7" placeholder="00-0000" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
                             </div>
                         </div>
 
@@ -342,31 +326,28 @@ const DashboardUI = {
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Course</label>
-                                <input type="text" id="udProgramCourse" value="${escapeHtml(user.Program_Course || '')}" placeholder="e.g. BSCS" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udProgramCourse" readonly value="${escapeHtml(user.Program_Course || '')}" placeholder="e.g. BSCS" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Year</label>
-                                <input type="text" id="udProgramYear" value="${escapeHtml(user.Program_Year || '')}" placeholder="e.g. 2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udProgramYear" readonly value="${escapeHtml(user.Program_Year || '')}" placeholder="e.g. 2" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Section</label>
-                                <input type="text" id="udProgramSection" value="${escapeHtml(user.Program_Section || '')}" placeholder="e.g. A" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <input type="text" id="udProgramSection" readonly value="${escapeHtml(user.Program_Section || '')}" placeholder="e.g. A" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             </div>
                         </div>
                         ` : ''}
 
-                        <div class="border-t border-gray-200 mt-4 pt-4">
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Verify Password</label>
-                            <input type="password" id="udPassword" required placeholder="Enter current password to save" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                        </div>
+                        <input type="hidden" id="udPassword" value="">
 
-                        <button type="submit" id="udSubmitBtn" class="form-save w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-2">
-                            Save Details
-                        </button>
+                        <div id="udActions" class="hidden grid grid-cols-2 gap-3 pt-2">
+                            <button type="button" id="udCancelBtn" class="py-2.5 px-4 border border-gray-300 rounded-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none">Cancel</button>
+                            <button type="submit" id="udSubmitBtn" class="form-save py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">Save Details</button>
+                        </div>
                     </form>
-                </div>
-            </div>
+            </section>
         `;
     },
 
@@ -399,7 +380,7 @@ const DashboardUI = {
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Schedule Day</label>
                             <select id="scheduleDay" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
                                 <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
-                                <option>Thursday</option><option>Friday</option><option>Saturday</option>
+                                <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
                             </select>
                         </div>
                         <div>
@@ -659,15 +640,21 @@ export const DashboardComponents = {
         const panelAvatar = avatarSrc ? `<img src="${safeUrl(avatarSrc)}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(user.Name)}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';
 
         let lecturerBtns = '';
-        if (user.role.toLowerCase() === 'lecturer') {
-            lecturerBtns = `
-                <div class="mt-6">
-                    <button type="button" id="openAdminPageBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
-                        <i class="fa-solid fa-screwdriver-wrench mr-2 mt-0.5"></i> Admin Tools
-                    </button>
+        const appearanceHtml = `
+            <div class="mt-6">
+                <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Appearance</div>
+                <div class="grid grid-cols-3 gap-2" role="group" aria-label="Appearance">
+                    <button type="button" class="theme-choice" data-theme-choice="auto" aria-pressed="false"><i class="fa-solid fa-circle-half-stroke mr-1" aria-hidden="true"></i>Auto</button>
+                    <button type="button" class="theme-choice" data-theme-choice="light" aria-pressed="false"><i class="fa-solid fa-sun mr-1" aria-hidden="true"></i>Light</button>
+                    <button type="button" class="theme-choice" data-theme-choice="dark" aria-pressed="false"><i class="fa-solid fa-moon mr-1" aria-hidden="true"></i>Dark</button>
                 </div>
-            `;
-        }
+                <button type="button" id="installAppBtn" class="w-full mt-3 flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors">
+                    <i class="fa-solid fa-mobile-screen-button mr-2" aria-hidden="true"></i> Install app
+                </button>
+            </div>
+        `;
+
+        lecturerBtns += appearanceHtml;
 
         return `
             ${DashboardUI.renderHeader(user, headerAvatar)}
@@ -681,7 +668,6 @@ export const DashboardComponents = {
             ${DashboardUI.renderTabBar(user.role.toLowerCase() === 'lecturer')}
             ${DashboardUI.renderProfilePanel(user, panelAvatar, displayCourse, lecturerBtns)}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAdminPage() : ''}
-            ${DashboardUI.renderUpdateDetailsModal(user)}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderManageUsersModal() : ''}
             ${DashboardUI.renderChangePasswordModal()}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderCreateCourseModal() : ''}

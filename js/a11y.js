@@ -25,6 +25,7 @@ const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NOSCR
 // clickable (it closes the drawer). The backdrop has no content, so it is only aria-hidden.
 const EXEMPT_IDS = new Set(['toastHost', 'profilePanelOverlay']);
 // Full-screen pages that keep the bottom tab bar usable (phones).
+const DASH_PAGES = new Set(['profilePanel', 'adminPage', 'ccModal', 'apModal', 'muModal', 'cpModal']);   // dashboard pages that keep #dashTabBar usable
 const TAB_PAGES = new Set(['scoresModal', 'examManagerModal', 'scannerModal', 'courseMenuModal', 'attendanceDatesModal', 'noClassModal', 'classSummaryModal']);
 // Icon-only buttons get a name from their Font Awesome icon.
 const ICON_LABELS = [
@@ -132,7 +133,7 @@ export const A11y = {
                 for (const sib of node.parentElement.children) {
                     if (sib === node || SKIP_TAGS.has(sib.tagName)) continue;
                     if (sib.id === 'classTabBar' && TAB_PAGES.has(top.id)) continue;
-                    if (sib.id === 'dashTabBar' && (top.id === 'profilePanel' || top.id === 'adminPage')) continue;
+                    if (sib.id === 'dashTabBar' && DASH_PAGES.has(top.id)) continue;
                     if (EXEMPT_IDS.has(sib.id)) {
                         if (sib.id === 'profilePanelOverlay') sib.setAttribute('aria-hidden', 'true');
                         continue;
