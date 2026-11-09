@@ -1,4 +1,5 @@
 // js/router.js
+import { StudentSummaryUI } from './student-summary-ui.js';
 import { Components } from './components.js';
 import { AppState } from './globals.js';
 import { CourseClass } from './course-class.js';
@@ -60,6 +61,7 @@ export const AppRouter = {
                 break;
             case '#dashboard':
                 root.innerHTML = Components.renderDashboard(AppState.user);
+                StudentSummaryUI.init();
                 await CourseDashboard.loadDashboardData();
                 break;
             default:

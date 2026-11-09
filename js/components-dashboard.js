@@ -23,8 +23,9 @@ const TERM_THEMES = {
 const renderTermBlock = (term, label) => {
     const t = TERM_THEMES[term];
     return `
-                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                        <h4 class="text-lg font-black text-gray-800 mb-4 border-b pb-2 border-gray-200"><i class="${t.icon} mr-2"></i>${label}</h4>
+                    <div class="ss-term bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm" data-term-block="${term}">
+                        <h4 class="text-lg font-black text-gray-800 mb-2 flex items-center justify-between"><span><i class="${t.icon} mr-2"></i>${label}</span><span class="ss-pill" id="${term}Pill">&ndash;</span></h4>
+                        <div class="ss-bar mb-4" role="img" aria-label="${label} attendance"><span id="${term}BarFill" style="width:0%"></span></div>
 
                         <div class="space-y-4">
                             <div>
@@ -550,50 +551,48 @@ const DashboardUI = {
     `,
 
     renderStudentSummaryModal: () => `
-        <div id="studentSummaryModal" class="hidden fixed inset-0 z-[80] bg-gray-50 flex flex-col fade-in overflow-y-auto w-full h-full">
-            <div class="bg-white shadow-sm sticky top-0 z-10 w-full">
-                <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center border-b border-gray-200">
-                    <h3 class="text-xl sm:text-2xl font-black text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>My Course Summary</h3>
-                    <button id="closeStudentSummaryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-2xl"></i>
+        <div id="studentSummaryModal" class="hidden fixed inset-0 z-[80] bg-gray-50 flex flex-col fade-in overflow-y-auto w-full h-full ss-page">
+            <div class="ss-top sticky top-0 z-10 w-full">
+                <div class="max-w-4xl mx-auto px-2 sm:px-6 py-2 flex items-center gap-1">
+                    <button id="closeStudentSummaryModalBtn" type="button" aria-label="Back" class="app-page-close text-white/90 hover:text-white focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl"></i>
                     </button>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-blue-100">My Course Summary</div>
+                        <div id="ssCourseTitle" class="font-black text-white text-lg leading-tight truncate"></div>
+                    </div>
+                </div>
+                <div id="ssEnrollmentInfo" class="hidden max-w-4xl mx-auto px-4 sm:px-6 pb-3 flex flex-wrap gap-2">
+                    <span class="ss-chip"><i class="fa-solid fa-chair" aria-hidden="true"></i> Seat <b id="ssSeat">-</b></span>
+                    <span class="ss-chip"><i class="fa-solid fa-user-group" aria-hidden="true"></i> Group <b id="ssGroup">-</b></span>
+                    <span class="ss-chip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Topic <b id="ssTopic">-</b></span>
+                </div>
+                <div id="ssTermTabs" class="ss-tabs max-w-4xl mx-auto" role="tablist" aria-label="Term">
+                    <button type="button" role="tab" class="ss-term-tab is-active" data-term="midterm" aria-selected="true">Mid Term</button>
+                    <button type="button" role="tab" class="ss-term-tab" data-term="finalterm" aria-selected="false">Final Term</button>
                 </div>
             </div>
 
-            <div class="max-w-4xl mx-auto w-full p-4 sm:p-6 flex-1">
-                <div id="ssCourseTitle" class="font-black text-blue-700 text-center mb-6 text-xl sm:text-2xl"></div>
-
-                <div id="ssEnrollmentInfo" class="hidden grid grid-cols-3 gap-4 mb-6 text-center border border-blue-200 bg-blue-50 p-4 rounded-xl shadow-sm">
-                    <div>
-                        <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Seat</div>
-                        <div id="ssSeat" class="text-lg sm:text-xl font-black text-blue-800">-</div>
-                    </div>
-                    <div class="border-x border-blue-200">
-                        <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Group</div>
-                        <div id="ssGroup" class="text-lg sm:text-xl font-black text-blue-800 transition hover:text-blue-600">-</div>
-                    </div>
-                    <div>
-                        <div class="text-xs sm:text-sm font-bold text-blue-400 uppercase tracking-wider">Topic</div>
-                        <div id="ssTopic" class="text-lg sm:text-xl font-black text-blue-800">-</div>
-                    </div>
+            <div class="max-w-4xl mx-auto w-full p-4 sm:p-6 flex-1 ss-body">
+                <div id="summaryLoading" class="space-y-4" aria-busy="true" role="status">
+                    <span class="sr-only">Loading summary</span>
+                    <div class="ss-skel h-24"></div><div class="ss-skel h-40"></div><div class="ss-skel h-24"></div>
                 </div>
-
-                <div id="summaryLoading" class="text-center py-12 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-4xl"></i></div>
                 <div id="summaryError" class="hidden text-center py-12 text-red-500 font-bold text-lg"></div>
 
                 <div id="summaryContent" class="hidden space-y-6">
                     ${renderTermBlock('midterm', 'Mid Term')}
                     ${renderTermBlock('finalterm', 'Final Term')}
-
-                    <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3 border-t border-gray-200 pt-6">
-                        <button id="openHistoryModalBtn" class="bg-white border-2 border-green-500 text-green-600 hover:bg-green-50 font-bold py-3 px-6 rounded-lg shadow-sm transition flex items-center justify-center w-full sm:w-auto">
-                            <i class="fa-solid fa-clock-rotate-left mr-2"></i> View History
-                        </button>
-                        <button id="openSubmitDocModalBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition flex items-center justify-center w-full sm:w-auto">
-                            <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Upload Document
-                        </button>
-                    </div>
                 </div>
+            </div>
+
+            <div id="ssActionBar" class="hidden ss-actions">
+                <button id="openHistoryModalBtn" type="button" class="ss-act ss-act-secondary">
+                    <i class="fa-solid fa-clock-rotate-left mr-2" aria-hidden="true"></i> History
+                </button>
+                <button id="openSubmitDocModalBtn" type="button" class="ss-act ss-act-primary">
+                    <i class="fa-solid fa-cloud-arrow-up mr-2" aria-hidden="true"></i> Upload Document
+                </button>
             </div>
         </div>
     `,
