@@ -251,8 +251,8 @@ body { overscroll-behavior-y: contain; }
     :is(#adminPage, #ccModal, #apModal, #muModal, #cpModal) .app-page { padding-bottom: .75rem; }
     :is(#profilePanel, #ccModal, #apModal, #cpModal) .form-save { bottom: .5rem; }
     #profilePanel { padding-bottom: .5rem; }
-    /* The tabs replace the profile's close button. */
-    #closeProfilePanel { display: none; }
+    /* The profile keeps its close button, so it can never become a dead end. */
+    #installBanner { bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)) !important; }
 }
 /* Edit mode of the profile details */
 #updateDetailsForm .ud-field[readonly] { background-color: #f9fafb; color: #374151; border-color: #e5e7eb; box-shadow: none; }

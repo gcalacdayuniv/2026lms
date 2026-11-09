@@ -156,8 +156,10 @@ export const PWA = {
         bar.id = 'installBanner';
         bar.setAttribute('role', 'region');
         bar.setAttribute('aria-label', 'Install the app');
-        bar.className = 'fixed left-3 right-3 z-[60] bg-gray-900 text-white rounded-xl shadow-2xl p-3 flex items-center gap-3 fade-in';
+        bar.className = 'fixed left-3 right-3 bg-gray-900 text-white rounded-xl shadow-2xl p-3 flex items-center gap-3 fade-in';
         bar.style.bottom = 'calc(0.75rem + env(safe-area-inset-bottom, 0px))';
+        // Below the pages (z 50+) and the tab bar (z 45) so it can never cover them; on phones styles.css lifts it above the bar.
+        bar.style.zIndex = '44';
         const text = PWA.deferred
             ? 'Install this app on your phone for quick access.'
             : 'To install: tap Share, then Add to Home Screen.';
