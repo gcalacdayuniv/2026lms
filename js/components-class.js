@@ -920,6 +920,7 @@ export const ClassComponents = {
                     <i class="fa-solid fa-triangle-exclamation mr-2 text-lg"></i> This date is marked as No Class
                 </div>
                 <div id="attendanceAlert" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium"></div>
+                <div id="pendingSyncBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium bg-amber-50 text-amber-900 border border-amber-200" role="status" aria-live="polite"></div>
 
                 <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mx-0 sm:mx-0">
                     <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">

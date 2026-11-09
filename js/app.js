@@ -16,6 +16,7 @@ import { AppFeel } from './app-feel.js';
 import { MuSwipe } from './mu-swipe.js';
 import { Theme } from './theme.js';
 import { ProfileEdit } from './profile-edit.js';
+import { CoursePending } from './course-pending.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
@@ -41,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     MuSwipe.init();
     Theme.init();
     ProfileEdit.init();
+    CoursePending.init();
     CourseAttendanceDates.init();
     AppRouter.init();
     A11y.init();

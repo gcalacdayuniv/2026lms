@@ -2,6 +2,7 @@
 import { apiFetch, AppState } from './globals.js';
 import { Components, getLoadableAvatarSrc } from './components.js';
 import { CourseAttendance } from './course-attendance.js';
+import { CoursePending } from './course-pending.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
@@ -538,6 +539,9 @@ export const CourseClass = {
                 document.addEventListener('touchstart', CourseClass.resetFabOpacity);
                 CourseClass.resetFabOpacity();
             }
+
+            // Ask the server whether the drafts kept on this device are already recorded.
+            setTimeout(() => CoursePending.check(courseId, { quiet: true }), 1200);
 
             // NOTE: the .view-summary-trigger click is handled by the delegated
             // listener in course.js. Do not bind it here, or it fires twice.

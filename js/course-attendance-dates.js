@@ -150,6 +150,7 @@ export const CourseAttendanceDates = {
             return;
         }
 
+        const unsaved = new Set(CourseAttendance.getDraftDates(CourseAttendanceDates.courseId));
         list.innerHTML = dates.map(d => {
             const weekday = getWeekdayName(d.Date);
             const offSchedule = !matchesScheduleDay(d.Date, scheduleDay);
@@ -163,6 +164,7 @@ export const CourseAttendanceDates = {
                                 ${esc(d.Date)}
                                 <span class="text-xs font-medium text-gray-500">(${esc(weekday)})</span>
                                 ${offSchedule ? `<span class="ml-1 text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-1.5 py-0.5 rounded uppercase">Not ${esc(scheduleDay)}</span>` : ''}
+                                ${unsaved.has(d.Date) ? '<span class="ml-1 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded uppercase">Unsaved on this device</span>' : ''}
                                 ${d.Is_No_Class ? '<span class="ml-1 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded uppercase">No Class</span>' : ''}
                             </div>
                             <div class="text-[11px] text-gray-500 mt-0.5">
