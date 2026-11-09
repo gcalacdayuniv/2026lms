@@ -117,6 +117,13 @@ We use the following environment variables strictly within the API (`worker/wran
 * **Attendance Dates & Save All:** Lecturers can change, delete or merge attendance dates. The roster uses one **Save All** button with an unsaved-changes indicator and local drafts; per-student saving was removed.
 * **UI feedback & loading states:** Toasts and a confirm modal replace browser alerts, and skeleton placeholders replace spinners on major screens.
 
+## Dashboard Navigation
+- **Phones:** a bottom tab bar (`#dashTabBar`, rendered by `DashboardUI.renderTabBar`) switches between Courses, New, Admin and Profile (students: Courses and Profile). The profile drawer is a full-screen page on phones and the tab bar stays visible under it. The "New Course" floating button is hidden on phones because the New tab replaces it.
+- **Admin Tools page (`#adminPage`, lecturers):** a tile page holding Create Course, Registration List and Manage Users. The tiles keep their old IDs (`openCreateCourseModalBtn`, `openApModalBtn`, `openMuModalBtn`), so the existing handlers in `auth.js` still open the modals. It opens from the Admin tab or from "Admin Tools" in the profile panel.
+- **Search and filter:** a search box shows above the course list (lecturers with 3+ courses, students with 4+). Lecturers also get day chips (All, Today, and each day that has a course). Cards carry `data-course-card`, `data-search` and `data-day`.
+- **Dialog stacking:** `a11y.js` ranks open dialogs by z-index and makes everything below the top one inert. Dialogs created in JavaScript (`UI.confirm`, the sheet header dialog, the toast host) set `style.zIndex` inline, because the Tailwind CDN builds arbitrary classes such as `z-[300]` a moment late and a dialog read too early could be ranked under a page and left unclickable. `a11y.js` also re-ranks 120 ms after any element is added. Any bottom bar that must stay usable under a full-screen page must sit outside `<main>`, as a sibling of the pages (`#classTabBar`, `#dashTabBar`), and be listed in `a11y.js`.
+- Logic lives in `js/dash-nav.js`; markup in `components-dashboard.js`; cards in `course-dashboard.js`; styles in `styles.css`.
+
 ## Development Directives
 When asked to add features, debug, or refactor, you must strictly adhere to the following rules:
 

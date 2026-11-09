@@ -94,9 +94,50 @@ const DashboardUI = {
         </header>
     `,
 
+    renderTabBar: (isLecturer) => `
+        <nav id="dashTabBar" class="class-tabbar dash-tabbar" aria-label="Main" style="--cols:${isLecturer ? 4 : 2}">
+            <button type="button" class="class-tab is-active" data-dash-tab="courses" aria-current="page"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Courses</span></button>
+            ${isLecturer ? `
+            <button type="button" class="class-tab" data-dash-tab="new"><i class="fa-solid fa-circle-plus" aria-hidden="true"></i><span>New</span></button>
+            <button type="button" class="class-tab" data-dash-tab="admin"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>Admin</span></button>` : ''}
+            <button type="button" class="class-tab" data-dash-tab="profile"><i class="fa-solid fa-circle-user" aria-hidden="true"></i><span>Profile</span></button>
+        </nav>
+    `,
+
+    renderAdminPage: () => `
+        <div id="adminPage" class="hidden fixed inset-0 z-[55] flex items-center justify-center fade-in p-0 sm:p-4" role="dialog" aria-modal="true" aria-label="Admin tools">
+            <div id="closeAdminPageBg" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-sm h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center gap-3 mb-5 border-b pb-3 app-page-header">
+                    <div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-gray-800 truncate"><i class="fa-solid fa-screwdriver-wrench text-blue-600 mr-2"></i>Admin Tools</h3><p class="keep-sub text-xs text-gray-500 truncate">Courses, registration list and users</p></div>
+                    <button id="closeAdminPageBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <section aria-label="Admin">
+                    <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Manage</h4>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" id="openCreateCourseModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-blue-100 text-blue-700"><i class="fa-solid fa-folder-plus" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Create Course</span>
+                        </button>
+                        <button type="button" id="openApModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-purple-100 text-purple-700"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Registration List</span>
+                        </button>
+                        <button type="button" id="openMuModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-green-100 text-green-700"><i class="fa-solid fa-users-gear" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Manage Users</span>
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    `,
+
     renderProfilePanel: (user, panelAvatar, displayCourse, lecturerBtns) => `
         <div id="profilePanelOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-sm z-40 hidden transition-opacity"></div>
-        <div id="profilePanel" class="fixed inset-y-0 right-0 w-4/5 sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto flex flex-col">
+        <div id="profilePanel" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto flex flex-col">
             <div class="p-6 bg-gradient-to-b from-blue-50 to-white flex-grow relative">
                 <button id="closeProfilePanel" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
                     <i class="fa-solid fa-xmark text-2xl"></i>
@@ -619,18 +660,8 @@ export const DashboardComponents = {
         if (user.role.toLowerCase() === 'lecturer') {
             lecturerBtns = `
                 <div class="mt-6">
-                    <button id="openCreateCourseModalBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
-                        <i class="fa-solid fa-folder-plus mr-2 mt-0.5"></i> Create New Course
-                    </button>
-                </div>
-                <div class="mt-3">
-                    <button id="openApModalBtn" class="w-full flex justify-center py-2 px-4 border border-purple-300 rounded-md shadow-sm text-sm font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none transition-colors">
-                        <i class="fa-solid fa-graduation-cap mr-2 mt-0.5"></i> Add Registration Course List
-                    </button>
-                </div>
-                <div class="mt-3">
-                    <button id="openMuModalBtn" class="w-full flex justify-center py-2 px-4 border border-green-300 rounded-md shadow-sm text-sm font-bold text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none transition-colors">
-                        <i class="fa-solid fa-users-gear mr-2 mt-0.5"></i> Manage Users
+                    <button type="button" id="openAdminPageBtn" class="w-full flex justify-center py-2 px-4 border border-blue-300 rounded-md shadow-sm text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-screwdriver-wrench mr-2 mt-0.5"></i> Admin Tools
                     </button>
                 </div>
             `;
@@ -643,9 +674,11 @@ export const DashboardComponents = {
                 <div id="courseContainer" class="w-full"></div>
             </main>
 
-            ${user.role.toLowerCase() === 'lecturer' ? `<button type="button" class="open-create-course-btn fixed bottom-6 right-6 z-30 h-14 pl-4 pr-5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center gap-2 text-sm font-bold focus:outline-none focus-visible:ring-4 ring-blue-300 transition-colors" aria-label="Create new course"><i class="fa-solid fa-plus text-lg" aria-hidden="true"></i><span class="hidden sm:inline">New Course</span></button>` : ''}
+            ${user.role.toLowerCase() === 'lecturer' ? `<button type="button" class="open-create-course-btn dash-fab fixed bottom-6 right-6 z-30 h-14 pl-4 pr-5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center gap-2 text-sm font-bold focus:outline-none focus-visible:ring-4 ring-blue-300 transition-colors" aria-label="Create new course"><i class="fa-solid fa-plus text-lg" aria-hidden="true"></i><span class="hidden sm:inline">New Course</span></button>` : ''}
 
+            ${DashboardUI.renderTabBar(user.role.toLowerCase() === 'lecturer')}
             ${DashboardUI.renderProfilePanel(user, panelAvatar, displayCourse, lecturerBtns)}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAdminPage() : ''}
             ${DashboardUI.renderUpdateDetailsModal(user)}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderManageUsersModal() : ''}
             ${DashboardUI.renderChangePasswordModal()}

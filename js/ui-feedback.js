@@ -25,6 +25,7 @@ export const UI = {
         const host = document.createElement('div');
         host.id = 'toastHost';
         host.className = 'fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-[400] flex flex-col gap-2 pointer-events-none';
+        host.style.zIndex = '400';
         host.setAttribute('aria-live', 'polite');
         document.body.appendChild(host);
         UI.host = host;
@@ -77,6 +78,8 @@ export const UI = {
 
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[300] flex items-center justify-center p-4 fade-in';
+        // Inline z-index: the Tailwind CDN builds z-[300] a moment late, and a11y.js ranks dialogs by z-index.
+        overlay.style.zIndex = '300';
         overlay.setAttribute('role', 'alertdialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.setAttribute('aria-labelledby', 'uiConfirmTitle');

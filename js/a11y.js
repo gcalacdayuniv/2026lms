@@ -52,6 +52,7 @@ export const A11y = {
     ignorePop: false,     // next popstate came from our own history.go()
     lastHash: '',
     swipe: null,
+    settleTimer: 0,
 
     init: () => {
         if (A11y.observer) return;
@@ -90,6 +91,12 @@ export const A11y = {
             }
         }
         if (relevant) A11y.sync(rerender);
+        // A dialog that was just added may not have its final z-index yet (the Tailwind CDN builds some
+        // classes a moment late). Re-rank once the styles have landed so it is never left inert.
+        if (records.some(m => m.type === 'childList' && m.addedNodes.length)) {
+            clearTimeout(A11y.settleTimer);
+            A11y.settleTimer = setTimeout(() => A11y.sync(false), 120);
+        }
     },
 
     // Open dialogs ordered bottom to top by z-index.
@@ -125,6 +132,7 @@ export const A11y = {
                 for (const sib of node.parentElement.children) {
                     if (sib === node || SKIP_TAGS.has(sib.tagName)) continue;
                     if (sib.id === 'classTabBar' && TAB_PAGES.has(top.id)) continue;
+                    if (sib.id === 'dashTabBar' && (top.id === 'profilePanel' || top.id === 'adminPage')) continue;
                     if (EXEMPT_IDS.has(sib.id)) {
                         if (sib.id === 'profilePanelOverlay') sib.setAttribute('aria-hidden', 'true');
                         continue;

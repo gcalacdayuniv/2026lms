@@ -178,8 +178,22 @@ const sortCoursesBySchedule = (courses) => courses.sort((a, b) => {
 const loadErrorHtml = (err) =>
     `<div class="p-4 bg-red-50 text-red-600 rounded font-medium border border-red-200">Failed to load data: ${escapeHtml(err && err.message)}</div>`;
 
+// Search box (and day chips for lecturers). Filtering is done by dash-nav.js.
+const searchBarHtml = (days = []) => `
+                    <div class="mb-5" data-course-filter>
+                        <label for="courseSearch" class="sr-only">Search courses</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" aria-hidden="true"></i>
+                            <input id="courseSearch" type="search" autocomplete="off" placeholder="Search courses" class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-full bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        ${days.length ? `<div class="flex gap-2 overflow-x-auto mt-3 pb-1 -mx-1 px-1" role="group" aria-label="Filter by day">
+                            ${['All', 'Today', ...days].map((d, i) => `<button type="button" data-day-chip="${escapeHtml(d)}" aria-pressed="${i === 0}" class="day-chip flex-shrink-0${i === 0 ? ' is-on' : ''}">${escapeHtml(d)}</button>`).join('')}
+                        </div>` : ''}
+                        <p id="courseNoMatch" class="hidden text-center text-sm text-gray-500 font-medium py-6" role="status">No courses match.</p>
+                    </div>`;
+
 const lecturerCourseCardHtml = (c) => `
-                <a href="#class-${c.Course_ID}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
+                <a href="#class-${c.Course_ID}" data-course-card data-day="${escapeHtml(c.ScheduleDay)}" data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.ScheduleDay, c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ').toLowerCase())}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
                     <div class="flex justify-between items-start mb-1">
                         <div class="font-bold text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
                         ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
@@ -197,7 +211,7 @@ const lecturerCourseCardHtml = (c) => `
             `;
 
 const enrolledCourseCardHtml = (c) => `
-                <div class="cursor-pointer student-active-course p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md hover:border-green-400 transform hover:-translate-y-1" data-course-id="${c.Course_ID}" data-course-title="${escapeHtml(c.CourseCode)} | ${escapeHtml(c.CourseTitle)}">
+                <div data-course-card data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.LecturerName].filter(Boolean).join(' ').toLowerCase())}" class="cursor-pointer student-active-course p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md hover:border-green-400 transform hover:-translate-y-1" data-course-id="${c.Course_ID}" data-course-title="${escapeHtml(c.CourseCode)} | ${escapeHtml(c.CourseTitle)}">
                     <div class="absolute top-0 right-0 bg-green-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold shadow-sm tracking-widest uppercase">Enrolled</div>
                     <div class="font-black text-xl text-green-800 pr-16">${escapeHtml(c.CourseCode)}</div>
                     <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
@@ -208,7 +222,7 @@ const enrolledCourseCardHtml = (c) => `
             `;
 
 const availableCourseCardHtml = (c) => `
-                <div class="p-5 border rounded-xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start md:items-center transition hover:border-blue-300 gap-4">
+                <div data-course-card data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.LecturerName].filter(Boolean).join(' ').toLowerCase())}" class="p-5 border rounded-xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start md:items-center transition hover:border-blue-300 gap-4">
                     <div>
                         <div class="font-black text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
                         <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
@@ -562,6 +576,7 @@ export const CourseDashboard = {
                         <h2 class="text-xl font-bold text-gray-800 flex items-center"><div class="bg-gray-200 p-2 rounded-lg mr-3"><i class="fa-solid fa-chalkboard-user text-gray-600"></i></div>My Created Courses</h2>
                         <button type="button" id="headerNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button>
                     </div>
+                    ${data.courses.length >= 3 ? searchBarHtml([...new Set(data.courses.map(c => c.ScheduleDay).filter(Boolean))]) : ''}
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         ${coursesHtml}
                     </div>
@@ -614,6 +629,7 @@ export const CourseDashboard = {
             container.innerHTML = `
                 <div class="space-y-12 fade-in">
                     ${assignedExamsSectionHtml}
+                    ${(myCoursesRes.courses.length + availableCourses.length) >= 4 ? searchBarHtml() : ''}
                     <section>
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

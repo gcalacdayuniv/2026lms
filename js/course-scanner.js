@@ -390,6 +390,7 @@ export const CourseScanner = {
 
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 z-[310] flex items-center justify-center p-4 fade-in';
+        overlay.style.zIndex = '310';   // inline: see UI.confirm
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.setAttribute('aria-label', 'Answer sheet header');

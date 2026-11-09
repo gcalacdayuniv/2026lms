@@ -136,3 +136,19 @@ body { overscroll-behavior-y: contain; }
     }
     .class-tab.is-active { background: #eff6ff; border-radius: .75rem; }
 }
+
+
+/* ---------- Dashboard: bottom tabs, Admin page, course search ---------- */
+.day-chip {
+    padding: .35rem .85rem; border-radius: 9999px; border: 1px solid #d1d5db; background: #fff;
+    color: #4b5563; font-size: .75rem; font-weight: 700; white-space: nowrap; transition: background .12s, color .12s;
+}
+.day-chip.is-on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.day-chip:focus-visible { outline: 3px solid #93c5fd; outline-offset: 1px; }
+@media (max-width: 639px) {
+    .dash-tabbar { grid-template-columns: repeat(var(--cols, 4), 1fr); }
+    .dash-fab { display: none !important; }
+    #adminPage, #profilePanel { bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)) !important; }
+    #adminPage .app-page { padding-bottom: .75rem; }
+    #profilePanel { width: 100%; }
+}

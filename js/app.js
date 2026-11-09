@@ -11,6 +11,7 @@ import { CourseFab } from './course-fab.js';
 import { CourseSwipe } from './course-swipe.js';
 import { CoursePull } from './course-pull.js';
 import { PWA } from './pwa.js';
+import { DashNav } from './dash-nav.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseSwipe.init();
     CoursePull.init();
     PWA.init();
+    DashNav.init();
     CourseAttendanceDates.init();
     AppRouter.init();
     A11y.init();

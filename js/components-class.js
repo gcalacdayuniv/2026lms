@@ -981,14 +981,16 @@ export const ClassComponents = {
                     </button>
                 </div>
 
-                <nav id="classTabBar" class="class-tabbar" aria-label="Class sections">
+            </main>
+
+            <!-- Outside <main> so it stays usable (not inert) while a full-screen page is open -->
+            <nav id="classTabBar" class="class-tabbar" aria-label="Class sections">
                     <button type="button" class="class-tab is-active" aria-current="page" data-tab-target="top" aria-label="Roster"><i class="fa-solid fa-users" aria-hidden="true"></i><span>Roster</span></button>
                     <button type="button" class="class-tab" data-tab-target="openScoresModalBtn" aria-label="Scores"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span>Scores</span></button>
                     <button type="button" class="class-tab" data-tab-target="openScannerBtn" aria-label="Scan"><i class="fa-solid fa-camera" aria-hidden="true"></i><span>Scan</span></button>
                     <button type="button" class="class-tab" data-tab-target="openExamManagerBtn" aria-label="Exams"><i class="fa-solid fa-file-contract" aria-hidden="true"></i><span>Exams</span></button>
                     <button type="button" class="class-tab" data-tab-target="openCourseMenuBtn" aria-label="More"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>More</span></button>
-                </nav>
-            </main>
+            </nav>
 
             ${ClassUI.renderCourseMenuModal(course)}
             ${ClassUI.renderClassSummaryModal()}
