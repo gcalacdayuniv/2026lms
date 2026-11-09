@@ -52,6 +52,20 @@ export const CourseFab = {
         });
     },
 
+    // Dashboard card shortcuts (data-intent) open the class and then one of its pages. The class screen is
+    // drawn a moment after the hash changes, so wait for its tab bar, for up to 8 seconds.
+    goWith: (target) => {
+        if (!target || target === 'top') return;
+        const until = Date.now() + 8000;
+        const tick = () => {
+            if (Date.now() > until) return;
+            const bar = $('classTabBar');
+            if (bar && $(target)) { setTimeout(() => CourseFab.openTab(target), 120); return; }
+            setTimeout(tick, 100);
+        };
+        setTimeout(tick, 150);
+    },
+
     isOpen: () => $('fabMenu') && !$('fabMenu').classList.contains('hidden'),
 
     set: (open, focusMain = false) => {
@@ -84,7 +98,7 @@ export const CourseFab = {
                 CourseFab.set(!CourseFab.isOpen());
                 return;
             }
-            const tab = t.closest('.class-tab');
+            const tab = t.closest('.class-tab[data-tab-target]');
             if (tab) {
                 if (CourseFab.isOpen()) CourseFab.set(false);
                 if (navigator.vibrate) navigator.vibrate(8);

@@ -80,7 +80,7 @@ const renderTermBlock = (term, label) => {
 
 const DashboardUI = {
     renderHeader: (user, headerAvatar) => `
-        <header class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
+        <header id="dashHeader" class="bg-white shadow-sm fixed top-0 w-full z-40 border-b border-gray-200">
             <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
                 <div class="flex justify-between items-center h-16">
                     <div class="flex items-center">
@@ -95,11 +95,13 @@ const DashboardUI = {
     `,
 
     renderTabBar: (isLecturer) => `
-        <nav id="dashTabBar" class="class-tabbar dash-tabbar" aria-label="Main" style="--cols:${isLecturer ? 4 : 2}">
+        <nav id="dashTabBar" class="class-tabbar dash-tabbar" aria-label="Main" style="--cols:4">
             <button type="button" class="class-tab is-active" data-dash-tab="courses" aria-current="page"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Courses</span></button>
             ${isLecturer ? `
             <button type="button" class="class-tab" data-dash-tab="new"><i class="fa-solid fa-circle-plus" aria-hidden="true"></i><span>New</span></button>
-            <button type="button" class="class-tab" data-dash-tab="admin"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>Admin</span></button>` : ''}
+            <button type="button" class="class-tab" data-dash-tab="admin"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>Admin</span></button>` : `
+            <button type="button" class="class-tab" data-dash-tab="exams"><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>Exams</span></button>
+            <button type="button" class="class-tab" data-dash-tab="browse"><i class="fa-solid fa-book-open" aria-hidden="true"></i><span>Browse</span></button>`}
             <button type="button" class="class-tab" data-dash-tab="profile"><i class="fa-solid fa-circle-user" aria-hidden="true"></i><span>Profile</span></button>
         </nav>
     `,

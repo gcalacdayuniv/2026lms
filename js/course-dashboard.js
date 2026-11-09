@@ -4,6 +4,7 @@ import { CourseExam } from './course-exam.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 import { escapeHtml } from './html-utils.js';
+import { getLocalDateString } from './date-utils.js';
 
 // Maximum size of an uploaded submission file.
 const MAX_UPLOAD_MB = 25;
@@ -192,23 +193,100 @@ const searchBarHtml = (days = []) => `
                         <p id="courseNoMatch" class="hidden text-center text-sm text-gray-500 font-medium py-6" role="status">No courses match.</p>
                     </div>`;
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_MS = 86400000;
+const dayNumber = (ymd) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || ''));
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / DAY_MS : null;
+};
+
+// Nearest exam period that is running now or starts within 14 days: { text, tone } or null.
+const examBadge = (c, today) => {
+    const t = dayNumber(today);
+    if (t === null) return null;
+    let best = null;
+    [['Midterm', c.Midterm_Start, c.Midterm_End], ['Final', c.Final_Start, c.Final_End]].forEach(([label, from, to]) => {
+        const start = dayNumber(from);
+        if (start === null) return;
+        const end = dayNumber(to) ?? start;
+        let cand = null;
+        if (t >= start && t <= end) cand = { rank: 0, text: `${label} exams now`, tone: 'amber' };
+        else if (start > t && start - t <= 14) cand = { rank: start - t, text: `${label} in ${start - t} day${start - t === 1 ? '' : 's'}`, tone: 'blue' };
+        if (cand && (!best || cand.rank < best.rank)) best = cand;
+    });
+    return best;
+};
+
+const CHIP_TONES = {
+    gray: 'bg-gray-100 text-gray-600 border-gray-200',
+    green: 'bg-green-50 text-green-700 border-green-200',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200',
+    blue: 'bg-blue-50 text-blue-700 border-blue-200'
+};
+const chip = (icon, text, tone = 'gray') =>
+    `<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${CHIP_TONES[tone]}"><i class="fa-solid ${icon}" aria-hidden="true"></i>${escapeHtml(text)}</span>`;
+
+// Info chips: student count, today's attendance (only on the class day), nearest exam period.
+const courseChipsHtml = (c) => {
+    const today = getLocalDateString();
+    const chips = [];
+    const count = Number(c.StudentCount);
+    if (c.StudentCount !== undefined && c.StudentCount !== null && !Number.isNaN(count)) {
+        chips.push(chip('fa-users', `${count} student${count === 1 ? '' : 's'}`));
+        if (c.ScheduleDay === DAY_NAMES[new Date().getDay()] && count > 0) {
+            const marked = Number(c.TodayMarked) || 0;
+            if (marked === 0) chips.push(chip('fa-clipboard-check', 'Attendance not taken', 'amber'));
+            else if (marked >= count) chips.push(chip('fa-clipboard-check', 'Attendance done', 'green'));
+            else chips.push(chip('fa-clipboard-check', `Attendance ${marked}/${count}`, 'amber'));
+        }
+    }
+    const exam = examBadge(c, today);
+    if (exam) chips.push(chip('fa-file-pen', exam.text, exam.tone));
+    return chips.length ? `<div class="flex flex-wrap gap-1.5 mt-3">${chips.join('')}</div>` : '';
+};
+
+// Card = link to the class plus a row of shortcuts. A shortcut opens the class and then that page (data-intent).
 const lecturerCourseCardHtml = (c) => `
-                <a href="#class-${c.Course_ID}" data-course-card data-day="${escapeHtml(c.ScheduleDay)}" data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.ScheduleDay, c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ').toLowerCase())}" class="block p-5 border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300">
-                    <div class="flex justify-between items-start mb-1">
-                        <div class="font-bold text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
-                        ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
-                            `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
-                                ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
-                            </span>` :
-                            `<span class="bg-blue-50 text-blue-500 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
-                        }
+                <div data-course-card data-day="${escapeHtml(c.ScheduleDay)}" data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.ScheduleDay, c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ').toLowerCase())}" class="border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300 overflow-hidden">
+                    <a href="#class-${c.Course_ID}" class="block p-5 pb-3">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="font-bold text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
+                            ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
+                                `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
+                                    ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
+                                </span>` :
+                                `<span class="bg-blue-50 text-blue-500 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
+                            }
+                        </div>
+                        <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
+                        <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
+                            <i class="fa-regular fa-calendar mr-1"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(c.TimePeriod)}
+                        </div>
+                        ${courseChipsHtml(c)}
+                    </a>
+                    <div class="grid grid-cols-3 border-t border-gray-100 text-xs font-bold text-gray-600">
+                        <a href="#class-${c.Course_ID}" class="card-action" data-intent="top"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i>Attendance</a>
+                        <a href="#class-${c.Course_ID}" class="card-action border-x border-gray-100" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
+                        <a href="#class-${c.Course_ID}" class="card-action" data-intent="openScoresModalBtn"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Scores</a>
                     </div>
-                    <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
-                    <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
-                        <i class="fa-regular fa-calendar mr-1"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(c.TimePeriod)}
-                    </div>
-                </a>
+                </div>
             `;
+
+// Student card chips: attendance counts so far (when the server sends them) and the nearest exam period.
+const studentChipsHtml = (c) => {
+    const chips = [];
+    if (c.Att_Present !== undefined && c.Att_Present !== null) {
+        const present = (Number(c.Att_Present) || 0) + (Number(c.Att_Late) || 0);
+        const absent = Number(c.Att_Absent) || 0;
+        if (present + absent + (Number(c.Att_Excused) || 0) > 0) {
+            chips.push(chip('fa-circle-check', `${present} present`, 'green'));
+            if (absent > 0) chips.push(chip('fa-circle-xmark', `${absent} absent`, 'amber'));
+        }
+    }
+    const exam = examBadge(c, getLocalDateString());
+    if (exam) chips.push(chip('fa-file-pen', exam.text, exam.tone));
+    return chips.length ? `<div class="flex flex-wrap gap-1.5 mt-3">${chips.join('')}</div>` : '';
+};
 
 const enrolledCourseCardHtml = (c) => `
                 <div data-course-card data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.LecturerName].filter(Boolean).join(' ').toLowerCase())}" class="cursor-pointer student-active-course p-5 border-2 border-green-200 rounded-xl shadow-sm bg-green-50 relative overflow-hidden transition hover:shadow-md hover:border-green-400 transform hover:-translate-y-1" data-course-id="${c.Course_ID}" data-course-title="${escapeHtml(c.CourseCode)} | ${escapeHtml(c.CourseTitle)}">
@@ -218,6 +296,7 @@ const enrolledCourseCardHtml = (c) => `
                     <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${escapeHtml(c.Seat_Number || 'Unassigned')}</span></div>
+                    ${studentChipsHtml(c)}
                 </div>
             `;
 
@@ -234,6 +313,20 @@ const availableCourseCardHtml = (c) => `
                     </button>
                 </div>
             `;
+
+// Row of three tiles at the top of the student dashboard. Each scrolls to its section.
+const overviewTile = (target, icon, tone, value, label) =>
+    `<button type="button" data-scroll-to="${target}" class="overview-tile"><span class="overview-icon ${tone}"><i class="fa-solid ${icon}" aria-hidden="true"></i></span><span class="overview-value">${escapeHtml(String(value))}</span><span class="overview-label">${escapeHtml(label)}</span></button>`;
+
+const studentOverviewHtml = (courses, pendingExams, availableCount) => {
+    const absences = courses.reduce((n, c) => n + (Number(c.Att_Absent) || 0), 0);
+    const hasAtt = courses.some(c => c.Att_Present !== undefined && c.Att_Present !== null);
+    return `<div class="grid grid-cols-3 gap-3">
+        ${overviewTile('studentCoursesSection', 'fa-check-double', 'bg-green-100 text-green-700', courses.length, 'Enrolled')}
+        ${overviewTile('studentExamsSection', 'fa-file-pen', 'bg-yellow-100 text-yellow-700', pendingExams, 'Exams to take')}
+        ${hasAtt ? overviewTile('studentCoursesSection', 'fa-user-xmark', 'bg-red-100 text-red-700', absences, 'Absences') : overviewTile('studentAvailableSection', 'fa-book-open', 'bg-blue-100 text-blue-700', availableCount, 'Available')}
+    </div>`;
+};
 
 const buildAssignedExamsSection = (assignedExams, isBlind) => {
     if (!(assignedExams.length > 0 || isBlind)) return '';
@@ -274,7 +367,7 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
                             </button>` : '';
 
                 assignedExamsSectionHtml = `
-                    <section class="bg-indigo-950 text-white p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-yellow-400">
+                    <section id="studentExamsSection" class="bg-indigo-950 text-white p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-yellow-400 scroll-mt-20">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-indigo-800">
                             <div class="flex items-center">
                                 <div class="bg-yellow-400 text-gray-950 p-2.5 rounded-xl mr-3">
@@ -453,6 +546,7 @@ export const CourseDashboard = {
             }
 
             progressDiv.classList.add('hidden');
+            UI.success('Submission uploaded');
             successDiv.textContent = "Submission uploaded successfully!";
             successDiv.classList.remove('hidden');
             document.getElementById('submitDocForm').reset();
@@ -491,6 +585,7 @@ export const CourseDashboard = {
 
         try {
             await apiFetch('/api/programs', { method: 'POST', body: JSON.stringify(payload) });
+            UI.success('Added to registration list');
             successDiv.textContent = "Added to Registration List successfully!";
             successDiv.classList.remove('hidden');
             document.getElementById('addProgramForm').reset();
@@ -532,6 +627,7 @@ export const CourseDashboard = {
             await apiFetch('/api/courses', { method: 'POST', body: JSON.stringify(payload) });
             document.getElementById('addCourseForm').reset();
             document.getElementById('ccModal').classList.add('hidden');
+            UI.success('Course created');
             await CourseDashboard.loadDashboardData();
         } catch (err) {
             errorDiv.textContent = err.message;
@@ -548,6 +644,7 @@ export const CourseDashboard = {
                 method: 'POST',
                 body: JSON.stringify({ courseId: courseId, studentId: AppState.user.User_ID })
             });
+            UI.success('Enrolled in course');
             await CourseDashboard.loadDashboardData();
         } catch (err) {
             UI.error(err.message);
@@ -560,14 +657,14 @@ export const CourseDashboard = {
             const ts = new Date().getTime();
             await refreshProgramOptions();
 
-            const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&_t=${ts}`);
+            const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&today=${getLocalDateString()}&_t=${ts}`);
 
             sortCoursesBySchedule(data.courses);
 
             let coursesHtml = data.courses.map(lecturerCourseCardHtml).join('');
 
             if (!coursesHtml) {
-                coursesHtml = `<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><p class="mb-4">No courses created yet.</p><button type="button" id="emptyNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button></div>`;
+                coursesHtml = `<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><div class="mx-auto mb-3 w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i></div><p class="mb-1 font-bold text-gray-700">No courses yet</p><p class="mb-4 text-sm">Create your first course to start taking attendance.</p><button type="button" id="emptyNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button></div>`;
             }
 
             container.innerHTML = `
@@ -616,7 +713,7 @@ export const CourseDashboard = {
             let enrolledHtml = myCoursesRes.courses.map(enrolledCourseCardHtml).join('');
 
             if (!enrolledHtml) {
-                enrolledHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">You are not enrolled in any courses yet.</div>';
+                enrolledHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><div class="mx-auto mb-3 w-14 h-14 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-book-open" aria-hidden="true"></i></div><p class="font-bold text-gray-700">Not enrolled yet</p><p class="text-sm mt-1">Pick a course from Available Courses below.</p></div>';
             }
 
             const availableCourses = allCoursesRes.courses.filter(c => !enrolledIds.includes(c.Course_ID));
@@ -628,16 +725,17 @@ export const CourseDashboard = {
 
             container.innerHTML = `
                 <div class="space-y-12 fade-in">
+                    ${studentOverviewHtml(myCoursesRes.courses, assignedExams.filter(e => e.status !== 'Completed').length, availableCourses.length)}
                     ${assignedExamsSectionHtml}
                     ${(myCoursesRes.courses.length + availableCourses.length) >= 4 ? searchBarHtml() : ''}
-                    <section>
+                    <section id="studentCoursesSection" class="scroll-mt-20">
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             ${enrolledHtml}
                         </div>
                     </section>
 
-                    <section>
+                    <section id="studentAvailableSection" class="scroll-mt-20">
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center pt-8 border-t border-gray-200"><div class="bg-blue-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-book-open text-blue-600"></i></div>Available Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             ${availableHtml}

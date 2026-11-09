@@ -168,6 +168,7 @@ export const AuthModule = {
                 localStorage.setItem('user', JSON.stringify(AppState.user));
                 localStorage.setItem('portal_user', JSON.stringify(AppState.user));
                 
+                UI.success('Details updated');
                 successDiv.textContent = "Details updated successfully.";
                 successDiv.classList.remove('hidden');
                 document.getElementById('udPassword').value = '';
@@ -213,6 +214,7 @@ export const AuthModule = {
                     method: 'POST',
                     body: JSON.stringify({ userId: AppState.user.User_ID, currentPassword: current, newPassword: newPw })
                 });
+                UI.success('Password updated');
                 successDiv.textContent = "Password updated securely.";
                 successDiv.classList.remove('hidden');
                 e.target.reset();

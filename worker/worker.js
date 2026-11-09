@@ -1820,13 +1820,24 @@ export default {
                 const role = url.searchParams.get("role");
 
                 if (role === 'lecturer') {
+                    // StudentCount and TodayMarked feed the dashboard cards. "today" is the caller's local date
+                    // (YYYY-MM-DD), because attendance dates are stored in local time.
+                    const todayParam = url.searchParams.get("today") || "";
+                    const today = /^\d{4}-\d{2}-\d{2}$/.test(todayParam) ? todayParam : "";
                     const myCourses = await env.DB.prepare(
-                        `SELECT * FROM Courses WHERE Lecturer_ID = ?`
-                    ).bind(userId).all();
+                        `SELECT c.*,
+                            (SELECT COUNT(*) FROM Enrollments e WHERE e.Course_ID = c.Course_ID) AS StudentCount,
+                            (SELECT COUNT(*) FROM Attendance a WHERE a.Course_ID = c.Course_ID AND a.Date = ?) AS TodayMarked
+                         FROM Courses c WHERE c.Lecturer_ID = ?`
+                    ).bind(today, userId).all();
                     return new Response(JSON.stringify({ success: true, courses: myCourses.results }), { status: 200, headers: corsHeaders });
                 } else {
                     const enrolled = await env.DB.prepare(
-                        `SELECT c.*, u.Name as LecturerName, e.Seat_Number
+                        `SELECT c.*, u.Name as LecturerName, e.Seat_Number,
+                            (SELECT COUNT(*) FROM Attendance a WHERE a.Course_ID = c.Course_ID AND a.Student_ID = e.Student_ID AND a.Status = 'Present') AS Att_Present,
+                            (SELECT COUNT(*) FROM Attendance a WHERE a.Course_ID = c.Course_ID AND a.Student_ID = e.Student_ID AND a.Status = 'Late') AS Att_Late,
+                            (SELECT COUNT(*) FROM Attendance a WHERE a.Course_ID = c.Course_ID AND a.Student_ID = e.Student_ID AND a.Status = 'Excused') AS Att_Excused,
+                            (SELECT COUNT(*) FROM Attendance a WHERE a.Course_ID = c.Course_ID AND a.Student_ID = e.Student_ID AND a.Status = 'Absent') AS Att_Absent
                          FROM Enrollments e
                          JOIN Courses c ON e.Course_ID = c.Course_ID
                          JOIN Users u ON c.Lecturer_ID = u.User_ID
