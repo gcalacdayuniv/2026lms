@@ -66,11 +66,11 @@ export const UnsavedCenter = {
 
     // Count on the "Unsaved on this device" button of the profile panel.
     updateBadge: () => {
-        const badge = $('unsavedBadge');
-        if (!badge) return;
         const n = UnsavedCenter.count();
-        badge.textContent = String(n);
-        badge.classList.toggle('hidden', n === 0);
+        document.querySelectorAll('.unsaved-badge').forEach(badge => {
+            badge.textContent = String(n);
+            badge.classList.toggle('hidden', n === 0);
+        });
     },
 
     // ---------- Drawing ----------
@@ -213,8 +213,8 @@ export const UnsavedCenter = {
     init: () => {
         document.addEventListener('click', (e) => {
             if (!e.target.closest) return;
-            if (e.target.closest('#openUnsavedBtn')) UnsavedCenter.open();
-            if (e.target.closest('#profileToggleBtn')) setTimeout(UnsavedCenter.updateBadge, 50);
+            if (e.target.closest('.open-unsaved')) UnsavedCenter.open();
+            if (e.target.closest('#profileToggleBtn, [data-dash-tab], .class-tab, #openCourseMenuBtn')) setTimeout(UnsavedCenter.updateBadge, 80);
         });
         window.addEventListener('storage', UnsavedCenter.updateBadge);
         window.addEventListener('profile-saved', UnsavedCenter.updateBadge);

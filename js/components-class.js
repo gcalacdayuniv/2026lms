@@ -66,6 +66,11 @@ const ClassUI = {
                             <span class="menu-tile-icon bg-purple-100 text-purple-700"><i class="fa-solid fa-table-list" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Class Summary</span>
                         </button>
+                        <button type="button" class="menu-tile open-unsaved" style="position:relative">
+                            <span class="menu-tile-icon bg-amber-100 text-amber-700"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Unsaved on Device</span>
+                            <span class="unsaved-badge hidden" style="position:absolute;top:.35rem;right:.5rem;min-width:1.2rem;padding:0 .3rem;border-radius:9999px;background:#f59e0b;color:#fff;font-size:.7rem;font-weight:800;text-align:center;line-height:1.2rem">0</span>
+                        </button>
                         </div>
                     </section>
                     <section aria-label="Grades & Exams">

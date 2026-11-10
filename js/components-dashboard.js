@@ -132,6 +132,11 @@ const DashboardUI = {
                             <span class="menu-tile-icon bg-green-100 text-green-700"><i class="fa-solid fa-users-gear" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Manage Users</span>
                         </button>
+                        <button type="button" class="menu-tile open-unsaved" style="position:relative">
+                            <span class="menu-tile-icon bg-amber-100 text-amber-700"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Unsaved on Device</span>
+                            <span class="unsaved-badge hidden" style="position:absolute;top:.35rem;right:.5rem;min-width:1.2rem;padding:0 .3rem;border-radius:9999px;background:#f59e0b;color:#fff;font-size:.7rem;font-weight:800;text-align:center;line-height:1.2rem">0</span>
+                        </button>
                     </div>
                 </section>
             </div>
@@ -646,9 +651,9 @@ export const DashboardComponents = {
         let lecturerBtns = '';
         const appearanceHtml = `
             <div class="mt-6">
-                <button type="button" id="openUnsavedBtn" class="w-full mb-5 flex items-center justify-between py-2.5 px-3 border border-gray-300 rounded-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50">
+                <button type="button" id="openUnsavedBtn" class="open-unsaved w-full mb-5 flex items-center justify-between py-2.5 px-3 border border-gray-300 rounded-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50">
                     <span><i class="fa-solid fa-cloud-arrow-up mr-2" aria-hidden="true"></i>Unsaved on this device</span>
-                    <span id="unsavedBadge" class="hidden min-w-[1.4rem] text-center px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-xs">0</span>
+                    <span class="unsaved-badge hidden min-w-[1.4rem] text-center px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-xs">0</span>
                 </button>
                 <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Appearance</div>
                 <div class="grid grid-cols-3 gap-2" role="group" aria-label="Appearance">
