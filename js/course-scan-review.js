@@ -8,7 +8,7 @@ import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { PhotoCache, CACHE_DAYS } from './course-scan-photos.js';
 import { answerRows } from './omr-sheet.js';
-import { cropBox, drawCrop, RECT_LAYOUT } from './omr-crop.js';
+import { cropBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -190,8 +190,17 @@ export const CourseScanReview = {
         setNote('');
         phs().forEach(p => p.classList.add('is-loading'));
         try {
-            const { blob, layout, cached } = await PhotoCache.get(sheet);
+            let { blob, layout, cached } = await PhotoCache.get(sheet);
             if (mine !== CourseScanReview.token) return;
+            if (layout !== RECT_LAYOUT) {
+                // Older plain photo: find the sheet in it and straighten it here, once; the result is kept for 7 days.
+                const fixed = await straightenLegacy(blob, session.Num_Questions, session.Num_Choices);
+                if (mine !== CourseScanReview.token) return;
+                if (fixed) {
+                    blob = fixed; layout = RECT_LAYOUT;
+                    PhotoCache.put(sheet.Photo_File_ID, blob, layout).catch(() => {});
+                }
+            }
             const bitmap = await createImageBitmap(blob);
             if (mine !== CourseScanReview.token) { bitmap.close(); return; }
             CourseScanReview.bitmap = bitmap;
@@ -212,7 +221,7 @@ export const CourseScanReview = {
                 box.innerHTML = `<img alt="Scanned answer sheet" src="${url}">`;
                 box.querySelector('img').onload = () => setTimeout(() => URL.revokeObjectURL(url), 30000);
                 body.insertBefore(box, body.firstChild);
-                setNote('This photo was saved before question crops existed, so the whole sheet is shown.', 'is-info');
+                setNote('The sheet could not be located in this older photo, so the whole sheet is shown. Scan it again to get per-question crops.', 'is-info');
             }
         } catch (err) {
             if (mine !== CourseScanReview.token) return;

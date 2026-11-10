@@ -212,5 +212,8 @@ export const PhotoCache = {
         return { blob, layout, cached: false };
     },
 
+    // Replaces a kept photo (used when an older photo was straightened on this device).
+    put: (fileId, blob, layout) => cacheTx('readwrite', s => s.put({ fileId, blob, layout, savedAt: Date.now() })),
+
     forget: (fileId) => cacheTx('readwrite', s => s.delete(fileId))
 };

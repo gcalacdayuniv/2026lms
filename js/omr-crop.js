@@ -3,7 +3,7 @@
 // The sheet is warped to its own frame (the 4 corner markers) at RECT_SCALE pixels per frame unit, so the same
 // geometry as the printed sheet (omr-sheet.js) tells where every question row is, on any device, later on.
 import { FRAME } from './omr-sheet.js';
-import { applyH } from './omr-scan.js';
+import { applyH, scanImage } from './omr-scan.js';
 
 export const RECT_SCALE = 5;
 export const RECT_LAYOUT = 'rect1';
@@ -18,9 +18,10 @@ const loadImage = (url) => new Promise((resolve, reject) => {
 
 // H maps frame units to pixels of the photo at `url` (the same canvas the sheet was read from).
 // Returns a JPEG blob of FRAME.w*RECT_SCALE x FRAME.h*RECT_SCALE pixels.
-export const rectify = async (url, H) => {
-    const img = await loadImage(url);
-    const sw = img.naturalWidth, sh = img.naturalHeight;
+export const rectify = async (source, H) => {
+    // source: URL of the photo, or a canvas / image that already holds it
+    const img = typeof source === 'string' ? await loadImage(source) : source;
+    const sw = img.naturalWidth || img.width, sh = img.naturalHeight || img.height;
     const src = document.createElement('canvas');
     src.width = sw; src.height = sh;
     const sctx = src.getContext('2d', { willReadFrequently: true });
@@ -73,4 +74,16 @@ export const drawCrop = (canvas, bitmap, box) => {
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bitmap, box.x, box.y, box.w, box.h, 0, 0, canvas.width, canvas.height);
+};
+
+// Photos saved before the straightened layout existed: find the 4 corner markers again in the stored picture and
+// straighten it now. Returns a "rect1" JPEG blob, or null when the sheet cannot be found in the picture.
+export const straightenLegacy = async (blob, numQuestions, numChoices) => {
+    try {
+        const res = await scanImage(blob, numQuestions, numChoices);
+        if (!res || !res.ok || !res.H || !res.canvas) return null;
+        return await rectify(res.canvas, res.H);
+    } catch (e) {
+        return null;
+    }
 };
