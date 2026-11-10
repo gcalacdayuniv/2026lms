@@ -6,6 +6,7 @@
 import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
+import { driveImageUrl, driveViewUrl } from './course-scan-photos.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -313,7 +314,12 @@ export const CourseScanRecords = {
                     <div class="text-right shrink-0"><span class="text-lg font-black font-mono text-gray-800">${fmt(g.score)}</span><span class="text-xs text-gray-500"> / ${maxText}</span></div>
                 </div>
                 <div class="mt-1 flex flex-wrap gap-1">${badges}</div>
-                <button type="button" class="scr-toggle-btn mt-2 text-xs font-bold text-blue-700 hover:underline" data-sheet="${esc(id)}" aria-expanded="${open}">${open ? 'Hide answers' : 'Review / correct answers'}</button>
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <button type="button" class="scr-toggle-btn text-xs font-bold text-blue-700 hover:underline" data-sheet="${esc(id)}" aria-expanded="${open}">${open ? 'Hide answers' : 'Review / correct answers'}</button>
+                    ${sheet.Photo_File_ID
+                        ? `<button type="button" class="scr-photo-btn text-xs font-bold text-purple-700 hover:underline" data-sheet="${esc(id)}"><i class="fa-regular fa-image mr-1" aria-hidden="true"></i>View sheet photo</button>`
+                        : '<span class="text-[11px] text-gray-400">No photo saved</span>'}
+                </div>
                 ${open ? CourseScanRecords.editor(sheet, a) : ''}
             </div>`;
     },
@@ -349,6 +355,51 @@ export const CourseScanRecords = {
                     <button type="button" class="scr-save-btn px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-xs font-bold transition disabled:opacity-50" data-sheet="${esc(id)}" data-role="save" ${changed ? '' : 'disabled'}>Save correction</button>
                 </div>
             </div>`;
+    },
+
+    // Full-screen viewer of the low-resolution photo kept in Google Drive. Tap the picture to zoom.
+    showPhoto: (sheet) => {
+        document.getElementById('scrPhotoViewer')?.remove();
+        const fid = sheet.Photo_File_ID;
+        const wrap = document.createElement('div');
+        wrap.id = 'scrPhotoViewer';
+        wrap.setAttribute('role', 'dialog');
+        wrap.setAttribute('aria-modal', 'true');
+        wrap.setAttribute('aria-label', `Photo of ${sheet.Name || 'answer sheet'}`);
+        wrap.className = 'fixed inset-0 flex flex-col';
+        wrap.style.cssText = 'z-index:330;background:#0b1220;padding-top:env(safe-area-inset-top)';
+        wrap.innerHTML = `
+            <div class="flex items-center justify-between gap-2 px-3 py-2 text-white">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold truncate">${esc(sheet.Name || 'Answer sheet')}</div>
+                    <div class="text-[11px] text-gray-300">${esc(sheet.Student_Number || '')} &middot; tap the picture to zoom</div>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <a href="${esc(driveViewUrl(fid))}" target="_blank" rel="noopener" class="px-3 py-2 text-xs font-bold text-blue-200 hover:text-white">Open in Drive</a>
+                    <button type="button" id="scrPhotoClose" aria-label="Close photo" class="app-page-close text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+            </div>
+            <div id="scrPhotoBox" class="flex-1 overflow-auto text-center" style="-webkit-overflow-scrolling:touch">
+                <div id="scrPhotoMsg" class="text-gray-300 text-sm py-16"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading photo...</div>
+                <img id="scrPhotoImg" alt="Scanned answer sheet" class="hidden mx-auto" style="max-width:100%;height:auto">
+            </div>`;
+        document.body.appendChild(wrap);
+        const img = wrap.querySelector('#scrPhotoImg');
+        const msg = wrap.querySelector('#scrPhotoMsg');
+        let zoom = false;
+        img.onload = () => { msg.classList.add('hidden'); img.classList.remove('hidden'); };
+        img.onerror = () => { msg.innerHTML = 'The photo could not be loaded here. Use <b>Open in Drive</b>.'; };
+        img.onclick = () => {
+            zoom = !zoom;
+            img.style.maxWidth = zoom ? 'none' : '100%';
+            img.style.width = zoom ? '220%' : '';
+        };
+        img.src = driveImageUrl(fid, 1400);
+        const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); };
+        const onKey = (e) => { if (e.key === 'Escape') close(); };
+        document.addEventListener('keydown', onKey);
+        wrap.querySelector('#scrPhotoClose').onclick = close;
+        wrap.querySelector('#scrPhotoClose').focus();
     },
 
     findSheet: (id) => (CourseScanRecords.detail ? CourseScanRecords.detail.sheets.find(s => s.Sheet_ID === id) : null),
@@ -441,6 +492,13 @@ export const CourseScanRecords = {
                 if (sheet) CourseScanRecords.drafts[id] = sheet.Answers.slice();
             }
             CourseScanRecords.renderDetail();
+            return;
+        }
+
+        const photoBtn = e.target.closest('.scr-photo-btn');
+        if (photoBtn) {
+            const sheet = CourseScanRecords.findSheet(photoBtn.dataset.sheet);
+            if (sheet && sheet.Photo_File_ID) CourseScanRecords.showPhoto(sheet);
             return;
         }
 

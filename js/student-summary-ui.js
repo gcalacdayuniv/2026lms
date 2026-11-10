@@ -41,6 +41,41 @@ export const StudentSummaryUI = {
         if (body) body.style.paddingBottom = 'calc(5.5rem + env(safe-area-inset-bottom))';
     },
 
+    // Small pop-up with the complete text of a field that is cut off in its chip.
+    callout: (label, text) => {
+        $('ssCallout')?.remove();
+        const wrap = document.createElement('div');
+        wrap.id = 'ssCallout';
+        wrap.setAttribute('role', 'dialog');
+        wrap.setAttribute('aria-modal', 'true');
+        wrap.setAttribute('aria-label', label);
+        wrap.className = 'fixed inset-0 flex items-end sm:items-center justify-center p-4';
+        wrap.style.cssText = 'z-index:340;background:rgba(15,23,42,.55)';
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-2xl shadow-xl w-full max-w-sm p-5';
+        card.style.paddingBottom = 'calc(1.25rem + env(safe-area-inset-bottom))';
+        const h = document.createElement('div');
+        h.className = 'text-xs font-bold uppercase tracking-wider text-blue-600 mb-2';
+        h.textContent = label;
+        const body = document.createElement('div');
+        body.className = 'text-gray-800 font-semibold text-base leading-relaxed whitespace-pre-wrap break-words';
+        body.style.maxHeight = '50vh'; body.style.overflowY = 'auto';
+        body.textContent = text;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mt-4 w-full py-3 rounded-xl bg-blue-600 text-white font-bold';
+        btn.textContent = 'Close';
+        card.append(h, body, btn);
+        wrap.appendChild(card);
+        document.body.appendChild(wrap);
+        const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); $('ssTopicChip')?.focus(); };
+        const onKey = (e) => { if (e.key === 'Escape') close(); };
+        document.addEventListener('keydown', onKey);
+        btn.onclick = close;
+        wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+        btn.focus();
+    },
+
     init: () => {
         const modal = $('studentSummaryModal');
         if (!modal || modal.dataset.ssInit) return;
@@ -56,6 +91,7 @@ export const StudentSummaryUI = {
         new MutationObserver(() => { if (modal.classList.contains('hidden')) $('ssActionBar')?.classList.add('hidden'); })
             .observe(modal, { attributes: true, attributeFilter: ['class'] });
 
+        $('ssTopicChip')?.addEventListener('click', () => StudentSummaryUI.callout('Topic', $('ssTopic')?.textContent || ''));
         $('ssTermTabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest && e.target.closest('.ss-term-tab');
             if (btn) { StudentSummaryUI.show(btn.dataset.term); modal.scrollTo?.({ top: 0 }); }

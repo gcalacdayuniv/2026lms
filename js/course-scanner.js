@@ -9,6 +9,7 @@ import { getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { CourseScanRecords } from './course-scan-records.js';
 import { ScanQueue } from './course-scan-queue.js';
+import { ScanPhotos } from './course-scan-photos.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
 import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
 
@@ -84,8 +85,13 @@ export const CourseScanner = {
         document.addEventListener('change', CourseScanner.handleChanges);
         document.addEventListener('input', CourseScanner.handleInputs);
         // Sheets that could not be uploaded stay in the cache and are sent again when the connection is back.
-        window.addEventListener('online', () => { if (AppState.user) CourseScanner.flush(true); });
-        setInterval(() => { if (AppState.user && ScanQueue.all().length) CourseScanner.flush(); }, 20000);
+        window.addEventListener('online', () => { if (AppState.user) { CourseScanner.flush(true); ScanPhotos.send(); } });
+        setInterval(() => {
+            if (!AppState.user) return;
+            if (ScanQueue.all().length) CourseScanner.flush();
+            ScanPhotos.send();
+            ScanPhotos.purge(id => ScanQueue.all().some(e => e.scanId === id));
+        }, 20000);
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) CourseScanner.stopLive();
         });
@@ -1094,6 +1100,8 @@ export const CourseScanner = {
                 // The sheet was uploaded for another student first: that earlier upload is undone.
                 removeStudent: row.savedStudentId && row.savedStudentId !== row.studentId ? row.savedStudentId : null
             });
+            // Low-resolution photo for later review (kept on the phone until the sheet is confirmed saved).
+            ScanPhotos.keep(row.scanId, CourseScanner.courseId, row.photoUrl);
             row.cfg = row.cfg || cfg;
             row.saveState = 'pending';
             row.attempts = 0;
@@ -1216,6 +1224,7 @@ export const CourseScanner = {
             });
             // The server confirmed these: the cached copies are deleted now (unless edited again meanwhile).
             ScanQueue.removeIfSame(done);
+            ScanPhotos.saved(done.map(e => ({ scanId: e.scanId, courseId, assessmentId: target.id, studentId: e.studentId }))).catch(() => {});
             done.forEach(e => {
                 const row = CourseScanner.rowByScan(e.scanId);
                 if (!row) return;

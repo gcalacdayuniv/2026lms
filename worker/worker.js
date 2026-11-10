@@ -345,8 +345,16 @@ async function ensureScanTables(env) {
     } catch (err) {
         if (!/duplicate column/i.test(String(err && err.message))) throw err;
     }
+    // Photo_File_ID = Google Drive file id of the low-resolution photo of the captured sheet.
+    try {
+        await env.DB.prepare("ALTER TABLE Scan_Sheets ADD COLUMN Photo_File_ID TEXT").run();
+    } catch (err) {
+        if (!/duplicate column/i.test(String(err && err.message))) throw err;
+    }
     scanTablesReady = true;
 }
+
+const SCAN_PHOTO_MAX_B64 = 900000; // about 650 KB of image; the app sends about 100 to 200 KB
 
 const parseJsonList = (text) => {
     try {
@@ -427,7 +435,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (!session) return json(corsHeaders, { error: 'Saved scan not found.' }, 404);
 
         const rows = await env.DB.prepare(
-            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At,
+            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID,
                     u.Name, u.Student_Number
              FROM Scan_Sheets h LEFT JOIN Users u ON u.User_ID = h.Student_ID
              WHERE h.Session_ID = ?
@@ -565,7 +573,9 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(Session_ID, Student_ID) DO UPDATE SET
                     Student_No_Read = excluded.Student_No_Read, Original_Answers = excluded.Original_Answers,
-                    Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited, Scan_ID = excluded.Scan_ID,
+                    Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited,
+                    Photo_File_ID = CASE WHEN Scan_Sheets.Scan_ID IS excluded.Scan_ID THEN Scan_Sheets.Photo_File_ID ELSE NULL END,
+                    Scan_ID = excluded.Scan_ID,
                     Updated_At = CURRENT_TIMESTAMP`
             ).bind(
                 crypto.randomUUID(), sessionId, sheet.studentId, String(sheet.studentNo || '').slice(0, 20),
@@ -611,6 +621,37 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
 
         await runInChunks(env, statements.concat(regradeStatements));
         return json(corsHeaders, { success: true, sessionId, saved: written.size, unchanged, conflicts, removed, regraded }, 201);
+    }
+
+    // Keeps the low-resolution photo of a captured sheet in Google Drive (through the same Apps Script web app
+    // as the other uploads). Only a sheet that is already saved with this capture id can receive a photo.
+    if (method === 'POST' && path === '/api/scan-sheets/photo') {
+        const body = await request.json();
+        const { courseId, assessmentId, studentId, scanId, base64 } = body;
+        if (!courseId || !assessmentId || !studentId || typeof scanId !== 'string' || !scanId || scanId.length > 64) {
+            return json(corsHeaders, { error: 'Missing sheet details.' }, 400);
+        }
+        if (typeof base64 !== 'string' || base64.length < 100 || base64.length > SCAN_PHOTO_MAX_B64) {
+            return json(corsHeaders, { error: 'The photo is missing or too large.' }, 400);
+        }
+        const row = await env.DB.prepare(
+            `SELECT h.Sheet_ID, h.Photo_File_ID, s.Session_ID
+             FROM Scan_Sheets h JOIN Scan_Sessions s ON s.Session_ID = h.Session_ID
+             WHERE s.Course_ID = ? AND s.Assessment_ID = ? AND h.Student_ID = ? AND h.Scan_ID = ?`
+        ).bind(courseId, assessmentId, studentId, scanId).first();
+        // Not an error for the app: the sheet may still be waiting to be saved, or was replaced.
+        if (!row) return json(corsHeaders, { success: false, code: 'no-sheet' });
+        if (row.Photo_File_ID) return json(corsHeaders, { success: true, fileId: row.Photo_File_ID, already: true });
+
+        const gas = await callGas(env, JSON.stringify({
+            filename: `scan_${row.Sheet_ID}.jpg`,
+            mimeType: 'image/jpeg',
+            base64,
+            pathParts: ['Scan Sheets', courseId, row.Session_ID]
+        }));
+        if (!gas.fileId) throw new Error('Google Drive did not return a file id.');
+        await env.DB.prepare("UPDATE Scan_Sheets SET Photo_File_ID = ? WHERE Sheet_ID = ?").bind(gas.fileId, row.Sheet_ID).run();
+        return json(corsHeaders, { success: true, fileId: gas.fileId }, 201);
     }
 
     // Corrects one student's answers later; the score in the assessment is updated too.

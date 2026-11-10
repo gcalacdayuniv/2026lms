@@ -555,23 +555,24 @@ const ClassUI = {
     `,
 
     renderDetailsModal: () => `
-        <div id="detailsModal" class="hidden fixed inset-0 z-[90] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
-            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeDetailsModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
-                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-base sm:text-lg font-bold text-gray-800" id="detailsModalTitle">Details</h3>
-                    <button id="closeDetailsModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+        <div id="detailsModal" class="hidden fixed inset-0 flex flex-col bg-gray-50 fade-in details-page" style="z-index:90">
+            <div id="closeDetailsModalBg" class="hidden"></div>
+            <div class="details-top sticky top-0">
+                <div class="max-w-4xl mx-auto px-2 sm:px-6 py-2 flex items-center gap-1">
+                    <button type="button" id="closeDetailsModalBtn" aria-label="Back" class="app-page-close text-white/90 hover:text-white focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl"></i>
                     </button>
+                    <h3 class="text-base sm:text-lg font-black text-white truncate" id="detailsModalTitle">Details</h3>
                 </div>
-                <div class="overflow-y-auto flex-1 bg-gray-50 border border-gray-200 rounded-lg">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm">
+            </div>
+            <div class="flex-1 overflow-y-auto" style="padding-bottom:env(safe-area-inset-bottom)">
+                <div class="max-w-4xl mx-auto bg-white sm:my-4 sm:rounded-xl sm:border sm:border-gray-200 overflow-hidden">
+                    <table class="w-full text-sm text-left details-table">
+                        <thead class="bg-gray-100 text-gray-700 sticky top-0 shadow-sm">
                             <tr>
-                                <th class="px-3 py-2">Date</th>
-                                <th class="px-3 py-2 text-center">Status / Info</th>
-                                <th class="px-3 py-2 text-center" id="detailsScoreHeader">Score</th>
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3 text-center">Status / Info</th>
+                                <th class="px-4 py-3 text-center" id="detailsScoreHeader">Score</th>
                             </tr>
                         </thead>
                         <tbody id="detailsTableBody" class="divide-y divide-gray-200 bg-white">
