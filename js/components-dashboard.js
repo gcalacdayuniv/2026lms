@@ -590,14 +590,14 @@ const DashboardUI = {
                 </div>
             </div>
 
-            <div id="ssActionBar" class="hidden ss-actions">
-                <button id="openHistoryModalBtn" type="button" class="ss-act ss-act-secondary">
-                    <i class="fa-solid fa-clock-rotate-left mr-2" aria-hidden="true"></i> History
-                </button>
-                <button id="openSubmitDocModalBtn" type="button" class="ss-act ss-act-primary">
-                    <i class="fa-solid fa-cloud-arrow-up mr-2" aria-hidden="true"></i> Upload Document
-                </button>
-            </div>
+        </div>
+        <div id="ssActionBar" class="hidden ss-actions">
+            <button id="openHistoryModalBtn" type="button" class="ss-act ss-act-secondary">
+                <i class="fa-solid fa-clock-rotate-left mr-2" aria-hidden="true"></i> History
+            </button>
+            <button id="openSubmitDocModalBtn" type="button" class="ss-act ss-act-primary">
+                <i class="fa-solid fa-cloud-arrow-up mr-2" aria-hidden="true"></i> Upload Document
+            </button>
         </div>
     `,
 

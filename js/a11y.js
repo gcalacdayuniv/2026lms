@@ -26,6 +26,7 @@ const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'TEMPLATE', 'NOSCR
 const EXEMPT_IDS = new Set(['toastHost', 'profilePanelOverlay']);
 // Full-screen pages that keep the bottom tab bar usable (phones).
 const DASH_PAGES = new Set(['profilePanel', 'adminPage', 'ccModal', 'apModal', 'muModal', 'cpModal']);   // dashboard pages that keep #dashTabBar usable
+const SS_PAGES = new Set(['studentSummaryModal', 'detailsModal']);   // student summary keeps its History / Upload bar usable
 const TAB_PAGES = new Set(['scoresModal', 'examManagerModal', 'scannerModal', 'courseMenuModal', 'attendanceDatesModal', 'noClassModal', 'classSummaryModal']);
 // Icon-only buttons get a name from their Font Awesome icon.
 const ICON_LABELS = [
@@ -134,6 +135,8 @@ export const A11y = {
                     if (sib === node || SKIP_TAGS.has(sib.tagName)) continue;
                     if (sib.id === 'classTabBar' && TAB_PAGES.has(top.id)) continue;
                     if (sib.id === 'dashTabBar' && DASH_PAGES.has(top.id)) continue;
+                    if (sib.id === 'ssActionBar' && SS_PAGES.has(top.id)) continue;
+                    if (sib.id === 'studentSummaryModal' && top.id === 'detailsModal') continue;   // its header and term tabs stay visible and usable
                     if (EXEMPT_IDS.has(sib.id)) {
                         if (sib.id === 'profilePanelOverlay') sib.setAttribute('aria-hidden', 'true');
                         continue;

@@ -87,6 +87,18 @@ export const StudentSummaryUI = {
                 else $('ssActionBar')?.classList.add('hidden');
             }).observe(content, { attributes: true, attributeFilter: ['class'] });
         }
+        // The score details page stops above the History / Upload bar so the bar stays in reach.
+        const details = $('detailsModal');
+        const fit = () => {
+            const bar = $('ssActionBar');
+            const open = details && !details.classList.contains('hidden') && !modal.classList.contains('hidden') && bar && !bar.classList.contains('hidden');
+            details.style.bottom = open ? `${Math.ceil(bar.getBoundingClientRect().height)}px` : '';
+            // Also stay below the summary header (course, seat/group/topic, term tabs).
+            const head = modal.querySelector('.ss-top');
+            details.style.top = open && head ? `${Math.ceil(head.getBoundingClientRect().bottom)}px` : '';
+        };
+        if (details) new MutationObserver(fit).observe(details, { attributes: true, attributeFilter: ['class'] });
+        window.addEventListener('resize', fit);
         // Closing the page hides the action bar too.
         new MutationObserver(() => { if (modal.classList.contains('hidden')) $('ssActionBar')?.classList.add('hidden'); })
             .observe(modal, { attributes: true, attributeFilter: ['class'] });
@@ -94,7 +106,7 @@ export const StudentSummaryUI = {
         $('ssTopicChip')?.addEventListener('click', () => StudentSummaryUI.callout('Topic', $('ssTopic')?.textContent || ''));
         $('ssTermTabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest && e.target.closest('.ss-term-tab');
-            if (btn) { StudentSummaryUI.show(btn.dataset.term); modal.scrollTo?.({ top: 0 }); }
+            if (btn) { $('detailsModal')?.classList.add('hidden'); StudentSummaryUI.show(btn.dataset.term); modal.scrollTo?.({ top: 0 }); }
         });
 
         // Swipe left/right on the content switches the term.
