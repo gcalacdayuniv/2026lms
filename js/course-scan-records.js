@@ -6,7 +6,7 @@
 import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
-import { driveImageUrl, driveViewUrl } from './course-scan-photos.js';
+import { CourseScanReview } from './course-scan-review.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -53,14 +53,11 @@ export const CourseScanRecords = {
     courseId: '',
     sessions: [],
     detail: null,          // { session, sheets } while one saved scan is open
-    openIds: new Set(),    // sheets whose answer editor is open
-    drafts: {},            // sheetId -> answers being edited
     onlyAttention: false,
     busy: false,
 
     init: () => {
         document.addEventListener('click', CourseScanRecords.handleClicks);
-        document.addEventListener('change', CourseScanRecords.handleChanges);
     },
 
     setAlert: (msg, ok = true) => {
@@ -89,8 +86,6 @@ export const CourseScanRecords = {
     load: async () => {
         CourseScanRecords.courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
         CourseScanRecords.detail = null;
-        CourseScanRecords.drafts = {};
-        CourseScanRecords.openIds = new Set();
         CourseScanRecords.paint('<div class="text-sm text-gray-500 italic text-center py-10">Loading saved scans...</div>');
         try {
             const res = await apiFetch(`/api/scan-sessions?courseId=${CourseScanRecords.courseId}&_t=${new Date().getTime()}`);
@@ -162,8 +157,6 @@ export const CourseScanRecords = {
         try {
             const res = await apiFetch(`/api/scan-sheets?sessionId=${sessionId}&_t=${new Date().getTime()}`);
             CourseScanRecords.detail = { session: res.session, sheets: res.sheets || [] };
-            CourseScanRecords.drafts = {};
-            CourseScanRecords.openIds = new Set();
             CourseScanRecords.onlyAttention = false;
             CourseScanRecords.setAlert('');
             CourseScanRecords.renderDetail();
@@ -209,6 +202,12 @@ export const CourseScanRecords = {
             multiple: total('multiple'),
             edited: sheets.filter(s => s.Edited).length
         };
+    },
+
+    // Sheets in list order (respecting the "needs attention" filter), the order used by the reviewer's Next / Previous.
+    visibleSheets: () => {
+        const a = CourseScanRecords.analyze();
+        return a.graded.filter(x => !CourseScanRecords.onlyAttention || CourseScanRecords.needsAttention(x)).map(x => x.sheet);
     },
 
     needsAttention: (x) => x.g.blank > 0 || x.g.multiple > 0 || Boolean(x.sheet.Edited),
@@ -288,10 +287,10 @@ export const CourseScanRecords = {
         `);
     },
 
+    // One student: a compact row. Tapping it opens the full-screen reviewer (photo crops + corrections).
     sheetCard: (x, a) => {
         const { sheet, g } = x;
         const id = sheet.Sheet_ID;
-        const open = CourseScanRecords.openIds.has(id);
         const maxText = a.max == null ? '?' : fmt(a.max);
         const attention = CourseScanRecords.needsAttention(x);
         const b = CourseScanRecords.badge;
@@ -305,153 +304,18 @@ export const CourseScanRecords = {
         ].filter(Boolean).join(' ');
 
         return `
-            <div class="bg-white border ${attention ? 'border-amber-300' : 'border-gray-200'} rounded-lg p-3" data-sheet-card="${esc(id)}">
-                <div class="flex items-center justify-between gap-2">
-                    <div class="min-w-0">
-                        <div class="text-sm font-bold text-gray-800 truncate">${esc(sheet.Name || 'Unknown student')}</div>
-                        <div class="text-[11px] text-gray-500">${esc(sheet.Student_Number || '')}${sheet.Student_No_Read ? ` | scanned number ${esc(sheet.Student_No_Read)}` : ''}</div>
-                    </div>
-                    <div class="text-right shrink-0"><span class="text-lg font-black font-mono text-gray-800">${fmt(g.score)}</span><span class="text-xs text-gray-500"> / ${maxText}</span></div>
-                </div>
-                <div class="mt-1 flex flex-wrap gap-1">${badges}</div>
-                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <button type="button" class="scr-toggle-btn text-xs font-bold text-blue-700 hover:underline" data-sheet="${esc(id)}" aria-expanded="${open}">${open ? 'Hide answers' : 'Review / correct answers'}</button>
-                    ${sheet.Photo_File_ID
-                        ? `<button type="button" class="scr-photo-btn text-xs font-bold text-purple-700 hover:underline" data-sheet="${esc(id)}"><i class="fa-regular fa-image mr-1" aria-hidden="true"></i>View sheet photo</button>`
-                        : '<span class="text-[11px] text-gray-400">No photo saved</span>'}
-                </div>
-                ${open ? CourseScanRecords.editor(sheet, a) : ''}
-            </div>`;
-    },
-
-    // Answer editor of one sheet: every question with its current answer, the scanned read when it differs.
-    editor: (sheet, a) => {
-        const id = sheet.Sheet_ID;
-        const draft = CourseScanRecords.drafts[id] || sheet.Answers;
-        const cells = draft.map((cur, q) => {
-            const orig = sheet.Original_Answers[q];
-            const options = [
-                `<option value="${BLANK}"${cur === BLANK ? ' selected' : ''}>-</option>`,
-                `<option value="${MULTIPLE}"${cur === MULTIPLE ? ' selected' : ''}>x2</option>`
-            ].concat(Array.from({ length: a.c }, (_, k) => `<option value="${k}"${cur === k ? ' selected' : ''}>${LETTERS[k]}</option>`)).join('');
-            const tone = cur === a.key[q] ? 'border-green-400 bg-green-50' : 'border-red-300 bg-red-50';
-            return `<label class="text-[11px]">
-                <span class="flex items-center gap-1"><span class="w-7 text-right font-bold text-gray-500">${q + 1}${a.bonus[q] ? '<span class="text-amber-600" title="Bonus">*</span>' : ''}</span>
-                <select class="scr-answer-select w-full px-1 py-0.5 border rounded text-xs ${tone}" data-sheet="${esc(id)}" data-q="${q}" aria-label="Question ${q + 1} answer">${options}</select></span>
-                <span class="block ml-8 text-[9px] text-gray-400">key ${LETTERS[a.key[q]]}${orig !== cur ? ` | <span class="text-amber-700 font-bold">scanned: ${answerLabel(orig)}</span>` : ''}</span>
-            </label>`;
-        }).join('');
-
-        const changed = !sameList(draft, sheet.Answers);
-        const differsFromScan = !sameList(draft, sheet.Original_Answers);
-        const g = grade(draft, a.key, a.bonus, a.max);
-        return `
-            <div class="mt-2 pt-2 border-t border-gray-200">
-                <p class="text-[11px] text-gray-500 mb-2">Compare with the paper sheet. Change any answer the reader missed, then save: the score is recalculated and updated in Record Scores.</p>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1">${cells}</div>
-                <div class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
-                    <div class="flex-1 text-xs font-bold text-gray-700" data-role="preview">Score: ${fmt(g.score)} / ${a.max == null ? '?' : fmt(a.max)} (${g.raw} correct${g.bonus ? ` + ${g.bonus} bonus` : ''}, ${g.wrong} wrong, ${g.blank} blank, ${g.multiple} double-shaded)</div>
-                    <button type="button" class="scr-reset-btn px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-xs font-bold transition ${differsFromScan ? '' : 'hidden'}" data-sheet="${esc(id)}" data-role="reset">Reset to scanned answers</button>
-                    <button type="button" class="scr-save-btn px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-xs font-bold transition disabled:opacity-50" data-sheet="${esc(id)}" data-role="save" ${changed ? '' : 'disabled'}>Save correction</button>
-                </div>
-            </div>`;
-    },
-
-    // Full-screen viewer of the low-resolution photo kept in Google Drive. Tap the picture to zoom.
-    showPhoto: (sheet) => {
-        document.getElementById('scrPhotoViewer')?.remove();
-        const fid = sheet.Photo_File_ID;
-        const wrap = document.createElement('div');
-        wrap.id = 'scrPhotoViewer';
-        wrap.setAttribute('role', 'dialog');
-        wrap.setAttribute('aria-modal', 'true');
-        wrap.setAttribute('aria-label', `Photo of ${sheet.Name || 'answer sheet'}`);
-        wrap.className = 'fixed inset-0 flex flex-col';
-        wrap.style.cssText = 'z-index:330;background:#0b1220;padding-top:env(safe-area-inset-top)';
-        wrap.innerHTML = `
-            <div class="flex items-center justify-between gap-2 px-3 py-2 text-white">
-                <div class="min-w-0">
-                    <div class="text-sm font-bold truncate">${esc(sheet.Name || 'Answer sheet')}</div>
-                    <div class="text-[11px] text-gray-300">${esc(sheet.Student_Number || '')} &middot; tap the picture to zoom</div>
-                </div>
-                <div class="flex items-center gap-1 shrink-0">
-                    <a href="${esc(driveViewUrl(fid))}" target="_blank" rel="noopener" class="px-3 py-2 text-xs font-bold text-blue-200 hover:text-white">Open in Drive</a>
-                    <button type="button" id="scrPhotoClose" aria-label="Close photo" class="app-page-close text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-                </div>
-            </div>
-            <div id="scrPhotoBox" class="flex-1 overflow-auto text-center" style="-webkit-overflow-scrolling:touch">
-                <div id="scrPhotoMsg" class="text-gray-300 text-sm py-16"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading photo...</div>
-                <img id="scrPhotoImg" alt="Scanned answer sheet" class="hidden mx-auto" style="max-width:100%;height:auto">
-            </div>`;
-        document.body.appendChild(wrap);
-        const img = wrap.querySelector('#scrPhotoImg');
-        const msg = wrap.querySelector('#scrPhotoMsg');
-        let zoom = false;
-        img.onload = () => { msg.classList.add('hidden'); img.classList.remove('hidden'); };
-        img.onerror = () => { msg.innerHTML = 'The photo could not be loaded here. Use <b>Open in Drive</b>.'; };
-        img.onclick = () => {
-            zoom = !zoom;
-            img.style.maxWidth = zoom ? 'none' : '100%';
-            img.style.width = zoom ? '220%' : '';
-        };
-        img.src = driveImageUrl(fid, 1400);
-        const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); };
-        const onKey = (e) => { if (e.key === 'Escape') close(); };
-        document.addEventListener('keydown', onKey);
-        wrap.querySelector('#scrPhotoClose').onclick = close;
-        wrap.querySelector('#scrPhotoClose').focus();
-    },
-
-    findSheet: (id) => (CourseScanRecords.detail ? CourseScanRecords.detail.sheets.find(s => s.Sheet_ID === id) : null),
-
-    // Edits one answer without redrawing the list: updates the preview, button state and colour only.
-    updateEditor: (sheetId) => {
-        const sheet = CourseScanRecords.findSheet(sheetId);
-        const card = document.querySelector(`[data-sheet-card="${CSS.escape(sheetId)}"]`);
-        if (!sheet || !card) return;
-        const { session } = CourseScanRecords.detail;
-        const key = session.Answer_Key;
-        const bonus = session.Bonus_Flags.map(Boolean);
-        const draft = CourseScanRecords.drafts[sheetId] || sheet.Answers;
-        const g = grade(draft, key, bonus, session.Max_Score);
-
-        card.querySelector('[data-role="preview"]').textContent =
-            `Score: ${fmt(g.score)} / ${session.Max_Score == null ? '?' : fmt(session.Max_Score)} (${g.raw} correct${g.bonus ? ` + ${g.bonus} bonus` : ''}, ${g.wrong} wrong, ${g.blank} blank, ${g.multiple} double-shaded)`;
-        card.querySelector('[data-role="save"]').disabled = sameList(draft, sheet.Answers);
-        card.querySelector('[data-role="reset"]').classList.toggle('hidden', sameList(draft, sheet.Original_Answers));
-        card.querySelectorAll('.scr-answer-select').forEach(sel => {
-            const q = Number(sel.dataset.q);
-            sel.className = `scr-answer-select w-full px-1 py-0.5 border rounded text-xs ${draft[q] === key[q] ? 'border-green-400 bg-green-50' : 'border-red-300 bg-red-50'}`;
-        });
-    },
-
-    saveCorrection: async (sheetId) => {
-        const sheet = CourseScanRecords.findSheet(sheetId);
-        const draft = CourseScanRecords.drafts[sheetId];
-        if (!sheet || !draft || CourseScanRecords.busy) return;
-        CourseScanRecords.busy = true;
-        const btn = document.querySelector(`.scr-save-btn[data-sheet="${CSS.escape(sheetId)}"]`);
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
-        }
-        try {
-            const res = await apiFetch('/api/scan-sheets/correct', {
-                method: 'POST',
-                body: JSON.stringify({ sheetId, answers: draft })
-            });
-            sheet.Answers = draft.slice();
-            sheet.Score = res.score;
-            sheet.Edited = res.edited ? 1 : 0;
-            delete CourseScanRecords.drafts[sheetId];
-            CourseScanRecords.renderDetail();
-            CourseScanRecords.setAlert(`Saved. ${sheet.Name || 'Student'} now has ${fmt(res.score)} (also updated in Record Scores).`, true);
-        } catch (err) {
-            CourseScanRecords.setAlert(err.message || 'Failed to save the correction.', false);
-            CourseScanRecords.renderDetail();
-        } finally {
-            CourseScanRecords.busy = false;
-        }
+            <button type="button" class="scr-row-btn w-full text-left bg-white border ${attention ? 'border-amber-300' : 'border-gray-200'} rounded-lg p-3 flex items-center gap-3" data-sheet="${esc(id)}" aria-label="Review ${esc(sheet.Name || 'student')}">
+                <span class="min-w-0 flex-1">
+                    <span class="block text-sm font-bold text-gray-800 truncate">${esc(sheet.Name || 'Unknown student')}</span>
+                    <span class="block text-[11px] text-gray-500">${esc(sheet.Student_Number || '')}${sheet.Student_No_Read ? ` | scanned number ${esc(sheet.Student_No_Read)}` : ''}</span>
+                    <span class="mt-1 flex flex-wrap gap-1">${badges}</span>
+                </span>
+                <span class="text-right shrink-0">
+                    <span class="block"><span class="text-lg font-black font-mono text-gray-800">${fmt(g.score)}</span><span class="text-xs text-gray-500"> / ${maxText}</span></span>
+                    <span class="block text-[10px] text-gray-400"><i class="fa-regular fa-image mr-1" aria-hidden="true"></i>${sheet.Photo_File_ID ? 'photo' : 'no photo'}</span>
+                </span>
+                <i class="fa-solid fa-chevron-right text-gray-300" aria-hidden="true"></i>
+            </button>`;
     },
 
     // ---------- Events ----------
@@ -480,51 +344,15 @@ export const CourseScanRecords = {
             return;
         }
 
-        const toggle = e.target.closest('.scr-toggle-btn');
-        if (toggle) {
-            const id = toggle.dataset.sheet;
-            if (CourseScanRecords.openIds.has(id)) {
-                CourseScanRecords.openIds.delete(id);
-                delete CourseScanRecords.drafts[id];
-            } else {
-                CourseScanRecords.openIds.add(id);
-                const sheet = CourseScanRecords.findSheet(id);
-                if (sheet) CourseScanRecords.drafts[id] = sheet.Answers.slice();
-            }
-            CourseScanRecords.renderDetail();
-            return;
+        const rowBtn = e.target.closest('.scr-row-btn');
+        if (rowBtn) {
+            const { detail } = CourseScanRecords;
+            if (!detail) return;
+            const order = CourseScanRecords.visibleSheets();
+            CourseScanReview.open({
+                detail, order, sheetId: rowBtn.dataset.sheet,
+                onChange: () => { if (CourseScanRecords.detail === detail) CourseScanRecords.renderDetail(); }
+            });
         }
-
-        const photoBtn = e.target.closest('.scr-photo-btn');
-        if (photoBtn) {
-            const sheet = CourseScanRecords.findSheet(photoBtn.dataset.sheet);
-            if (sheet && sheet.Photo_File_ID) CourseScanRecords.showPhoto(sheet);
-            return;
-        }
-
-        const resetBtn = e.target.closest('.scr-reset-btn');
-        if (resetBtn) {
-            const id = resetBtn.dataset.sheet;
-            const sheet = CourseScanRecords.findSheet(id);
-            if (sheet) {
-                CourseScanRecords.drafts[id] = sheet.Original_Answers.slice();
-                CourseScanRecords.renderDetail();
-            }
-            return;
-        }
-
-        const saveBtn = e.target.closest('.scr-save-btn');
-        if (saveBtn) await CourseScanRecords.saveCorrection(saveBtn.dataset.sheet);
-    },
-
-    handleChanges: (e) => {
-        const t = e.target;
-        if (!t.classList || !t.classList.contains('scr-answer-select')) return;
-        const id = t.dataset.sheet;
-        const sheet = CourseScanRecords.findSheet(id);
-        if (!sheet) return;
-        if (!CourseScanRecords.drafts[id]) CourseScanRecords.drafts[id] = sheet.Answers.slice();
-        CourseScanRecords.drafts[id][Number(t.dataset.q)] = parseInt(t.value, 10);
-        CourseScanRecords.updateEditor(id);
     }
 };

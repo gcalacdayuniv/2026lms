@@ -351,6 +351,13 @@ async function ensureScanTables(env) {
     } catch (err) {
         if (!/duplicate column/i.test(String(err && err.message))) throw err;
     }
+    // Photo_Layout = how the photo is drawn: "rect1" = the sheet straightened to its frame at 5 px per unit
+    // (so the app can cut out the row of any question). Empty = an older, plain photo.
+    try {
+        await env.DB.prepare("ALTER TABLE Scan_Sheets ADD COLUMN Photo_Layout TEXT").run();
+    } catch (err) {
+        if (!/duplicate column/i.test(String(err && err.message))) throw err;
+    }
     scanTablesReady = true;
 }
 
@@ -435,7 +442,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (!session) return json(corsHeaders, { error: 'Saved scan not found.' }, 404);
 
         const rows = await env.DB.prepare(
-            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID,
+            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID, h.Photo_Layout,
                     u.Name, u.Student_Number
              FROM Scan_Sheets h LEFT JOIN Users u ON u.User_ID = h.Student_ID
              WHERE h.Session_ID = ?
@@ -575,6 +582,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
                     Student_No_Read = excluded.Student_No_Read, Original_Answers = excluded.Original_Answers,
                     Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited,
                     Photo_File_ID = CASE WHEN Scan_Sheets.Scan_ID IS excluded.Scan_ID THEN Scan_Sheets.Photo_File_ID ELSE NULL END,
+                    Photo_Layout = CASE WHEN Scan_Sheets.Scan_ID IS excluded.Scan_ID THEN Scan_Sheets.Photo_Layout ELSE NULL END,
                     Scan_ID = excluded.Scan_ID,
                     Updated_At = CURRENT_TIMESTAMP`
             ).bind(
@@ -628,6 +636,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
     if (method === 'POST' && path === '/api/scan-sheets/photo') {
         const body = await request.json();
         const { courseId, assessmentId, studentId, scanId, base64 } = body;
+        const layout = body.layout === 'rect1' ? 'rect1' : null;
         if (!courseId || !assessmentId || !studentId || typeof scanId !== 'string' || !scanId || scanId.length > 64) {
             return json(corsHeaders, { error: 'Missing sheet details.' }, 400);
         }
@@ -650,8 +659,20 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             pathParts: ['Scan Sheets', courseId, row.Session_ID]
         }));
         if (!gas.fileId) throw new Error('Google Drive did not return a file id.');
-        await env.DB.prepare("UPDATE Scan_Sheets SET Photo_File_ID = ? WHERE Sheet_ID = ?").bind(gas.fileId, row.Sheet_ID).run();
+        await env.DB.prepare("UPDATE Scan_Sheets SET Photo_File_ID = ?, Photo_Layout = ? WHERE Sheet_ID = ?").bind(gas.fileId, layout, row.Sheet_ID).run();
         return json(corsHeaders, { success: true, fileId: gas.fileId }, 201);
+    }
+
+    // Gives the stored photo of one saved sheet back as base64 (read from Google Drive through the Apps Script web app).
+    // The app asks for one sheet at a time and keeps the answer on the device for 7 days.
+    if (method === 'GET' && path === '/api/scan-sheets/photo') {
+        const sheetId = url.searchParams.get('sheetId');
+        if (!sheetId) return json(corsHeaders, { error: 'Missing sheetId' }, 400);
+        const row = await env.DB.prepare("SELECT Photo_File_ID, Photo_Layout FROM Scan_Sheets WHERE Sheet_ID = ?").bind(sheetId).first();
+        if (!row || !row.Photo_File_ID) return json(corsHeaders, { error: 'No photo is stored for this sheet.' }, 404);
+        const gas = await callGas(env, JSON.stringify({ action: 'read', fileId: row.Photo_File_ID }));
+        if (!gas.base64) throw new Error('Google Drive did not return the photo.');
+        return json(corsHeaders, { success: true, fileId: row.Photo_File_ID, layout: row.Photo_Layout || null, mimeType: gas.mimeType || 'image/jpeg', base64: gas.base64 });
     }
 
     // Corrects one student's answers later; the score in the assessment is updated too.

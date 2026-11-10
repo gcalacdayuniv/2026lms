@@ -1101,7 +1101,7 @@ export const CourseScanner = {
                 removeStudent: row.savedStudentId && row.savedStudentId !== row.studentId ? row.savedStudentId : null
             });
             // Low-resolution photo for later review (kept on the phone until the sheet is confirmed saved).
-            ScanPhotos.keep(row.scanId, CourseScanner.courseId, row.photoUrl);
+            ScanPhotos.keep(row.scanId, CourseScanner.courseId, row.photoUrl, row.result && row.result.H);
             row.cfg = row.cfg || cfg;
             row.saveState = 'pending';
             row.attempts = 0;

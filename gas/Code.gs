@@ -3,6 +3,7 @@
 //   1. Direct upload (no "action"): whole file in one request (small files, profile pictures).
 //   2. action "chunk":  stores one piece of a large upload in a temporary Drive folder.
 //   3. action "finish": joins the pieces, saves the final file, deletes the temporary pieces.
+//   4. action "read":   returns one stored picture (base64) so the app can show a saved answer sheet.
 
 var ROOT_FOLDER_ID = "1GcK1G9HE1NWII0XkSXLXyPWXP5Zxuv9f";
 var TEMP_FOLDER_NAME = "_upload_tmp";
@@ -21,6 +22,7 @@ function doPost(e) {
 
     if (payload.action === "chunk") return jsonOut(handleChunk(payload));
     if (payload.action === "finish") return jsonOut(handleFinish(payload));
+    if (payload.action === "read") return jsonOut(handleRead(payload));
     return jsonOut(handleDirect(payload));
 
   } catch (error) {
@@ -82,6 +84,21 @@ function handleDirect(payload) {
   var blob = decodeToBlob(payload.base64, payload.mimeType, filename);
   var folder = resolveTargetFolder(payload.pathParts);
   return saveFile(folder, blob);
+}
+
+// ---- 4. Read one stored picture ---------------------------------------------------
+// Only small pictures (the low-resolution answer sheet photos) are returned this way.
+var MAX_READ_BYTES = 3 * 1024 * 1024;
+function handleRead(payload) {
+  var fileId = String(payload.fileId || "");
+  if (!/^[A-Za-z0-9_-]{10,100}$/.test(fileId)) throw new Error("Invalid file id.");
+  var file = DriveApp.getFileById(fileId);
+  var blob = file.getBlob();
+  var mime = String(blob.getContentType() || "");
+  if (mime.indexOf("image/") !== 0) throw new Error("This file is not a picture.");
+  var bytes = blob.getBytes();
+  if (bytes.length > MAX_READ_BYTES) throw new Error("This picture is too large to read here.");
+  return { success: true, mimeType: mime, base64: Utilities.base64Encode(bytes) };
 }
 
 // ---- 2. One piece of a large upload ---------------------------------------------
