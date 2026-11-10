@@ -5,7 +5,7 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ALLOWED_ORIGIN = "https://plv.workers.dev" 
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxAqlxaClU1gn_m6bddHRZFvxe11xc5SezoxLR91HynCtmtvKr3Xaz4fuIuqMykI1sX/exec"
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzsHLilW-Cf6271-psjtck20A0rABnoywXCPvsSeL5rSypDxKC3v6HA_HPZ8YOg1Tns/exec"
 SESSION_SECRET = ""
 
 [[d1_databases]]
