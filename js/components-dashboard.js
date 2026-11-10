@@ -453,14 +453,14 @@ const DashboardUI = {
     `,
 
     renderSubmitDocumentModal: () => `
-        <div id="submitDocModal" class="hidden fixed inset-0 z-[90] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
+        <div id="submitDocModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmitDocModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 sheet-panel max-h-[92vh] overflow-y-auto">
-                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-cloud-arrow-up text-blue-600 mr-2"></i>Submit Document</h3>
-                    <button id="closeSubmitDocModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-cloud-arrow-up text-blue-600 mr-2"></i>Submit Document</h3>
+                    <button id="closeSubmitDocModalBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden"></i>
+                        <i class="fa-solid fa-xmark text-xl hidden sm:inline"></i>
                     </button>
                 </div>
                 <form id="submitDocForm" class="space-y-4">
@@ -512,7 +512,7 @@ const DashboardUI = {
                         <i class="fa-solid fa-spinner fa-spin mr-2"></i> <span id="submitDocProgressText">Uploading...</span>
                     </div>
 
-                    <button type="submit" id="submitDocBtn" class="w-full flex justify-center py-2.5 px-4 rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-4">
+                    <button type="submit" id="submitDocBtn" class="form-save w-full flex justify-center py-2.5 px-4 rounded-md shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors mt-4">
                         Submit
                     </button>
                 </form>
@@ -540,7 +540,7 @@ const DashboardUI = {
     renderGroupMembersModal: () => `
         <div id="groupMembersModal" class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeGroupMembersModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
                 <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users text-blue-600 mr-2"></i><span id="gmmTitle">Group Members</span></h3>

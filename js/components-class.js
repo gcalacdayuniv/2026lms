@@ -334,15 +334,15 @@ const ClassUI = {
         </div>
     `,
 
+    // Full-screen page on phones (centered dialog from 640px up).
     renderManageStudentModal: () => `
-        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
+        <div id="manageStudentModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeManageStudentModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 sheet-panel max-h-[92vh] overflow-y-auto">
-                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-gear text-blue-600 mr-2"></i>Manage Student</h3>
-                    <button id="closeManageStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="flex-1 min-w-0 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-user-gear text-blue-600 mr-2"></i>Manage Student</h3>
+                    <button id="closeManageStudentModalBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div id="manageStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
@@ -457,14 +457,15 @@ const ClassUI = {
         </div>
     `,
 
+    // Lecturer's view of one student's summary: full-screen page on phones.
     renderSummaryModal: () => `
-        <div id="summaryModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center fade-in p-4">
+        <div id="summaryModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSummaryModalBg"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 scale-up max-h-[90vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>Performance Summary</h3>
-                    <button id="closeSummaryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-2xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="flex-1 min-w-0 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i>Performance Summary</h3>
+                    <button id="closeSummaryModalBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div id="summaryStudentName" class="font-black text-gray-800 text-center mb-4 text-base sm:text-lg"></div>
@@ -604,15 +605,15 @@ const ClassUI = {
         </div>
     `,
 
+    // Full-screen page on phones: search box + long list need the space and the keyboard.
     renderAddStudentModal: () => `
-        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
+        <div id="addStudentModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm modal-backdrop" id="closeAddStudentModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-3xl p-4 sm:p-6 relative z-10 sheet-panel max-h-[92vh] sm:max-h-[90vh] flex flex-col">
-                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
-                <div class="flex justify-between items-center mb-5 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
-                    <button id="closeAddStudentModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[90vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="flex-1 min-w-0 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-user-plus text-green-600 mr-2"></i>Manually Enroll Student</h3>
+                    <button id="closeAddStudentModalBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -637,7 +638,7 @@ const ClassUI = {
                     </div>
                 </div>
 
-                <div id="unenrolledStudentsList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
+                <div id="unenrolledStudentsList" class="flex-1 min-h-0 overflow-y-auto space-y-2 sm:min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
                     <div class="text-center py-10 text-gray-500 text-sm"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i><br>Loading students...</div>
                 </div>
             </div>
@@ -723,10 +724,11 @@ const ClassUI = {
         </div>
     `,
 
+    // Short list: stays a bottom sheet, now the full width of the screen.
     renderGroupMembersModal: () => `
         <div id="groupMembersModal" class="hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeGroupMembersModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-sm p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
+            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
                 <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
                 <div class="flex justify-between items-center mb-4 border-b pb-3">
                     <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-users text-blue-600 mr-2"></i><span id="gmmTitle">Group Members</span></h3>
