@@ -1,4 +1,5 @@
 // js/app.js
+import { UnsavedCenter } from './unsaved-center.js';
 import { AppRouter } from './router.js';
 import { AuthModule } from './auth.js';
 import { CourseModule } from './course.js';
@@ -41,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     AppFeel.init();
     MuSwipe.init();
     Theme.init();
+    UnsavedCenter.init();
     ProfileEdit.init();
     CoursePending.init();
     CourseAttendanceDates.init();

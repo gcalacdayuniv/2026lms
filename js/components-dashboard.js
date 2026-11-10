@@ -646,6 +646,10 @@ export const DashboardComponents = {
         let lecturerBtns = '';
         const appearanceHtml = `
             <div class="mt-6">
+                <button type="button" id="openUnsavedBtn" class="w-full mb-5 flex items-center justify-between py-2.5 px-3 border border-gray-300 rounded-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50">
+                    <span><i class="fa-solid fa-cloud-arrow-up mr-2" aria-hidden="true"></i>Unsaved on this device</span>
+                    <span id="unsavedBadge" class="hidden min-w-[1.4rem] text-center px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-xs">0</span>
+                </button>
                 <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Appearance</div>
                 <div class="grid grid-cols-3 gap-2" role="group" aria-label="Appearance">
                     <button type="button" class="theme-choice" data-theme-choice="auto" aria-pressed="false"><i class="fa-solid fa-circle-half-stroke mr-1" aria-hidden="true"></i>Auto</button>
