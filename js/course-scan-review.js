@@ -6,7 +6,7 @@
 import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
-import { PhotoCache, CACHE_DAYS } from './course-scan-photos.js';
+import { PhotoCache, ScanPhotos } from './course-scan-photos.js';
 import { answerRows } from './omr-sheet.js';
 import { cropBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
@@ -182,7 +182,7 @@ export const CourseScanReview = {
         };
         const phs = () => document.querySelectorAll('#scrvBody [data-ph]');
 
-        if (!sheet.Photo_File_ID) {
+        if (!sheet.Photo_File_ID && !(sheet.Scan_ID && await ScanPhotos.local(sheet.Scan_ID))) {
             setNote('No photo was saved for this sheet. You can still correct the answers.', 'is-info');
             phs().forEach(p => { p.textContent = 'no photo'; p.classList.add('is-empty'); });
             return;
@@ -190,7 +190,7 @@ export const CourseScanReview = {
         setNote('');
         phs().forEach(p => p.classList.add('is-loading'));
         try {
-            let { blob, layout, cached } = await PhotoCache.get(sheet);
+            let { blob, layout, source } = await PhotoCache.get(sheet);
             if (mine !== CourseScanReview.token) return;
             if (layout !== RECT_LAYOUT) {
                 // Older plain photo: find the sheet in it and straighten it here, once; the result is kept for 7 days.
@@ -210,7 +210,7 @@ export const CourseScanReview = {
                     if (canvas) { drawCrop(canvas, bitmap, cropBox(r, session.Num_Choices)); canvas.classList.add('is-ready'); }
                 });
                 phs().forEach(p => p.remove());
-                if (cached) CourseScanReview.cachedHint();
+                if (source === 'old-cache') setNote('Could not reach the server, showing the copy kept on this device.', 'is-info');
             } else {
                 // Older photo (not straightened): rows cannot be cut out, show the whole sheet on top instead.
                 phs().forEach(p => { p.textContent = 'see photo above'; p.classList.remove('is-loading'); p.classList.add('is-empty'); });
@@ -229,8 +229,6 @@ export const CourseScanReview = {
             setNote(`The photo could not be loaded (${esc((err && err.message) || 'offline')}). <button type="button" id="scrvRetry" class="underline font-black">Try again</button>`, 'is-warn');
         }
     },
-
-    cachedHint: () => { /* photos come from the device after the first download; kept for CACHE_DAYS days */ void CACHE_DAYS; },
 
     // Updates colours, scanned/key note, score and buttons for the open sheet without redrawing the photos.
     refresh: () => {

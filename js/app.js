@@ -1,4 +1,5 @@
 // js/app.js
+import { StudentSheetViewer } from './student-sheet-viewer.js';
 import { UnsavedCenter } from './unsaved-center.js';
 import { AppRouter } from './router.js';
 import { AuthModule } from './auth.js';
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     MuSwipe.init();
     Theme.init();
     UnsavedCenter.init();
+    StudentSheetViewer.init();
     ProfileEdit.init();
     CoursePending.init();
     CourseAttendanceDates.init();

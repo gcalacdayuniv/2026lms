@@ -406,7 +406,7 @@ async function runInChunks(env, statements) {
 
 // Returns a Response when the request is handled here, otherwise null.
 async function handleScanSheets(request, env, path, url, corsHeaders) {
-    if (path !== '/api/scan-sessions' && !path.startsWith('/api/scan-sheets')) return null;
+    if (path !== '/api/scan-sessions' && path !== '/api/student-sheet-photo' && !path.startsWith('/api/scan-sheets')) return null;
     await ensureScanTables(env);
     const method = request.method;
 
@@ -442,7 +442,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (!session) return json(corsHeaders, { error: 'Saved scan not found.' }, 404);
 
         const rows = await env.DB.prepare(
-            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID, h.Photo_Layout,
+            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID, h.Photo_Layout, h.Scan_ID,
                     u.Name, u.Student_Number
              FROM Scan_Sheets h LEFT JOIN Users u ON u.User_ID = h.Student_ID
              WHERE h.Session_ID = ?
@@ -661,6 +661,19 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (!gas.fileId) throw new Error('Google Drive did not return a file id.');
         await env.DB.prepare("UPDATE Scan_Sheets SET Photo_File_ID = ?, Photo_Layout = ? WHERE Sheet_ID = ?").bind(gas.fileId, layout, row.Sheet_ID).run();
         return json(corsHeaders, { success: true, fileId: gas.fileId }, 201);
+    }
+
+    // A student's own answer sheet photo, so they can check it is their paper. Only the sheet that belongs to the
+    // given student is returned.
+    if (method === 'GET' && path === '/api/student-sheet-photo') {
+        const sheetId = url.searchParams.get('sheetId');
+        const studentId = url.searchParams.get('studentId');
+        if (!sheetId || !studentId) return json(corsHeaders, { error: 'Missing sheetId or studentId' }, 400);
+        const row = await env.DB.prepare("SELECT Student_ID, Photo_File_ID, Photo_Layout FROM Scan_Sheets WHERE Sheet_ID = ?").bind(sheetId).first();
+        if (!row || row.Student_ID !== studentId || !row.Photo_File_ID) return json(corsHeaders, { error: 'No photo is stored for this sheet.' }, 404);
+        const gas = await callGas(env, JSON.stringify({ action: 'read', fileId: row.Photo_File_ID }));
+        if (!gas.base64) throw new Error('Google Drive did not return the photo.');
+        return json(corsHeaders, { success: true, fileId: row.Photo_File_ID, layout: row.Photo_Layout || null, mimeType: gas.mimeType || 'image/jpeg', base64: gas.base64 });
     }
 
     // Gives the stored photo of one saved sheet back as base64 (read from Google Drive through the Apps Script web app).
@@ -2357,20 +2370,38 @@ export default {
 
                 let assessments = [];
                 try {
+                    // Sheet_ID = this student's scanned answer sheet (with a stored photo) for the assessment, if any.
+                    await ensureScanTables(env);
                     const assessmentRes = await env.DB.prepare(
-                        `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, s.Score
+                        `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, s.Score,
+                                (SELECT h.Sheet_ID FROM Scan_Sheets h JOIN Scan_Sessions ss ON ss.Session_ID = h.Session_ID
+                                  WHERE ss.Assessment_ID = a.Assessment_ID AND h.Student_ID = ? AND h.Photo_File_ID IS NOT NULL LIMIT 1) AS Sheet_ID,
+                                (SELECT h.Scan_ID FROM Scan_Sheets h JOIN Scan_Sessions ss ON ss.Session_ID = h.Session_ID
+                                  WHERE ss.Assessment_ID = a.Assessment_ID AND h.Student_ID = ? AND h.Photo_File_ID IS NOT NULL LIMIT 1) AS Sheet_Version
                          FROM Assessments a
                          LEFT JOIN Assessment_Scores s ON s.Assessment_ID = a.Assessment_ID AND s.Student_ID = ?
                          WHERE a.Course_ID = ?
                          ORDER BY a.Date ASC, a.Created_At ASC`
-                    ).bind(studentId, courseId).all();
+                    ).bind(studentId, studentId, studentId, courseId).all();
                     assessments = assessmentRes.results;
                 } catch (err) {
-                    assessments = [];
+                    try {
+                        const assessmentRes = await env.DB.prepare(
+                            `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, s.Score
+                             FROM Assessments a
+                             LEFT JOIN Assessment_Scores s ON s.Assessment_ID = a.Assessment_ID AND s.Student_ID = ?
+                             WHERE a.Course_ID = ?
+                             ORDER BY a.Date ASC, a.Created_At ASC`
+                        ).bind(studentId, courseId).all();
+                        assessments = assessmentRes.results;
+                    } catch (err2) {
+                        assessments = [];
+                    }
                 }
 
                 return new Response(JSON.stringify({
                     success: true,
+                    studentId: studentId,
                     course: course,
                     sessions: sessions.results,
                     records: records.results,

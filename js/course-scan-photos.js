@@ -144,6 +144,15 @@ export const ScanPhotos = {
         }
     },
 
+    // The copy still on this phone for a captured sheet (not uploaded yet, or upload not confirmed), if any.
+    local: async (scanId) => {
+        if (!scanId) return null;
+        try {
+            const e = await getEntry(scanId);
+            return e && e.blob ? { blob: e.blob, layout: e.layout || null } : null;
+        } catch (err) { return null; }
+    },
+
     waiting: async () => (await allEntries()).length
 };
 
@@ -198,18 +207,31 @@ export const PhotoCache = {
         }
     },
 
-    // The photo of one saved sheet: from the device when it was downloaded before (and is not 7 days old),
-    // otherwise downloaded now (only this one) and kept. Returns { blob, layout, cached } or throws.
-    get: async (sheet) => {
+    // The photo of one saved sheet, from the best place available:
+    //   1. the copy still on this phone (captured here, upload not finished)   - no download
+    //   2. the copy downloaded before and kept for 7 days                      - no download
+    //   3. Google Drive through the Worker (only this one photo), then kept    - download
+    //   4. if the download fails: an older kept copy, even past 7 days, rather than nothing
+    // `endpoint` lets a student read their own sheet. Returns { blob, layout, source } or throws.
+    get: async (sheet, { endpoint = '/api/scan-sheets/photo', query = '' } = {}) => {
         const fileId = sheet.Photo_File_ID;
+        if (sheet.Scan_ID) {
+            const mine = await ScanPhotos.local(sheet.Scan_ID);
+            if (mine) return { ...mine, source: 'device' };
+        }
         if (!fileId) throw new Error('No photo is stored for this sheet.');
         const hit = await cacheTx('readonly', s => s.get(fileId));
-        if (hit && hit.blob && Date.now() - hit.savedAt <= CACHE_MS) return { blob: hit.blob, layout: hit.layout || null, cached: true };
-        const res = await apiFetch(`/api/scan-sheets/photo?sheetId=${encodeURIComponent(sheet.Sheet_ID)}`, { timeoutMs: 45000 });
-        const blob = fromBase64(res.base64, res.mimeType);
-        const layout = res.layout || null;
-        await cacheTx('readwrite', s => s.put({ fileId, blob, layout, savedAt: Date.now() }));
-        return { blob, layout, cached: false };
+        if (hit && hit.blob && Date.now() - hit.savedAt <= CACHE_MS) return { blob: hit.blob, layout: hit.layout || null, source: 'cache' };
+        try {
+            const res = await apiFetch(`${endpoint}?sheetId=${encodeURIComponent(sheet.Sheet_ID)}${query}`, { timeoutMs: 45000 });
+            const blob = fromBase64(res.base64, res.mimeType);
+            const layout = res.layout || null;
+            await cacheTx('readwrite', s => s.put({ fileId, blob, layout, savedAt: Date.now() }));
+            return { blob, layout, source: 'web' };
+        } catch (err) {
+            if (hit && hit.blob) return { blob: hit.blob, layout: hit.layout || null, source: 'old-cache' };
+            throw err;
+        }
     },
 
     // Replaces a kept photo (used when an older photo was straightened on this device).

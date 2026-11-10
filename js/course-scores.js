@@ -1,4 +1,5 @@
 // js/course-scores.js
+import { StudentSheetViewer } from './student-sheet-viewer.js';
 import { apiFetch } from './globals.js';
 import { CourseSummary } from './course-summary.js';
 import { UI } from './ui-feedback.js';
@@ -130,7 +131,7 @@ export const CourseScores = {
                 return `
                     <tr class="hover:bg-gray-50 transition">
                         <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${esc(a.Date || '')}</td>
-                        <td class="px-3 py-2 text-center text-gray-600">${esc(a.Title)}</td>
+                        <td class="px-3 py-2 text-center text-gray-600">${esc(a.Title)}${StudentSheetViewer.buttonHtml(a, data.studentId)}</td>
                         <td class="px-3 py-2 text-center font-mono font-bold text-blue-600">${scoreText}</td>
                     </tr>
                 `;
