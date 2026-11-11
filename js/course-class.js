@@ -308,7 +308,7 @@ export const CourseClass = {
                 <body>
                     <div class="header">
                         <h1>${escapeHtml(data.course.CourseCode)} | ${escapeHtml(data.course.CourseTitle)}</h1>
-                        <h3>Schedule: ${escapeHtml(data.course.ScheduleDay)} | ${escapeHtml(data.course.TimePeriod)}</h3>
+                        <h3>Schedule: ${escapeHtml(data.course.ScheduleDay)} | ${escapeHtml(data.course.TimePeriod)}${data.course.Room ? ' | Room: ' + escapeHtml(data.course.Room) : ''}</h3>
                     </div>
                     <table>
                         <thead>
@@ -551,3 +551,33 @@ export const CourseClass = {
         }
     }
 };
+
+// Lecturer edits the classroom of a class from the class page.
+document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#editRoomBtn');
+    if (!btn) return;
+    const text = document.getElementById('classRoomText');
+    const current = text ? (text.dataset.room || '') : '';
+    const answer = window.prompt('Classroom (leave blank to clear):', current);
+    if (answer === null) return;
+    const room = answer.trim().slice(0, 60);
+    if (room === current) return;
+    btn.disabled = true;
+    try {
+        const res = await apiFetch('/api/update-course-room', {
+            method: 'POST',
+            body: JSON.stringify({ courseId: btn.dataset.courseId, room, lecturerId: AppState.user.User_ID })
+        });
+        const saved = (res && typeof res.room === 'string') ? res.room : room;
+        if (text) {
+            text.dataset.room = saved;
+            text.innerHTML = saved ? escapeHtml(saved) : '<span class="italic text-gray-400">No room assigned</span>';
+        }
+        try { localStorage.removeItem(classCacheKey(btn.dataset.courseId)); } catch (err) { /* storage blocked */ }
+        UI.success(saved ? 'Classroom saved' : 'Classroom cleared');
+    } catch (err) {
+        UI.error(err.message || 'Could not save the classroom');
+    } finally {
+        btn.disabled = false;
+    }
+});

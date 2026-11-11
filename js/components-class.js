@@ -903,7 +903,10 @@ export const ClassComponents = {
                         <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
                             Class Roster & Attendance ${audienceBadge}
                         </h2>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(course.ScheduleDay)} | ${escapeHtml(course.TimePeriod)}</p>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(course.ScheduleDay)} | ${escapeHtml(course.TimePeriod)}
+                            <span class="mx-1">|</span><i class="fa-solid fa-door-open mr-1"></i><span id="classRoomText" data-room="${escapeHtml(course.Room || '')}">${course.Room ? escapeHtml(course.Room) : '<span class="italic text-gray-400">No room assigned</span>'}</span>
+                            <button type="button" id="editRoomBtn" data-course-id="${escapeHtml(course.Course_ID)}" class="ml-1 px-1.5 py-0.5 text-blue-600 hover:text-blue-800 focus:outline-none" aria-label="Edit classroom"><i class="fa-solid fa-pen text-[11px]"></i></button>
+                        </p>
                     </div>
                 </div>
 

@@ -986,6 +986,18 @@ function resolveAllowedOrigin(env, requestOrigin) {
     return list[0];
 }
 
+// Room = the classroom the class meets in. Added to an existing Courses table the first time it is needed.
+let courseRoomReady = false;
+async function ensureCourseRoom(env) {
+    if (courseRoomReady) return;
+    try {
+        await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Room TEXT").run();
+    } catch (err) {
+        if (!/duplicate column/i.test(String(err && err.message))) throw err;
+    }
+    courseRoomReady = true;
+}
+
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
@@ -1007,6 +1019,10 @@ export default {
         }
 
         try {
+            if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room") {
+                await ensureCourseRoom(env);
+            }
+
             if (request.method === "GET" && path === "/api/exams") {
                 const lecturerId = url.searchParams.get("lecturerId");
                 const exams = await env.DB.prepare("SELECT Exam_ID, Title, ExamData, Created_At FROM Exams WHERE Lecturer_ID = ? ORDER BY Created_At DESC").bind(lecturerId).all();
@@ -1778,12 +1794,27 @@ export default {
                 const targetCourse = body.targetCourse ? body.targetCourse.trim() : "";
                 const targetYear = body.targetYear ? body.targetYear.trim() : "";
                 const targetSection = body.targetSection ? body.targetSection.trim() : "";
+                const room = body.room ? String(body.room).trim().slice(0, 60) : "";
 
                 await env.DB.prepare(
-                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-                ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId, targetCourse, targetYear, targetSection).run();
+                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section, Room) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId, targetCourse, targetYear, targetSection, room).run();
 
                 return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && path === "/api/update-course-room") {
+                const body = await request.json();
+                const course = await env.DB.prepare("SELECT Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+                if (course.Lecturer_ID !== body.lecturerId) {
+                    return new Response(JSON.stringify({ error: "Only the lecturer of this class can change the room." }), { status: 403, headers: corsHeaders });
+                }
+                const room = body.room ? String(body.room).trim().slice(0, 60) : "";
+                await env.DB.prepare("UPDATE Courses SET Room = ? WHERE Course_ID = ?").bind(room, body.courseId).run();
+                return new Response(JSON.stringify({ success: true, room }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "POST" && path === "/api/update-course-terms") {

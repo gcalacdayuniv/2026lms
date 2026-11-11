@@ -174,7 +174,7 @@ export const ScannerUI = {
                             </div>
                             <div id="scnLiveDone" class="hidden">
                                 <div class="flex gap-2">
-                                    <button type="button" id="scnCaptureAgainBtn" class="flex-1 whitespace-nowrap bg-rose-600 hover:bg-rose-700 text-white px-2 py-2 rounded-md text-xs font-bold transition"><i class="fa-solid fa-rotate-right mr-1"></i> Capture again</button>
+                                    <button type="button" id="scnCaptureAgainBtn" class="flex-1 whitespace-nowrap bg-rose-600 hover:bg-rose-700 text-white px-2 py-2 rounded-md text-xs font-bold transition"><i class="fa-solid fa-rotate-right mr-1"></i> Recapture (replace)</button>
                                     <button type="button" id="scnAfterDoneBtn" class="flex-1 whitespace-nowrap bg-white hover:bg-gray-100 text-gray-800 px-2 py-2 rounded-md text-xs font-bold transition">Back to scan menu</button>
                                 </div>
                             </div>

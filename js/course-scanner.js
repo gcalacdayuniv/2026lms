@@ -21,8 +21,6 @@ const LIVE_REVIEW_HOLD_MS = 20000; // while a live review is open the lecturer g
 const RETRY_MS = 15000;
 const MAX_ATTEMPTS = 6;
 const UPLOAD_CHUNK = 100;
-const STEADY_MS = 2000;        // the sheet must stay still and fully visible this long before it is captured
-const MOVE_TOL = 0.012;        // corner movement (share of the frame) that still counts as steady
 const REARM_MOVE = 0.06;       // after a capture, the sheet must move this much (or leave) before the next one
 const MIN_SPAN = 0.5;          // the sheet must fill at least this share of the frame
 const MIN_BRIGHT = 70;         // average brightness (0-255) below this is "too dark"
@@ -78,7 +76,7 @@ export const CourseScanner = {
     lastChange: 0,
     targets: new Map(),     // assessment already resolved for a setup, so it is looked up or created once
     examsMade: new Set(),
-    live: { stream: null, timer: null, canvas: null, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 },
+    live: { stream: null, timer: null, canvas: null, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, replacing: null, vw: 0, vh: 0 },
 
     init: () => {
         document.addEventListener('click', CourseScanner.handleClicks);
@@ -628,7 +626,7 @@ export const CourseScanner = {
         video.srcObject = stream;
         try { await video.play(); } catch (e) { /* autoplay is already on */ }
 
-        Object.assign(live, { stream, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, vw: 0, vh: 0 });
+        Object.assign(live, { stream, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, replacing: null, vw: 0, vh: 0 });
         CourseScanner.setAlert('');
         CourseScanner.liveMode('camera');
         $('scnLivePanel').classList.remove('hidden');
@@ -656,6 +654,14 @@ export const CourseScanner = {
 
     liveReviewRow: null,
 
+    // Removes a captured sheet (used when a recapture replaces it).
+    dropRow: (row) => {
+        if (!row) return;
+        if (row.scanId && row.saveState !== 'saved') ScanQueue.remove([row.scanId]);
+        CourseScanner.revokeRow(row);
+        CourseScanner.rows = CourseScanner.rows.filter(r => r !== row);
+    },
+
     // 'camera' = camera view with its controls; 'review' = the captured sheet with Capture again / Back.
     liveMode: (mode) => {
         const review = mode === 'review';
@@ -679,7 +685,8 @@ export const CourseScanner = {
     showLiveReview: (row) => {
         CourseScanner.liveReviewRow = row;
         const box = $('scnLiveReview');
-        box.innerHTML = CourseScanner.rowHtml(row, CourseScanner.duplicateIds(), 'scnLv');
+        box.innerHTML = `<div class="mb-2 rounded bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold px-3 py-2"><i class="fa-solid fa-circle-question mr-1"></i> Captured the moment all 4 corners were seen. If the sheet looks off or a corner was missed, tap Recapture to replace it.</div>`
+            + CourseScanner.rowHtml(row, CourseScanner.duplicateIds(), 'scnLv');
         box.querySelector('details')?.setAttribute('open', '');
         CourseScanner.liveMode('review');
         box.scrollTop = 0;
@@ -773,7 +780,6 @@ export const CourseScanner = {
         const ys = norm.map(m => m[1]);
         const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
         const dist = (a, b) => Math.max(...a.map((p, i) => Math.max(Math.abs(p[0] - b[i][0]), Math.abs(p[1] - b[i][1]))));
-        const move = live.prev ? dist(norm, live.prev) : 1;
         live.prev = norm;
 
         if (!live.armed) {
@@ -799,19 +805,8 @@ export const CourseScanner = {
             return;
         }
 
-        const now = Date.now();
-        if (move < MOVE_TOL) {
-            if (!live.steady) live.steadySince = now;
-            live.steady++;
-        } else {
-            live.steady = 0;
-        }
-        outline(live.steady > 0 ? '#22c55e' : '#f59e0b');
-        const held = live.steady > 1 ? now - live.steadySince : 0;
-        if (held < STEADY_MS) {
-            CourseScanner.setLiveStatus('Hold steady...', live.steady > 0 ? 'green' : 'amber', held / STEADY_MS);
-            return;
-        }
+        // All 4 corners found: capture right away. The lecturer can recapture from the review if it is off.
+        outline('#22c55e');
         await CourseScanner.liveCapture(norm);
     },
 
@@ -840,6 +835,9 @@ export const CourseScanner = {
 
             const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const row = await CourseScanner.rowFromResult(`Live scan ${time}`, result);
+            // A recapture replaces the earlier capture it was started from.
+            if (live.replacing) CourseScanner.dropRow(live.replacing);
+            live.replacing = null;
             CourseScanner.rows.push(row);
             CourseScanner.renderRows();
             CourseScanner.markChange();
@@ -1360,10 +1358,13 @@ export const CourseScanner = {
         if (e.target.closest('#scnLiveBtn')) await CourseScanner.startLive();
         if (e.target.closest('#scnLiveStopBtn')) CourseScanner.stopLive();
         if (e.target.closest('#scnCaptureAgainBtn')) {
+            // Keep the first capture until the new one succeeds, then replace it.
+            const old = CourseScanner.liveReviewRow;
             CourseScanner.renderRows();
             CourseScanner.liveReviewRow = null;
             CourseScanner.flush();
             await CourseScanner.startLive();
+            CourseScanner.live.replacing = CourseScanner.live.stream ? old : null;
         }
         if (e.target.closest('#scnAfterDoneBtn')) CourseScanner.stopLive();
         if (e.target.closest('#scnLiveCaptureBtn')) await CourseScanner.liveCapture(CourseScanner.live.prev);

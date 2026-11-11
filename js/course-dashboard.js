@@ -310,7 +310,7 @@ const lecturerCourseCardHtml = (c) => `
                         </div>
                         <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
                         <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
-                            <i class="fa-regular fa-calendar mr-1"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(c.TimePeriod)}
+                            <i class="fa-regular fa-calendar mr-1"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(c.TimePeriod)}${c.Room ? ` &nbsp;|&nbsp; <i class="fa-solid fa-door-open mr-1"></i> ${escapeHtml(c.Room)}` : ''}
                         </div>
                         ${courseChipsHtml(c)}
                     </a>
@@ -345,6 +345,7 @@ const enrolledCourseCardHtml = (c) => `
                     <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
                     <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
+                    ${c.Room ? `<div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-door-open w-5 text-gray-400"></i> Room: <span class="font-bold">${escapeHtml(c.Room)}</span></div>` : ''}
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${escapeHtml(c.Seat_Number || 'Unassigned')}</span></div>
                     ${studentChipsHtml(c)}
                 </div>
@@ -357,6 +358,7 @@ const availableCourseCardHtml = (c) => `
                         <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
                         <div class="text-sm text-gray-600 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
                         <div class="text-sm text-gray-600 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
+                        ${c.Room ? `<div class="text-sm text-gray-600 mt-1"><i class="fa-solid fa-door-open w-5 text-gray-400"></i> Room: ${escapeHtml(c.Room)}</div>` : ''}
                     </div>
                     <button data-id="${c.Course_ID}" class="enroll-btn w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-bold transition-colors">
                         Enroll Now
@@ -667,6 +669,7 @@ export const CourseDashboard = {
             courseTitle: document.getElementById('courseTitle').value.trim(),
             scheduleDay: document.getElementById('scheduleDay').value,
             timePeriod: document.getElementById('timePeriod').value.trim(),
+            room: document.getElementById('courseRoom').value.trim(),
             targetCourse: document.getElementById('targetCourse').value.trim(),
             targetYear: document.getElementById('targetYear').value.trim(),
             targetSection: document.getElementById('targetSection').value.trim(),

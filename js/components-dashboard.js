@@ -395,6 +395,11 @@ const DashboardUI = {
                         </div>
                     </div>
 
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Classroom <span class="font-normal normal-case text-gray-400">(optional)</span></label>
+                        <input type="text" id="courseRoom" maxlength="60" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. Room 204, Computer Lab 2">
+                    </div>
+
                     <div class="border-t border-gray-200 pt-4 mt-4">
                         <p class="text-xs font-bold text-gray-800 mb-2 uppercase">Target Audience (Restriction)</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
