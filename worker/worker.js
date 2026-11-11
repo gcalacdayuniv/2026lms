@@ -1,4 +1,6 @@
 // worker/worker.js
+import { authorize, signToken, authEnabled } from './auth.js';
+import { hashPassword, verifyPassword } from './password.js';
 // worker/upload-guard.js
 // Cheap checks that run BEFORE any upload bytes are streamed to Google Drive.
 // Uses a few small D1 queries and no heavy CPU work, so it fits the free Workers plan.
@@ -277,12 +279,83 @@ async function handleAttendanceDates(request, env, path, url, corsHeaders) {
 }
 // ---------- End attendance date management ----------
 
-async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+// Finds the account for a sign-in identifier whose password matches. Older SHA-256 hashes are replaced by a
+// salted hash on the spot. Returns the row (with Password removed) or null.
+async function findUserByCredentials(env, identifier, password, columns) {
+    const rows = await env.DB.prepare(
+        `SELECT ${columns}, Password
+         FROM Users
+         WHERE Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?
+         LIMIT 3`
+    ).bind(identifier, identifier, identifier, identifier).all();
+    for (const row of rows.results || []) {
+        const check = await verifyPassword(password, row.Password, env);
+        if (!check.ok) continue;
+        if (check.needsUpgrade) {
+            try {
+                const upgraded = await hashPassword(password, env);
+                await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(upgraded, row.User_ID).run();
+            } catch (err) { /* the sign-in still works; the hash is upgraded next time */ }
+        }
+        delete row.Password;
+        return row;
+    }
+    return null;
+}
+
+// ---------- Exam scoring ----------
+// A saved question row is [part, question, choices, answer, explanation, isBonus, type, ordered].
+// Rows saved before types existed have only the first six values. An enumeration keeps its items in the answer
+// (an array) and is worth 1 point per correct item; every other question is worth 1 point.
+
+const normAnswer = (v) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+function enumItems(value) {
+    const list = Array.isArray(value) ? value : String(value ?? "").split(/\||\r?\n/);
+    return list.map(normAnswer).filter(Boolean);
+}
+
+function questionType(q) {
+    if (typeof q[6] === "string" && q[6]) return q[6];
+    if (Array.isArray(q[3])) return "enum";
+    const choices = Array.isArray(q[2]) ? q[2] : [];
+    if (choices.length === 0) return "id";
+    return "mc";
+}
+
+function questionPoints(q) {
+    return questionType(q) === "enum" ? Math.max(1, enumItems(q[3]).length) : 1;
+}
+
+// Points earned by one answer. Enumeration: the student's items are matched against the key; each key item can be
+// matched once, in any order, or in the same position when the question says the order matters.
+function gradeQuestion(q, studentAnswer) {
+    if (questionType(q) === "enum") {
+        const key = enumItems(q[3]);
+        const given = enumItems(studentAnswer);
+        if (!key.length || !given.length) return 0;
+        if (q[7]) {
+            let hit = 0;
+            key.forEach((item, i) => { if (given[i] === item) hit++; });
+            return hit;
+        }
+        const used = new Array(key.length).fill(false);
+        let hit = 0;
+        given.forEach(item => {
+            const at = key.findIndex((k, i) => !used[i] && k === item);
+            if (at >= 0) { used[at] = true; hit++; }
+        });
+        return hit;
+    }
+    const correct = normAnswer(q[3]);
+    const answer = normAnswer(Array.isArray(studentAnswer) ? studentAnswer[0] : studentAnswer);
+    return answer !== "" && answer === correct ? 1 : 0;
+}
+
+// Total points of the regular (not bonus) questions, at least 1.
+function examMaxPoints(questions) {
+    const total = questions.filter(q => !q[5]).reduce((sum, q) => sum + questionPoints(q), 0);
+    return total > 0 ? total : Math.max(1, questions.length);
 }
 
 const ASSESSMENT_TERMS = ['MidTerm', 'FinalTerm'];
@@ -817,7 +890,10 @@ async function getStudentAccessibleExamsList(env, studentId) {
             part: q[0],
             question: q[1],
             choices: Array.isArray(q[2]) ? q[2] : [],
-            isBonus: Boolean(q[5])
+            isBonus: Boolean(q[5]),
+            type: questionType(q),
+            itemCount: questionType(q) === "enum" ? questionPoints(q) : 0,
+            ordered: Boolean(q[7])
         }));
 
         const regularCount = questions.filter(q => !q.isBonus).length;
@@ -837,7 +913,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
             toDate: r.To_Date,
             status: r.Status,
             finalScore: r.Final_Score,
-            maxScore: r.Recorded_Max || (regularCount > 0 ? regularCount : questions.length),
+            maxScore: r.Recorded_Max || examMaxPoints(parsed),
             regularCount,
             bonusCount,
             questions
@@ -1009,7 +1085,7 @@ export default {
         const corsHeaders = {
             "Access-Control-Allow-Origin": allowedOrigin,
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
-            "Access-Control-Allow-Headers": "Content-Type, X-Submission-Meta, X-Chunk-Meta",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Submission-Meta, X-Chunk-Meta",
             "Access-Control-Max-Age": "86400",
             "Vary": "Origin"
         };
@@ -1019,6 +1095,12 @@ export default {
         }
 
         try {
+            // Who is calling, and may they do this? (Off until the SESSION_SECRET secret is set.)
+            const gate = await authorize(request, env, path, url);
+            if (!gate.ok) {
+                return new Response(JSON.stringify({ error: gate.error }), { status: gate.status, headers: corsHeaders });
+            }
+
             if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room") {
                 await ensureCourseRoom(env);
             }
@@ -1121,8 +1203,7 @@ export default {
                     parsedQuestions = [];
                 }
 
-                const regularCount = parsedQuestions.filter(q => !q[5]).length;
-                const defaultMaxScore = regularCount > 0 ? regularCount : Math.max(1, parsedQuestions.length);
+                const defaultMaxScore = examMaxPoints(parsedQuestions);
                 const selectedTerm = ASSESSMENT_TERMS.includes(term) ? term : 'MidTerm';
                 const selectedCategory = ASSESSMENT_CATEGORIES.includes(category) ? category : 'MajorExam';
                 const today = getRequestDate(request);
@@ -1263,19 +1344,14 @@ export default {
 
             if (request.method === "POST" && path === "/api/student-accessible-exams") {
                 const body = await request.json();
-                const hashedPassword = await hashPassword(body.password || "");
                 const id = (body.identifier || "").trim();
 
                 if (!id || !body.password) {
                     return new Response(JSON.stringify({ error: "Please enter your identifier and password." }), { status: 400, headers: corsHeaders });
                 }
 
-                const user = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Student_Number, account_status, role, course, year, section, eye_condition
-                     FROM Users
-                     WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?)
-                     AND Password = ?`
-                ).bind(id, id, id, id, hashedPassword).first();
+                const user = await findUserByCredentials(env, id, body.password,
+                    "User_ID, Username, Name, Student_Number, account_status, role, course, year, section, eye_condition");
 
                 if (!user) {
                     return new Response(JSON.stringify({ error: "Invalid credentials." }), { status: 401, headers: corsHeaders });
@@ -1338,26 +1414,14 @@ export default {
 
                 let rawScore = 0;
                 let bonusScore = 0;
-                let regularCount = 0;
 
                 quizData.forEach((q, idx) => {
-                    const correctAns = String(q[3] ?? "").trim().toLowerCase();
-                    const studentAns = String(answers[idx] ?? "").trim().toLowerCase();
-                    const isBonus = Boolean(q[5]);
-
-                    if (!isBonus) {
-                        regularCount++;
-                        if (studentAns !== "" && studentAns === correctAns) {
-                            rawScore += 1;
-                        }
-                    } else {
-                        if (studentAns !== "" && studentAns === correctAns) {
-                            bonusScore += 1;
-                        }
-                    }
+                    const earned = gradeQuestion(q, answers[idx]);
+                    if (q[5]) bonusScore += earned;
+                    else rawScore += earned;
                 });
 
-                let maxScore = regularCount > 0 ? regularCount : Math.max(1, quizData.length);
+                let maxScore = examMaxPoints(quizData);
 
                 let assessment = null;
                 if (record.Assessment_ID) {
@@ -1584,7 +1648,7 @@ export default {
                 }
 
                 const userId = crypto.randomUUID();
-                const hashedPassword = await hashPassword(body.password);
+                const hashedPassword = await hashPassword(body.password, env);
 
                 await env.DB.prepare(
                     `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, registration_timestamp)
@@ -1600,15 +1664,12 @@ export default {
 
             if (request.method === "POST" && path === "/api/login") {
                 const body = await request.json();
-                const hashedPassword = await hashPassword(body.password);
                 const id = body.identifier;
 
-                const user = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition
-                     FROM Users
-                     WHERE (Username COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ? OR Student_Number COLLATE NOCASE = ?)
-                     AND Password = ?`
-                ).bind(id, id, id, id, hashedPassword).first();
+                const user = (id && body.password)
+                    ? await findUserByCredentials(env, id, body.password,
+                        "User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition")
+                    : null;
 
                 if (!user) {
                     return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: corsHeaders });
@@ -1635,21 +1696,21 @@ export default {
                     }), { status: 403, headers: corsHeaders });
                 }
 
-                return new Response(JSON.stringify({ success: true, user }), { status: 200, headers: corsHeaders });
+                const token = authEnabled(env) ? await signToken(env, user.User_ID) : undefined;
+                return new Response(JSON.stringify({ success: true, user, token }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "POST" && path === "/api/change-password") {
                 const body = await request.json();
                 const { userId, currentPassword, newPassword } = body;
 
-                const currentHash = await hashPassword(currentPassword);
                 const user = await env.DB.prepare("SELECT Password FROM Users WHERE User_ID = ?").bind(userId).first();
 
-                if (!user || user.Password !== currentHash) {
+                if (!user || !(await verifyPassword(currentPassword, user.Password, env)).ok) {
                     return new Response(JSON.stringify({ error: "Incorrect current password" }), { status: 400, headers: corsHeaders });
                 }
 
-                const newHash = await hashPassword(newPassword);
+                const newHash = await hashPassword(newPassword, env);
                 await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, userId).run();
 
                 return new Response(JSON.stringify({ success: true, message: "Password updated successfully" }), { status: 200, headers: corsHeaders });
@@ -1664,10 +1725,9 @@ export default {
                     return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
                 }
 
-                const currentHash = await hashPassword(password);
                 const user = await env.DB.prepare("SELECT Password FROM Users WHERE User_ID = ?").bind(userId).first();
 
-                if (!user || user.Password !== currentHash) {
+                if (!user || !(await verifyPassword(password, user.Password, env)).ok) {
                     return new Response(JSON.stringify({ error: "Incorrect password" }), { status: 400, headers: corsHeaders });
                 }
 
@@ -1734,7 +1794,7 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing studentId" }), { status: 400, headers: corsHeaders });
                 }
 
-                const newHash = await hashPassword("123456");
+                const newHash = await hashPassword("123456", env);
                 await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, studentId).run();
 
                 return new Response(JSON.stringify({ success: true, message: "Password reset successfully" }), { status: 200, headers: corsHeaders });

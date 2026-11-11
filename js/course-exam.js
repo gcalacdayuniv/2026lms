@@ -3,6 +3,7 @@ import { apiFetch, AppState } from './globals.js';
 import { CourseClass } from './course-class.js';
 import { UI } from './ui-feedback.js';
 import { ExamBuilder } from './exam-builder.js';
+import { fromCsvText, fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -44,6 +45,13 @@ export const CourseExam = {
     // Read-aloud and the audio-driven keyboard flow are for Legally Blind students only.
     isVoiceUser: () => AppState.user?.eye_condition === 'Legally Blind',
 
+    // Text boxes of the student exam: the single answer box and the item boxes of an enumeration.
+    isTextField: (el) => Boolean(el && (el.id === 'accExamTextAnswerInput' || (el.classList && el.classList.contains('acc-exam-enum-input')))),
+
+    // An answer is '' (none), a text, or for an enumeration an array of the items typed so far.
+    isAnswered: (a) => (Array.isArray(a) ? a.some(x => String(x).trim() !== '') : a !== '' && a != null),
+    answerText: (a) => (Array.isArray(a) ? a.map(x => String(x).trim()).filter(Boolean).join(', ') : String(a ?? '')),
+
     speak: (text) => {
         if (!CourseExam.isVoiceUser()) return;
         if (!('speechSynthesis' in window)) return;
@@ -83,36 +91,15 @@ export const CourseExam = {
                 CourseExam.speak("Read Question Again Button");
             } else if (e.target.id === 'accExamTextAnswerInput') {
                 CourseExam.speak("Text Answer Input. Type your answer here, then press Enter.");
+            } else if (e.target.classList.contains('acc-exam-enum-input')) {
+                const total = CourseExam.accExam.questions[CourseExam.accIndex]?.itemCount || 0;
+                CourseExam.speak(`Item ${parseInt(e.target.dataset.i, 10) + 1} of ${total}. Type it, then press Enter for the next item.`);
             }
         }
     },
 
-    downloadCsvTemplate: () => {
-        const rows = [
-            ['Part Index', 'Question', 'Choices', 'Answer', 'Explanation', 'Bonus'],
-            ['0', 'What does CPU stand for?', 'Central Processing Unit | Control Processing Unit | Computer Personal Unit | Central Power Unit', 'Central Processing Unit', 'The CPU is the primary component of a computer that processes instructions.', ''],
-            ['0', 'Statement I: HTML is used to structure web pages.\nStatement II: CSS is used to style web pages.', 'Both statements are true | Both statements are false | Only Statement I is true | Only Statement II is true', 'Both statements are true', 'HTML provides structure while CSS handles presentation.', ''],
-            ['1', 'The binary number system uses only 0 and 1.', 'True | False', 'True', 'Binary is a base-2 numeral system.', ''],
-            ['2', 'Identify the protocol used for secure communication over a computer network (abbreviation).', '', 'HTTPS', 'Hypertext Transfer Protocol Secure encrypts data between browser and server.', ''],
-            ['0', 'BONUS: Which company developed the JavaScript programming language originally named Mocha?', 'Netscape | Microsoft | Sun Microsystems | IBM', 'Netscape', 'Brendan Eich created JavaScript at Netscape in 1995.', '1']
-        ];
-
-        const csvCell = (val) => {
-            const str = String(val ?? '');
-            return `"${str.replace(/"/g, '""')}"`;
-        };
-
-        const csvContent = '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'exam_upload_template.csv';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    },
+    // The sample file has one example of every question type, in the same columns as the builder's spreadsheet view.
+    downloadCsvTemplate: () => ExamBuilder.downloadTemplate(),
 
     announceDashboardExams: () => {
         if (!CourseExam.isVoiceUser()) return;
@@ -142,7 +129,10 @@ export const CourseExam = {
 
         if (e.target.closest('#toggleExamCsvGuideBtn')) {
             const panel = document.getElementById('examCsvGuidePanel');
-            if (panel) panel.classList.toggle('hidden');
+            if (panel) {
+                panel.classList.toggle('hidden');
+                e.target.closest('#toggleExamCsvGuideBtn').setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
+            }
         }
 
         if (e.target.closest('#readDashboardExamsBtn')) {
@@ -180,8 +170,16 @@ export const CourseExam = {
             await ExamBuilder.open({ examId: btn.dataset.examId, title: btn.dataset.title, onSaved: () => CourseExam.loadExams() });
         }
 
-        if (e.target.closest('#uploadExamBtn')) {
-            await CourseExam.uploadCsv();
+        if (e.target.closest('#importExamCsvBtn')) {
+            document.getElementById('examCsvUpload')?.click();
+        }
+
+        if (e.target.closest('.export-exam-csv-btn')) {
+            CourseExam.exportExamCsv(e.target.closest('.export-exam-csv-btn').dataset.examId);
+        }
+
+        if (e.target.closest('.duplicate-exam-btn')) {
+            await CourseExam.duplicateExam(e.target.closest('.duplicate-exam-btn').dataset.examId);
         }
 
         if (e.target.closest('.present-exam-btn')) {
@@ -271,6 +269,29 @@ export const CourseExam = {
             await CourseExam.toggleQuestionBonus(idx, e.target.checked);
         }
 
+        if (e.target.classList.contains('acc-exam-enum-input') && CourseExam.accExam) {
+            const q = CourseExam.accExam.questions[CourseExam.accIndex];
+            const list = Array.isArray(CourseExam.accAnswers[CourseExam.accIndex])
+                ? CourseExam.accAnswers[CourseExam.accIndex].slice()
+                : new Array(q.itemCount).fill('');
+            list[parseInt(e.target.dataset.i, 10)] = e.target.value.trim();
+            CourseExam.accAnswers[CourseExam.accIndex] = list.some(Boolean) ? list : '';
+            localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
+            CourseExam.updateAccessibleAnsweredBadge();
+            if (e.target.value.trim() && CourseExam.isVoiceUser()) {
+                const msg = `Item ${parseInt(e.target.dataset.i, 10) + 1}: ${e.target.value.trim()}.`;
+                document.getElementById('accExamLiveFeedback').textContent = msg;
+                CourseExam.speak(msg);
+            }
+        }
+
+        if (e.target.id === 'examCsvUpload') {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (file) await CourseExam.importCsvFile(file);
+            return;
+        }
+
         if (e.target.id === 'accExamTextAnswerInput') {
             const val = e.target.value.trim();
             CourseExam.accAnswers[CourseExam.accIndex] = val;
@@ -296,7 +317,7 @@ export const CourseExam = {
             if (!CourseExam.isVoiceUser()) return;
 
             // Allow normal typing in text input, but let Enter register as a submit/blur
-            if (document.activeElement && document.activeElement.id === 'accExamTextAnswerInput') {
+            if (CourseExam.isTextField(document.activeElement)) {
                 if (e.key === ' ') return; // Let space type space normally inside text box
             } else {
                 if (e.key === ' ') e.preventDefault(); // Prevent page scroll for space globally in exam
@@ -305,7 +326,7 @@ export const CourseExam = {
             // Custom Tab Cycling (Trap focus strictly to Question, Choices, Nav Buttons)
             if (e.key === 'Tab') {
                 e.preventDefault();
-                const focusables = Array.from(document.querySelectorAll('#accExamQuestionText, .acc-exam-choice-btn, #accExamPrevBtn, #accExamNextBtn:not(.hidden), #accExamSubmitBtn:not(.hidden), #accExamTextAnswerInput'))
+                const focusables = Array.from(document.querySelectorAll('#accExamQuestionText, .acc-exam-choice-btn, #accExamPrevBtn, #accExamNextBtn:not(.hidden), #accExamSubmitBtn:not(.hidden), #accExamTextAnswerInput, .acc-exam-enum-input'))
                     .filter(el => !el.disabled && el.offsetParent !== null);
 
                 const currIdx = focusables.indexOf(document.activeElement);
@@ -315,6 +336,17 @@ export const CourseExam = {
                 if (nextIdx < 0) nextIdx = focusables.length - 1;
 
                 focusables[nextIdx].focus();
+                return;
+            }
+
+            // Enumeration: Enter moves to the next item box (the last one just saves). It never counts as a double press.
+            if (e.key === 'Enter' && document.activeElement && document.activeElement.classList.contains('acc-exam-enum-input')) {
+                e.preventDefault();
+                CourseExam.lastEnterSpaceTime = 0;
+                const inputs = Array.from(document.querySelectorAll('.acc-exam-enum-input'));
+                const at = inputs.indexOf(document.activeElement);
+                if (at >= 0 && at < inputs.length - 1) inputs[at + 1].focus();
+                else document.activeElement.blur();
                 return;
             }
 
@@ -342,9 +374,9 @@ export const CourseExam = {
                         e.preventDefault();
                         const idx = parseInt(activeEl.dataset.choiceIndex, 10);
                         CourseExam.selectAccessibleChoice(idx);
-                    } else if (e.key === 'Enter' && activeEl && activeEl.id === 'accExamTextAnswerInput') {
+                    } else if (e.key === 'Enter' && CourseExam.isTextField(activeEl)) {
                         activeEl.blur(); // Save text input on single enter
-                    } else if (!isChoice && (!activeEl || activeEl.id !== 'accExamTextAnswerInput')) {
+                    } else if (!isChoice && !CourseExam.isTextField(activeEl)) {
                         // General hint if pressing space randomly
                         const isLast = CourseExam.accIndex === CourseExam.accExam.questions.length - 1;
                         const action = isLast ? "submit the exam" : "go to the next question";
@@ -365,6 +397,9 @@ export const CourseExam = {
                     }
                 }
             }
+
+            // While typing in a text box the remaining keys (R, Q, digits, A-D, Left/Right) belong to the text.
+            if (CourseExam.isTextField(document.activeElement)) return;
 
             // Right/Left for Fast Question Navigation
             if (e.key === 'ArrowRight') {
@@ -433,15 +468,27 @@ export const CourseExam = {
             CourseExam.classAssignments = classExamRes ? (classExamRes.assignments || []) : [];
 
             if (CourseExam.exams.length === 0) {
-                container.innerHTML = '<div class="text-sm text-gray-500 italic text-center py-6">No exams uploaded yet.</div>';
+                container.innerHTML = '<div class="text-center py-10 px-4"><i class="fa-regular fa-file-lines text-3xl text-gray-300"></i><p class="mt-2 text-sm font-bold text-gray-600">No exams yet</p><p class="text-xs text-gray-500">Use Create Exam or Import from Spreadsheet above.</p></div>';
+                const countEl = document.getElementById('examCountLabel');
+                if (countEl) countEl.textContent = '';
                 return;
             }
 
             container.innerHTML = CourseExam.exams.map(ex => {
                 let parsed = [];
                 try { parsed = JSON.parse(ex.ExamData || '[]'); } catch (e) { parsed = []; }
-                const regCount = parsed.filter(q => !q[5]).length;
-                const bonusCount = parsed.filter(q => Boolean(q[5])).length;
+                const rows = fromExamData(parsed);
+                const regCount = rows.filter(q => !q.bonus).length;
+                const bonusCount = rows.filter(q => q.bonus).length;
+                const points = rows.filter(q => !q.bonus).reduce((sum, q) => sum + pointsOf(q), 0);
+                const typeChip = (key, label, color) => {
+                    const n = rows.filter(q => typeKey(q) === key || (key === 'enum' && typeKey(q) === 'enumo')).length;
+                    return n ? `<span class="text-[10px] ${color} px-1.5 py-0.5 rounded font-bold">${label} ${n}</span>` : '';
+                };
+                const typeChips = typeChip('mc', 'Multiple choice', 'bg-blue-50 text-blue-700 border border-blue-100')
+                    + typeChip('tf', 'True/False', 'bg-teal-50 text-teal-700 border border-teal-100')
+                    + typeChip('id', 'Identification', 'bg-orange-50 text-orange-700 border border-orange-100')
+                    + typeChip('enum', 'Enumeration', 'bg-indigo-50 text-indigo-700 border border-indigo-100');
 
                 const linked = CourseExam.classExams.find(ce => ce.Exam_ID === ex.Exam_ID);
                 const enabledStudentsCount = linked
@@ -453,35 +500,40 @@ export const CourseExam = {
                     : `<span class="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 font-medium px-2 py-0.5 rounded">Not linked to this class</span>`;
 
                 return `
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3 border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition gap-3">
-                        <div>
-                            <div class="font-black text-gray-800 text-sm flex flex-wrap items-center gap-2">
-                                <span>${esc(ex.Title)}</span>
-                                <span class="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-bold">${regCount} Qs${bonusCount > 0 ? ` + ${bonusCount} Bonus` : ''}</span>
-                            </div>
-                            <div class="mt-1 flex flex-wrap items-center gap-2">
-                                ${linkBadge}
-                            </div>
+                    <div class="bg-white p-3 border border-gray-200 rounded-xl shadow-sm hover:border-indigo-300 transition">
+                        <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                            <div class="font-black text-gray-800 text-sm min-w-0 break-words">${esc(ex.Title)}</div>
+                            <div class="text-[11px] font-bold text-gray-500 whitespace-nowrap">${regCount} question${regCount === 1 ? '' : 's'}${points !== regCount ? ` &bull; ${points} points` : ''}${bonusCount > 0 ? ` &bull; ${bonusCount} bonus` : ''}</div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-end">
-                            <button type="button" class="edit-exam-builder-btn bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
-                            </button>
-                            <button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                <i class="fa-solid fa-star mr-1"></i> Bonus Qs
-                            </button>
+                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${typeChips}</div>
+                        <div class="mt-1.5">${linkBadge}</div>
+                        <div class="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end gap-1.5">
                             ${courseId ? `
-                                <button type="button" class="assign-class-exam-btn bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                    <i class="fa-solid fa-universal-access mr-1"></i> Link & Assign Students
+                                <button type="button" class="assign-class-exam-btn col-span-2 sm:col-span-1 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-2 rounded-md text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                                    <i class="fa-solid fa-universal-access mr-1" aria-hidden="true"></i> Link &amp; Assign Students
                                 </button>
                             ` : ''}
-                            <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                <i class="fa-solid fa-play mr-1"></i> Present
+                            <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                                <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
+                            </button>
+                            <button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                                <i class="fa-solid fa-pen-to-square mr-1" aria-hidden="true"></i> Edit
+                            </button>
+                            <button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                                <i class="fa-solid fa-star mr-1" aria-hidden="true"></i> Bonus Qs
+                            </button>
+                            <button type="button" class="export-exam-csv-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Export ${esc(ex.Title)} as CSV">
+                                <i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i> CSV
+                            </button>
+                            <button type="button" class="duplicate-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Duplicate ${esc(ex.Title)}">
+                                <i class="fa-regular fa-copy mr-1" aria-hidden="true"></i> Copy
                             </button>
                         </div>
                     </div>
                 `;
             }).join('');
+            const countEl = document.getElementById('examCountLabel');
+            if (countEl) countEl.textContent = `${CourseExam.exams.length} exam${CourseExam.exams.length === 1 ? '' : 's'}`;
 
         } catch (err) {
             container.innerHTML = `<div class="text-red-500 font-bold text-sm text-center py-4">${esc(err.message)}</div>`;
@@ -680,7 +732,9 @@ export const CourseExam = {
 
         listEl.innerHTML = CourseExam.activeBonusData.map((q, idx) => {
             const isBonus = Boolean(q[5]);
-            const choicesText = Array.isArray(q[2]) && q[2].length > 0 ? q[2].join(' | ') : 'Identification / No choices';
+            const isEnum = q[6] === 'enum' || Array.isArray(q[3]);
+            const choicesText = isEnum ? `Enumeration (${(Array.isArray(q[3]) ? q[3].length : 0)} items${q[7] ? ', in order' : ''})` : (Array.isArray(q[2]) && q[2].length > 0 ? q[2].join(' | ') : 'Identification / No choices');
+            const answerText = Array.isArray(q[3]) ? q[3].join(' | ') : String(q[3] ?? '');
 
             return `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2.5 bg-white border ${isBonus ? 'border-amber-400 bg-amber-50/40' : 'border-gray-200'} rounded-md gap-2">
@@ -690,7 +744,7 @@ export const CourseExam = {
                             ${isBonus ? '<span class="px-1.5 py-0.5 text-[9px] font-black uppercase bg-amber-200 text-amber-900 rounded mr-1">BONUS</span>' : ''}
                             ${esc(q[1])}
                         </div>
-                        <div class="text-[10px] text-gray-500 mt-0.5">Choices: ${esc(choicesText)} &bull; <span class="font-bold text-green-700">Ans: ${esc(q[3])}</span></div>
+                        <div class="text-[10px] text-gray-500 mt-0.5">Choices: ${esc(choicesText)} &bull; <span class="font-bold text-green-700">Ans: ${esc(answerText)}</span></div>
                     </div>
                     <div class="flex items-center gap-3 self-end sm:self-center flex-shrink-0">
                         <label class="flex items-center space-x-1.5 text-xs font-bold ${isBonus ? 'text-amber-800' : 'text-gray-600'} cursor-pointer">
@@ -784,91 +838,46 @@ export const CourseExam = {
         }
     },
 
-    parseCSV: (str) => {
-        const arr = [];
-        let quote = false;
-        let row = 0, col = 0;
-        for (let c = 0; c < str.length; c++) {
-            let cc = str[c], nc = str[c + 1];
-            arr[row] = arr[row] || [];
-            arr[row][col] = arr[row][col] || '';
-
-            if (cc === '"' && quote && nc === '"') { arr[row][col] += cc; ++c; continue; }
-            if (cc === '"') { quote = !quote; continue; }
-            if (cc === ',' && !quote) { ++col; continue; }
-            if (cc === '\r' && nc === '\n' && !quote) { ++row; col = 0; ++c; continue; }
-            if (cc === '\n' && !quote) { ++row; col = 0; continue; }
-            if (cc === '\r' && !quote) { ++row; col = 0; continue; }
-            arr[row][col] += cc;
+    // Opens the builder with the questions of a CSV file so the lecturer can check them before saving.
+    importCsvFile: async (file) => {
+        try {
+            const { questions, skipped } = fromCsvText(await file.text());
+            if (!questions.length) {
+                UI.error('No questions found in that file. Download the template to see the columns.');
+                return;
+            }
+            const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+            await ExamBuilder.open({ preset: { title, questions }, onSaved: () => CourseExam.loadExams() });
+            UI.success(`Imported ${questions.length} question${questions.length === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} empty row${skipped === 1 ? '' : 's'}` : ''}. Check them, then save.`);
+        } catch (err) {
+            UI.error('Could not read that file.');
         }
-        return arr.map(r => r.map(c => c.trim()));
     },
 
-    uploadCsv: async () => {
-        const titleInput = document.getElementById('newExamTitle');
-        const fileInput = document.getElementById('examCsvUpload');
-        const msgDiv = document.getElementById('examUploadMessage');
-        const btn = document.getElementById('uploadExamBtn');
+    exportExamCsv: (examId) => {
+        const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
+        if (!ex) return;
+        let rows = [];
+        try { rows = JSON.parse(ex.ExamData || '[]'); } catch (e) { rows = []; }
+        const name = (ex.Title || 'exam').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'exam';
+        ExamBuilder.download(`${name}.csv`, toCsv(fromExamData(rows)));
+    },
 
-        if (!titleInput.value.trim() || !fileInput.files.length) {
-            msgDiv.textContent = "Please provide a title and select a CSV file.";
-            msgDiv.className = "mt-2 text-xs font-bold p-2 rounded bg-red-100 text-red-700 block";
-            return;
+    duplicateExam: async (examId) => {
+        const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
+        if (!ex) return;
+        let rows = [];
+        try { rows = JSON.parse(ex.ExamData || '[]'); } catch (e) { rows = []; }
+        try {
+            await apiFetch('/api/exams', {
+                method: 'POST',
+                body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: `${ex.Title} (copy)`, examData: rows })
+            });
+            UI.success('Exam duplicated');
+            await CourseExam.loadExams();
+        } catch (err) {
+            UI.error(err.message || 'Could not duplicate the exam.');
         }
-
-        const file = fileInput.files[0];
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const text = e.target.result;
-                const rows = CourseExam.parseCSV(text);
-                const examData = [];
-
-                for (let i = 1; i < rows.length; i++) {
-                    const row = rows[i];
-                    if (row.length < 4 || row.every(col => col === "")) continue;
-
-                    const part = parseInt(row[0], 10) || 0;
-                    const question = row[1];
-                    const choicesStr = row[2] ? row[2].trim() : "";
-                    const choices = choicesStr ? choicesStr.split('|').map(c => c.trim()) : [];
-                    const answer = row[3];
-                    const expl = row[4] || "";
-                    const bonusRaw = (row[5] || "").toString().trim().toLowerCase();
-                    const isBonus = bonusRaw === '1' || bonusRaw === 'true' || bonusRaw === 'yes' || bonusRaw === 'bonus';
-
-                    examData.push([part, question, choices, answer, expl, isBonus]);
-                }
-
-                if (examData.length === 0) throw new Error("No valid questions found in CSV.");
-
-                await apiFetch('/api/exams', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        lecturerId: AppState.user.User_ID,
-                        title: titleInput.value.trim(),
-                        examData: examData
-                    })
-                });
-
-                msgDiv.textContent = "Exam uploaded successfully.";
-                msgDiv.className = "mt-2 text-xs font-bold p-2 rounded bg-green-100 text-green-700 block";
-                titleInput.value = '';
-                fileInput.value = '';
-                await CourseExam.loadExams();
-            } catch (err) {
-                msgDiv.textContent = err.message;
-                msgDiv.className = "mt-2 text-xs font-bold p-2 rounded bg-red-100 text-red-700 block";
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = 'Upload';
-                setTimeout(() => msgDiv.classList.add('hidden'), 3000);
-            }
-        };
-        reader.readAsText(file);
     },
 
     // ---------- Lecturer Presentation Mode ----------
@@ -974,7 +983,9 @@ export const CourseExam = {
 
         const counterEl = document.getElementById('examCounter');
         const bonusTag = isBonus ? ` &nbsp;<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-weight:800;font-size:0.9rem;">BONUS</span>` : '';
-        counterEl.innerHTML = `<span class="num">${CourseExam.current + 1}</span><span class="of">of ${total} &nbsp;|&nbsp; ${posInPart} of ${inPart.length} in this part${bonusTag}</span>`;
+        const enumTag = (dataRow[6] === 'enum' || Array.isArray(dataRow[3]))
+            ? ` &nbsp;<span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:6px;font-weight:800;font-size:0.9rem;">LIST ${(Array.isArray(dataRow[3]) ? dataRow[3] : []).length} ITEMS${dataRow[7] ? ' IN ORDER' : ''}</span>` : '';
+        counterEl.innerHTML = `<span class="num">${CourseExam.current + 1}</span><span class="of">of ${total} &nbsp;|&nbsp; ${posInPart} of ${inPart.length} in this part${enumTag}${bonusTag}</span>`;
 
         document.getElementById('examQuestion').textContent = q;
 
@@ -994,8 +1005,12 @@ export const CourseExam = {
         });
 
         const answerEl = document.getElementById('examAnswer');
-        const explanationHTML = expl ? `<div class="exam-expl">${expl}</div>` : "";
-        answerEl.innerHTML = `<span class="label">Answer</span>${ans}${explanationHTML}`;
+        const explanationHTML = expl ? `<div class="exam-expl">${esc(expl)}</div>` : "";
+        const isEnum = dataRow[6] === 'enum' || Array.isArray(ans);
+        const answerHtml = isEnum
+            ? `<ol style="margin:0.25rem 0 0 1.4rem;padding:0;list-style:${dataRow[7] ? 'decimal' : 'disc'};">${(Array.isArray(ans) ? ans : String(ans ?? '').split('|')).map(i => `<li>${esc(String(i).trim())}</li>`).join('')}</ol>${dataRow[7] ? '' : '<div class="exam-expl" style="margin-top:0.4rem;">Any order</div>'}`
+            : esc(ans);
+        answerEl.innerHTML = `<span class="label">${isEnum ? (dataRow[7] ? 'Answer (in order)' : 'Answer') : 'Answer'}</span>${answerHtml}${explanationHTML}`;
 
         document.getElementById('examBar').style.width = ((CourseExam.current + 1) / total * 100) + "%";
         document.getElementById('examPrevBtn').disabled = CourseExam.current === 0;
@@ -1060,11 +1075,11 @@ export const CourseExam = {
         const statusEl = document.getElementById('accExamAnsweredStatus');
         if (!statusEl || !CourseExam.accExam) return;
         const currentAns = CourseExam.accAnswers[CourseExam.accIndex];
-        const answeredCount = CourseExam.accAnswers.filter(a => a !== '').length;
+        const answeredCount = CourseExam.accAnswers.filter(a => CourseExam.isAnswered(a)).length;
         const total = CourseExam.accExam.questions.length;
 
         if (currentAns) {
-            statusEl.textContent = `Selected: ${currentAns} (${answeredCount}/${total} Answered)`;
+            statusEl.textContent = `Selected: ${CourseExam.answerText(currentAns)} (${answeredCount}/${total} Answered)`;
             statusEl.className = "text-sm sm:text-base font-black px-4 py-1 rounded-full bg-green-900 text-green-200 border-2 border-green-400";
         } else {
             statusEl.textContent = `Not Answered Yet (${answeredCount}/${total} Answered)`;
@@ -1118,6 +1133,21 @@ export const CourseExam = {
                     </button>
                 `;
             }).join('');
+        } else if (q.type === 'enum') {
+            const saved = Array.isArray(currentAnswer) ? currentAnswer : [];
+            const boxes = Array.from({ length: q.itemCount }, (_, i) => `
+                <div class="flex items-center gap-3">
+                    <label for="accExamEnumInput${i}" class="w-10 shrink-0 text-right text-xl font-black text-yellow-400">${i + 1}.</label>
+                    <input type="text" id="accExamEnumInput${i}" data-i="${i}" value="${esc(saved[i] || '')}" autocomplete="off"
+                        class="acc-exam-enum-input flex-1 min-w-0 px-4 py-3 text-xl sm:text-2xl font-bold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400"
+                        placeholder="Item ${i + 1}">
+                </div>`).join('');
+            choicesContainer.innerHTML = `
+                <div class="bg-gray-900 p-5 sm:p-6 rounded-2xl border-2 border-yellow-400 space-y-3">
+                    <p class="text-lg font-bold text-yellow-300">List ${q.itemCount} item${q.itemCount === 1 ? '' : 's'}${q.ordered ? ', in the correct order' : ', in any order'}. Press Enter to go to the next box.</p>
+                    ${boxes}
+                </div>
+            `;
         } else {
             choicesContainer.innerHTML = `
                 <div class="bg-gray-900 p-6 rounded-2xl border-2 border-yellow-400">
@@ -1162,7 +1192,7 @@ export const CourseExam = {
         speech += `${q.question}. `;
 
         if (currentAns) {
-            speech += `Your selected answer is ${currentAns}. `;
+            speech += `Your answer so far is ${CourseExam.answerText(currentAns)}. `;
         }
 
         if (q.choices && q.choices.length > 0) {
@@ -1172,6 +1202,8 @@ export const CourseExam = {
                 speech += `Choice ${idx + 1}, ${letter}: ${c}. `;
             });
             speech += `Press R to repeat the question. Press Enter or Space for the selected answer. `;
+        } else if (q.type === 'enum') {
+            speech += `This is an enumeration question. List ${q.itemCount} item${q.itemCount === 1 ? '' : 's'}${q.ordered ? ', in the correct order' : ', in any order'}. There are ${q.itemCount} text boxes. Type an item, then press Enter to go to the next box. Press R to repeat the question. `;
         } else {
             speech += `This is an identification question. Please type your answer in the text box. Press R to repeat the question. `;
         }
@@ -1184,7 +1216,7 @@ export const CourseExam = {
         }
 
         document.getElementById('accExamLiveFeedback').textContent = currentAns
-            ? `Current Answer: ${currentAns}`
+            ? `Current Answer: ${CourseExam.answerText(currentAns)}`
             : `Listening... Choose an option or press 1 to ${q.choices?.length || 4}.`;
 
         CourseExam.speak(speech);
@@ -1235,7 +1267,7 @@ export const CourseExam = {
         if (!CourseExam.accExam || !CourseExam.accStudent || CourseExam.accSubmitting) return;
 
         const unanswered = CourseExam.accAnswers
-            .map((a, i) => (a === '' ? i + 1 : null))
+            .map((a, i) => (!CourseExam.isAnswered(a) ? i + 1 : null))
             .filter(Boolean);
 
         let promptMsg = `Are you sure you want to submit ${CourseExam.accExam.examTitle}?`;

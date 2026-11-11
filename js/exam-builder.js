@@ -51,7 +51,11 @@ export const ExamBuilder = {
         body.innerHTML = '<div class="text-center py-10 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>';
 
         try {
-            if (s.examId) {
+            if (options.preset) {
+                s.title = options.preset.title || s.title;
+                s.questions = options.preset.questions;
+                s.dirty = true;
+            } else if (s.examId) {
                 const data = await apiFetch(`/api/exam-data?examId=${encodeURIComponent(s.examId)}&_t=${Date.now()}`);
                 let rows = [];
                 try { rows = JSON.parse((data.exam && data.exam.ExamData) || '[]'); } catch (e) { rows = []; }
@@ -67,7 +71,7 @@ export const ExamBuilder = {
         }
 
         // A draft kept on this device from an earlier, unsaved session.
-        const saved = store.get(draftKey(s.examId));
+        const saved = options.preset ? null : store.get(draftKey(s.examId));
         if (saved) {
             try {
                 const d = JSON.parse(saved);
@@ -151,6 +155,11 @@ export const ExamBuilder = {
                             ${tab('sheet', 'fa-table', 'Spreadsheet')}
                         </div>
                         <span id="ebCount" class="text-xs font-bold text-gray-500"></span>
+                        <div class="ml-auto flex items-center gap-1.5">
+                            <button type="button" id="ebImportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-import mr-1" aria-hidden="true"></i>Import CSV</button>
+                            <button type="button" id="ebExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
+                            <input type="file" id="ebCsvInput" accept=".csv,text/csv" class="hidden">
+                        </div>
                     </div>
                     ${s.examId ? '<p class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>Editing changes the exam for students who have not taken it yet. Scores already recorded are not recalculated.</p>' : ''}
                     <div id="ebAlert" class="hidden mt-2 text-xs font-bold p-2 rounded bg-red-100 text-red-700" role="alert"></div>
@@ -162,6 +171,7 @@ export const ExamBuilder = {
                         <button type="button" data-add="mc" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Multiple choice</button>
                         <button type="button" data-add="tf" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>T/F</button>
                         <button type="button" data-add="id" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Identification</button>
+                        <button type="button" data-add="enum" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Enumeration</button>
                     </div>
                     <button type="button" id="ebSaveBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-md text-sm font-bold shadow-sm transition disabled:opacity-50"><i class="fa-solid fa-floppy-disk mr-1" aria-hidden="true"></i>Save exam</button>
                 </div>
@@ -174,7 +184,8 @@ export const ExamBuilder = {
         if (!s || !el) return;
         const bonus = s.questions.filter(q => q.bonus).length;
         const regular = s.questions.length - bonus;
-        el.textContent = `${regular} question${regular === 1 ? '' : 's'}${bonus ? ` + ${bonus} bonus` : ''}`;
+        const points = s.questions.filter(q => !q.bonus).reduce((sum, q) => sum + M.pointsOf(q), 0);
+        el.textContent = `${regular} question${regular === 1 ? '' : 's'}${points !== regular ? ` (${points} points)` : ''}${bonus ? ` + ${bonus} bonus` : ''}`;
     },
 
     renderBody: (focusSel) => {
@@ -225,6 +236,22 @@ export const ExamBuilder = {
                     <p class="text-[11px] font-bold text-gray-500 uppercase mb-1.5">Correct answer</p>
                     <div class="flex gap-2">${btn('True')}${btn('False')}</div>
                 </div>`;
+        } else if (q.type === 'enum') {
+            answerArea = `
+                <div class="mt-3 space-y-1.5">
+                    <p class="text-[11px] font-bold text-gray-500 uppercase">Items to list <span class="normal-case font-normal">- ${M.pointsOf(q)} point${M.pointsOf(q) === 1 ? '' : 's'}, 1 for each correct item</span></p>
+                    ${q.items.map((it, k) => `
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 shrink-0 text-right text-xs font-bold text-gray-400">${k + 1}.</span>
+                            <input type="text" class="${INPUT} eb-field eb-item" data-i="${k}" value="${esc(it)}" placeholder="Item ${k + 1}" aria-label="Item ${k + 1}">
+                            <button type="button" class="eb-item-del shrink-0 w-8 h-8 text-gray-400 hover:text-red-600 ${q.items.length <= M.MIN_ITEMS ? 'invisible' : ''}" data-i="${k}" aria-label="Remove item ${k + 1}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                        </div>`).join('')}
+                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        ${q.items.length < M.MAX_ITEMS ? '<button type="button" class="eb-item-add text-xs font-bold text-indigo-600 hover:text-indigo-800 py-1.5"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Add item</button>' : '<span></span>'}
+                        <label class="text-xs font-bold text-gray-600 flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="eb-ordered rounded text-indigo-600 focus:ring-indigo-500" ${q.ordered ? 'checked' : ''}> Order matters</label>
+                    </div>
+                    <p class="text-[11px] text-gray-500">Capital letters are ignored. ${q.ordered ? 'The student must list the items in this order.' : 'The student can list the items in any order.'}</p>
+                </div>`;
         } else {
             answerArea = `
                 <div class="mt-3">
@@ -270,9 +297,9 @@ export const ExamBuilder = {
     sheetHtml: () => {
         const s = ExamBuilder.s;
         const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', ''];
-        const widths = ['w-10', 'w-16', 'w-36', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'w-32', 'min-w-[180px]', 'w-14', 'w-20'];
+        const widths = ['w-10', 'w-16', 'w-44', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-20'];
         return `
-            <p class="text-[11px] text-gray-500 mb-2">Type straight into the cells. Copy rows from Excel or Google Sheets and paste them into any cell: they fill to the right and down, and add rows as needed. Enter moves down.</p>
+            <p class="text-[11px] text-gray-500 mb-2">Type straight into the cells. Copy rows from Excel or Google Sheets and paste them into any cell: they fill to the right and down, and add rows as needed. Enter moves down. For an enumeration, type the items in Answer separated by |.</p>
             <div class="bg-white border border-gray-300 rounded-md overflow-auto">
                 <table class="border-collapse text-xs" id="ebSheet">
                     <thead class="sticky top-0 z-10">
@@ -285,7 +312,7 @@ export const ExamBuilder = {
 
     rowHtml: (q, i) => {
         const s = ExamBuilder.s;
-        const typeOptions = M.TYPES.map(t => `<option value="${t.id}" ${q.type === t.id ? 'selected' : ''}>${t.label}</option>`).join('');
+        const typeOptions = M.SHEET_TYPES.map(t => `<option value="${t.key}" ${M.typeKey(q) === t.key ? 'selected' : ''}>${t.label}</option>`).join('');
         const optCells = Array.from({ length: M.MAX_OPTIONS }, (_, k) => {
             const on = q.type === 'mc';
             return `<td class="border border-gray-200 p-0 ${on ? '' : 'bg-gray-100'}"><input type="text" class="${CELL}" data-col="o${k}" value="${on ? esc(q.options[k] || '') : ''}" ${on ? '' : 'disabled'} aria-label="Choice ${M.letter(k)}"></td>`;
@@ -296,6 +323,8 @@ export const ExamBuilder = {
             answerCell = `<select class="${CELL} eb-answer-sel" data-col="answer" aria-label="Correct choice"><option value="">- pick -</option>${letters}</select>`;
         } else if (q.type === 'tf') {
             answerCell = `<select class="${CELL} eb-answer-sel" data-col="answer" aria-label="Correct answer"><option value="">- pick -</option><option ${q.tf === 'True' ? 'selected' : ''}>True</option><option ${q.tf === 'False' ? 'selected' : ''}>False</option></select>`;
+        } else if (q.type === 'enum') {
+            answerCell = `<input type="text" class="${CELL}" data-col="answer" value="${esc(M.cellText(q, 'answer'))}" placeholder="item 1 | item 2 | item 3" aria-label="Items, separated by |">`;
         } else {
             answerCell = `<input type="text" class="${CELL}" data-col="answer" value="${esc(q.answer)}" aria-label="Correct answer">`;
         }
@@ -349,6 +378,8 @@ export const ExamBuilder = {
 
         if (t.closest('#closeExamBuilderBtn') || t.id === 'closeExamBuilderBg') { ExamBuilder.close(); return; }
         if (t.closest('#ebSaveBtn')) { await ExamBuilder.save(); return; }
+        if (t.closest('#ebImportBtn')) { ExamBuilder.root.querySelector('#ebCsvInput').click(); return; }
+        if (t.closest('#ebExportBtn')) { ExamBuilder.exportCsv(); return; }
 
         const viewBtn = t.closest('.eb-view-btn');
         if (viewBtn) {
@@ -395,6 +426,23 @@ export const ExamBuilder = {
             return;
         }
 
+        if (t.closest('.eb-item-add')) {
+            if (q.items.length < M.MAX_ITEMS) q.items.push('');
+            ExamBuilder.touch();
+            ExamBuilder.refreshCard(q.id, `.eb-item[data-i="${q.items.length - 1}"]`);
+            return;
+        }
+        const delItem = t.closest('.eb-item-del');
+        if (delItem) {
+            if (q.items.length > M.MIN_ITEMS) {
+                q.items.splice(parseInt(delItem.dataset.i, 10), 1);
+                ExamBuilder.touch();
+                ExamBuilder.refreshCard(q.id);
+                ExamBuilder.updateCount();
+            }
+            return;
+        }
+
         if (t.closest('.eb-opt-add')) {
             if (q.options.length < M.MAX_OPTIONS) q.options.push('');
             ExamBuilder.touch();
@@ -433,21 +481,41 @@ export const ExamBuilder = {
         const t = e.target;
         if (t.id === 'ebTitle') { s.title = t.value; ExamBuilder.touch(); return; }
         if (t.tagName === 'SELECT' || t.type === 'checkbox' || t.type === 'radio') return;
-        const col = t.dataset.col;
-        if (!col) return;
         const q = ExamBuilder.qOf(t);
         if (!q) return;
+        if (t.classList.contains('eb-item')) {
+            q.items[parseInt(t.dataset.i, 10)] = t.value;
+            ExamBuilder.touch();
+            ExamBuilder.updateCount();
+            return;
+        }
+        const col = t.dataset.col;
+        if (!col) return;
         M.setCell(q, col, t.value);
         ExamBuilder.touch();
+        if (col === 'answer' && q.type === 'enum') ExamBuilder.updateCount();
     },
 
     onChange: (e) => {
         const s = ExamBuilder.s;
         if (!s) return;
         const t = e.target;
+        if (t.id === 'ebCsvInput') {
+            const file = t.files && t.files[0];
+            t.value = '';
+            if (file) ExamBuilder.importCsv(file);
+            return;
+        }
         const q = ExamBuilder.qOf(t);
         if (!q) return;
         const inSheet = s.view === 'sheet';
+
+        if (t.classList.contains('eb-ordered')) {
+            q.ordered = t.checked;
+            ExamBuilder.touch();
+            ExamBuilder.refreshCard(q.id);
+            return;
+        }
 
         if (t.classList.contains('eb-bonus')) {
             q.bonus = t.checked;
@@ -479,8 +547,25 @@ export const ExamBuilder = {
 
     onKeydown: (e) => {
         const s = ExamBuilder.s;
-        if (!s || s.view !== 'sheet' || e.key !== 'Enter' || e.shiftKey) return;
+        if (!s || e.key !== 'Enter' || e.shiftKey) return;
         const t = e.target;
+        if (t.classList && t.classList.contains('eb-item')) {
+            // Enter in an enumeration item moves to the next item, or adds one after the last.
+            e.preventDefault();
+            const q = ExamBuilder.qOf(t);
+            const k = parseInt(t.dataset.i, 10);
+            if (!q) return;
+            if (k >= q.items.length - 1) {
+                if (q.items.length >= M.MAX_ITEMS) return;
+                q.items.push('');
+                ExamBuilder.touch();
+                ExamBuilder.refreshCard(q.id, `.eb-item[data-i="${q.items.length - 1}"]`);
+            } else {
+                t.closest('.eb-card').querySelector(`.eb-item[data-i="${k + 1}"]`)?.focus();
+            }
+            return;
+        }
+        if (s.view !== 'sheet') return;
         const col = t.dataset && t.dataset.col;
         if (!col || t.tagName === 'SELECT') return;
         e.preventDefault();
@@ -521,6 +606,79 @@ export const ExamBuilder = {
         ExamBuilder.touch();
         ExamBuilder.renderBody();
         UI.success(`Pasted ${rows.length} row${rows.length === 1 ? '' : 's'}`);
+    },
+
+    // ---------- CSV ----------
+
+    importCsv: async (file) => {
+        const s = ExamBuilder.s;
+        if (!s) return;
+        try {
+            const text = await file.text();
+            const { questions, skipped } = M.fromCsvText(text);
+            if (!questions.length) {
+                UI.error('No questions found in that file. Use the template for the right columns.');
+                return;
+            }
+            const onlyBlank = s.questions.length === 1 && !s.questions[0].text.trim();
+            s.questions = onlyBlank ? questions : s.questions.concat(questions);
+            if (!s.title.trim()) s.title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+            ExamBuilder.touch();
+            ExamBuilder.renderShell();
+            ExamBuilder.renderBody();
+            UI.success(`Imported ${questions.length} question${questions.length === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} empty row${skipped === 1 ? '' : 's'}` : ''}. Check them, then save.`);
+        } catch (err) {
+            UI.error('Could not read that file.');
+        }
+    },
+
+    exportCsv: () => {
+        const s = ExamBuilder.s;
+        if (!s || !s.questions.length) { UI.error('There are no questions to export yet.'); return; }
+        const name = (s.title.trim() || 'exam').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'exam';
+        ExamBuilder.download(`${name}.csv`, M.toCsv(s.questions));
+    },
+
+    // The sample file shown in Manage Exams: one example of every question type.
+    downloadTemplate: () => {
+        const mc = M.blankQuestion('mc', 0);
+        mc.text = 'What does CPU stand for?';
+        mc.options = ['Central Processing Unit', 'Control Processing Unit', 'Computer Personal Unit', 'Central Power Unit'];
+        mc.correct = 0;
+        mc.expl = 'The CPU is the main processor of a computer.';
+        const tf = M.blankQuestion('tf', 1);
+        tf.text = 'The binary number system uses only 0 and 1.';
+        tf.tf = 'True';
+        tf.expl = 'Binary is a base-2 system.';
+        const id = M.blankQuestion('id', 2);
+        id.text = 'Name the protocol used for secure web traffic (abbreviation).';
+        id.answer = 'HTTPS';
+        const en = M.blankQuestion('enum', 3);
+        en.text = 'List the three primary colors of light.';
+        en.items = ['Red', 'Green', 'Blue'];
+        en.expl = 'Each correct item is worth 1 point, in any order.';
+        const eo = M.blankQuestion('enum', 3);
+        eo.text = 'List the first three planets from the Sun, in order.';
+        eo.items = ['Mercury', 'Venus', 'Earth'];
+        eo.ordered = true;
+        const bonus = M.blankQuestion('mc', 0);
+        bonus.text = 'BONUS: Which company created JavaScript?';
+        bonus.options = ['Netscape', 'Microsoft', 'Sun Microsystems', 'IBM'];
+        bonus.correct = 0;
+        bonus.bonus = true;
+        ExamBuilder.download('exam_template.csv', M.toCsv([mc, tf, id, en, eo, bonus]));
+    },
+
+    download: (filename, text) => {
+        const blob = new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     },
 
     // ---------- Save ----------

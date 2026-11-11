@@ -8,104 +8,88 @@ export const ExamUI = {
                 <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
                     <div class="flex-1 min-w-0">
                         <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-file-contract text-blue-600 mr-2"></i>Manage Exams & Accessible Class Assignments</h3>
-                        <p class="text-xs text-gray-500">Upload exams, add bonus questions, link exams to this class with date schedules, and assign students.</p>
+                        <p class="text-xs text-gray-500">Create or import exams, edit them, add bonus questions, link them to this class with date schedules, and assign students.</p>
                     </div>
                     <button id="closeExamManagerBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
 
-                <!-- Main Exam List & Upload View -->
+                <!-- Main Exam List View -->
                 <div id="examManagerMainView" class="flex-1 flex flex-col min-h-0 overflow-hidden">
-                    <div class="mb-4 bg-indigo-50 p-4 border border-indigo-200 rounded-lg flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                            <h4 class="text-sm font-bold text-indigo-800"><i class="fa-solid fa-wand-magic-sparkles mr-1.5" aria-hidden="true"></i>Create an Exam</h4>
-                            <p class="text-xs text-indigo-700 mt-0.5">Build it right here like a Google Form or a spreadsheet: pick Multiple choice, True or False, or Identification, then mark the correct answer.</p>
-                        </div>
-                        <button type="button" id="openExamBuilderBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-md text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1.5" aria-hidden="true"></i>Create Exam</button>
-                    </div>
-                    <div class="mb-4 bg-blue-50 p-4 border border-blue-200 rounded-lg flex-shrink-0">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                            <h4 class="text-sm font-bold text-blue-800">Or Upload an Exam (CSV Format)</h4>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <button type="button" id="toggleExamCsvGuideBtn" class="px-3 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs font-bold transition shadow-sm flex items-center">
-                                    <i class="fa-solid fa-circle-question mr-1.5"></i> Spreadsheet Guide
-                                </button>
-                                <button type="button" id="downloadExamCsvTemplateBtn" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition shadow-sm flex items-center">
-                                    <i class="fa-solid fa-file-csv mr-1.5"></i> Download CSV Template
-                                </button>
+                    <div class="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-3 flex-shrink-0">
+                        <button type="button" id="openExamBuilderBtn" class="text-left bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl p-4 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <div class="flex items-center gap-3">
+                                <span class="w-10 h-10 shrink-0 rounded-full bg-white/20 flex items-center justify-center"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+                                <span>
+                                    <span class="block text-sm font-black">Create Exam</span>
+                                    <span class="block text-xs text-indigo-100 mt-0.5">Build it like a Google Form or a spreadsheet and mark the correct answers.</span>
+                                </span>
                             </div>
-                        </div>
-                        <p class="text-xs text-blue-600 mb-3">Columns: Part Index (0=Part 1, 1=Part 2, 2=Part 3), Question, Choices (Pipe separated "|"), Answer, Explanation, Bonus (Optional: 1 or Bonus).</p>
-
-                        <!-- Collapsible Spreadsheet Guide -->
-                        <div id="examCsvGuidePanel" class="hidden mb-3 bg-white p-3 rounded-lg border border-blue-200 text-xs text-gray-700 space-y-2">
-                            <div class="font-black text-blue-900 uppercase tracking-wider text-[11px]">How to Prepare Your Exam in Excel or Google Sheets:</div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left border-collapse border border-gray-200 text-[11px]">
-                                    <thead class="bg-gray-100 text-gray-800 font-bold">
-                                        <tr>
-                                            <th class="border border-gray-200 px-2 py-1">Col</th>
-                                            <th class="border border-gray-200 px-2 py-1">Header</th>
-                                            <th class="border border-gray-200 px-2 py-1">Description & Rules</th>
-                                            <th class="border border-gray-200 px-2 py-1">Sample Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">A</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-bold">Part Index</td>
-                                            <td class="border border-gray-200 px-2 py-1">Use <code class="bg-gray-100 px-1 rounded">0</code> for Part 1, <code class="bg-gray-100 px-1 rounded">1</code> for Part 2, <code class="bg-gray-100 px-1 rounded">2</code> for Part 3.</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono">0</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">B</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-bold">Question</td>
-                                            <td class="border border-gray-200 px-2 py-1">Full question text. Multi-line text inside a cell is supported.</td>
-                                            <td class="border border-gray-200 px-2 py-1">What does HTML stand for?</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">C</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-bold">Choices</td>
-                                            <td class="border border-gray-200 px-2 py-1">Separate choices with a pipe <code class="bg-gray-100 px-1 rounded">|</code>. Leave blank for Identification.</td>
-                                            <td class="border border-gray-200 px-2 py-1">HyperText Markup Language | HighText Machine Language | HyperLoop</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">D</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-bold">Answer</td>
-                                            <td class="border border-gray-200 px-2 py-1">Must match the exact text of the correct choice (case-insensitive when grading).</td>
-                                            <td class="border border-gray-200 px-2 py-1">HyperText Markup Language</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">E</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-bold">Explanation</td>
-                                            <td class="border border-gray-200 px-2 py-1">Optional note shown when revealing the answer in Present mode.</td>
-                                            <td class="border border-gray-200 px-2 py-1">HTML is the standard markup language for web pages.</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono font-bold">F</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-bold">Bonus</td>
-                                            <td class="border border-gray-200 px-2 py-1">Optional: type <code class="bg-gray-100 px-1 rounded">1</code> or <code class="bg-gray-100 px-1 rounded">Bonus</code> for bonus credit (capped at Max Score).</td>
-                                            <td class="border border-gray-200 px-2 py-1 font-mono">1</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                        </button>
+                        <button type="button" id="importExamCsvBtn" class="text-left bg-white hover:bg-green-50 text-gray-800 border-2 border-green-500 rounded-xl p-4 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-green-400">
+                            <div class="flex items-center gap-3">
+                                <span class="w-10 h-10 shrink-0 rounded-full bg-green-100 text-green-700 flex items-center justify-center"><i class="fa-solid fa-file-csv" aria-hidden="true"></i></span>
+                                <span>
+                                    <span class="block text-sm font-black">Import from Spreadsheet</span>
+                                    <span class="block text-xs text-gray-600 mt-0.5">Pick a CSV from Excel or Google Sheets. It opens in the builder so you can check it before saving.</span>
+                                </span>
                             </div>
-                            <div class="text-[11px] text-gray-600">
-                                <strong>Tip:</strong> Click <strong>Download CSV Template</strong>, open it in Excel or Google Sheets, replace the sample rows with your questions, keep Row 1 as the header, and save/export as <strong>CSV (Comma delimited) (*.csv)</strong>.
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col sm:flex-row gap-2">
-                            <input type="text" id="newExamTitle" placeholder="Exam Title (links to Record Scores)" class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white">
-                            <input type="file" id="examCsvUpload" accept=".csv" class="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm bg-white">
-                            <button type="button" id="uploadExamBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded text-sm font-bold transition shadow-sm">
-                                Upload
-                            </button>
-                        </div>
-                        <div id="examUploadMessage" class="hidden mt-2 text-xs font-bold p-2 rounded"></div>
+                        </button>
+                        <input type="file" id="examCsvUpload" accept=".csv,text/csv" class="hidden">
                     </div>
 
+                    <div class="mb-3 flex flex-wrap items-center gap-2 flex-shrink-0">
+                        <button type="button" id="downloadExamCsvTemplateBtn" class="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md text-xs font-bold transition shadow-sm flex items-center">
+                            <i class="fa-solid fa-download mr-1.5" aria-hidden="true"></i> Download CSV Template
+                        </button>
+                        <button type="button" id="toggleExamCsvGuideBtn" class="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md text-xs font-bold transition shadow-sm flex items-center" aria-expanded="false" aria-controls="examCsvGuidePanel">
+                            <i class="fa-solid fa-circle-question mr-1.5" aria-hidden="true"></i> Spreadsheet Guide
+                        </button>
+                        <span class="text-[11px] text-gray-500">Types: Multiple choice, True or False, Identification, Enumeration</span>
+                    </div>
+
+                    <!-- Collapsible Spreadsheet Guide -->
+                    <div id="examCsvGuidePanel" class="hidden mb-3 bg-white p-3 rounded-lg border border-gray-200 text-xs text-gray-700 space-y-3 flex-shrink-0 max-h-[40vh] overflow-y-auto">
+                        <div class="font-black text-gray-900 uppercase tracking-wider text-[11px]">The same columns are used in the builder's Spreadsheet view, the CSV import and the CSV export</div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse border border-gray-200 text-[11px]">
+                                <thead class="bg-gray-100 text-gray-800 font-bold">
+                                    <tr><th class="border border-gray-200 px-2 py-1">Column</th><th class="border border-gray-200 px-2 py-1">What to put there</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Part</td><td class="border border-gray-200 px-2 py-1">A number: <code class="bg-gray-100 px-1 rounded">0</code> is Part 1, <code class="bg-gray-100 px-1 rounded">1</code> is Part 2, and so on.</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Type</td><td class="border border-gray-200 px-2 py-1"><code class="bg-gray-100 px-1 rounded">Multiple choice</code>, <code class="bg-gray-100 px-1 rounded">True or False</code>, <code class="bg-gray-100 px-1 rounded">Identification</code>, <code class="bg-gray-100 px-1 rounded">Enumeration</code> or <code class="bg-gray-100 px-1 rounded">Enumeration (ordered)</code>. Left empty, it is worked out from the other cells.</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Question</td><td class="border border-gray-200 px-2 py-1">The question text. A cell may hold several lines.</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Choice A to H</td><td class="border border-gray-200 px-2 py-1">One choice per cell, for Multiple choice only (up to 8).</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Answer</td><td class="border border-gray-200 px-2 py-1">See the next table.</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Explanation</td><td class="border border-gray-200 px-2 py-1">Optional. Shown after the answer.</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Bonus</td><td class="border border-gray-200 px-2 py-1">Optional. Write <code class="bg-gray-100 px-1 rounded">Yes</code> to make it a bonus question.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse border border-gray-200 text-[11px]">
+                                <thead class="bg-gray-100 text-gray-800 font-bold">
+                                    <tr><th class="border border-gray-200 px-2 py-1">Type</th><th class="border border-gray-200 px-2 py-1">Answer cell</th><th class="border border-gray-200 px-2 py-1">Points</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Multiple choice</td><td class="border border-gray-200 px-2 py-1">The letter of the right choice, like <code class="bg-gray-100 px-1 rounded">B</code> (or its exact text)</td><td class="border border-gray-200 px-2 py-1">1</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">True or False</td><td class="border border-gray-200 px-2 py-1"><code class="bg-gray-100 px-1 rounded">True</code> or <code class="bg-gray-100 px-1 rounded">False</code></td><td class="border border-gray-200 px-2 py-1">1</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Identification</td><td class="border border-gray-200 px-2 py-1">The exact answer (capital letters are ignored)</td><td class="border border-gray-200 px-2 py-1">1</td></tr>
+                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Enumeration</td><td class="border border-gray-200 px-2 py-1">The items separated by <code class="bg-gray-100 px-1 rounded">|</code>, like <code class="bg-gray-100 px-1 rounded">Red | Green | Blue</code>. Any order, unless the type is "Enumeration (ordered)".</td><td class="border border-gray-200 px-2 py-1">1 for each correct item</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-[11px] text-gray-600">
+                            <strong>Tip:</strong> Download the template, replace the sample rows, keep Row 1 as the header, and save as <strong>CSV UTF-8</strong>. Files in the older 6-column layout (Part Index, Question, Choices, Answer, Explanation, Bonus) still import.
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-1.5 flex-shrink-0">
+                        <h4 class="text-xs font-black text-gray-700 uppercase tracking-wider">Your exams</h4>
+                        <span id="examCountLabel" class="text-[11px] font-bold text-gray-500"></span>
+                    </div>
                     <div id="examListContainer" class="flex-1 overflow-y-auto space-y-2 bg-gray-50 p-2 rounded border border-gray-200 min-h-[220px]">
                         <div class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
                     </div>
