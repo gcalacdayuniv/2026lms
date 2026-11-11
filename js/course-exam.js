@@ -2,6 +2,7 @@
 import { apiFetch, AppState } from './globals.js';
 import { CourseClass } from './course-class.js';
 import { UI } from './ui-feedback.js';
+import { ExamBuilder } from './exam-builder.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -168,6 +169,15 @@ export const CourseExam = {
 
         if (e.target.closest('#closeExamManagerBtn') || e.target.id === 'closeExamManagerBg') {
             document.getElementById('examManagerModal').classList.add('hidden');
+        }
+
+        if (e.target.closest('#openExamBuilderBtn')) {
+            await ExamBuilder.open({ onSaved: () => CourseExam.loadExams() });
+        }
+
+        if (e.target.closest('.edit-exam-builder-btn')) {
+            const btn = e.target.closest('.edit-exam-builder-btn');
+            await ExamBuilder.open({ examId: btn.dataset.examId, title: btn.dataset.title, onSaved: () => CourseExam.loadExams() });
         }
 
         if (e.target.closest('#uploadExamBtn')) {
@@ -454,6 +464,9 @@ export const CourseExam = {
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-end">
+                            <button type="button" class="edit-exam-builder-btn bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                                <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
+                            </button>
                             <button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
                                 <i class="fa-solid fa-star mr-1"></i> Bonus Qs
                             </button>

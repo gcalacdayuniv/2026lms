@@ -17,9 +17,16 @@ export const ExamUI = {
 
                 <!-- Main Exam List & Upload View -->
                 <div id="examManagerMainView" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div class="mb-4 bg-indigo-50 p-4 border border-indigo-200 rounded-lg flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h4 class="text-sm font-bold text-indigo-800"><i class="fa-solid fa-wand-magic-sparkles mr-1.5" aria-hidden="true"></i>Create an Exam</h4>
+                            <p class="text-xs text-indigo-700 mt-0.5">Build it right here like a Google Form or a spreadsheet: pick Multiple choice, True or False, or Identification, then mark the correct answer.</p>
+                        </div>
+                        <button type="button" id="openExamBuilderBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-md text-sm font-bold shadow-sm transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1.5" aria-hidden="true"></i>Create Exam</button>
+                    </div>
                     <div class="mb-4 bg-blue-50 p-4 border border-blue-200 rounded-lg flex-shrink-0">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                            <h4 class="text-sm font-bold text-blue-800">Upload New Exam (CSV Format)</h4>
+                            <h4 class="text-sm font-bold text-blue-800">Or Upload an Exam (CSV Format)</h4>
                             <div class="flex flex-wrap items-center gap-2">
                                 <button type="button" id="toggleExamCsvGuideBtn" class="px-3 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs font-bold transition shadow-sm flex items-center">
                                     <i class="fa-solid fa-circle-question mr-1.5"></i> Spreadsheet Guide
