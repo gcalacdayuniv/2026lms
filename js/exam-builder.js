@@ -22,6 +22,8 @@ const store = {
 
 const draftKey = (examId) => `exam_builder_draft_${AppState.user ? AppState.user.User_ID : ''}_${examId || 'new'}`;
 
+const ADD_LABEL = { mc: 'Multiple choice', multi: 'Multi-answer', tf: 'T/F', id: 'Identification', num: 'Numeric', enum: 'Enumeration', order: 'Ordering', match: 'Matching', essay: 'Essay' };
+
 const INPUT = 'w-full border-0 border-b border-gray-300 focus:border-indigo-500 focus:ring-0 outline-none px-1 py-1.5 text-sm bg-transparent';
 const CELL = 'eb-cell w-full px-2 py-1.5 text-xs border border-transparent focus:border-indigo-500 focus:bg-white bg-transparent outline-none rounded-none disabled:bg-gray-100 disabled:text-gray-300';
 
@@ -32,7 +34,7 @@ export const ExamBuilder = {
 
     // ---------- Open / close ----------
 
-    // options: { examId?, title?, onSaved? }
+    // options: { examId?, title?, onSaved?, classLink? }  classLink: { enabled, term, category, fromDate, toDate, audience, linked } shows the Record Scores panel
     open: async (options = {}) => {
         const root = ExamBuilder.mount();
         ExamBuilder.s = {
@@ -42,7 +44,8 @@ export const ExamBuilder = {
             questions: [],
             dirty: false,
             saving: false,
-            onSaved: options.onSaved || null
+            onSaved: options.onSaved || null,
+            link: options.classLink ? { ...options.classLink } : null
         };
         const s = ExamBuilder.s;
         root.classList.remove('hidden');
@@ -149,6 +152,7 @@ export const ExamBuilder = {
                 </div>
                 <div class="px-4 pt-3 pb-2 shrink-0 bg-white border-b">
                     <input type="text" id="ebTitle" maxlength="120" value="${esc(s.title)}" placeholder="Exam title (this is the name in Record Scores)" aria-label="Exam title" class="w-full text-lg font-bold border-0 border-b-2 border-gray-300 focus:border-indigo-600 focus:ring-0 outline-none px-1 py-1.5 bg-transparent">
+                    ${ExamBuilder.linkPanel()}
                     <div class="mt-2 flex flex-wrap items-center gap-2">
                         <div class="flex w-full sm:w-auto bg-gray-100 rounded-lg p-1" role="group" aria-label="Builder view">
                             ${tab('form', 'fa-list-check', 'Form')}
@@ -167,11 +171,10 @@ export const ExamBuilder = {
                 <div id="ebBody" class="flex-1 min-h-0 overflow-auto bg-indigo-50/60 p-3 sm:p-4"></div>
                 <div class="shrink-0 border-t bg-white px-3 py-2 flex flex-wrap items-center gap-2" style="padding-bottom:max(0.5rem,env(safe-area-inset-bottom))">
                     <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span class="text-[11px] font-bold text-gray-500 uppercase hidden sm:inline">Add</span>
-                        <button type="button" data-add="mc" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Multiple choice</button>
-                        <button type="button" data-add="tf" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>T/F</button>
-                        <button type="button" data-add="id" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Identification</button>
-                        <button type="button" data-add="enum" class="eb-add px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Enumeration</button>
+                        <span class="text-[11px] font-bold text-gray-500 uppercase hidden sm:inline shrink-0">Add</span>
+                        <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Add a question">
+                            ${M.TYPES.map(t => `<button type="button" data-add="${t.id}" class="eb-add shrink-0 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>${ADD_LABEL[t.id] || t.label}</button>`).join('')}
+                        </div>
                     </div>
                     <button type="button" id="ebSaveBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-md text-sm font-bold shadow-sm transition disabled:opacity-50"><i class="fa-solid fa-floppy-disk mr-1" aria-hidden="true"></i>Save exam</button>
                 </div>
@@ -216,19 +219,54 @@ export const ExamBuilder = {
         const s = ExamBuilder.s;
         const typeOptions = M.TYPES.map(t => `<option value="${t.id}" ${q.type === t.id ? 'selected' : ''}>${t.label}</option>`).join('');
         let answerArea = '';
-        if (q.type === 'mc') {
-            answerArea = `
+        const pts = M.pointsOf(q);
+        const ptsText = `${pts} point${pts === 1 ? '' : 's'}`;
+        const optionsEditor = (multi) => `
                 <div class="mt-3 space-y-1.5">
-                    <p class="text-[11px] font-bold text-gray-500 uppercase">Choices <span class="normal-case font-normal">- tap the circle of the correct one</span></p>
-                    ${q.options.map((o, k) => `
-                        <div class="flex items-center gap-2 rounded ${q.correct === k ? 'bg-green-50' : ''}">
-                            <input type="radio" name="ebc-${q.id}" class="eb-correct w-5 h-5 shrink-0 text-green-600 focus:ring-green-500" data-i="${k}" ${q.correct === k ? 'checked' : ''} aria-label="Mark choice ${M.letter(k)} as the correct answer">
+                    <p class="text-[11px] font-bold text-gray-500 uppercase">Choices <span class="normal-case font-normal">- ${multi ? 'tick every correct one' : 'tap the circle of the correct one'}</span></p>
+                    ${q.options.map((o, k) => {
+                        const on = multi ? q.corrects.includes(k) : q.correct === k;
+                        const mark = multi
+                            ? `<input type="checkbox" class="eb-correct-multi w-5 h-5 shrink-0 rounded text-green-600 focus:ring-green-500" data-i="${k}" ${on ? 'checked' : ''} aria-label="Mark choice ${M.letter(k)} as a correct answer">`
+                            : `<input type="radio" name="ebc-${q.id}" class="eb-correct w-5 h-5 shrink-0 text-green-600 focus:ring-green-500" data-i="${k}" ${on ? 'checked' : ''} aria-label="Mark choice ${M.letter(k)} as the correct answer">`;
+                        return `
+                        <div class="flex items-center gap-2 rounded ${on ? 'bg-green-50' : ''}">
+                            ${mark}
                             <span class="w-4 shrink-0 text-xs font-bold text-gray-400">${M.letter(k)}</span>
                             <input type="text" class="${INPUT} eb-field" data-col="o${k}" value="${esc(o)}" placeholder="Choice ${M.letter(k)}" aria-label="Choice ${M.letter(k)}">
                             <button type="button" class="eb-opt-del shrink-0 w-8 h-8 text-gray-400 hover:text-red-600 ${q.options.length <= M.MIN_OPTIONS ? 'invisible' : ''}" data-i="${k}" aria-label="Remove choice ${M.letter(k)}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-                        </div>`).join('')}
-                    ${q.options.length < M.MAX_OPTIONS ? '<button type="button" class="eb-opt-add text-xs font-bold text-indigo-600 hover:text-indigo-800 py-1.5"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Add choice</button>' : ''}
+                        </div>`;
+                    }).join('')}
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        ${q.options.length < M.MAX_OPTIONS ? '<button type="button" class="eb-opt-add text-xs font-bold text-indigo-600 hover:text-indigo-800 py-1.5"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Add choice</button>' : '<span></span>'}
+                        ${multi ? `<label class="text-xs font-bold text-gray-600 flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="eb-mode rounded text-indigo-600 focus:ring-indigo-500" ${q.mode === 'all' ? 'checked' : ''}> All or nothing</label>` : ''}
+                    </div>
+                    ${multi ? `<p class="text-[11px] text-gray-500">${q.mode === 'all' ? 'Full points only when exactly the correct choices are ticked.' : 'Partial credit: each correct tick earns a share, each wrong tick takes one away (never below 0).'}</p>` : ''}
                 </div>`;
+        const itemsEditor = (isOrder) => `
+                <div class="mt-3 space-y-1.5">
+                    <p class="text-[11px] font-bold text-gray-500 uppercase">${isOrder ? 'Items in the correct order' : 'Items to list'} <span class="normal-case font-normal">- ${ptsText}${isOrder ? '' : ', 1 for each correct item'}</span></p>
+                    ${q.items.map((it, k) => `
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 shrink-0 text-right text-xs font-bold text-gray-400">${k + 1}.</span>
+                            <input type="text" class="${INPUT} eb-field eb-item" data-i="${k}" value="${esc(it)}" placeholder="${isOrder ? 'Step' : 'Item'} ${k + 1}" aria-label="Item ${k + 1}">
+                            <button type="button" class="eb-item-del shrink-0 w-8 h-8 text-gray-400 hover:text-red-600 ${q.items.length <= M.MIN_ITEMS ? 'invisible' : ''}" data-i="${k}" aria-label="Remove item ${k + 1}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                        </div>`).join('')}
+                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        ${q.items.length < M.MAX_ITEMS ? '<button type="button" class="eb-item-add text-xs font-bold text-indigo-600 hover:text-indigo-800 py-1.5"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Add item</button>' : '<span></span>'}
+                        ${isOrder
+                            ? `<label class="text-xs font-bold text-gray-600 flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="eb-mode rounded text-indigo-600 focus:ring-indigo-500" ${q.mode === 'all' ? 'checked' : ''}> All or nothing</label>`
+                            : `<label class="text-xs font-bold text-gray-600 flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="eb-ordered rounded text-indigo-600 focus:ring-indigo-500" ${q.ordered ? 'checked' : ''}> Order matters</label>`}
+                    </div>
+                    <p class="text-[11px] text-gray-500">${isOrder
+                        ? `Students see these shuffled and put them in order. ${q.mode === 'all' ? 'Full points only for the exact order.' : 'Partial credit for each item in the right place.'}`
+                        : `Capital letters are ignored. ${q.ordered ? 'The student must list the items in this order.' : 'The student can list the items in any order.'} Accept another spelling with " / ", for example <b>CPU / processor</b>.`}</p>
+                </div>`;
+
+        if (q.type === 'mc') {
+            answerArea = optionsEditor(false);
+        } else if (q.type === 'multi') {
+            answerArea = optionsEditor(true);
         } else if (q.type === 'tf') {
             const btn = (v) => `<button type="button" class="eb-tf flex-1 py-3 rounded-lg border-2 text-sm font-black transition ${q.tf === v ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300'}" data-v="${v}" aria-pressed="${q.tf === v}">${q.tf === v ? '<i class="fa-solid fa-circle-check mr-1" aria-hidden="true"></i>' : ''}${v}</button>`;
             answerArea = `
@@ -237,25 +275,50 @@ export const ExamBuilder = {
                     <div class="flex gap-2">${btn('True')}${btn('False')}</div>
                 </div>`;
         } else if (q.type === 'enum') {
+            answerArea = itemsEditor(false);
+        } else if (q.type === 'order') {
+            answerArea = itemsEditor(true);
+        } else if (q.type === 'match') {
             answerArea = `
                 <div class="mt-3 space-y-1.5">
-                    <p class="text-[11px] font-bold text-gray-500 uppercase">Items to list <span class="normal-case font-normal">- ${M.pointsOf(q)} point${M.pointsOf(q) === 1 ? '' : 's'}, 1 for each correct item</span></p>
-                    ${q.items.map((it, k) => `
+                    <p class="text-[11px] font-bold text-gray-500 uppercase">Pairs <span class="normal-case font-normal">- ${ptsText}, 1 for each correct pair. Students see the right-hand side shuffled.</span></p>
+                    ${q.pairs.map((p, k) => `
                         <div class="flex items-center gap-2">
                             <span class="w-6 shrink-0 text-right text-xs font-bold text-gray-400">${k + 1}.</span>
-                            <input type="text" class="${INPUT} eb-field eb-item" data-i="${k}" value="${esc(it)}" placeholder="Item ${k + 1}" aria-label="Item ${k + 1}">
-                            <button type="button" class="eb-item-del shrink-0 w-8 h-8 text-gray-400 hover:text-red-600 ${q.items.length <= M.MIN_ITEMS ? 'invisible' : ''}" data-i="${k}" aria-label="Remove item ${k + 1}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                            <input type="text" class="${INPUT} eb-pair" data-i="${k}" data-side="l" value="${esc(p.l)}" placeholder="Left item" aria-label="Pair ${k + 1}, left item">
+                            <i class="fa-solid fa-arrow-right text-gray-300 shrink-0" aria-hidden="true"></i>
+                            <input type="text" class="${INPUT} eb-pair" data-i="${k}" data-side="r" value="${esc(p.r)}" placeholder="Matches with" aria-label="Pair ${k + 1}, matching item">
+                            <button type="button" class="eb-pair-del shrink-0 w-8 h-8 text-gray-400 hover:text-red-600 ${q.pairs.length <= M.MIN_PAIRS ? 'invisible' : ''}" data-i="${k}" aria-label="Remove pair ${k + 1}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                         </div>`).join('')}
-                    <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-                        ${q.items.length < M.MAX_ITEMS ? '<button type="button" class="eb-item-add text-xs font-bold text-indigo-600 hover:text-indigo-800 py-1.5"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Add item</button>' : '<span></span>'}
-                        <label class="text-xs font-bold text-gray-600 flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="eb-ordered rounded text-indigo-600 focus:ring-indigo-500" ${q.ordered ? 'checked' : ''}> Order matters</label>
+                    ${q.pairs.length < M.MAX_PAIRS ? '<button type="button" class="eb-pair-add text-xs font-bold text-indigo-600 hover:text-indigo-800 py-1.5"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Add pair</button>' : ''}
+                    <div class="pt-1">
+                        <p class="text-[11px] font-bold text-gray-500 uppercase">Extra wrong choices <span class="normal-case font-normal">- optional, separate with |</span></p>
+                        <input type="text" class="${INPUT} eb-extra" value="${esc(q.extra.join(' | '))}" placeholder="Decoy 1 | Decoy 2" aria-label="Extra wrong choices">
                     </div>
-                    <p class="text-[11px] text-gray-500">Capital letters are ignored. ${q.ordered ? 'The student must list the items in this order.' : 'The student can list the items in any order.'}</p>
+                </div>`;
+        } else if (q.type === 'num') {
+            answerArea = `
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                        <p class="text-[11px] font-bold text-gray-500 uppercase">Correct number</p>
+                        <input type="text" inputmode="decimal" class="${INPUT} eb-field" data-col="answer" value="${esc(M.cellText(q, 'answer').replace(/\s*±.*$/, ''))}" placeholder="9.8" aria-label="Correct number">
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-gray-500 uppercase">Accept within +/-</p>
+                        <input type="text" inputmode="decimal" class="${INPUT} eb-tol" value="${esc(q.tol)}" placeholder="0 (exact)" aria-label="Tolerance">
+                    </div>
+                    <p class="col-span-2 text-[11px] text-gray-500">An answer is correct when it is within the tolerance of the number. Example: 9.8 with +/- 0.1 accepts 9.7 to 9.9.</p>
+                </div>`;
+        } else if (q.type === 'essay') {
+            answerArea = `
+                <div class="mt-3">
+                    <p class="text-[11px] font-bold text-gray-500 uppercase">Model answer or rubric <span class="normal-case font-normal">- only you see this. You score essays by hand in Grade Essays.</span></p>
+                    <textarea rows="3" class="eb-field w-full border border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none rounded-md px-2 py-2 text-sm bg-gray-50 focus:bg-white mt-1" data-col="answer" placeholder="Key points a good answer should include" aria-label="Model answer or rubric">${esc(q.answer)}</textarea>
                 </div>`;
         } else {
             answerArea = `
                 <div class="mt-3">
-                    <p class="text-[11px] font-bold text-gray-500 uppercase">Correct answer <span class="normal-case font-normal">- the student's answer must match this, capital letters ignored</span></p>
+                    <p class="text-[11px] font-bold text-gray-500 uppercase">Correct answer <span class="normal-case font-normal">- capital letters ignored. Accept other answers with " / ", for example <b>CPU / processor</b></span></p>
                     <input type="text" class="${INPUT} eb-field" data-col="answer" value="${esc(q.answer)}" placeholder="Type the exact answer" aria-label="Correct answer">
                 </div>`;
         }
@@ -266,6 +329,9 @@ export const ExamBuilder = {
                     <select class="eb-type text-xs font-bold border border-gray-300 rounded-md px-2 py-1.5 bg-white" aria-label="Question type">${typeOptions}</select>
                     <label class="text-[11px] font-bold text-gray-500 flex items-center gap-1">Part
                         <input type="number" min="0" max="99" class="eb-field w-14 border border-gray-300 rounded px-1.5 py-1 text-xs bg-white" data-col="part" value="${q.part}" aria-label="Part number">
+                    </label>
+                    <label class="text-[11px] font-bold text-gray-500 flex items-center gap-1">Points
+                        <input type="text" inputmode="decimal" class="eb-field w-16 border border-gray-300 rounded px-1.5 py-1 text-xs bg-white" data-col="points" value="${esc(q.points)}" placeholder="${M.defaultPoints(q)}" aria-label="Points for this question">
                     </label>
                     <label class="ml-auto text-[11px] font-bold ${q.bonus ? 'text-amber-800' : 'text-gray-500'} flex items-center gap-1 cursor-pointer">
                         <input type="checkbox" class="eb-bonus rounded text-amber-600 focus:ring-amber-500" ${q.bonus ? 'checked' : ''}> Bonus
@@ -296,10 +362,10 @@ export const ExamBuilder = {
 
     sheetHtml: () => {
         const s = ExamBuilder.s;
-        const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', ''];
-        const widths = ['w-10', 'w-16', 'w-44', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-20'];
+        const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points', ''];
+        const widths = ['w-10', 'w-16', 'w-44', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
         return `
-            <p class="text-[11px] text-gray-500 mb-2">Type straight into the cells. Copy rows from Excel or Google Sheets and paste them into any cell: they fill to the right and down, and add rows as needed. Enter moves down. For an enumeration, type the items in Answer separated by |.</p>
+            <p class="text-[11px] text-gray-500 mb-2">Type straight into the cells. Copy rows from Excel or Google Sheets and paste them into any cell: they fill to the right and down, and add rows as needed. Enter moves down. Choice A-H hold the choices; for Matching type each pair as <b>left | right</b> (wrong extra choices go in Answer, separated by |). Answer: a letter for multiple choice, letters like <b>A, C</b> for multiple answer, items separated by | for enumeration and ordering, <b>9.8 ± 0.1</b> for numeric. Use " / " for alternative answers. Leave Points empty for the default.</p>
             <div class="bg-white border border-gray-300 rounded-md overflow-auto">
                 <table class="border-collapse text-xs" id="ebSheet">
                     <thead class="sticky top-0 z-10">
@@ -314,8 +380,9 @@ export const ExamBuilder = {
         const s = ExamBuilder.s;
         const typeOptions = M.SHEET_TYPES.map(t => `<option value="${t.key}" ${M.typeKey(q) === t.key ? 'selected' : ''}>${t.label}</option>`).join('');
         const optCells = Array.from({ length: M.MAX_OPTIONS }, (_, k) => {
-            const on = q.type === 'mc';
-            return `<td class="border border-gray-200 p-0 ${on ? '' : 'bg-gray-100'}"><input type="text" class="${CELL}" data-col="o${k}" value="${on ? esc(q.options[k] || '') : ''}" ${on ? '' : 'disabled'} aria-label="Choice ${M.letter(k)}"></td>`;
+            const on = q.type === 'mc' || q.type === 'multi' || q.type === 'match';
+            const ph = q.type === 'match' ? 'left | right' : '';
+            return `<td class="border border-gray-200 p-0 ${on ? '' : 'bg-gray-100'}"><input type="text" class="${CELL}" data-col="o${k}" value="${on ? esc(M.cellText(q, `o${k}`)) : ''}" placeholder="${ph}" ${on ? '' : 'disabled'} aria-label="${q.type === 'match' ? `Pair ${k + 1}` : `Choice ${M.letter(k)}`}"></td>`;
         }).join('');
         let answerCell;
         if (q.type === 'mc') {
@@ -323,10 +390,12 @@ export const ExamBuilder = {
             answerCell = `<select class="${CELL} eb-answer-sel" data-col="answer" aria-label="Correct choice"><option value="">- pick -</option>${letters}</select>`;
         } else if (q.type === 'tf') {
             answerCell = `<select class="${CELL} eb-answer-sel" data-col="answer" aria-label="Correct answer"><option value="">- pick -</option><option ${q.tf === 'True' ? 'selected' : ''}>True</option><option ${q.tf === 'False' ? 'selected' : ''}>False</option></select>`;
-        } else if (q.type === 'enum') {
-            answerCell = `<input type="text" class="${CELL}" data-col="answer" value="${esc(M.cellText(q, 'answer'))}" placeholder="item 1 | item 2 | item 3" aria-label="Items, separated by |">`;
         } else {
-            answerCell = `<input type="text" class="${CELL}" data-col="answer" value="${esc(q.answer)}" aria-label="Correct answer">`;
+            const hint = {
+                multi: 'A, C', enum: 'item 1 | item 2 | item 3', order: 'first | second | third',
+                match: 'extra wrong choices (optional)', num: '9.8 ± 0.1', essay: 'model answer / rubric'
+            }[q.type] || '';
+            answerCell = `<input type="text" class="${CELL}" data-col="answer" value="${esc(M.cellText(q, 'answer'))}" placeholder="${hint}" aria-label="Correct answer">`;
         }
         return `
             <tr data-qid="${q.id}" class="eb-row">
@@ -338,6 +407,7 @@ export const ExamBuilder = {
                 <td class="border border-gray-200 p-0">${answerCell}</td>
                 <td class="border border-gray-200 p-0"><input type="text" class="${CELL}" data-col="expl" value="${esc(q.expl)}" aria-label="Explanation"></td>
                 <td class="border border-gray-200 text-center"><input type="checkbox" class="eb-bonus rounded text-amber-600" ${q.bonus ? 'checked' : ''} aria-label="Bonus question"></td>
+                <td class="border border-gray-200 p-0"><input type="text" inputmode="decimal" class="${CELL}" data-col="points" value="${esc(q.points)}" placeholder="${M.defaultPoints(q)}" aria-label="Points"></td>
                 <td class="border border-gray-200 text-center whitespace-nowrap">
                     <button type="button" class="eb-act w-7 h-7 text-gray-500 hover:text-indigo-600" data-act="dup" aria-label="Duplicate row"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
                     <button type="button" class="eb-act w-7 h-7 text-gray-500 hover:text-red-600" data-act="del" aria-label="Delete row"><i class="fa-regular fa-trash-can" aria-hidden="true"></i></button>
@@ -408,7 +478,7 @@ export const ExamBuilder = {
         if (actBtn) {
             const act = actBtn.dataset.act;
             if (act === 'del') {
-                const hasContent = q.text.trim() || q.answer.trim() || q.options.some(o => o.trim());
+                const hasContent = q.text.trim() || q.answer.trim() || q.options.some(o => o.trim()) || q.items.some(o => o.trim()) || q.pairs.some(p => p.l.trim() || p.r.trim());
                 if (hasContent && !window.confirm(`Delete question ${i + 1}?`)) return;
                 s.questions.splice(i, 1);
                 ExamBuilder.touch();
@@ -443,6 +513,24 @@ export const ExamBuilder = {
             return;
         }
 
+        if (t.closest('.eb-pair-add')) {
+            if (q.pairs.length < M.MAX_PAIRS) q.pairs.push({ l: '', r: '' });
+            ExamBuilder.touch();
+            ExamBuilder.refreshCard(q.id, `.eb-pair[data-i="${q.pairs.length - 1}"][data-side="l"]`);
+            ExamBuilder.updateCount();
+            return;
+        }
+        const delPair = t.closest('.eb-pair-del');
+        if (delPair) {
+            if (q.pairs.length > M.MIN_PAIRS) {
+                q.pairs.splice(parseInt(delPair.dataset.i, 10), 1);
+                ExamBuilder.touch();
+                ExamBuilder.refreshCard(q.id);
+                ExamBuilder.updateCount();
+            }
+            return;
+        }
+
         if (t.closest('.eb-opt-add')) {
             if (q.options.length < M.MAX_OPTIONS) q.options.push('');
             ExamBuilder.touch();
@@ -456,6 +544,7 @@ export const ExamBuilder = {
                 q.options.splice(k, 1);
                 if (q.correct === k) q.correct = -1;
                 else if (q.correct > k) q.correct -= 1;
+                q.corrects = q.corrects.filter(c => c !== k).map(c => (c > k ? c - 1 : c));
                 ExamBuilder.touch();
                 ExamBuilder.refreshCard(q.id);
             }
@@ -480,6 +569,7 @@ export const ExamBuilder = {
         if (!s) return;
         const t = e.target;
         if (t.id === 'ebTitle') { s.title = t.value; ExamBuilder.touch(); return; }
+        if (ExamBuilder.onLinkField(t)) return;
         if (t.tagName === 'SELECT' || t.type === 'checkbox' || t.type === 'radio') return;
         const q = ExamBuilder.qOf(t);
         if (!q) return;
@@ -489,17 +579,35 @@ export const ExamBuilder = {
             ExamBuilder.updateCount();
             return;
         }
+        if (t.classList.contains('eb-pair')) {
+            const pair = q.pairs[parseInt(t.dataset.i, 10)];
+            if (pair) pair[t.dataset.side] = t.value;
+            ExamBuilder.touch();
+            ExamBuilder.updateCount();
+            return;
+        }
+        if (t.classList.contains('eb-extra')) {
+            q.extra = M.splitItems(t.value);
+            ExamBuilder.touch();
+            return;
+        }
+        if (t.classList.contains('eb-tol')) {
+            q.tol = t.value.trim();
+            ExamBuilder.touch();
+            return;
+        }
         const col = t.dataset.col;
         if (!col) return;
         M.setCell(q, col, t.value);
         ExamBuilder.touch();
-        if (col === 'answer' && q.type === 'enum') ExamBuilder.updateCount();
+        if (col === 'points' || (col === 'answer' && (q.type === 'enum' || q.type === 'order'))) ExamBuilder.updateCount();
     },
 
     onChange: (e) => {
         const s = ExamBuilder.s;
         if (!s) return;
         const t = e.target;
+        if (ExamBuilder.onLinkField(t)) return;
         if (t.id === 'ebCsvInput') {
             const file = t.files && t.files[0];
             t.value = '';
@@ -509,6 +617,20 @@ export const ExamBuilder = {
         const q = ExamBuilder.qOf(t);
         if (!q) return;
         const inSheet = s.view === 'sheet';
+
+        if (t.classList.contains('eb-correct-multi')) {
+            const k = parseInt(t.dataset.i, 10);
+            q.corrects = t.checked ? [...new Set([...q.corrects, k])] : q.corrects.filter(c => c !== k);
+            ExamBuilder.touch();
+            ExamBuilder.refreshCard(q.id);
+            return;
+        }
+        if (t.classList.contains('eb-mode')) {
+            q.mode = t.checked ? 'all' : 'partial';
+            ExamBuilder.touch();
+            ExamBuilder.refreshCard(q.id);
+            return;
+        }
 
         if (t.classList.contains('eb-ordered')) {
             q.ordered = t.checked;
@@ -527,6 +649,7 @@ export const ExamBuilder = {
         if (t.classList.contains('eb-type')) {
             M.changeType(q, t.value);
             ExamBuilder.touch();
+            ExamBuilder.updateCount();
             inSheet ? ExamBuilder.refreshRow(q.id) : ExamBuilder.refreshCard(q.id);
             return;
         }
@@ -562,6 +685,23 @@ export const ExamBuilder = {
                 ExamBuilder.refreshCard(q.id, `.eb-item[data-i="${q.items.length - 1}"]`);
             } else {
                 t.closest('.eb-card').querySelector(`.eb-item[data-i="${k + 1}"]`)?.focus();
+            }
+            return;
+        }
+        if (t.classList && t.classList.contains('eb-pair')) {
+            e.preventDefault();
+            const q = ExamBuilder.qOf(t);
+            const k = parseInt(t.dataset.i, 10);
+            if (!q) return;
+            if (t.dataset.side === 'l') {
+                t.closest('.eb-card').querySelector(`.eb-pair[data-i="${k}"][data-side="r"]`)?.focus();
+            } else if (k >= q.pairs.length - 1) {
+                if (q.pairs.length >= M.MAX_PAIRS) return;
+                q.pairs.push({ l: '', r: '' });
+                ExamBuilder.touch();
+                ExamBuilder.refreshCard(q.id, `.eb-pair[data-i="${q.pairs.length - 1}"][data-side="l"]`);
+            } else {
+                t.closest('.eb-card').querySelector(`.eb-pair[data-i="${k + 1}"][data-side="l"]`)?.focus();
             }
             return;
         }
@@ -661,12 +801,36 @@ export const ExamBuilder = {
         eo.text = 'List the first three planets from the Sun, in order.';
         eo.items = ['Mercury', 'Venus', 'Earth'];
         eo.ordered = true;
+        const multi = M.blankQuestion('multi', 1);
+        multi.text = 'Which of these are programming languages?';
+        multi.options = ['Python', 'HTML', 'Java', 'Excel'];
+        multi.corrects = [0, 2];
+        multi.points = '2';
+        multi.expl = 'Partial credit: wrong ticks take points away.';
+        const num = M.blankQuestion('num', 2);
+        num.text = 'What is the acceleration due to gravity in m/s^2 (nearest tenth)?';
+        num.answer = '9.8';
+        num.tol = '0.1';
+        const alt = M.blankQuestion('id', 2);
+        alt.text = 'What does the "P" in CPU stand for?';
+        alt.answer = 'Processing / Processor';
+        const order = M.blankQuestion('order', 3);
+        order.text = 'Put the software development steps in order.';
+        order.items = ['Plan', 'Design', 'Build', 'Test', 'Deploy'];
+        const match = M.blankQuestion('match', 3);
+        match.text = 'Match each device to its job.';
+        match.pairs = [{ l: 'Keyboard', r: 'Input' }, { l: 'Monitor', r: 'Output' }, { l: 'SSD', r: 'Storage' }];
+        match.extra = ['Power'];
+        const essay = M.blankQuestion('essay', 4);
+        essay.text = 'Explain in a few sentences why backups matter.';
+        essay.answer = 'Mentions data loss, recovery and keeping copies in another place.';
+        essay.points = '10';
         const bonus = M.blankQuestion('mc', 0);
         bonus.text = 'BONUS: Which company created JavaScript?';
         bonus.options = ['Netscape', 'Microsoft', 'Sun Microsystems', 'IBM'];
         bonus.correct = 0;
         bonus.bonus = true;
-        ExamBuilder.download('exam_template.csv', M.toCsv([mc, tf, id, en, eo, bonus]));
+        ExamBuilder.download('exam_template.csv', M.toCsv([mc, tf, id, alt, en, eo, multi, num, order, match, essay, bonus]));
     },
 
     download: (filename, text) => {
@@ -698,6 +862,49 @@ export const ExamBuilder = {
         else ExamBuilder.root.querySelector('#ebTitle')?.focus();
     },
 
+    // The same information as Link & Assign Students, filled in while creating the exam.
+    linkPanel: () => {
+        const l = ExamBuilder.s.link;
+        if (!l) return '';
+        const opt = (v, label, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${label}</option>`;
+        const cats = [['MajorExam', 'Major Exam'], ['Written', 'Written (Quiz/Long)'], ['Narrative', 'Written (Narrative)'], ['Individual', 'Written (Individual)'], ['Performance', 'Performance (Task)'], ['Report', 'Performance (Report)']];
+        const lab = 'block text-[10px] font-bold text-indigo-700 uppercase mb-1';
+        const inp = 'w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white font-bold';
+        return `
+            <details id="ebLinkPanel" class="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg" ${l.enabled ? 'open' : ''}>
+                <summary class="px-3 py-2 text-xs font-black text-indigo-900 cursor-pointer select-none"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i>Record Scores &amp; this class <span id="ebLinkState" class="font-medium text-indigo-700">${l.enabled ? '(will be linked when saved)' : '(not linked)'}</span></summary>
+                <div class="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <label class="sm:col-span-2 lg:col-span-3 flex items-center gap-2 text-xs font-black text-indigo-900 cursor-pointer"><input type="checkbox" id="ebLinkOn" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" ${l.enabled ? 'checked' : ''}> Link &amp; enable for this class and record the scores</label>
+                    <div><label class="${lab}" for="ebLinkTerm">Record scores term</label>
+                        <select id="ebLinkTerm" class="${inp}">${opt('MidTerm', 'Mid Term', l.term)}${opt('FinalTerm', 'Final Term', l.term)}</select></div>
+                    <div><label class="${lab}" for="ebLinkCategory">Assessment category</label>
+                        <select id="ebLinkCategory" class="${inp}">${cats.map(c => opt(c[0], c[1], l.category)).join('')}</select></div>
+                    <div><label class="${lab}" for="ebLinkWho">Who can take it</label>
+                        <select id="ebLinkWho" class="${inp}">${l.linked ? opt('keep', 'Keep current students', l.audience) : ''}${opt('blind', 'Legally Blind students only', l.audience)}${opt('all', 'All students', l.audience)}</select></div>
+                    <div><label class="${lab}" for="ebLinkFrom">Available from</label><input type="date" id="ebLinkFrom" class="${inp}" value="${esc(l.fromDate || '')}"></div>
+                    <div><label class="${lab}" for="ebLinkTo">Available until</label><input type="date" id="ebLinkTo" class="${inp}" value="${esc(l.toDate || '')}"></div>
+                    <p class="sm:col-span-2 lg:col-span-3 text-[11px] text-indigo-800">The exam title above is the name shown in Record Scores. You can pick individual students later with Link &amp; Assign Students.</p>
+                </div>
+            </details>`;
+    },
+
+    // Keeps the Record Scores panel fields in the builder state.
+    onLinkField: (t) => {
+        const s = ExamBuilder.s;
+        const l = s && s.link;
+        if (!l) return false;
+        const map = { ebLinkOn: 'enabled', ebLinkTerm: 'term', ebLinkCategory: 'category', ebLinkWho: 'audience', ebLinkFrom: 'fromDate', ebLinkTo: 'toDate' };
+        const key = map[t.id];
+        if (!key) return false;
+        l[key] = t.id === 'ebLinkOn' ? t.checked : t.value;
+        if (t.id === 'ebLinkOn') {
+            const st = ExamBuilder.root.querySelector('#ebLinkState');
+            if (st) st.textContent = l.enabled ? '(will be linked when saved)' : '(not linked)';
+        }
+        ExamBuilder.touch();
+        return true;
+    },
+
     save: async () => {
         const s = ExamBuilder.s;
         if (!s || s.saving) return;
@@ -711,23 +918,25 @@ export const ExamBuilder = {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1" aria-hidden="true"></i>Saving...';
         try {
             const examData = s.questions.map(M.toRow);
+            let savedId = s.examId;
             if (s.examId) {
                 await apiFetch('/api/exams/update', {
                     method: 'POST',
                     body: JSON.stringify({ examId: s.examId, title: s.title.trim(), examData })
                 });
             } else {
-                await apiFetch('/api/exams', {
+                const made = await apiFetch('/api/exams', {
                     method: 'POST',
                     body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: s.title.trim(), examData })
                 });
+                savedId = made && made.examId;
             }
             store.del(draftKey(s.examId));
             s.dirty = false;
             const done = s.onSaved;
             ExamBuilder.close(true);
             UI.success('Exam saved');
-            if (done) await done();
+            if (done) await done({ examId: savedId, link: s.link && s.link.enabled ? s.link : null });
         } catch (err) {
             s.saving = false;
             btn.disabled = false;

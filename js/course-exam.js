@@ -3,7 +3,7 @@ import { apiFetch, AppState } from './globals.js';
 import { CourseClass } from './course-class.js';
 import { UI } from './ui-feedback.js';
 import { ExamBuilder } from './exam-builder.js';
-import { fromCsvText, fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
+import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -38,6 +38,7 @@ export const CourseExam = {
     init: () => {
         document.addEventListener('click', CourseExam.handleClicks);
         document.addEventListener('change', CourseExam.handleChanges);
+        document.addEventListener('input', CourseExam.handleInput);
         document.addEventListener('keydown', CourseExam.handleKeydown);
         document.addEventListener('focusin', CourseExam.handleFocus);
     },
@@ -45,8 +46,8 @@ export const CourseExam = {
     // Read-aloud and the audio-driven keyboard flow are for Legally Blind students only.
     isVoiceUser: () => AppState.user?.eye_condition === 'Legally Blind',
 
-    // Text boxes of the student exam: the single answer box and the item boxes of an enumeration.
-    isTextField: (el) => Boolean(el && (el.id === 'accExamTextAnswerInput' || (el.classList && el.classList.contains('acc-exam-enum-input')))),
+    // Fields of the student exam that take typing or a drop-down choice: the answer box, essay box, enumeration boxes and the order / match selects.
+    isTextField: (el) => Boolean(el && (el.id === 'accExamTextAnswerInput' || el.id === 'accExamEssayInput' || (el.classList && (el.classList.contains('acc-exam-enum-input') || el.classList.contains('acc-exam-sel'))))),
 
     // An answer is '' (none), a text, or for an enumeration an array of the items typed so far.
     isAnswered: (a) => (Array.isArray(a) ? a.some(x => String(x).trim() !== '') : a !== '' && a != null),
@@ -91,6 +92,10 @@ export const CourseExam = {
                 CourseExam.speak("Read Question Again Button");
             } else if (e.target.id === 'accExamTextAnswerInput') {
                 CourseExam.speak("Text Answer Input. Type your answer here, then press Enter.");
+            } else if (e.target.id === 'accExamEssayInput') {
+                CourseExam.speak("Essay answer box. Type your answer. Press Tab when you are done.");
+            } else if (e.target.classList.contains('acc-exam-sel')) {
+                CourseExam.speak(`${e.target.getAttribute('aria-label') || 'Choice list'}. Use the up and down arrow keys to choose.`);
             } else if (e.target.classList.contains('acc-exam-enum-input')) {
                 const total = CourseExam.accExam.questions[CourseExam.accIndex]?.itemCount || 0;
                 CourseExam.speak(`Item ${parseInt(e.target.dataset.i, 10) + 1} of ${total}. Type it, then press Enter for the next item.`);
@@ -162,16 +167,12 @@ export const CourseExam = {
         }
 
         if (e.target.closest('#openExamBuilderBtn')) {
-            await ExamBuilder.open({ onSaved: () => CourseExam.loadExams() });
+            await ExamBuilder.open({ classLink: CourseExam.classLinkFor(null), onSaved: CourseExam.afterBuilderSave });
         }
 
         if (e.target.closest('.edit-exam-builder-btn')) {
             const btn = e.target.closest('.edit-exam-builder-btn');
-            await ExamBuilder.open({ examId: btn.dataset.examId, title: btn.dataset.title, onSaved: () => CourseExam.loadExams() });
-        }
-
-        if (e.target.closest('#importExamCsvBtn')) {
-            document.getElementById('examCsvUpload')?.click();
+            await ExamBuilder.open({ examId: btn.dataset.examId, title: btn.dataset.title, classLink: CourseExam.classLinkFor(btn.dataset.examId), onSaved: CourseExam.afterBuilderSave });
         }
 
         if (e.target.closest('.export-exam-csv-btn')) {
@@ -187,6 +188,16 @@ export const CourseExam = {
             await CourseExam.startPresentation(btn.dataset.examId, btn.dataset.title);
         }
 
+        if (e.target.closest('.grade-essays-btn')) {
+            const btn = e.target.closest('.grade-essays-btn');
+            await CourseExam.openEssayView(btn.dataset.classExamId, btn.dataset.title);
+            return;
+        }
+        if (e.target.closest('.eev-save-btn')) {
+            await CourseExam.saveEssayMarks(e.target.closest('.eev-save-btn'));
+            return;
+        }
+
         if (e.target.closest('.assign-class-exam-btn')) {
             const btn = e.target.closest('.assign-class-exam-btn');
             await CourseExam.openClassAssignView(btn.dataset.examId, btn.dataset.title);
@@ -197,7 +208,7 @@ export const CourseExam = {
             await CourseExam.openBonusView(btn.dataset.examId, btn.dataset.title);
         }
 
-        if (e.target.closest('#backFromExamAssignBtn') || e.target.closest('#backFromExamBonusBtn')) {
+        if (e.target.closest('#backFromExamAssignBtn') || e.target.closest('#backFromExamBonusBtn') || e.target.closest('#backFromExamEssayBtn')) {
             CourseExam.showMainManagerView();
             await CourseExam.loadExams();
         }
@@ -263,6 +274,19 @@ export const CourseExam = {
         if (e.target.closest('#accExamExitBtn')) CourseExam.closeAccessibleExam();
     },
 
+    // Stores the answer of the current question and keeps the draft on this device.
+    saveAccAnswer: (value) => {
+        if (!CourseExam.accExam) return;
+        CourseExam.accAnswers[CourseExam.accIndex] = value;
+        try { localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers)); } catch (err) { /* storage blocked */ }
+        CourseExam.updateAccessibleAnsweredBadge();
+    },
+
+    // Essays are long: keep the draft while the student types.
+    handleInput: (e) => {
+        if (e.target.id === 'accExamEssayInput' && CourseExam.accExam) CourseExam.saveAccAnswer(e.target.value);
+    },
+
     handleChanges: async (e) => {
         if (e.target.classList.contains('toggle-question-bonus-cb')) {
             const idx = parseInt(e.target.dataset.index, 10);
@@ -285,10 +309,27 @@ export const CourseExam = {
             }
         }
 
-        if (e.target.id === 'examCsvUpload') {
-            const file = e.target.files && e.target.files[0];
-            e.target.value = '';
-            if (file) await CourseExam.importCsvFile(file);
+        if (e.target.id === 'eevOnlyUnmarked') {
+            CourseExam.renderEssayList();
+            return;
+        }
+
+        if (e.target.classList.contains('acc-exam-sel') && CourseExam.accExam) {
+            const q = CourseExam.accExam.questions[CourseExam.accIndex];
+            const size = q.type === 'match' ? (q.lefts || []).length : q.itemCount;
+            const prev = Array.isArray(CourseExam.accAnswers[CourseExam.accIndex]) ? CourseExam.accAnswers[CourseExam.accIndex].slice() : new Array(size).fill('');
+            const at = parseInt(e.target.dataset.i, 10);
+            prev[at] = e.target.value;
+            CourseExam.saveAccAnswer(prev.some(Boolean) ? prev : '');
+            if (e.target.value && CourseExam.isVoiceUser()) {
+                const msg = q.type === 'match' ? `${q.lefts[at]} matched with ${e.target.value}.` : `Position ${at + 1}: ${e.target.value}.`;
+                document.getElementById('accExamLiveFeedback').textContent = msg;
+                CourseExam.speak(msg);
+            }
+        }
+
+        if (e.target.id === 'accExamEssayInput' && CourseExam.accExam) {
+            CourseExam.saveAccAnswer(e.target.value);
             return;
         }
 
@@ -326,7 +367,7 @@ export const CourseExam = {
             // Custom Tab Cycling (Trap focus strictly to Question, Choices, Nav Buttons)
             if (e.key === 'Tab') {
                 e.preventDefault();
-                const focusables = Array.from(document.querySelectorAll('#accExamQuestionText, .acc-exam-choice-btn, #accExamPrevBtn, #accExamNextBtn:not(.hidden), #accExamSubmitBtn:not(.hidden), #accExamTextAnswerInput, .acc-exam-enum-input'))
+                const focusables = Array.from(document.querySelectorAll('#accExamQuestionText, .acc-exam-choice-btn, #accExamPrevBtn, #accExamNextBtn:not(.hidden), #accExamSubmitBtn:not(.hidden), #accExamTextAnswerInput, #accExamEssayInput, .acc-exam-enum-input, .acc-exam-sel'))
                     .filter(el => !el.disabled && el.offsetParent !== null);
 
                 const currIdx = focusables.indexOf(document.activeElement);
@@ -349,6 +390,11 @@ export const CourseExam = {
                 else document.activeElement.blur();
                 return;
             }
+
+            // Essay box: Enter makes a new line and the arrow keys move the cursor.
+            if (document.activeElement && document.activeElement.id === 'accExamEssayInput') return;
+            // Drop-downs keep their own arrow keys.
+            if (document.activeElement && document.activeElement.classList.contains('acc-exam-sel') && /^Arrow/.test(e.key)) return;
 
             // Enter & Space Double Tap Logic
             if (e.key === 'Enter' || e.key === ' ') {
@@ -445,6 +491,7 @@ export const CourseExam = {
         document.getElementById('examManagerMainView')?.classList.remove('hidden');
         document.getElementById('examClassAssignView')?.classList.add('hidden');
         document.getElementById('examBonusView')?.classList.add('hidden');
+        document.getElementById('examEssayView')?.classList.add('hidden');
     },
 
     loadExams: async () => {
@@ -482,18 +529,33 @@ export const CourseExam = {
                 const bonusCount = rows.filter(q => q.bonus).length;
                 const points = rows.filter(q => !q.bonus).reduce((sum, q) => sum + pointsOf(q), 0);
                 const typeChip = (key, label, color) => {
-                    const n = rows.filter(q => typeKey(q) === key || (key === 'enum' && typeKey(q) === 'enumo')).length;
+                    const n = rows.filter(q => q.type === key).length;
                     return n ? `<span class="text-[10px] ${color} px-1.5 py-0.5 rounded font-bold">${label} ${n}</span>` : '';
                 };
                 const typeChips = typeChip('mc', 'Multiple choice', 'bg-blue-50 text-blue-700 border border-blue-100')
+                    + typeChip('multi', 'Multiple answer', 'bg-sky-50 text-sky-700 border border-sky-100')
                     + typeChip('tf', 'True/False', 'bg-teal-50 text-teal-700 border border-teal-100')
                     + typeChip('id', 'Identification', 'bg-orange-50 text-orange-700 border border-orange-100')
-                    + typeChip('enum', 'Enumeration', 'bg-indigo-50 text-indigo-700 border border-indigo-100');
+                    + typeChip('num', 'Numeric', 'bg-lime-50 text-lime-800 border border-lime-200')
+                    + typeChip('enum', 'Enumeration', 'bg-indigo-50 text-indigo-700 border border-indigo-100')
+                    + typeChip('order', 'Ordering', 'bg-violet-50 text-violet-700 border border-violet-100')
+                    + typeChip('match', 'Matching', 'bg-pink-50 text-pink-700 border border-pink-100')
+                    + typeChip('essay', 'Essay', 'bg-rose-50 text-rose-700 border border-rose-100');
+                const essayRows = rows.map((q, i) => (q.type === 'essay' ? i : -1)).filter(i => i >= 0);
 
                 const linked = CourseExam.classExams.find(ce => ce.Exam_ID === ex.Exam_ID);
                 const enabledStudentsCount = linked
                     ? CourseExam.classAssignments.filter(a => a.Class_Exam_ID === linked.Class_Exam_ID && a.Is_Enabled === 1).length
                     : 0;
+
+                let essayPending = 0;
+                if (linked && essayRows.length) {
+                    CourseExam.classAssignments.filter(a => a.Class_Exam_ID === linked.Class_Exam_ID && a.Status === 'Completed').forEach(a => {
+                        let marks = {};
+                        try { marks = JSON.parse(a.Manual_Marks || '{}') || {}; } catch (err) { marks = {}; }
+                        if (essayRows.some(i => !Object.prototype.hasOwnProperty.call(marks, i))) essayPending++;
+                    });
+                }
 
                 const linkBadge = linked && linked.Is_Active
                     ? `<span class="text-[10px] bg-green-100 text-green-800 border border-green-300 font-bold px-2 py-0.5 rounded">Linked (${enabledStudentsCount} student${enabledStudentsCount === 1 ? '' : 's'}) | ${linked.From_Date || 'Any'} to ${linked.To_Date || 'Any'}</span>`
@@ -513,6 +575,10 @@ export const CourseExam = {
                                     <i class="fa-solid fa-universal-access mr-1" aria-hidden="true"></i> Link &amp; Assign Students
                                 </button>
                             ` : ''}
+                            ${linked && essayRows.length ? `
+                                <button type="button" class="grade-essays-btn bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
+                                    <i class="fa-solid fa-pen-ruler mr-1" aria-hidden="true"></i> Grade Essays${essayPending ? ` (${essayPending} to mark)` : ''}
+                                </button>` : ''}
                             <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
                                 <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
                             </button>
@@ -544,6 +610,7 @@ export const CourseExam = {
         CourseExam.activeConfigExamId = examId;
         document.getElementById('examManagerMainView').classList.add('hidden');
         document.getElementById('examBonusView').classList.add('hidden');
+        document.getElementById('examEssayView')?.classList.add('hidden');
         document.getElementById('examClassAssignView').classList.remove('hidden');
 
         document.getElementById('ecaExamTitle').textContent = title;
@@ -617,6 +684,66 @@ export const CourseExam = {
                 </div>
             `;
         }).join('');
+    },
+
+    // Record Scores settings for the builder, or null when no class is open (the builder is then used on its own).
+    classLinkFor: (examId) => {
+        const courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
+        if (!courseId) return null;
+        const linked = examId ? (CourseExam.classExams || []).find(ce => ce.Exam_ID === examId) : null;
+        return {
+            courseId,
+            linked: Boolean(linked),
+            enabled: linked ? Boolean(linked.Is_Active) : false,
+            term: linked?.Term || 'MidTerm',
+            category: linked?.Category || 'MajorExam',
+            fromDate: linked?.From_Date || '',
+            toDate: linked?.To_Date || '',
+            audience: linked ? 'keep' : 'blind'
+        };
+    },
+
+    // Runs after the builder saved. When "Link & enable for this class" was ticked, it links the exam like Link & Assign Students does.
+    afterBuilderSave: async (result) => {
+        const link = result && result.link;
+        if (link && result.examId) {
+            try {
+                const existing = (CourseExam.classExams || []).find(ce => ce.Exam_ID === result.examId);
+                const have = {};
+                if (existing) {
+                    (CourseExam.classAssignments || []).filter(a => a.Class_Exam_ID === existing.Class_Exam_ID).forEach(a => { have[a.Student_ID] = a.Is_Enabled === 1; });
+                }
+                const assignments = (CourseClass.currentStudents || []).map(st => {
+                    const blind = st.eye_condition === 'Legally Blind';
+                    let on;
+                    if (link.audience === 'all') on = true;
+                    else if (link.audience === 'keep' && st.User_ID in have) on = have[st.User_ID];
+                    else on = blind;
+                    return { studentId: st.User_ID, isEnabled: on };
+                });
+                if (link.fromDate && link.toDate && link.fromDate > link.toDate) {
+                    UI.error('Exam saved, but not linked: From date is later than To date.');
+                } else {
+                    await apiFetch('/api/class-exams', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            courseId: link.courseId,
+                            examId: result.examId,
+                            term: link.term,
+                            category: link.category,
+                            isActive: true,
+                            fromDate: link.fromDate || '',
+                            toDate: link.toDate || '',
+                            assignments
+                        })
+                    });
+                    UI.success('Exam saved and linked to this class');
+                }
+            } catch (err) {
+                UI.error('Exam saved, but linking failed: ' + err.message);
+            }
+        }
+        await CourseExam.loadExams();
     },
 
     saveClassExamAssignment: async () => {
@@ -700,10 +827,130 @@ export const CourseExam = {
         }
     },
 
+    // ---------- Grade Essays ----------
+
+    essayData: null,
+
+    openEssayView: async (classExamId, title) => {
+        document.getElementById('examManagerMainView').classList.add('hidden');
+        document.getElementById('examClassAssignView').classList.add('hidden');
+        document.getElementById('examBonusView').classList.add('hidden');
+        document.getElementById('examEssayView').classList.remove('hidden');
+        document.getElementById('eevExamTitle').textContent = title;
+        document.getElementById('eevAlert').classList.add('hidden');
+        const list = document.getElementById('eevList');
+        list.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>';
+        try {
+            const data = await apiFetch(`/api/exam-essays?classExamId=${encodeURIComponent(classExamId)}&_t=${Date.now()}`);
+            CourseExam.essayData = { classExamId, ...data };
+            CourseExam.renderEssayList();
+        } catch (err) {
+            list.innerHTML = `<div class="text-red-500 font-bold text-sm text-center py-4">${esc(err.message)}</div>`;
+        }
+    },
+
+    renderEssayList: () => {
+        const d = CourseExam.essayData;
+        const list = document.getElementById('eevList');
+        if (!d || !list) return;
+        const onlyUnmarked = document.getElementById('eevOnlyUnmarked')?.checked;
+        const done = (st) => st.marks.every(m => m !== null && m !== undefined);
+        const shown = d.students.filter(st => !onlyUnmarked || !done(st));
+        const left = d.students.filter(st => !done(st)).length;
+        const countEl = document.getElementById('eevCount');
+        if (countEl) countEl.textContent = `${d.students.length} submitted, ${left} still to mark`;
+
+        if (!d.students.length) {
+            list.innerHTML = '<div class="text-center py-10 text-sm text-gray-500">No student has submitted this exam yet.</div>';
+            return;
+        }
+        if (!shown.length) {
+            list.innerHTML = '<div class="text-center py-10 text-sm font-bold text-green-700"><i class="fa-solid fa-circle-check mr-1"></i>Everything is marked.</div>';
+            return;
+        }
+        list.innerHTML = shown.map(st => `
+            <div class="bg-white border border-gray-200 rounded-xl p-3 shadow-sm" data-student-id="${esc(st.studentId)}">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div class="font-black text-sm text-gray-800">${esc(st.name)} <span class="text-[11px] font-medium text-gray-500">${esc(st.studentNumber)}</span></div>
+                    <div class="flex items-center gap-2">
+                        <span class="eev-status text-[10px] font-black px-2 py-0.5 rounded ${done(st) ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-amber-100 text-amber-900 border border-amber-300'}">${done(st) ? 'Marked' : 'To mark'}</span>
+                        <span class="eev-score text-[11px] font-bold text-gray-600">Score ${st.finalScore ?? '-'} / ${st.maxScore ?? '-'}</span>
+                    </div>
+                </div>
+                ${d.essays.map((e, k) => `
+                    <div class="border-t border-gray-100 pt-2 mt-2">
+                        <div class="text-xs font-bold text-gray-700">${esc(e.question)}${e.isBonus ? ' <span class="text-amber-700">(bonus)</span>' : ''}</div>
+                        ${e.rubric ? `<details class="mt-1"><summary class="text-[11px] text-indigo-700 font-bold cursor-pointer">Model answer / rubric</summary><div class="text-[11px] text-gray-600 bg-indigo-50 rounded p-2 mt-1" style="white-space:pre-wrap">${esc(e.rubric)}</div></details>` : ''}
+                        <div class="mt-1.5 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded p-2 min-h-[2.5rem]" style="white-space:pre-wrap">${st.answers[k].trim() ? esc(st.answers[k]) : '<span class="text-gray-400 italic">No answer written.</span>'}</div>
+                        <label class="mt-1.5 flex items-center gap-2 text-xs font-bold text-gray-700">Points
+                            <input type="number" min="0" max="${e.points}" step="0.5" class="eev-mark w-24 border border-gray-300 rounded px-2 py-1 text-sm bg-white" data-index="${e.index}" value="${st.marks[k] ?? ''}" placeholder="0 - ${e.points}" aria-label="Points for ${esc(st.name)}, out of ${e.points}">
+                            <span class="font-medium text-gray-500">out of ${e.points}</span>
+                        </label>
+                    </div>`).join('')}
+                <div class="mt-3 flex justify-end">
+                    <button type="button" class="eev-save-btn px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold transition disabled:opacity-50" data-student-id="${esc(st.studentId)}"><i class="fa-solid fa-floppy-disk mr-1" aria-hidden="true"></i>Save marks</button>
+                </div>
+            </div>`).join('');
+    },
+
+    saveEssayMarks: async (btn) => {
+        const d = CourseExam.essayData;
+        if (!d) return;
+        const studentId = btn.dataset.studentId;
+        const card = btn.closest('[data-student-id]');
+        const marks = {};
+        card.querySelectorAll('.eev-mark').forEach(input => {
+            const v = input.value.trim();
+            if (v === '') return;
+            const n = Number(v);
+            const max = Number(input.max);
+            if (!Number.isFinite(n) || n < 0 || n > max) {
+                input.classList.add('border-red-500');
+                marks.__bad = true;
+            } else {
+                input.classList.remove('border-red-500');
+                marks[input.dataset.index] = n;
+            }
+        });
+        if (marks.__bad) { UI.error('Points must be a number from 0 up to the maximum shown.'); return; }
+        if (!Object.keys(marks).length) { UI.error('Type the points first.'); return; }
+
+        btn.disabled = true;
+        try {
+            const res = await apiFetch('/api/grade-essay', {
+                method: 'POST',
+                body: JSON.stringify({ classExamId: d.classExamId, studentId, marks })
+            });
+            const st = d.students.find(x => x.studentId === studentId);
+            if (st) {
+                d.essays.forEach((e, k) => { if (marks[e.index] !== undefined) st.marks[k] = marks[e.index]; });
+                st.finalScore = res.finalScore;
+                st.maxScore = res.maxScore;
+            }
+            UI.success(`Saved. Score is now ${res.finalScore} / ${res.maxScore}`);
+            const onlyUnmarked = document.getElementById('eevOnlyUnmarked')?.checked;
+            if (onlyUnmarked) CourseExam.renderEssayList();
+            else {
+                const done = st && st.marks.every(m => m !== null && m !== undefined);
+                const status = card.querySelector('.eev-status');
+                status.textContent = done ? 'Marked' : 'To mark';
+                status.className = `eev-status text-[10px] font-black px-2 py-0.5 rounded ${done ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-amber-100 text-amber-900 border border-amber-300'}`;
+                card.querySelector('.eev-score').textContent = `Score ${res.finalScore} / ${res.maxScore}`;
+                const countEl = document.getElementById('eevCount');
+                if (countEl) countEl.textContent = `${d.students.length} submitted, ${d.students.filter(x => !x.marks.every(m => m !== null && m !== undefined)).length} still to mark`;
+            }
+        } catch (err) {
+            UI.error(err.message || 'Could not save the marks.');
+        } finally {
+            btn.disabled = false;
+        }
+    },
+
     openBonusView: async (examId, title) => {
         CourseExam.activeBonusExamId = examId;
         document.getElementById('examManagerMainView').classList.add('hidden');
         document.getElementById('examClassAssignView').classList.add('hidden');
+        document.getElementById('examEssayView')?.classList.add('hidden');
         document.getElementById('examBonusView').classList.remove('hidden');
 
         document.getElementById('ebvExamTitle').textContent = title;
@@ -838,22 +1085,6 @@ export const CourseExam = {
         }
     },
 
-    // Opens the builder with the questions of a CSV file so the lecturer can check them before saving.
-    importCsvFile: async (file) => {
-        try {
-            const { questions, skipped } = fromCsvText(await file.text());
-            if (!questions.length) {
-                UI.error('No questions found in that file. Download the template to see the columns.');
-                return;
-            }
-            const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
-            await ExamBuilder.open({ preset: { title, questions }, onSaved: () => CourseExam.loadExams() });
-            UI.success(`Imported ${questions.length} question${questions.length === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} empty row${skipped === 1 ? '' : 's'}` : ''}. Check them, then save.`);
-        } catch (err) {
-            UI.error('Could not read that file.');
-        }
-    },
-
     exportExamCsv: (examId) => {
         const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
         if (!ex) return;
@@ -881,6 +1112,23 @@ export const CourseExam = {
     },
 
     // ---------- Lecturer Presentation Mode ----------
+
+    // A saved row as a builder question (to reuse its type and points rules).
+    builderRow: (row) => fromExamData([row])[0],
+    pointsOfRow: (row) => pointsOf(fromExamData([row])[0]),
+
+    // Shows the items of an ordering or matching question out of order. Fixed per question so it does not change on redraw.
+    scramble: (items, seed) => {
+        const a = items.map(String);
+        if (a.length < 2) return a;
+        const out = a.slice();
+        for (let i = out.length - 1; i > 0; i--) {
+            const j = (seed * 7 + i * 5 + 3) % (i + 1);
+            [out[i], out[j]] = [out[j], out[i]];
+        }
+        return out.every((v, i) => v === a[i]) ? out.slice(1).concat(out[0]) : out;
+    },
+
 
     startPresentation: async (examId, title) => {
         document.getElementById('examManagerModal').classList.add('hidden');
@@ -936,9 +1184,10 @@ export const CourseExam = {
         revealBtn.textContent = show ? "Hide answer" : "Show answer";
 
         if (choices && choices.length > 0) {
+            const right = (c) => (Array.isArray(ans) ? ans.includes(c) : c === ans);
             [...choicesEl.children].forEach((el, i) => {
-                el.classList.toggle("correct", show && choices[i] === ans);
-                el.classList.toggle("dim", show && choices[i] !== ans);
+                el.classList.toggle("correct", show && right(choices[i]));
+                el.classList.toggle("dim", show && !right(choices[i]));
             });
         }
 
@@ -983,8 +1232,15 @@ export const CourseExam = {
 
         const counterEl = document.getElementById('examCounter');
         const bonusTag = isBonus ? ` &nbsp;<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-weight:800;font-size:0.9rem;">BONUS</span>` : '';
-        const enumTag = (dataRow[6] === 'enum' || Array.isArray(dataRow[3]))
-            ? ` &nbsp;<span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:6px;font-weight:800;font-size:0.9rem;">LIST ${(Array.isArray(dataRow[3]) ? dataRow[3] : []).length} ITEMS${dataRow[7] ? ' IN ORDER' : ''}</span>` : '';
+        const kind = typeKey(CourseExam.builderRow(dataRow));
+        const tagStyle = 'background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:6px;font-weight:800;font-size:0.9rem;';
+        const tagText = {
+            multi: 'SELECT ALL THAT APPLY', multia: 'SELECT ALL (ALL OR NOTHING)', match: 'MATCHING', order: 'ORDERING', ordera: 'ORDERING (ALL OR NOTHING)',
+            num: 'NUMERIC', essay: 'ESSAY'
+        }[kind] || ((kind === 'enum' || kind === 'enumo') ? `LIST ${(Array.isArray(dataRow[3]) ? dataRow[3] : []).length} ITEMS${dataRow[7] ? ' IN ORDER' : ''}` : '');
+        const pts = CourseExam.pointsOfRow(dataRow);
+        const enumTag = (tagText ? ` &nbsp;<span style="${tagStyle}">${tagText}</span>` : '')
+            + (pts !== 1 ? ` &nbsp;<span style="${tagStyle}">${pts} PTS</span>` : '');
         counterEl.innerHTML = `<span class="num">${CourseExam.current + 1}</span><span class="of">of ${total} &nbsp;|&nbsp; ${posInPart} of ${inPart.length} in this part${enumTag}${bonusTag}</span>`;
 
         document.getElementById('examQuestion').textContent = q;
@@ -993,24 +1249,59 @@ export const CourseExam = {
         choicesEl.innerHTML = "";
 
         let choicesClass = "exam-choices";
-        if (choices.length === 2) choicesClass += " two";
-        else if (choices.length >= 6) choicesClass += " many";
+        const shownCount = (kind === 'match' || kind === 'order' || kind === 'ordera') ? (Array.isArray(ans) ? ans.length : 0) : choices.length;
+        if (shownCount === 2) choicesClass += " two";
+        else if (shownCount >= 6) choicesClass += " many";
         choicesEl.className = choicesClass;
 
-        choices.forEach(c => {
+        const shown = kind === 'match'
+            ? (Array.isArray(ans) ? ans : []).map((p, i) => `${i + 1}. ${p[0]}`)
+            : (kind === 'order' || kind === 'ordera')
+                ? CourseExam.scramble(Array.isArray(ans) ? ans : [], CourseExam.current)
+                : choices;
+        shown.forEach(c => {
             const div = document.createElement("div");
             div.className = "exam-choice";
             div.textContent = c;
             choicesEl.appendChild(div);
         });
+        if (kind === 'match') {
+            const pool = (Array.isArray(ans) ? ans.map(p => p[1]) : []).concat((dataRow[8] && dataRow[8].extra) || []);
+            const note = document.createElement("div");
+            note.className = "exam-expl";
+            note.style.gridColumn = "1 / -1";
+            note.textContent = 'Partners: ' + CourseExam.scramble(pool, CourseExam.current).join('  |  ');
+            choicesEl.appendChild(note);
+        }
 
         const answerEl = document.getElementById('examAnswer');
         const explanationHTML = expl ? `<div class="exam-expl">${esc(expl)}</div>` : "";
-        const isEnum = dataRow[6] === 'enum' || Array.isArray(ans);
-        const answerHtml = isEnum
-            ? `<ol style="margin:0.25rem 0 0 1.4rem;padding:0;list-style:${dataRow[7] ? 'decimal' : 'disc'};">${(Array.isArray(ans) ? ans : String(ans ?? '').split('|')).map(i => `<li>${esc(String(i).trim())}</li>`).join('')}</ol>${dataRow[7] ? '' : '<div class="exam-expl" style="margin-top:0.4rem;">Any order</div>'}`
-            : esc(ans);
-        answerEl.innerHTML = `<span class="label">${isEnum ? (dataRow[7] ? 'Answer (in order)' : 'Answer') : 'Answer'}</span>${answerHtml}${explanationHTML}`;
+        const list = (items, ordered) => `<ol style="margin:0.25rem 0 0 1.4rem;padding:0;list-style:${ordered ? 'decimal' : 'disc'};">${items.map(i => `<li>${i}</li>`).join('')}</ol>`;
+        let label = 'Answer';
+        let answerHtml;
+        if (kind === 'enum' || kind === 'enumo') {
+            const items = Array.isArray(ans) ? ans : String(ans ?? '').split('|');
+            answerHtml = list(items.map(i => esc(String(i).trim())), dataRow[7]) + (dataRow[7] ? '' : '<div class="exam-expl" style="margin-top:0.4rem;">Any order</div>');
+            if (dataRow[7]) label = 'Answer (in order)';
+        } else if (kind === 'order' || kind === 'ordera') {
+            answerHtml = list((Array.isArray(ans) ? ans : []).map(i => esc(String(i))), true);
+            label = 'Correct order';
+        } else if (kind === 'match') {
+            answerHtml = list((Array.isArray(ans) ? ans : []).map(p => `${esc(p[0])} &rarr; <b>${esc(p[1])}</b>`), false);
+            label = 'Pairs';
+        } else if (kind === 'multi' || kind === 'multia') {
+            answerHtml = list((Array.isArray(ans) ? ans : []).map(i => esc(String(i))), false);
+            label = 'Correct answers';
+        } else if (kind === 'num') {
+            const tol = Number(dataRow[8] && dataRow[8].tol) || 0;
+            answerHtml = esc(ans) + (tol > 0 ? ` <span style="font-weight:600;">&plusmn; ${esc(tol)}</span>` : '');
+        } else if (kind === 'essay') {
+            answerHtml = ans ? esc(ans) : 'Scored by the lecturer.';
+            label = 'Model answer';
+        } else {
+            answerHtml = esc(ans);
+        }
+        answerEl.innerHTML = `<span class="label">${label}</span>${answerHtml}${explanationHTML}`;
 
         document.getElementById('examBar').style.width = ((CourseExam.current + 1) / total * 100) + "%";
         document.getElementById('examPrevBtn').disabled = CourseExam.current === 0;
@@ -1078,8 +1369,9 @@ export const CourseExam = {
         const answeredCount = CourseExam.accAnswers.filter(a => CourseExam.isAnswered(a)).length;
         const total = CourseExam.accExam.questions.length;
 
-        if (currentAns) {
-            statusEl.textContent = `Selected: ${CourseExam.answerText(currentAns)} (${answeredCount}/${total} Answered)`;
+        if (CourseExam.isAnswered(currentAns)) {
+            const shown = CourseExam.answerText(currentAns);
+            statusEl.textContent = `${shown.length > 60 ? 'Answered' : `Selected: ${shown}`} (${answeredCount}/${total} Answered)`;
             statusEl.className = "text-sm sm:text-base font-black px-4 py-1 rounded-full bg-green-900 text-green-200 border-2 border-green-400";
         } else {
             statusEl.textContent = `Not Answered Yet (${answeredCount}/${total} Answered)`;
@@ -1100,7 +1392,8 @@ export const CourseExam = {
         const bonusBadge = q.isBonus
             ? ` <span class="ml-2 px-3 py-0.5 bg-amber-400 text-gray-950 rounded-full text-sm sm:text-lg font-black uppercase">Bonus Question</span>`
             : '';
-        document.getElementById('accExamQuestionCounter').innerHTML = `Question ${CourseExam.accIndex + 1} of ${total}${bonusBadge}`;
+        const pointsBadge = q.points ? ` <span class="ml-2 px-3 py-0.5 bg-gray-800 text-yellow-300 border border-yellow-400 rounded-full text-sm sm:text-lg font-black">${q.points} point${q.points === 1 ? '' : 's'}</span>` : '';
+        document.getElementById('accExamQuestionCounter').innerHTML = `Question ${CourseExam.accIndex + 1} of ${total}${bonusBadge}${pointsBadge}`;
 
         // Add tabindex="0" so the question text itself can receive focus naturally.
         document.getElementById('accExamQuestionText').setAttribute('tabindex', '0');
@@ -1111,10 +1404,19 @@ export const CourseExam = {
         const choicesContainer = document.getElementById('accExamChoicesContainer');
         const currentAnswer = CourseExam.accAnswers[CourseExam.accIndex];
 
+        const SEL = 'acc-exam-sel w-full min-w-0 px-4 py-3 text-lg sm:text-xl font-bold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400';
+        const options = (list, chosen) => `<option value="">- choose -</option>` + list.map(o => `<option value="${esc(o)}" ${o === chosen ? 'selected' : ''}>${esc(o)}</option>`).join('');
+        const panel = (hint, inner) => `<div class="bg-gray-900 p-5 sm:p-6 rounded-2xl border-2 border-yellow-400 space-y-3"><p class="text-lg font-bold text-yellow-300">${hint}</p>${inner}</div>`;
+
         if (q.choices && q.choices.length > 0) {
-            choicesContainer.innerHTML = q.choices.map((choiceText, idx) => {
+            const multi = q.type === 'multi';
+            const picked = multi && Array.isArray(currentAnswer) ? currentAnswer : [];
+            const hint = multi
+                ? `<p class="text-lg font-bold text-yellow-300 px-1">Select all the correct answers${q.mode === 'all' ? ' (all or nothing)' : ''}. Tap a choice again to remove it.</p>`
+                : '';
+            choicesContainer.innerHTML = hint + q.choices.map((choiceText, idx) => {
                 const letter = String.fromCharCode(65 + idx);
-                const isSelected = currentAnswer === choiceText;
+                const isSelected = multi ? picked.includes(choiceText) : currentAnswer === choiceText;
                 return `
                     <button type="button"
                         class="acc-exam-choice-btn w-full text-left p-5 sm:p-6 rounded-2xl border-4 transition flex items-center justify-between gap-4 focus:outline-none focus:ring-4 focus:ring-yellow-300 ${
@@ -1123,8 +1425,8 @@ export const CourseExam = {
                                 : 'bg-gray-900 hover:bg-gray-800 text-white border-gray-700 font-bold'
                         }"
                         data-choice-index="${idx}"
-                        role="option"
-                        aria-selected="${isSelected}">
+                        role="${multi ? 'checkbox' : 'option'}"
+                        ${multi ? `aria-checked="${isSelected}"` : `aria-selected="${isSelected}"`}>
                         <span class="text-xl sm:text-2xl leading-snug">
                             <span class="inline-block w-10 font-black ${isSelected ? 'text-gray-950' : 'text-yellow-400'}">${idx + 1} (${letter}).</span>
                             ${esc(choiceText)}
@@ -1142,19 +1444,40 @@ export const CourseExam = {
                         class="acc-exam-enum-input flex-1 min-w-0 px-4 py-3 text-xl sm:text-2xl font-bold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400"
                         placeholder="Item ${i + 1}">
                 </div>`).join('');
+            choicesContainer.innerHTML = panel(`List ${q.itemCount} item${q.itemCount === 1 ? '' : 's'}${q.ordered ? ', in the correct order' : ', in any order'}. Press Enter to go to the next box.`, boxes);
+        } else if (q.type === 'order') {
+            const saved = Array.isArray(currentAnswer) ? currentAnswer : [];
+            const items = (q.items || []).map(it => `<li class="text-lg sm:text-xl font-bold text-white">${esc(it)}</li>`).join('');
+            const rows = Array.from({ length: (q.items || []).length }, (_, i) => `
+                <div class="flex items-center gap-3">
+                    <label for="accExamOrderSel${i}" class="w-24 shrink-0 text-right text-lg font-black text-yellow-400">Position ${i + 1}</label>
+                    <select id="accExamOrderSel${i}" data-i="${i}" aria-label="Position ${i + 1} of ${q.items.length}" class="${SEL}">${options(q.items, saved[i] || '')}</select>
+                </div>`).join('');
+            choicesContainer.innerHTML = panel(`Put these in the correct order${q.mode === 'all' ? ' (all or nothing)' : ''}:`, `<ul class="list-disc pl-8 space-y-1">${items}</ul>${rows}`);
+        } else if (q.type === 'match') {
+            const saved = Array.isArray(currentAnswer) ? currentAnswer : [];
+            const rows = (q.lefts || []).map((left, i) => `
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <label for="accExamMatchSel${i}" class="sm:w-2/5 text-lg sm:text-xl font-black text-white">${i + 1}. ${esc(left)}</label>
+                    <select id="accExamMatchSel${i}" data-i="${i}" aria-label="Match for ${esc(left)}" class="${SEL}">${options(q.rights || [], saved[i] || '')}</select>
+                </div>`).join('');
+            choicesContainer.innerHTML = panel('Match each item on the left with its partner.', rows);
+        } else if (q.type === 'essay') {
             choicesContainer.innerHTML = `
-                <div class="bg-gray-900 p-5 sm:p-6 rounded-2xl border-2 border-yellow-400 space-y-3">
-                    <p class="text-lg font-bold text-yellow-300">List ${q.itemCount} item${q.itemCount === 1 ? '' : 's'}${q.ordered ? ', in the correct order' : ', in any order'}. Press Enter to go to the next box.</p>
-                    ${boxes}
-                </div>
-            `;
+                <div class="bg-gray-900 p-5 sm:p-6 rounded-2xl border-2 border-yellow-400">
+                    <label for="accExamEssayInput" class="block text-lg font-bold text-yellow-300 mb-2">Write your answer. Your lecturer will score it.</label>
+                    <textarea id="accExamEssayInput" rows="8" maxlength="10000" autocomplete="off"
+                        class="w-full px-4 py-4 text-xl font-semibold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400"
+                        placeholder="Type your answer here...">${esc(currentAnswer)}</textarea>
+                </div>`;
         } else {
+            const isNum = q.type === 'num';
             choicesContainer.innerHTML = `
                 <div class="bg-gray-900 p-6 rounded-2xl border-2 border-yellow-400">
-                    <label for="accExamTextAnswerInput" class="block text-lg font-bold text-yellow-300 mb-2">Type your answer below and press Tab or Enter:</label>
-                    <input type="text" id="accExamTextAnswerInput" value="${esc(currentAnswer)}"
+                    <label for="accExamTextAnswerInput" class="block text-lg font-bold text-yellow-300 mb-2">${isNum ? 'Type the number and press Tab or Enter:' : 'Type your answer below and press Tab or Enter:'}</label>
+                    <input type="text" id="accExamTextAnswerInput" ${isNum ? 'inputmode="decimal"' : ''} value="${esc(currentAnswer)}" autocomplete="off"
                         class="w-full px-4 py-4 text-2xl font-bold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400"
-                        placeholder="Type your answer here...">
+                        placeholder="${isNum ? 'Type a number...' : 'Type your answer here...'}">
                 </div>
             `;
         }
@@ -1181,7 +1504,7 @@ export const CourseExam = {
         const currentAns = CourseExam.accAnswers[CourseExam.accIndex];
         let speech = "";
 
-        if (currentAns) {
+        if (CourseExam.isAnswered(currentAns)) {
             speech += "Answered question. ";
         }
 
@@ -1191,11 +1514,12 @@ export const CourseExam = {
         }
         speech += `${q.question}. `;
 
-        if (currentAns) {
+        if (CourseExam.isAnswered(currentAns)) {
             speech += `Your answer so far is ${CourseExam.answerText(currentAns)}. `;
         }
 
         if (q.choices && q.choices.length > 0) {
+            if (q.type === 'multi') speech += `This question has more than one correct answer${q.mode === 'all' ? ', all or nothing' : ''}. Select every correct choice; select a choice again to remove it. `;
             speech += `The choices are: `;
             q.choices.forEach((c, idx) => {
                 const letter = String.fromCharCode(65 + idx);
@@ -1204,6 +1528,14 @@ export const CourseExam = {
             speech += `Press R to repeat the question. Press Enter or Space for the selected answer. `;
         } else if (q.type === 'enum') {
             speech += `This is an enumeration question. List ${q.itemCount} item${q.itemCount === 1 ? '' : 's'}${q.ordered ? ', in the correct order' : ', in any order'}. There are ${q.itemCount} text boxes. Type an item, then press Enter to go to the next box. Press R to repeat the question. `;
+        } else if (q.type === 'order') {
+            speech += `This is an ordering question. Put these items in the correct order: ${(q.items || []).map((it, i) => `${i + 1}, ${it}`).join('. ')}. There is a list box for each position. Choose the item for position 1, then Tab to the next position. Press R to repeat the question. `;
+        } else if (q.type === 'match') {
+            speech += `This is a matching question. There are ${(q.lefts || []).length} items. Each has a list box. The partners to choose from are: ${(q.rights || []).join('. ')}. The items are: ${(q.lefts || []).map((l, i) => `${i + 1}, ${l}`).join('. ')}. Press R to repeat the question. `;
+        } else if (q.type === 'essay') {
+            speech += `This is an essay question. Type your answer in the large text box. Your lecturer will score it. Press R to repeat the question. `;
+        } else if (q.type === 'num') {
+            speech += `This is a numeric question. Please type a number in the text box. Press R to repeat the question. `;
         } else {
             speech += `This is an identification question. Please type your answer in the text box. Press R to repeat the question. `;
         }
@@ -1215,7 +1547,7 @@ export const CourseExam = {
             speech += `Double press Enter or Space to go to the next question.`;
         }
 
-        document.getElementById('accExamLiveFeedback').textContent = currentAns
+        document.getElementById('accExamLiveFeedback').textContent = CourseExam.isAnswered(currentAns)
             ? `Current Answer: ${CourseExam.answerText(currentAns)}`
             : `Listening... Choose an option or press 1 to ${q.choices?.length || 4}.`;
 
@@ -1228,10 +1560,22 @@ export const CourseExam = {
         if (!q || !q.choices || choiceIndex < 0 || choiceIndex >= q.choices.length) return;
 
         const chosenText = q.choices[choiceIndex];
-        CourseExam.accAnswers[CourseExam.accIndex] = chosenText;
+        let speechAnswer = chosenText;
+        let removed = false;
+        if (q.type === 'multi') {
+            const had = Array.isArray(CourseExam.accAnswers[CourseExam.accIndex]) ? CourseExam.accAnswers[CourseExam.accIndex].slice() : [];
+            removed = had.includes(chosenText);
+            const next = removed ? had.filter(x => x !== chosenText) : had.concat(chosenText);
+            CourseExam.accAnswers[CourseExam.accIndex] = next.length ? next : '';
+            speechAnswer = chosenText;
+        } else {
+            CourseExam.accAnswers[CourseExam.accIndex] = chosenText;
+        }
 
         localStorage.setItem('acc_exam_draft_' + CourseExam.accExam.assignmentId, JSON.stringify(CourseExam.accAnswers));
         CourseExam.renderAccessibleQuestion(false);
+        // keep the keyboard on the choice that was just pressed
+        document.querySelector(`.acc-exam-choice-btn[data-choice-index="${choiceIndex}"]`)?.focus({ preventScroll: true });
 
         if (!CourseExam.isVoiceUser()) return;
 
@@ -1240,7 +1584,9 @@ export const CourseExam = {
             ? "Double press Enter or Space to go to the next question."
             : "This is the last question. Double press Enter or Space to submit the exam.";
 
-        const confirmSpeech = `You have selected ${chosenText} as your answer. ${navHint}`;
+        const confirmSpeech = q.type === 'multi'
+            ? `${removed ? 'Removed' : 'Selected'} ${speechAnswer}. ${CourseExam.answerText(CourseExam.accAnswers[CourseExam.accIndex]) ? `You have selected ${CourseExam.answerText(CourseExam.accAnswers[CourseExam.accIndex])}.` : 'Nothing is selected.'} ${navHint}`
+            : `You have selected ${chosenText} as your answer. ${navHint}`;
         document.getElementById('accExamLiveFeedback').textContent = confirmSpeech;
         CourseExam.speak(confirmSpeech);
     },
@@ -1301,11 +1647,12 @@ export const CourseExam = {
 
             localStorage.removeItem('acc_exam_draft_' + CourseExam.accExam.assignmentId);
 
-            const resultSpeech = `Exam submitted successfully! Your regular score is ${res.rawScore}, plus ${res.bonusScore} bonus points. Your final recorded score is ${res.finalScore} out of ${res.maxScore}. This score has been automatically recorded in your class assessment.`;
+            const essayNote = res.essayPending > 0 ? ` ${res.essayPending} essay answer${res.essayPending === 1 ? ' is' : 's are'} waiting for your lecturer to score, so your score can still go up.` : '';
+            const resultSpeech = `Exam submitted successfully! Your regular score is ${res.rawScore}, plus ${res.bonusScore} bonus points. Your final recorded score is ${res.finalScore} out of ${res.maxScore}. This score has been automatically recorded in your class assessment.${essayNote}`;
 
             document.getElementById('accExamLiveFeedback').innerHTML = `
                 <div class="text-green-300 font-black text-2xl mb-1">Exam Submitted! Final Score: ${res.finalScore} / ${res.maxScore}</div>
-                <div class="text-sm text-white">Regular Score: ${res.rawScore} | Bonus Points: +${res.bonusScore} (Capped at ${res.maxScore})</div>
+                <div class="text-sm text-white">Regular Score: ${res.rawScore} | Bonus Points: +${res.bonusScore} (Capped at ${res.maxScore})${essayNote ? `<br>${esc(essayNote.trim())}` : ''}</div>
             `;
             CourseExam.speak(resultSpeech);
 

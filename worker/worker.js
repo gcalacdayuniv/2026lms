@@ -1,6 +1,7 @@
 // worker/worker.js
 import { authorize, signToken, authEnabled } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion } from './grading.js';
 // worker/upload-guard.js
 // Cheap checks that run BEFORE any upload bytes are streamed to Google Drive.
 // Uses a few small D1 queries and no heavy CPU work, so it fits the free Workers plan.
@@ -304,59 +305,9 @@ async function findUserByCredentials(env, identifier, password, columns) {
 }
 
 // ---------- Exam scoring ----------
-// A saved question row is [part, question, choices, answer, explanation, isBonus, type, ordered].
-// Rows saved before types existed have only the first six values. An enumeration keeps its items in the answer
-// (an array) and is worth 1 point per correct item; every other question is worth 1 point.
+// Question types, points and grading live in ./grading.js.
 
-const normAnswer = (v) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-
-function enumItems(value) {
-    const list = Array.isArray(value) ? value : String(value ?? "").split(/\||\r?\n/);
-    return list.map(normAnswer).filter(Boolean);
-}
-
-function questionType(q) {
-    if (typeof q[6] === "string" && q[6]) return q[6];
-    if (Array.isArray(q[3])) return "enum";
-    const choices = Array.isArray(q[2]) ? q[2] : [];
-    if (choices.length === 0) return "id";
-    return "mc";
-}
-
-function questionPoints(q) {
-    return questionType(q) === "enum" ? Math.max(1, enumItems(q[3]).length) : 1;
-}
-
-// Points earned by one answer. Enumeration: the student's items are matched against the key; each key item can be
-// matched once, in any order, or in the same position when the question says the order matters.
-function gradeQuestion(q, studentAnswer) {
-    if (questionType(q) === "enum") {
-        const key = enumItems(q[3]);
-        const given = enumItems(studentAnswer);
-        if (!key.length || !given.length) return 0;
-        if (q[7]) {
-            let hit = 0;
-            key.forEach((item, i) => { if (given[i] === item) hit++; });
-            return hit;
-        }
-        const used = new Array(key.length).fill(false);
-        let hit = 0;
-        given.forEach(item => {
-            const at = key.findIndex((k, i) => !used[i] && k === item);
-            if (at >= 0) { used[at] = true; hit++; }
-        });
-        return hit;
-    }
-    const correct = normAnswer(q[3]);
-    const answer = normAnswer(Array.isArray(studentAnswer) ? studentAnswer[0] : studentAnswer);
-    return answer !== "" && answer === correct ? 1 : 0;
-}
-
-// Total points of the regular (not bonus) questions, at least 1.
-function examMaxPoints(questions) {
-    const total = questions.filter(q => !q[5]).reduce((sum, q) => sum + questionPoints(q), 0);
-    return total > 0 ? total : Math.max(1, questions.length);
-}
+const safeJson = (text) => { try { const v = JSON.parse(text || 'null'); return v && typeof v === 'object' ? v : null; } catch (e) { return null; } };
 
 const ASSESSMENT_TERMS = ['MidTerm', 'FinalTerm'];
 const ASSESSMENT_CATEGORIES = ['Written', 'Narrative', 'Individual', 'Performance', 'Report', 'MajorExam'];
@@ -840,6 +791,22 @@ async function ensureAccessibleExamTables(env) {
             )
         `)
     ]);
+    await ensureManualMarksColumn(env);
+}
+
+// Essay marks given by the lecturer: JSON { "<question index>": points }. Added to existing databases once.
+let manualMarksChecked = false;
+async function ensureManualMarksColumn(env) {
+    if (manualMarksChecked) return;
+    try {
+        const info = await env.DB.prepare("PRAGMA table_info(Exam_Assignments)").all();
+        const has = (info.results || []).some(c => c.name === "Manual_Marks");
+        if (!has) await env.DB.prepare("ALTER TABLE Exam_Assignments ADD COLUMN Manual_Marks TEXT").run();
+        manualMarksChecked = true;
+    } catch (e) {
+        // a second request may have added it already
+        manualMarksChecked = false;
+    }
 }
 
 function isWithinScheduleWindow(fromDate, toDate) {
@@ -859,7 +826,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
     await ensureAccessibleExamTables(env);
 
     const rows = await env.DB.prepare(
-        `SELECT ea.Assignment_ID, ea.Class_Exam_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score as Recorded_Max,
+        `SELECT ea.Assignment_ID, ea.Class_Exam_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score as Recorded_Max, ea.Manual_Marks,
                 ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date,
                 e.Title as Exam_Title, e.ExamData,
                 c.CourseCode, c.CourseTitle
@@ -885,16 +852,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
             parsed = [];
         }
 
-        const questions = parsed.map((q, idx) => ({
-            index: idx,
-            part: q[0],
-            question: q[1],
-            choices: Array.isArray(q[2]) ? q[2] : [],
-            isBonus: Boolean(q[5]),
-            type: questionType(q),
-            itemCount: questionType(q) === "enum" ? questionPoints(q) : 0,
-            ordered: Boolean(q[7])
-        }));
+        const questions = parsed.map((q, idx) => studentQuestion(q, idx, r.Assignment_ID));
 
         const regularCount = questions.filter(q => !q.isBonus).length;
         const bonusCount = questions.filter(q => q.isBonus).length;
@@ -916,6 +874,8 @@ async function getStudentAccessibleExamsList(env, studentId) {
             maxScore: r.Recorded_Max || examMaxPoints(parsed),
             regularCount,
             bonusCount,
+            totalPoints: examMaxPoints(parsed),
+            essayPending: r.Status === 'Completed' && essayIndexes(parsed).length > 0 && scoreExam(parsed, [], safeJson(r.Manual_Marks)).pending > 0,
             questions
         });
     }
@@ -1311,7 +1271,7 @@ export default {
 
                 await env.DB.prepare(
                     `UPDATE Exam_Assignments
-                     SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Submitted_At = NULL
+                     SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Manual_Marks = NULL, Submitted_At = NULL
                      WHERE Class_Exam_ID = ? AND Student_ID = ?`
                 ).bind(classExamId, studentId).run();
 
@@ -1370,6 +1330,128 @@ export default {
                 }), { status: 200, headers: corsHeaders });
             }
 
+            // Essays are scored by the lecturer. This lists the essay questions and every student's written answers.
+            if (request.method === "GET" && path === "/api/exam-essays") {
+                const classExamId = url.searchParams.get("classExamId");
+                if (!classExamId) {
+                    return new Response(JSON.stringify({ error: "Missing classExamId" }), { status: 400, headers: corsHeaders });
+                }
+                await ensureAccessibleExamTables(env);
+
+                const ce = await env.DB.prepare(
+                    `SELECT ce.Class_Exam_ID, ce.Course_ID, e.Title as Exam_Title, e.ExamData
+                     FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+                     WHERE ce.Class_Exam_ID = ?`
+                ).bind(classExamId).first();
+                if (!ce) {
+                    return new Response(JSON.stringify({ error: "Class exam not found." }), { status: 404, headers: corsHeaders });
+                }
+                const questions = safeJson(ce.ExamData) || [];
+                const essays = essayIndexes(questions).map(i => ({
+                    index: i,
+                    part: questions[i][0],
+                    question: questions[i][1],
+                    rubric: typeof questions[i][3] === "string" ? questions[i][3] : "",
+                    points: questionPoints(questions[i]),
+                    isBonus: Boolean(questions[i][5])
+                }));
+
+                const rows = await env.DB.prepare(
+                    `SELECT ea.Student_ID, ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, u.Name, u.Student_Number
+                     FROM Exam_Assignments ea LEFT JOIN Users u ON u.User_ID = ea.Student_ID
+                     WHERE ea.Class_Exam_ID = ? AND ea.Status = 'Completed'
+                     ORDER BY u.Name`
+                ).bind(classExamId).all();
+
+                const students = (rows.results || []).map(r => {
+                    const answers = safeJson(r.Answers_JSON) || [];
+                    const marks = safeJson(r.Manual_Marks) || {};
+                    return {
+                        studentId: r.Student_ID,
+                        name: r.Name || r.Student_ID,
+                        studentNumber: r.Student_Number || "",
+                        finalScore: r.Final_Score,
+                        maxScore: r.Max_Score,
+                        answers: essays.map(e => String(Array.isArray(answers) ? (answers[e.index] ?? "") : "")),
+                        marks: essays.map(e => (Object.prototype.hasOwnProperty.call(marks, e.index) ? marks[e.index] : null))
+                    };
+                });
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    examTitle: ce.Exam_Title,
+                    essays,
+                    students
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            // Saves the lecturer's essay points for one student and recalculates that student's score.
+            if (request.method === "POST" && path === "/api/grade-essay") {
+                const body = await request.json();
+                const { classExamId, studentId } = body;
+                if (!classExamId || !studentId || !body.marks || typeof body.marks !== "object") {
+                    return new Response(JSON.stringify({ error: "Invalid marks." }), { status: 400, headers: corsHeaders });
+                }
+                await ensureAccessibleExamTables(env);
+
+                const record = await env.DB.prepare(
+                    `SELECT ea.Assignment_ID, ea.Status, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ce.Assessment_ID, e.ExamData
+                     FROM Exam_Assignments ea
+                     JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
+                     JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+                     WHERE ea.Class_Exam_ID = ? AND ea.Student_ID = ?`
+                ).bind(classExamId, studentId).first();
+                if (!record) {
+                    return new Response(JSON.stringify({ error: "Exam record not found." }), { status: 404, headers: corsHeaders });
+                }
+                if (record.Status !== "Completed") {
+                    return new Response(JSON.stringify({ error: "This student has not submitted the exam yet." }), { status: 400, headers: corsHeaders });
+                }
+
+                const questions = safeJson(record.ExamData) || [];
+                const essaySet = new Set(essayIndexes(questions));
+                const marks = safeJson(record.Manual_Marks) || {};
+                for (const key of Object.keys(body.marks)) {
+                    const idx = parseInt(key, 10);
+                    if (!essaySet.has(idx)) continue;
+                    const raw = body.marks[key];
+                    if (raw === null || raw === "") { delete marks[idx]; continue; }
+                    const n = Number(raw);
+                    if (!Number.isFinite(n) || n < 0) {
+                        return new Response(JSON.stringify({ error: "Points must be a number, 0 or more." }), { status: 400, headers: corsHeaders });
+                    }
+                    marks[idx] = Math.round(Math.min(questionPoints(questions[idx]), n) * 100) / 100;
+                }
+
+                const answers = safeJson(record.Answers_JSON) || [];
+                const scored = scoreExam(questions, answers, marks);
+                const maxScore = record.Max_Score > 0 ? record.Max_Score : examMaxPoints(questions);
+                const finalScore = Math.min(maxScore, Math.round((scored.raw + scored.bonus) * 100) / 100);
+
+                const statements = [
+                    env.DB.prepare(
+                        "UPDATE Exam_Assignments SET Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Manual_Marks = ? WHERE Assignment_ID = ?"
+                    ).bind(scored.raw, scored.bonus, finalScore, JSON.stringify(marks), record.Assignment_ID)
+                ];
+                if (record.Assessment_ID) {
+                    statements.push(
+                        env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?").bind(record.Assessment_ID, studentId),
+                        env.DB.prepare("INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)")
+                            .bind(crypto.randomUUID(), record.Assessment_ID, studentId, finalScore)
+                    );
+                }
+                await env.DB.batch(statements);
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    rawScore: scored.raw,
+                    bonusScore: scored.bonus,
+                    finalScore,
+                    maxScore,
+                    pending: scored.pending
+                }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "POST" && path === "/api/submit-accessible-exam") {
                 const body = await request.json();
                 const { assignmentId, studentId, answers } = body;
@@ -1412,14 +1494,15 @@ export default {
                     quizData = [];
                 }
 
-                let rawScore = 0;
-                let bonusScore = 0;
-
-                quizData.forEach((q, idx) => {
-                    const earned = gradeQuestion(q, answers[idx]);
-                    if (q[5]) bonusScore += earned;
-                    else rawScore += earned;
+                // keep stored answers small: one entry per question, essays up to 10,000 characters
+                const cleanAnswers = quizData.map((q, idx) => {
+                    const a = answers[idx];
+                    if (Array.isArray(a)) return a.slice(0, 40).map(x => String(x ?? "").slice(0, 500));
+                    return String(a ?? "").slice(0, 10000);
                 });
+                const scored = scoreExam(quizData, cleanAnswers, null);
+                const rawScore = scored.raw;
+                const bonusScore = scored.bonus;
 
                 let maxScore = examMaxPoints(quizData);
 
@@ -1462,7 +1545,7 @@ export default {
                         `UPDATE Exam_Assignments
                          SET Status = 'Completed', Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Max_Score = ?, Answers_JSON = ?, Submitted_At = CURRENT_TIMESTAMP
                          WHERE Assignment_ID = ?`
-                    ).bind(rawScore, bonusScore, finalScore, maxScore, JSON.stringify(answers), assignmentId),
+                    ).bind(rawScore, bonusScore, finalScore, maxScore, JSON.stringify(cleanAnswers), assignmentId),
                     env.DB.prepare(
                         "DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?"
                     ).bind(targetAssessmentId, studentId),
@@ -1477,6 +1560,7 @@ export default {
                     bonusScore,
                     finalScore,
                     maxScore,
+                    essayPending: scored.pending,
                     examTitle: record.Exam_Title
                 }), { status: 200, headers: corsHeaders });
             }

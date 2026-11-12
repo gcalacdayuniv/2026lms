@@ -2,34 +2,56 @@
 // Pure data helpers for the Exam Builder and the CSV import/export (no DOM).
 //
 // One saved question row:
-//   [part, question, choices[], answer, explanation, isBonus, type, ordered]
-//   - type is 'mc' | 'tf' | 'id' | 'enum'. Rows saved before types existed have only the first six values;
-//     their type is worked out from the choices (none = identification, True/False = tf, else multiple choice).
-//   - enumeration: answer is an array of the items the student must list; ordered = the order must match.
-//     Every correct item is worth 1 point.
+//   [part, question, choices[], answer, explanation, isBonus, type, ordered, meta]
+//   type:  'mc' multiple choice | 'multi' multiple answer | 'tf' true or false | 'id' identification |
+//          'num' numeric | 'enum' enumeration | 'order' ordering | 'match' matching | 'essay' essay (scored by hand)
+//   Rows saved before types existed have only the first six values; their type is worked out from the choices.
+//   answer: mc/tf/id/num/essay = text | multi = array of the correct choices | enum, order = array of items |
+//           match = array of [left, right] pairs
+//   ordered: enumeration only. The order of the items matters.
+//   meta (optional object): points (number), mode ('all' = all or nothing, for multi and order),
+//           tol (number, numeric tolerance), extra (array, wrong right-hand choices of a matching question)
+//   Several accepted answers of an identification question, or of one enumeration item, are written
+//   "CPU / Central Processing Unit" (space, slash, space).
 //
 // One spreadsheet / CSV row (same columns in the builder grid, the CSV upload and the CSV export):
-//   Part | Type | Question | Choice A ... Choice H | Answer | Explanation | Bonus
+//   Part | Type | Question | Choice A ... Choice H | Answer | Explanation | Bonus | Points
 
 export const MAX_OPTIONS = 8;
 export const MIN_OPTIONS = 2;
 export const MAX_ITEMS = 30;
 export const MIN_ITEMS = 2;
+export const MAX_PAIRS = 8;
+export const MIN_PAIRS = 2;
+export const MAX_POINTS = 100;
+export const ESSAY_POINTS = 5;
 
 export const TYPES = [
     { id: 'mc', label: 'Multiple choice', icon: 'fa-list-ul' },
+    { id: 'multi', label: 'Multiple answer', icon: 'fa-square-check' },
     { id: 'tf', label: 'True or False', icon: 'fa-circle-half-stroke' },
     { id: 'id', label: 'Identification', icon: 'fa-pen-to-square' },
-    { id: 'enum', label: 'Enumeration', icon: 'fa-list-ol' }
+    { id: 'num', label: 'Numeric', icon: 'fa-calculator' },
+    { id: 'enum', label: 'Enumeration', icon: 'fa-list-ol' },
+    { id: 'order', label: 'Ordering', icon: 'fa-arrow-down-1-9' },
+    { id: 'match', label: 'Matching', icon: 'fa-right-left' },
+    { id: 'essay', label: 'Essay', icon: 'fa-align-left' }
 ];
 
-// The spreadsheet type list also separates ordered enumerations.
+// The spreadsheet type list also separates ordered enumerations and the all-or-nothing variants.
 export const SHEET_TYPES = [
     { key: 'mc', label: 'Multiple choice' },
+    { key: 'multi', label: 'Multiple answer' },
+    { key: 'multia', label: 'Multiple answer (all or nothing)' },
     { key: 'tf', label: 'True or False' },
     { key: 'id', label: 'Identification' },
+    { key: 'num', label: 'Numeric' },
     { key: 'enum', label: 'Enumeration' },
-    { key: 'enumo', label: 'Enumeration (ordered)' }
+    { key: 'enumo', label: 'Enumeration (ordered)' },
+    { key: 'order', label: 'Ordering' },
+    { key: 'ordera', label: 'Ordering (all or nothing)' },
+    { key: 'match', label: 'Matching' },
+    { key: 'essay', label: 'Essay' }
 ];
 
 let seq = 0;
@@ -40,21 +62,58 @@ export const blankQuestion = (type = 'mc', part = 0) => ({
     type,
     part,
     text: '',
-    options: type === 'mc' ? ['', '', '', ''] : [],
+    options: type === 'mc' || type === 'multi' ? ['', '', '', ''] : [],
     correct: -1,          // multiple choice: index of the right option
+    corrects: [],         // multiple answer: indexes of the right options
     tf: '',               // true or false: 'True' | 'False'
-    answer: '',           // identification: the exact answer
-    items: type === 'enum' ? ['', '', ''] : [],   // enumeration: the items to list
+    answer: '',           // identification, numeric, essay: the answer (essay: model answer or rubric)
+    tol: '',              // numeric: accepted difference, as text ('' = exact)
+    items: type === 'enum' || type === 'order' ? ['', '', ''] : [],   // enumeration / ordering: the items
     ordered: false,       // enumeration: the order matters
+    pairs: type === 'match' ? [{ l: '', r: '' }, { l: '', r: '' }, { l: '', r: '' }] : [],   // matching
+    extra: [],            // matching: wrong choices on the right-hand side
+    mode: 'partial',      // multiple answer / ordering: 'partial' credit or 'all' or nothing
+    points: '',           // '' = the default of the type
     expl: '',
     bonus: false
 });
 
-export const typeKey = (q) => (q.type === 'enum' && q.ordered ? 'enumo' : q.type);
+export const typeKey = (q) => {
+    if (q.type === 'enum' && q.ordered) return 'enumo';
+    if (q.type === 'multi' && q.mode === 'all') return 'multia';
+    if (q.type === 'order' && q.mode === 'all') return 'ordera';
+    return q.type;
+};
 export const typeLabel = (q) => (SHEET_TYPES.find(t => t.key === typeKey(q)) || SHEET_TYPES[0]).label;
 
-// How many points a question is worth: 1, or one per item for an enumeration.
-export const pointsOf = (q) => (q.type === 'enum' ? q.items.map(i => i.trim()).filter(Boolean).length : 1);
+const filled = (list) => list.map(i => String(i ?? '').trim()).filter(Boolean);
+const filledPairs = (q) => q.pairs.filter(p => p.l.trim() && p.r.trim());
+
+// Points of a question when none are set: 1, one per item or pair, or 5 for an essay.
+export const defaultPoints = (q) => {
+    if (q.type === 'enum') return Math.max(1, filled(q.items).length);
+    if (q.type === 'match') return Math.max(1, filledPairs(q).length);
+    if (q.type === 'essay') return ESSAY_POINTS;
+    return 1;
+};
+
+export const parsePoints = (value) => {
+    const n = Number(String(value ?? '').trim());
+    return Number.isFinite(n) && n > 0 && n <= MAX_POINTS ? Math.round(n * 100) / 100 : null;
+};
+
+// How many points a question is worth.
+export const pointsOf = (q) => parsePoints(q.points) ?? defaultPoints(q);
+
+// "9,5" or "1,250.5" -> number, or null.
+export const parseNumber = (value) => {
+    let s = String(value ?? '').trim().replace(/\s/g, '');
+    if (!s) return null;
+    if (s.includes(',') && !s.includes('.')) s = s.replace(',', '.');
+    else s = s.replace(/,/g, '');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+};
 
 const isTrueFalse = (choices) => {
     if (choices.length !== 2) return false;
@@ -69,24 +128,49 @@ export const fromRow = (row) => {
     const part = parseInt(row[0], 10) || 0;
     const choices = Array.isArray(row[2]) ? row[2].map(c => String(c ?? '')) : [];
     const rawAnswer = row[3];
-    const base = { id: newId(), part, text: String(row[1] ?? ''), expl: String(row[4] ?? ''), bonus: Boolean(row[5]) };
+    const meta = row[8] && typeof row[8] === 'object' ? row[8] : {};
+    const base = {
+        id: newId(), part, text: String(row[1] ?? ''), expl: String(row[4] ?? ''), bonus: Boolean(row[5]),
+        points: parsePoints(meta.points) !== null ? String(parsePoints(meta.points)) : ''
+    };
     const saved = typeof row[6] === 'string' ? row[6] : '';
+    const make = (type, extra) => ({ ...blankQuestion(type, part), ...base, ...extra });
 
+    if (saved === 'multi') {
+        const options = choices.slice(0, MAX_OPTIONS);
+        const rights = filled(Array.isArray(rawAnswer) ? rawAnswer : [rawAnswer]).map(a => a.toLowerCase());
+        const corrects = options.map((o, i) => (rights.includes(o.trim().toLowerCase()) ? i : -1)).filter(i => i >= 0);
+        return make('multi', { options, corrects, mode: meta.mode === 'all' ? 'all' : 'partial' });
+    }
+    if (saved === 'match') {
+        const pairs = (Array.isArray(rawAnswer) ? rawAnswer : []).map(p => ({ l: String(p[0] ?? ''), r: String(p[1] ?? '') }));
+        return make('match', { pairs: pairs.length ? pairs.slice(0, MAX_PAIRS) : blankQuestion('match').pairs, extra: filled(meta.extra || []) });
+    }
+    if (saved === 'order') {
+        const items = (Array.isArray(rawAnswer) ? rawAnswer : []).map(i => String(i ?? '').trim());
+        return make('order', { items: items.length ? items : ['', '', ''], mode: meta.mode === 'all' ? 'all' : 'partial' });
+    }
+    if (saved === 'num') {
+        return make('num', { answer: String(rawAnswer ?? ''), tol: meta.tol !== undefined && meta.tol !== null ? String(meta.tol) : '' });
+    }
+    if (saved === 'essay') {
+        return make('essay', { answer: String(rawAnswer ?? '') });
+    }
     if (saved === 'enum' || (!saved && Array.isArray(rawAnswer))) {
         const items = (Array.isArray(rawAnswer) ? rawAnswer : String(rawAnswer ?? '').split('|')).map(i => String(i ?? '').trim());
-        return { ...blankQuestion('enum', part), ...base, items: items.length ? items : ['', '', ''], ordered: Boolean(row[7]) };
+        return make('enum', { items: items.length ? items : ['', '', ''], ordered: Boolean(row[7]) });
     }
     const answer = String(rawAnswer ?? '');
     if (saved === 'id' || (!saved && choices.length === 0)) {
-        return { ...blankQuestion('id', part), ...base, answer };
+        return make('id', { answer });
     }
     if (saved === 'tf' || (!saved && isTrueFalse(choices))) {
         const tf = answer.trim().toLowerCase() === 'true' ? 'True' : answer.trim().toLowerCase() === 'false' ? 'False' : '';
-        return { ...blankQuestion('tf', part), ...base, tf };
+        return make('tf', { tf });
     }
     const options = choices.slice(0, MAX_OPTIONS);
     const correct = options.findIndex(c => c.trim() === answer.trim());
-    return { ...blankQuestion('mc', part), ...base, options, correct };
+    return make('mc', { options, correct });
 };
 
 export const fromExamData = (rows) => (Array.isArray(rows) ? rows : []).map(fromRow);
@@ -96,13 +180,43 @@ export const toRow = (q) => {
     const text = q.text.trim();
     const expl = q.expl.trim();
     const bonus = Boolean(q.bonus);
-    if (q.type === 'tf') return [q.part, text, ['True', 'False'], q.tf, expl, bonus, 'tf', false];
-    if (q.type === 'id') return [q.part, text, [], q.answer.trim(), expl, bonus, 'id', false];
-    if (q.type === 'enum') return [q.part, text, [], q.items.map(i => i.trim()).filter(Boolean), expl, bonus, 'enum', Boolean(q.ordered)];
-    const options = q.options.map(o => o.trim()).filter(Boolean);
+    const meta = {};
+    const pts = parsePoints(q.points);
+    if (pts !== null) meta.points = pts;
+    const done = (choices, answer, ordered = false) => {
+        const row = [q.part, text, choices, answer, expl, bonus, q.type, ordered];
+        if (Object.keys(meta).length) row.push(meta);
+        return row;
+    };
+
+    if (q.type === 'tf') return done(['True', 'False'], q.tf);
+    if (q.type === 'id') return done([], q.answer.trim());
+    if (q.type === 'enum') return done([], filled(q.items), Boolean(q.ordered));
+    if (q.type === 'num') {
+        const tol = parseNumber(q.tol);
+        if (tol !== null && tol > 0) meta.tol = tol;
+        const n = parseNumber(q.answer);
+        return done([], n === null ? q.answer.trim() : String(n));
+    }
+    if (q.type === 'essay') return done([], q.answer.trim());
+    if (q.type === 'order') {
+        if (q.mode === 'all') meta.mode = 'all';
+        return done([], filled(q.items));
+    }
+    if (q.type === 'match') {
+        if (filled(q.extra).length) meta.extra = filled(q.extra);
+        return done([], filledPairs(q).map(p => [p.l.trim(), p.r.trim()]));
+    }
+    if (q.type === 'multi') {
+        if (q.mode === 'all') meta.mode = 'all';
+        return done(filled(q.options), q.corrects.filter(i => q.options[i] && q.options[i].trim()).map(i => q.options[i].trim()));
+    }
+    const options = filled(q.options);
     const right = q.correct >= 0 && q.options[q.correct] ? q.options[q.correct].trim() : '';
-    return [q.part, text, options, right, expl, bonus, 'mc', false];
+    return done(options, right);
 };
+
+const dupes = (list) => new Set(list.map(o => o.toLowerCase())).size !== list.length;
 
 // Returns a list of { id, message } problems; empty = ready to save.
 export const validate = (title, questions) => {
@@ -110,22 +224,33 @@ export const validate = (title, questions) => {
     if (!String(title || '').trim()) problems.push({ id: null, message: 'Give the exam a title.' });
     if (questions.length === 0) problems.push({ id: null, message: 'Add at least one question.' });
     questions.forEach((q, i) => {
-        const n = i + 1;
-        const add = (message) => problems.push({ id: q.id, message: `Question ${n}: ${message}` });
+        const add = (message) => problems.push({ id: q.id, message: `Question ${i + 1}: ${message}` });
         if (!q.text.trim()) add('write the question.');
-        if (q.type === 'mc') {
-            const filled = q.options.map(o => o.trim()).filter(Boolean);
-            if (filled.length < MIN_OPTIONS) add('needs at least 2 choices.');
-            if (new Set(filled.map(o => o.toLowerCase())).size !== filled.length) add('two choices are the same.');
-            if (q.correct < 0 || !q.options[q.correct] || !q.options[q.correct].trim()) add('select the correct answer.');
+        if (String(q.points).trim() !== '' && parsePoints(q.points) === null) add(`points must be a number from 0.01 to ${MAX_POINTS}.`);
+        if (q.type === 'mc' || q.type === 'multi') {
+            const opts = filled(q.options);
+            if (opts.length < MIN_OPTIONS) add('needs at least 2 choices.');
+            if (dupes(opts)) add('two choices are the same.');
+            if (q.type === 'mc') {
+                if (q.correct < 0 || !q.options[q.correct] || !q.options[q.correct].trim()) add('select the correct answer.');
+            } else if (!q.corrects.some(k => q.options[k] && q.options[k].trim())) {
+                add('tick at least one correct answer.');
+            }
         } else if (q.type === 'tf') {
             if (q.tf !== 'True' && q.tf !== 'False') add('select True or False as the answer.');
-        } else if (q.type === 'enum') {
-            const filled = q.items.map(o => o.trim()).filter(Boolean);
-            if (filled.length < MIN_ITEMS) add('an enumeration needs at least 2 items.');
-            if (new Set(filled.map(o => o.toLowerCase())).size !== filled.length) add('two items are the same.');
-        } else if (!q.answer.trim()) {
-            add('type the correct answer.');
+        } else if (q.type === 'enum' || q.type === 'order') {
+            const items = filled(q.items);
+            const noun = q.type === 'enum' ? 'an enumeration' : 'an ordering';
+            if (items.length < MIN_ITEMS) add(`${noun} needs at least 2 items.`);
+            if (dupes(items)) add('two items are the same.');
+        } else if (q.type === 'match') {
+            if (filledPairs(q).length < MIN_PAIRS) add('matching needs at least 2 complete pairs.');
+            if (dupes(filledPairs(q).map(p => p.l.trim()))) add('two left-hand items are the same.');
+        } else if (q.type === 'num') {
+            if (parseNumber(q.answer) === null) add('type the correct number.');
+            if (String(q.tol).trim() !== '' && (parseNumber(q.tol) === null || parseNumber(q.tol) < 0)) add('the tolerance must be a number, 0 or more.');
+        } else if (q.type === 'id') {
+            if (!q.answer.trim()) add('type the correct answer.');
         }
     });
     return problems;
@@ -133,46 +258,73 @@ export const validate = (title, questions) => {
 
 // ---------- Spreadsheet view ----------
 // Column order of the grid, the CSV and a paste.
-export const COLUMNS = ['part', 'type', 'text', 'o0', 'o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'answer', 'expl', 'bonus'];
+export const COLUMNS = ['part', 'type', 'text', 'o0', 'o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'answer', 'expl', 'bonus', 'points'];
 
 export const letter = (i) => String.fromCharCode(65 + i);
 
 const TYPE_WORDS = {
-    mc: 'mc', 'multiple choice': 'mc', multiple: 'mc', choice: 'mc',
+    mc: 'mc', 'multiple choice': 'mc', choice: 'mc',
+    multi: 'multi', 'multiple answer': 'multi', 'multiple answers': 'multi', 'select all': 'multi', checkbox: 'multi',
+    multia: 'multia', 'multiple answer (all or nothing)': 'multia', 'multiple answer all or nothing': 'multia',
     tf: 'tf', 'true or false': 'tf', 'true/false': 'tf', 'true false': 'tf', boolean: 'tf',
     id: 'id', identification: 'id', 'fill in the blank': 'id', text: 'id',
+    num: 'num', numeric: 'num', number: 'num', numerical: 'num',
     enum: 'enum', enumeration: 'enum', enumerate: 'enum', list: 'enum',
-    enumo: 'enumo', 'enumeration (ordered)': 'enumo', 'ordered enumeration': 'enumo', 'enumeration ordered': 'enumo'
+    enumo: 'enumo', 'enumeration (ordered)': 'enumo', 'ordered enumeration': 'enumo', 'enumeration ordered': 'enumo',
+    order: 'order', ordering: 'order', sequence: 'order', sequencing: 'order',
+    ordera: 'ordera', 'ordering (all or nothing)': 'ordera', 'ordering all or nothing': 'ordera',
+    match: 'match', matching: 'match', 'matching type': 'match',
+    essay: 'essay', 'short answer': 'essay', 'essay / short answer': 'essay'
 };
 
 export const parseTypeWord = (word) => TYPE_WORDS[String(word || '').trim().toLowerCase()] || '';
 
-// Enumeration items typed in one cell: separated by | or line breaks.
+// Items typed in one cell: separated by | or line breaks.
 export const splitItems = (value) => String(value ?? '').split(/\||\r?\n/).map(s => s.trim()).filter(Boolean);
 
-// Switches the type and keeps whatever still makes sense. key can be 'enumo' (ordered enumeration).
+// Switches the type and keeps whatever still makes sense. key can also be 'enumo', 'multia' or 'ordera'.
 export const changeType = (q, key) => {
-    const type = key === 'enumo' ? 'enum' : key;
-    const ordered = key === 'enumo';
-    if (q.type === type) {
-        if (type === 'enum') q.ordered = ordered;
-        return q;
-    }
-    if (type === 'mc') {
-        if (q.options.length < MIN_OPTIONS) q.options = ['', '', '', ''];
-        q.correct = -1;
+    const type = key === 'enumo' ? 'enum' : key === 'multia' ? 'multi' : key === 'ordera' ? 'order' : key;
+    const was = q.type;
+    if (type === 'enum') q.ordered = key === 'enumo';
+    if (type === 'multi') q.mode = key === 'multia' ? 'all' : 'partial';
+    if (type === 'order') q.mode = key === 'ordera' ? 'all' : 'partial';
+    if (was === type) return q;
+
+    const lines = () => (was === 'enum' || was === 'order' ? filled(q.items) : was === 'id' ? splitItems(q.answer) : []);
+    if (type === 'mc' || type === 'multi') {
+        if (was === 'mc' || was === 'multi') {
+            if (type === 'multi') q.corrects = q.correct >= 0 ? [q.correct] : [];
+            else q.correct = q.corrects.length ? q.corrects[0] : -1;
+        } else {
+            q.options = ['', '', '', ''];
+            q.correct = -1;
+            q.corrects = [];
+        }
     } else if (type === 'tf') {
         q.tf = '';
-    } else if (type === 'enum') {
-        const carried = q.type === 'id' ? splitItems(q.answer) : [];
+    } else if (type === 'enum' || type === 'order') {
+        const carried = lines();
         q.items = carried.length ? carried : ['', '', ''];
-        q.ordered = ordered;
-    } else {
-        q.answer = q.type === 'mc' && q.correct >= 0 ? (q.options[q.correct] || '')
-            : q.type === 'enum' ? q.items.map(i => i.trim()).filter(Boolean).join(' | ') : '';
+    } else if (type === 'match') {
+        if (!q.pairs.length) q.pairs = blankQuestion('match').pairs;
+    } else if (type === 'num') {
+        q.answer = parseNumber(q.answer) !== null ? q.answer : '';
+    } else if (type === 'id' || type === 'essay') {
+        if (was === 'mc') q.answer = q.correct >= 0 ? (q.options[q.correct] || '') : '';
+        else if (was === 'enum' || was === 'order') q.answer = filled(q.items).join(' | ');
+        else if (was !== 'id' && was !== 'essay' && was !== 'num') q.answer = '';
     }
     q.type = type;
     return q;
+};
+
+const LETTERS_ONLY = /^[A-Ha-h]([\s,;]+[A-Ha-h])*$/;
+
+// "9.8 ± 0.1", "9.8 +- 0.1" or "9.8" -> { value, tol }
+const splitNumeric = (value) => {
+    const m = /^(.*?)\s*(?:±|\+\/-|\+-)\s*(.*)$/.exec(String(value));
+    return m ? { value: m[1].trim(), tol: m[2].trim() } : { value: String(value).trim(), tol: '' };
 };
 
 // Sets one cell of a question from text (typed, pasted or read from a CSV). Returns the changed question.
@@ -187,9 +339,13 @@ export const setCell = (q, col, raw) => {
         q.text = value;
     } else if (/^o[0-7]$/.test(col)) {
         const idx = parseInt(col.slice(1), 10);
-        if (q.type === 'mc') {
+        if (q.type === 'mc' || q.type === 'multi') {
             while (q.options.length <= idx) q.options.push('');
             q.options[idx] = value;
+        } else if (q.type === 'match') {
+            while (q.pairs.length <= idx) q.pairs.push({ l: '', r: '' });
+            const at = value.indexOf('|');
+            q.pairs[idx] = at >= 0 ? { l: value.slice(0, at).trim(), r: value.slice(at + 1).trim() } : { l: value.trim(), r: '' };
         }
     } else if (col === 'answer') {
         if (q.type === 'mc') {
@@ -198,12 +354,25 @@ export const setCell = (q, col, raw) => {
             if (/^[A-Ha-h]$/.test(v)) idx = v.toUpperCase().charCodeAt(0) - 65;
             else idx = q.options.findIndex(o => o.trim().toLowerCase() === v.toLowerCase());
             q.correct = idx >= 0 && idx < q.options.length ? idx : -1;
+        } else if (q.type === 'multi') {
+            const v = value.trim();
+            const tokens = LETTERS_ONLY.test(v) ? v.split(/[\s,;]+/) : splitItems(v);
+            q.corrects = [...new Set(tokens.map(t => {
+                if (/^[A-Ha-h]$/.test(t)) return t.toUpperCase().charCodeAt(0) - 65;
+                return q.options.findIndex(o => o.trim().toLowerCase() === t.toLowerCase());
+            }).filter(i => i >= 0 && i < q.options.length))];
         } else if (q.type === 'tf') {
             const v = value.trim().toLowerCase();
             q.tf = v === 'true' || v === 't' ? 'True' : v === 'false' || v === 'f' ? 'False' : '';
-        } else if (q.type === 'enum') {
+        } else if (q.type === 'enum' || q.type === 'order') {
             const items = splitItems(value).slice(0, MAX_ITEMS);
             q.items = items.length ? items : ['', '', ''];
+        } else if (q.type === 'match') {
+            q.extra = splitItems(value);
+        } else if (q.type === 'num') {
+            const { value: v, tol } = splitNumeric(value);
+            q.answer = v;
+            if (tol !== '' || /±|\+-|\+\/-/.test(value)) q.tol = tol;
         } else {
             q.answer = value;
         }
@@ -212,6 +381,8 @@ export const setCell = (q, col, raw) => {
     } else if (col === 'bonus') {
         const v = value.trim().toLowerCase();
         q.bonus = v === '1' || v === 'true' || v === 'yes' || v === 'bonus' || v === 'x';
+    } else if (col === 'points') {
+        q.points = value.trim();
     }
     return q;
 };
@@ -221,15 +392,27 @@ export const cellText = (q, col) => {
     if (col === 'part') return String(q.part);
     if (col === 'type') return typeLabel(q);
     if (col === 'text') return q.text;
-    if (/^o[0-7]$/.test(col)) return q.type === 'mc' ? (q.options[parseInt(col.slice(1), 10)] || '') : '';
+    if (/^o[0-7]$/.test(col)) {
+        const idx = parseInt(col.slice(1), 10);
+        if (q.type === 'mc' || q.type === 'multi') return q.options[idx] || '';
+        if (q.type === 'match') {
+            const p = q.pairs[idx];
+            return p && (p.l || p.r) ? `${p.l} | ${p.r}` : '';
+        }
+        return '';
+    }
     if (col === 'answer') {
         if (q.type === 'mc') return q.correct >= 0 ? letter(q.correct) : '';
+        if (q.type === 'multi') return q.corrects.slice().sort((a, b) => a - b).map(letter).join(', ');
         if (q.type === 'tf') return q.tf;
-        if (q.type === 'enum') return q.items.map(i => i.trim()).filter(Boolean).join(' | ');
+        if (q.type === 'enum' || q.type === 'order') return filled(q.items).join(' | ');
+        if (q.type === 'match') return filled(q.extra).join(' | ');
+        if (q.type === 'num') return String(q.tol).trim() !== '' ? `${q.answer} ± ${q.tol}` : q.answer;
         return q.answer;
     }
     if (col === 'expl') return q.expl;
     if (col === 'bonus') return q.bonus ? 'Yes' : '';
+    if (col === 'points') return q.points;
     return '';
 };
 
@@ -238,7 +421,7 @@ export const parsePaste = (text) => parseDelimited(text, '\t');
 
 // ---------- CSV ----------
 
-export const CSV_HEADER = ['Part', 'Type', 'Question', ...Array.from({ length: MAX_OPTIONS }, (_, k) => `Choice ${letter(k)}`), 'Answer', 'Explanation', 'Bonus'];
+export const CSV_HEADER = ['Part', 'Type', 'Question', ...Array.from({ length: MAX_OPTIONS }, (_, k) => `Choice ${letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points'];
 
 // Reads delimited text. Quoted cells may hold the delimiter and line breaks; "" is a quote.
 export function parseDelimited(text, delimiter) {
@@ -273,7 +456,12 @@ export const detectDelimiter = (text) => {
     return best[1] > 0 ? best[0] : ',';
 };
 
-const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+// A cell that starts with = + - @ would run as a formula in Excel. A leading ' keeps it text.
+const csvCell = (v) => {
+    let s = String(v ?? '');
+    if (/^[=+@]/.test(s) || (/^-/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s))) s = `'${s}`;
+    return `"${s.replace(/"/g, '""')}"`;
+};
 
 // Questions -> CSV text in the spreadsheet layout.
 export const toCsv = (questions) => {
@@ -288,6 +476,8 @@ const inferKey = (options, answer) => {
     if (options.length === 2 && isTrueFalse(options)) return 'tf';
     return 'mc';
 };
+
+const POINTS_COL = 3 + MAX_OPTIONS + 3;
 
 // CSV rows (already split into cells) -> { questions, skipped }.
 // Reads the new layout (header has a Type column) and the old 6-column layout:
@@ -305,26 +495,30 @@ export const fromCsvRows = (rows) => {
 
     body.forEach(r => {
         const cell = (i) => String(r[i] ?? '').trim();
+        // Excel text marker added by the export
+        const plain = (i) => cell(i).replace(/^'(?=[=+\-@])/, '');
         if (isNew) {
-            const options = Array.from({ length: MAX_OPTIONS }, (_, k) => String(r[3 + k] ?? '').trim());
-            const answer = cell(3 + MAX_OPTIONS);
-            const text = String(r[2] ?? '');
+            const text = String(r[2] ?? '').replace(/^'(?=[=+\-@])/, '');
             if (!text.trim()) { skipped++; return; }
-            const filled = options.filter(Boolean);
-            const key = parseTypeWord(cell(1)) || inferKey(filled, answer);
+            const options = Array.from({ length: MAX_OPTIONS }, (_, k) => plain(3 + k));
+            const answer = plain(3 + MAX_OPTIONS);
+            const key = parseTypeWord(cell(1)) || inferKey(options.filter(Boolean), answer);
             const q = blankQuestion('mc', parseInt(cell(0), 10) || 0);
             setCell(q, 'type', key);
             q.text = text.trim();
-            if (q.type === 'mc') {
-                // keep the grid positions so an answer given as a letter still points at the right choice
-                let last = options.length;
-                while (last > 0 && !options[last - 1]) last--;
-                q.options = options.slice(0, Math.max(last, MIN_OPTIONS));
+            if (q.type === 'mc' || q.type === 'multi') q.options = [];
+            if (q.type === 'match') q.pairs = [];
+            options.forEach((o, k) => { if (o) setCell(q, `o${k}`, o); });
+            if (q.type === 'mc' || q.type === 'multi') {
                 while (q.options.length < MIN_OPTIONS) q.options.push('');
+            } else if (q.type === 'match') {
+                q.pairs = q.pairs.filter(p => p.l || p.r);
+                while (q.pairs.length < MIN_PAIRS) q.pairs.push({ l: '', r: '' });
             }
             setCell(q, 'answer', answer);
-            q.expl = cell(4 + MAX_OPTIONS);
+            q.expl = plain(4 + MAX_OPTIONS);
             setCell(q, 'bonus', cell(5 + MAX_OPTIONS));
+            setCell(q, 'points', cell(POINTS_COL));
             questions.push(q);
         } else {
             if (r.length < 4 || !String(r[1] ?? '').trim()) { skipped++; return; }

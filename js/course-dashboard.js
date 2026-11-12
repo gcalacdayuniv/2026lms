@@ -401,7 +401,7 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
                                 </div>
                                 ${isDone ? `
                                     <div class="w-full py-3 px-4 bg-green-700 text-white font-black text-sm rounded-lg text-center border border-green-400">
-                                        <i class="fa-solid fa-circle-check mr-1.5"></i> Completed - Score: ${ex.finalScore} /${ex.maxScore}
+                                        <i class="fa-solid fa-circle-check mr-1.5"></i> Completed - Score: ${ex.finalScore} /${ex.maxScore}${ex.essayPending ? '<div class="text-xs font-bold text-yellow-200 mt-1">Essay answers are waiting for your lecturer. Your score may go up.</div>' : ''}
                                     </div>
                                 ` : `
                                     <button type="button" class="start-accessible-exam-btn w-full py-3.5 px-4 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-sm sm:text-base rounded-lg shadow-md transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}">
