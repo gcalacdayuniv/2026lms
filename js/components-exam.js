@@ -78,7 +78,7 @@ export const ExamUI = {
                             </table>
                         </div>
                         <div class="text-[11px] text-gray-600">
-                            <strong>Tip:</strong> Download the template, replace the sample rows, keep Row 1 as the header, and save as <strong>CSV UTF-8</strong>. Files in the older 6-column layout (Part Index, Question, Choices, Answer, Explanation, Bonus) still import.
+                            <strong>Tip:</strong> Download the template, replace the sample rows and keep Row 1 as the header. Import the file from inside Create Exam: a <strong>CSV</strong> or an <strong>Excel (.xlsx)</strong> file works (the first sheet is read). Files in the older 6-column layout (Part Index, Question, Choices, Answer, Explanation, Bonus) still import.
                         </div>
                     </div>
 

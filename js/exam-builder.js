@@ -160,9 +160,9 @@ export const ExamBuilder = {
                         </div>
                         <span id="ebCount" class="text-xs font-bold text-gray-500"></span>
                         <div class="ml-auto flex items-center gap-1.5">
-                            <button type="button" id="ebImportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-import mr-1" aria-hidden="true"></i>Import CSV</button>
+                            <button type="button" id="ebImportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-import mr-1" aria-hidden="true"></i>Import CSV / Excel</button>
                             <button type="button" id="ebExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
-                            <input type="file" id="ebCsvInput" accept=".csv,text/csv" class="hidden">
+                            <input type="file" id="ebCsvInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden">
                         </div>
                     </div>
                     ${s.examId ? '<p class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>Editing changes the exam for students who have not taken it yet. Scores already recorded are not recalculated.</p>' : ''}
@@ -750,11 +750,28 @@ export const ExamBuilder = {
 
     // ---------- CSV ----------
 
+    // Reads the first sheet of an Excel file as CSV text. The reader library loads only when an Excel file is picked.
+    excelToCsv: async (file) => {
+        if (!window.XLSX) {
+            await new Promise((resolve, reject) => {
+                const tag = document.createElement('script');
+                tag.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                tag.onload = resolve;
+                tag.onerror = () => reject(new Error('The Excel reader could not be loaded. Check your connection, or save the sheet as CSV and import that.'));
+                document.head.appendChild(tag);
+            });
+        }
+        const book = window.XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        const sheet = book.Sheets[book.SheetNames[0]];
+        if (!sheet) return '';
+        return window.XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+    },
+
     importCsv: async (file) => {
         const s = ExamBuilder.s;
         if (!s) return;
         try {
-            const text = await file.text();
+            const text = /\.xlsx?$/i.test(file.name) ? await ExamBuilder.excelToCsv(file) : await file.text();
             const { questions, skipped } = M.fromCsvText(text);
             if (!questions.length) {
                 UI.error('No questions found in that file. Use the template for the right columns.');
@@ -768,7 +785,7 @@ export const ExamBuilder = {
             ExamBuilder.renderBody();
             UI.success(`Imported ${questions.length} question${questions.length === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} empty row${skipped === 1 ? '' : 's'}` : ''}. Check them, then save.`);
         } catch (err) {
-            UI.error('Could not read that file.');
+            UI.error(err && err.message && /Excel reader/.test(err.message) ? err.message : 'Could not read that file.');
         }
     },
 
