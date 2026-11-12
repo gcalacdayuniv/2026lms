@@ -721,6 +721,7 @@ export const CourseModule = {
         if (e.target.closest('#markAllPresent')) {
             const rows = document.querySelectorAll('.student-row');
             rows.forEach(row => {
+                if (row.style.display === 'none') return;   // a search or filter is hiding it
                 const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
                 if (presentBtn) {
                     presentBtn.click();

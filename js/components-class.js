@@ -797,10 +797,11 @@ export const ClassComponents = {
                 : `<span class="text-gray-800">None</span>`;
 
             return `
-                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}" data-search="${escapeHtml([s.Name, s.Student_Number, s.Seat_Number, s.Group_Name, s.Assigned_Topic].filter(Boolean).join(' ').toLowerCase())}" data-eye="${escapeHtml(s.eye_condition || '')}" data-group="${escapeHtml(s.Group_Name || '')}" data-seat="${escapeHtml(s.Seat_Number || '')}">
 
                     <div class="flex items-start justify-between w-full lg:w-1/2">
                         <div class="flex items-center space-x-3 p-1.5 -ml-1.5 rounded-lg transition">
+                            <input type="checkbox" class="roster-check hidden w-5 h-5 rounded text-blue-600 focus:ring-blue-500 shrink-0" aria-label="Select ${escapeHtml(s.Name)}">
                             <span class="text-xs font-bold text-gray-400 w-5 text-center">${index + 1}</span>
                             <div class="flex-shrink-0">
                                 ${avatarImg}
@@ -945,6 +946,44 @@ export const ClassComponents = {
                             <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
                         </div>
                     </div>
+                    ${students.length > 1 ? `
+                    <div id="rosterTools" class="px-3 py-2 border-b border-gray-200 bg-white flex flex-wrap items-center gap-2">
+                        <div class="relative flex-1 min-w-[10rem]">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" aria-hidden="true"></i>
+                            <input type="search" id="rosterSearch" placeholder="Search name, number, seat, group..." aria-label="Search the class roster" class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <select id="rosterFilter" aria-label="Show" class="px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="all">All students</option>
+                            <option value="blind">Legally Blind</option>
+                            <option value="notpresent">Not present today</option>
+                            <option value="noseat">No seat yet</option>
+                            ${[...new Set(students.map(s => s.Group_Name).filter(Boolean))].sort().map(g => `<option value="group:${escapeHtml(g)}">Group: ${escapeHtml(g)}</option>`).join('')}
+                        </select>
+                        <button type="button" id="rosterSelectToggle" aria-pressed="false" class="px-3 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white hover:bg-gray-50 text-gray-700 transition"><i class="fa-regular fa-square-check mr-1" aria-hidden="true"></i>Select</button>
+                        <span id="rosterCount" class="w-full sm:w-auto text-[11px] font-bold text-gray-500" role="status" aria-live="polite"></span>
+                    </div>
+                    <div id="rosterBulkBar" class="hidden sticky top-[7.25rem] z-20 px-3 py-2 border-b border-blue-200 bg-blue-50/95 backdrop-blur" role="region" aria-label="Actions for selected students">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span id="rosterSelCount" class="text-xs font-black text-blue-900 mr-1" role="status" aria-live="polite">0 selected</span>
+                            <button type="button" id="rosterSelectShown" class="text-[11px] font-bold text-blue-700 underline">Select all shown</button>
+                            <button type="button" id="rosterClearSel" class="text-[11px] font-bold text-gray-600 underline">Clear</button>
+                            <span class="hidden sm:inline text-gray-300">|</span>
+                            <div class="flex flex-wrap gap-1" role="group" aria-label="Set attendance for selected">
+                                <button type="button" data-bulk-status="Present" class="roster-bulk px-2.5 py-1.5 rounded-md text-[11px] font-bold border border-green-400 bg-green-100 text-green-800">Present</button>
+                                <button type="button" data-bulk-status="Late" class="roster-bulk px-2.5 py-1.5 rounded-md text-[11px] font-bold border border-yellow-400 bg-yellow-100 text-yellow-800">Late</button>
+                                <button type="button" data-bulk-status="Excused" class="roster-bulk px-2.5 py-1.5 rounded-md text-[11px] font-bold border border-purple-300 bg-purple-100 text-purple-800">Excused</button>
+                                <button type="button" data-bulk-status="Absent" class="roster-bulk px-2.5 py-1.5 rounded-md text-[11px] font-bold border border-red-300 bg-red-100 text-red-800">Absent</button>
+                            </div>
+                            <button type="button" id="rosterExamToggle" aria-expanded="false" aria-controls="rosterExamPanel" class="roster-bulk ml-auto px-2.5 py-1.5 rounded-md text-[11px] font-bold border border-indigo-300 bg-indigo-100 text-indigo-800"><i class="fa-solid fa-universal-access mr-1" aria-hidden="true"></i>Exam access</button>
+                        </div>
+                        <div id="rosterExamPanel" class="hidden mt-2 p-2 bg-white border border-indigo-200 rounded-md flex flex-wrap items-center gap-2">
+                            <select id="rosterExamSelect" aria-label="Exam" class="flex-1 min-w-[10rem] px-2 py-1.5 border border-gray-300 rounded text-xs font-bold bg-white"></select>
+                            <button type="button" id="rosterExamEnable" class="px-3 py-1.5 rounded-md text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700">Enable for selected</button>
+                            <button type="button" id="rosterExamDisable" class="px-3 py-1.5 rounded-md text-xs font-bold bg-white text-gray-700 border border-gray-300 hover:bg-gray-50">Disable for selected</button>
+                            <span id="rosterExamNote" class="w-full text-[11px] text-gray-500">Only exams already linked to this class are listed.</span>
+                        </div>
+                    </div>
+                    <div id="rosterNoMatch" class="hidden p-8 text-center text-sm text-gray-500 bg-white">No student matches. Clear the search or change the filter.</div>` : ''}
                     <style>
                         /* Collapsed: all status buttons are hidden so the list stays short. */
                         #rosterListContainer.status-collapsed .status-btn-group { display: none; }
