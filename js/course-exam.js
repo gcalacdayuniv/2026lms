@@ -188,6 +188,21 @@ export const CourseExam = {
             await CourseExam.startPresentation(btn.dataset.examId, btn.dataset.title);
         }
 
+        if (e.target.closest('.exam-results-btn')) {
+            const btn = e.target.closest('.exam-results-btn');
+            await CourseExam.openResultsView(btn.dataset.classExamId, btn.dataset.title);
+            return;
+        }
+        if (e.target.closest('.er-sort-btn')) {
+            CourseExam.resultsSort = e.target.closest('.er-sort-btn').dataset.sort;
+            CourseExam.renderResults();
+            return;
+        }
+        if (e.target.closest('#erExportBtn')) {
+            CourseExam.exportResultsCsv();
+            return;
+        }
+
         if (e.target.closest('.grade-essays-btn')) {
             const btn = e.target.closest('.grade-essays-btn');
             await CourseExam.openEssayView(btn.dataset.classExamId, btn.dataset.title);
@@ -208,7 +223,7 @@ export const CourseExam = {
             await CourseExam.openBonusView(btn.dataset.examId, btn.dataset.title);
         }
 
-        if (e.target.closest('#backFromExamAssignBtn') || e.target.closest('#backFromExamBonusBtn') || e.target.closest('#backFromExamEssayBtn')) {
+        if (e.target.closest('#backFromExamAssignBtn') || e.target.closest('#backFromExamBonusBtn') || e.target.closest('#backFromExamEssayBtn') || e.target.closest('#backFromExamResultsBtn')) {
             CourseExam.showMainManagerView();
             await CourseExam.loadExams();
         }
@@ -492,6 +507,7 @@ export const CourseExam = {
         document.getElementById('examClassAssignView')?.classList.add('hidden');
         document.getElementById('examBonusView')?.classList.add('hidden');
         document.getElementById('examEssayView')?.classList.add('hidden');
+        document.getElementById('examResultsView')?.classList.add('hidden');
     },
 
     loadExams: async () => {
@@ -579,6 +595,10 @@ export const CourseExam = {
                                 <button type="button" class="grade-essays-btn bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
                                     <i class="fa-solid fa-pen-ruler mr-1" aria-hidden="true"></i> Grade Essays${essayPending ? ` (${essayPending} to mark)` : ''}
                                 </button>` : ''}
+                            ${linked ? `
+                                <button type="button" class="exam-results-btn bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
+                                    <i class="fa-solid fa-chart-column mr-1" aria-hidden="true"></i> Results
+                                </button>` : ''}
                             <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
                                 <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
                             </button>
@@ -611,6 +631,7 @@ export const CourseExam = {
         document.getElementById('examManagerMainView').classList.add('hidden');
         document.getElementById('examBonusView').classList.add('hidden');
         document.getElementById('examEssayView')?.classList.add('hidden');
+        document.getElementById('examResultsView')?.classList.add('hidden');
         document.getElementById('examClassAssignView').classList.remove('hidden');
 
         document.getElementById('ecaExamTitle').textContent = title;
@@ -623,6 +644,7 @@ export const CourseExam = {
         document.getElementById('ecaCategory').value = linked?.Category || 'MajorExam';
         document.getElementById('ecaFromDate').value = linked?.From_Date || '';
         document.getElementById('ecaToDate').value = linked?.To_Date || '';
+        document.getElementById('ecaTimeLimit').value = linked?.Time_Limit || '';
 
         const listEl = document.getElementById('ecaStudentList');
         const students = CourseClass.currentStudents || [];
@@ -699,6 +721,7 @@ export const CourseExam = {
             category: linked?.Category || 'MajorExam',
             fromDate: linked?.From_Date || '',
             toDate: linked?.To_Date || '',
+            timeLimit: linked?.Time_Limit || '',
             audience: linked ? 'keep' : 'blind'
         };
     },
@@ -734,6 +757,7 @@ export const CourseExam = {
                             isActive: true,
                             fromDate: link.fromDate || '',
                             toDate: link.toDate || '',
+                            timeLimit: parseInt(link.timeLimit, 10) || null,
                             assignments
                         })
                     });
@@ -759,6 +783,7 @@ export const CourseExam = {
         const category = document.getElementById('ecaCategory').value;
         const fromDate = document.getElementById('ecaFromDate').value;
         const toDate = document.getElementById('ecaToDate').value;
+        const timeLimit = parseInt(document.getElementById('ecaTimeLimit').value, 10) || null;
 
         if (fromDate && toDate && fromDate > toDate) {
             alertBox.textContent = "From Date cannot be later than To Date.";
@@ -786,6 +811,7 @@ export const CourseExam = {
                     isActive,
                     fromDate,
                     toDate,
+                    timeLimit,
                     assignments
                 })
             });
@@ -827,6 +853,170 @@ export const CourseExam = {
         }
     },
 
+    // ---------- Results ----------
+
+    resultsData: null,
+    resultsSort: 'hardest',
+
+    openResultsView: async (classExamId, title) => {
+        ['examManagerMainView', 'examClassAssignView', 'examBonusView', 'examEssayView'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+        document.getElementById('examResultsView').classList.remove('hidden');
+        document.getElementById('erTitle').textContent = title;
+        const body = document.getElementById('erBody');
+        body.innerHTML = '<div class="text-center py-10 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>';
+        try {
+            const data = await apiFetch(`/api/exam-results?classExamId=${encodeURIComponent(classExamId)}&_t=${Date.now()}`);
+            CourseExam.resultsData = { classExamId, title, ...data };
+            CourseExam.resultsSort = 'hardest';
+            CourseExam.renderResults();
+        } catch (err) {
+            body.innerHTML = `<div class="text-red-500 font-bold text-sm text-center py-4">${esc(err.message)}</div>`;
+        }
+    },
+
+    renderResults: () => {
+        const d = CourseExam.resultsData;
+        const body = document.getElementById('erBody');
+        if (!d || !body) return;
+        const sm = d.summary || {};
+        const fmt = (v, suffix = '') => (v === null || v === undefined ? '-' : `${v}${suffix}`);
+
+        if (!d.submitted) {
+            body.innerHTML = `<div class="text-center py-12 text-sm text-gray-500"><i class="fa-regular fa-hourglass-half text-3xl text-gray-300"></i><p class="mt-2 font-bold text-gray-600">No results yet</p><p class="text-xs">${d.assigned} student${d.assigned === 1 ? ' is' : 's are'} enabled and none has submitted.</p></div>`;
+            return;
+        }
+
+        const tile = (label, value, sub = '') => `<div class="bg-white border border-gray-200 rounded-xl p-3 text-center"><div class="text-[10px] font-bold uppercase tracking-wider text-gray-500">${label}</div><div class="text-xl font-black text-gray-900 mt-0.5">${value}</div>${sub ? `<div class="text-[10px] text-gray-500">${sub}</div>` : ''}</div>`;
+        const tiles = `
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                ${tile('Submitted', `${d.submitted}/${d.assigned}`)}
+                ${tile('Average', fmt(sm.mean, '%'))}
+                ${tile('Median', fmt(sm.median, '%'))}
+                ${tile('Highest / Lowest', `${fmt(sm.high, '%')} / ${fmt(sm.low, '%')}`)}
+                ${tile('Passed', fmt(sm.passRate, '%'), `${sm.passPercent}% or more`)}
+                ${tile('Average time', d.avgMinutes === null ? '-' : `${d.avgMinutes} min`, d.timeLimit ? `limit ${d.timeLimit} min` : 'no limit')}
+            </div>`;
+
+        const top = Math.max(1, ...sm.buckets);
+        const bars = sm.buckets.map((n, i) => `
+            <div class="flex-1 flex flex-col items-center justify-end min-w-0" title="${i * 10}-${i === 9 ? 100 : i * 10 + 9}%: ${n} student${n === 1 ? '' : 's'}">
+                <span class="text-[10px] font-bold text-gray-600">${n || ''}</span>
+                <div class="w-full rounded-t ${i < 6 ? 'bg-rose-300' : 'bg-teal-400'}" style="height:${Math.max(n ? 6 : 2, (n / top) * 90)}px"></div>
+                <span class="text-[9px] text-gray-500 mt-0.5">${i * 10}</span>
+            </div>`).join('');
+        const distribution = `
+            <div class="bg-white border border-gray-200 rounded-xl p-3">
+                <div class="text-xs font-black text-gray-700 uppercase tracking-wider mb-2">Score spread <span class="font-medium normal-case text-gray-500">(students per 10% band)</span></div>
+                <div class="flex items-end gap-1 h-28" role="img" aria-label="Score spread. ${sm.buckets.map((n, i) => `${i * 10} to ${i * 10 + 10} percent: ${n}`).join('. ')}">${bars}</div>
+            </div>`;
+
+        const labelFor = (q) => {
+            if (q.avgPct === null) return '';
+            if (q.avgPct < 40) return '<span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">Hard</span>';
+            if (q.avgPct >= 85) return '<span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-green-100 text-green-800 border border-green-200">Easy</span>';
+            return '';
+        };
+        const barColor = (p) => (p === null ? 'bg-gray-300' : p < 40 ? 'bg-red-400' : p < 70 ? 'bg-amber-400' : 'bg-teal-500');
+        const typeName = { mc: 'Multiple choice', multi: 'Multiple answer', tf: 'True/False', id: 'Identification', num: 'Numeric', enum: 'Enumeration', order: 'Ordering', match: 'Matching', essay: 'Essay' };
+        const pctBar = (p, color) => `<div class="h-2 bg-gray-100 rounded overflow-hidden"><div class="h-full ${color}" style="width:${p || 0}%"></div></div>`;
+
+        const detail = (q) => {
+            if (q.options) {
+                return `<div class="mt-2 space-y-1">${q.options.map(o => `
+                    <div class="flex items-center gap-2 text-[11px]">
+                        <span class="w-40 sm:w-56 shrink-0 truncate ${o.correct ? 'font-black text-green-700' : 'text-gray-700'}" title="${esc(o.text)}">${o.correct ? '<i class="fa-solid fa-check mr-1" aria-hidden="true"></i>' : ''}${esc(o.text)}</span>
+                        <div class="flex-1">${pctBar(o.pct, o.correct ? 'bg-green-500' : 'bg-gray-400')}</div>
+                        <span class="w-16 text-right text-gray-600">${o.count} (${fmt(o.pct, '%')})</span>
+                    </div>`).join('')}</div>`;
+            }
+            if (q.commonWrong && q.commonWrong.length) {
+                return `<div class="mt-2 text-[11px] text-gray-700"><span class="font-bold">Common wrong answers:</span> ${q.commonWrong.map(w => `"${esc(w.text)}" (${w.count})`).join(', ')}</div>`;
+            }
+            if (q.parts) {
+                return `<div class="mt-2 space-y-1">${q.parts.map(p => `
+                    <div class="flex items-center gap-2 text-[11px]">
+                        <span class="w-40 sm:w-56 shrink-0 truncate text-gray-700" title="${esc(p.label)}">${esc(p.label)}</span>
+                        <div class="flex-1">${pctBar(p.pct, barColor(p.pct))}</div>
+                        <span class="w-12 text-right text-gray-600">${fmt(p.pct, '%')}</span>
+                    </div>`).join('')}</div>`;
+            }
+            if (q.type === 'essay') {
+                return `<div class="mt-2 text-[11px] text-gray-700">${q.marked} of ${q.submitted} essay${q.submitted === 1 ? '' : 's'} marked${q.avgPct === null ? '' : `, average ${q.avgPct}% of ${q.points} points`}.</div>`;
+            }
+            return '';
+        };
+
+        const list = d.questions.map((q, i) => ({ ...q, no: i + 1 }));
+        if (CourseExam.resultsSort === 'hardest') list.sort((a, b) => (a.avgPct ?? 101) - (b.avgPct ?? 101));
+        const sortBtn = (key, label) => `<button type="button" data-sort="${key}" class="er-sort-btn px-2.5 py-1 text-[11px] font-bold rounded ${CourseExam.resultsSort === key ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}" aria-pressed="${CourseExam.resultsSort === key}">${label}</button>`;
+        const questionCards = list.map(q => `
+            <div class="bg-white border border-gray-200 rounded-xl p-3">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div class="text-sm font-bold text-gray-800 min-w-0 break-words"><span class="text-gray-400">${q.no}.</span> ${esc(q.question)}${q.isBonus ? ' <span class="text-amber-700 text-[11px]">(bonus)</span>' : ''}</div>
+                    <div class="flex items-center gap-1.5 shrink-0">${labelFor(q)}<span class="text-[10px] text-gray-500">${typeName[q.type] || q.type} &bull; ${q.points} pt${q.points === 1 ? '' : 's'}</span></div>
+                </div>
+                <div class="mt-2 flex items-center gap-2">
+                    <div class="flex-1">${pctBar(q.avgPct, barColor(q.avgPct))}</div>
+                    <span class="text-xs font-black text-gray-800 w-28 text-right">${fmt(q.avgPct, '%')} average</span>
+                </div>
+                <div class="mt-1 text-[11px] text-gray-500">${q.fullPct === null ? '' : `${q.fullPct}% got it fully right. `}${q.answered} of ${q.submitted} answered.</div>
+                ${detail(q)}
+            </div>`).join('');
+
+        const rows = d.students.map(s => `
+            <tr class="border-t border-gray-100">
+                <td class="px-2 py-1.5 font-bold text-gray-800">${esc(s.name)} <span class="font-normal text-gray-500">${esc(s.studentNumber)}</span></td>
+                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}</td>
+                <td class="px-2 py-1.5 text-right">${s.score === null ? '-' : `${s.score} / ${s.max}`}</td>
+                <td class="px-2 py-1.5 text-right font-bold">${fmt(s.percent, '%')}</td>
+                <td class="px-2 py-1.5 text-right">${s.minutes === null ? '-' : s.minutes + ' min'}</td>
+            </tr>`).join('');
+
+        body.innerHTML = `
+            ${tiles}
+            ${distribution}
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <h5 class="text-xs font-black text-gray-700 uppercase tracking-wider">Question analysis</h5>
+                    <div class="flex gap-1.5" role="group" aria-label="Sort questions">${sortBtn('hardest', 'Hardest first')}${sortBtn('order', 'Exam order')}</div>
+                </div>
+                <div class="space-y-2">${questionCards}</div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <h5 class="text-xs font-black text-gray-700 uppercase tracking-wider">Students</h5>
+                    <button type="button" id="erExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-50 text-gray-600"><tr><th class="px-2 py-1.5">Student</th><th class="px-2 py-1.5">Status</th><th class="px-2 py-1.5 text-right">Score</th><th class="px-2 py-1.5 text-right">%</th><th class="px-2 py-1.5 text-right">Time</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            </div>`;
+    },
+
+    exportResultsCsv: () => {
+        const d = CourseExam.resultsData;
+        if (!d) return;
+        const cell = (v) => {
+            let t = String(v ?? '');
+            if (/^[=+@]/.test(t) || (/^-/.test(t) && !/^-?\d+(\.\d+)?$/.test(t))) t = "'" + t;
+            return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+        };
+        const lines = [['Student', 'Student number', 'Status', 'Score', 'Max', 'Percent', 'Minutes'].join(',')]
+            .concat(d.students.map(s => [s.name, s.studentNumber, s.status, s.score ?? '', s.max ?? '', s.percent ?? '', s.minutes ?? ''].map(cell).join(',')));
+        const name = (d.title || 'exam').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'exam';
+        const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${name}_results.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    },
+
     // ---------- Grade Essays ----------
 
     essayData: null,
@@ -835,6 +1025,7 @@ export const CourseExam = {
         document.getElementById('examManagerMainView').classList.add('hidden');
         document.getElementById('examClassAssignView').classList.add('hidden');
         document.getElementById('examBonusView').classList.add('hidden');
+        document.getElementById('examResultsView')?.classList.add('hidden');
         document.getElementById('examEssayView').classList.remove('hidden');
         document.getElementById('eevExamTitle').textContent = title;
         document.getElementById('eevAlert').classList.add('hidden');
@@ -951,6 +1142,7 @@ export const CourseExam = {
         document.getElementById('examManagerMainView').classList.add('hidden');
         document.getElementById('examClassAssignView').classList.add('hidden');
         document.getElementById('examEssayView')?.classList.add('hidden');
+        document.getElementById('examResultsView')?.classList.add('hidden');
         document.getElementById('examBonusView').classList.remove('hidden');
 
         document.getElementById('ebvExamTitle').textContent = title;
@@ -1313,7 +1505,88 @@ export const CourseExam = {
 
     // ---------- Student Full-Screen Accessible Exam Overlay ----------
 
-    startAccessibleExam: (examObj, student, onComplete) => {
+    // ---- Time limit ----
+    timer: null,
+
+    formatClock: (secs) => {
+        const t = Math.max(0, Math.round(secs));
+        const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+        return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+    },
+
+    spokenTime: (secs) => {
+        const m = Math.floor(secs / 60), sec = secs % 60;
+        if (m > 0 && sec === 0) return `${m} minute${m === 1 ? '' : 's'}`;
+        if (m > 0) return `${m} minute${m === 1 ? '' : 's'} ${sec} seconds`;
+        return `${sec} seconds`;
+    },
+
+    stopTimer: () => {
+        if (CourseExam.timer && CourseExam.timer.id) clearInterval(CourseExam.timer.id);
+        CourseExam.timer = null;
+        document.getElementById('accExamTimer')?.classList.add('hidden');
+    },
+
+    startTimer: (remainingSeconds) => {
+        CourseExam.stopTimer();
+        const box = document.getElementById('accExamTimer');
+        const text = document.getElementById('accExamTimerText');
+        if (!box || !text) return;
+        const endsAt = Date.now() + remainingSeconds * 1000;
+        const told = new Set();
+        const state = { endsAt, id: null };
+        CourseExam.timer = state;
+        box.classList.remove('hidden');
+
+        const tick = () => {
+            if (CourseExam.timer !== state) return;
+            const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+            text.textContent = CourseExam.formatClock(left);
+            const low = left <= 60, mid = left <= 300;
+            box.className = `px-4 py-2 rounded-lg border-2 font-black text-lg sm:text-2xl tabular-nums ${low ? 'border-red-400 bg-red-900 text-red-100 animate-pulse' : mid ? 'border-amber-400 bg-amber-900 text-amber-100' : 'border-yellow-400 bg-gray-800 text-yellow-300'}`;
+            box.setAttribute('aria-label', `Time left: ${CourseExam.spokenTime(left)}`);
+
+            // spoken and screen reader warnings
+            const marks = [600, 300, 60, 30, 10];
+            const hit = marks.find(m => left <= m && !told.has(m) && (m === marks[0] || left > m - 20));
+            if (hit !== undefined && left > 0) {
+                marks.filter(m => m >= hit).forEach(m => told.add(m));
+                const msg = `${CourseExam.spokenTime(left)} left.`;
+                const live = document.getElementById('accExamTimerAnnounce');
+                if (live) live.textContent = msg;
+                CourseExam.speak(msg);
+            }
+
+            if (left <= 0) {
+                CourseExam.stopTimer();
+                CourseExam.speak('Time is up. Submitting your answers now.');
+                CourseExam.submitAccessibleExam(true);
+            }
+        };
+        tick();
+        state.id = setInterval(tick, 1000);
+    },
+
+    startAccessibleExam: async (examObj, student, onComplete) => {
+        let remaining = null;
+        if (examObj.timeLimit) {
+            if (!examObj.startedAt) {
+                const msg = `This exam has a time limit of ${examObj.timeLimit} minute${examObj.timeLimit === 1 ? '' : 's'}. The clock starts now and keeps running even if you leave. Start the exam?`;
+                CourseExam.speak(msg);
+                if (!window.confirm(msg)) return;
+            }
+            try {
+                const res = await apiFetch('/api/start-accessible-exam', {
+                    method: 'POST',
+                    body: JSON.stringify({ assignmentId: examObj.assignmentId, studentId: student.User_ID })
+                });
+                remaining = res.remainingSeconds;
+                examObj.startedAt = res.startedAt;
+            } catch (err) {
+                UI.error('Could not start the exam: ' + err.message);
+                return;
+            }
+        }
         CourseExam.accExam = examObj;
         CourseExam.accStudent = student;
         CourseExam.accIndex = 0;
@@ -1350,14 +1623,18 @@ export const CourseExam = {
         overlay.classList.remove('hidden');
 
         CourseExam.renderAccessibleQuestion(true);
+        if (remaining !== null) CourseExam.startTimer(remaining);
+        else CourseExam.stopTimer();
     },
 
     closeAccessibleExam: () => {
         if (CourseExam.accExam && !CourseExam.accSubmitting) {
-            const confirmExit = window.confirm("Are you sure you want to exit the exam without submitting?");
+            const timed = CourseExam.timer ? ' The clock keeps running while you are away.' : '';
+            const confirmExit = window.confirm("Are you sure you want to exit the exam without submitting?" + timed);
             if (!confirmExit) return;
         }
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        CourseExam.stopTimer();
         document.getElementById('accessibleExamOverlay')?.classList.add('hidden');
         CourseExam.accExam = null;
     },
@@ -1609,20 +1886,21 @@ export const CourseExam = {
         CourseExam.renderAccessibleQuestion(true);
     },
 
-    submitAccessibleExam: async () => {
+    submitAccessibleExam: async (force = false) => {
         if (!CourseExam.accExam || !CourseExam.accStudent || CourseExam.accSubmitting) return;
 
         const unanswered = CourseExam.accAnswers
             .map((a, i) => (!CourseExam.isAnswered(a) ? i + 1 : null))
             .filter(Boolean);
 
+        if (force) CourseExam.stopTimer();
         let promptMsg = `Are you sure you want to submit ${CourseExam.accExam.examTitle}?`;
         if (unanswered.length > 0) {
             promptMsg = `You have ${unanswered.length} unanswered question(s): Question ${unanswered.join(', ')}. Do you still want to submit your exam now?`;
         }
 
-        CourseExam.speak(promptMsg);
-        const confirmed = window.confirm(promptMsg);
+        if (!force) CourseExam.speak(promptMsg);
+        const confirmed = force ? true : window.confirm(promptMsg);
         if (!confirmed) {
             CourseExam.speak("Submission cancelled. You may continue reviewing your answers.");
             return;
@@ -1646,6 +1924,7 @@ export const CourseExam = {
             });
 
             localStorage.removeItem('acc_exam_draft_' + CourseExam.accExam.assignmentId);
+            CourseExam.stopTimer();
 
             const essayNote = res.essayPending > 0 ? ` ${res.essayPending} essay answer${res.essayPending === 1 ? ' is' : 's are'} waiting for your lecturer to score, so your score can still go up.` : '';
             const resultSpeech = `Exam submitted successfully! Your regular score is ${res.rawScore}, plus ${res.bonusScore} bonus points. Your final recorded score is ${res.finalScore} out of ${res.maxScore}. This score has been automatically recorded in your class assessment.${essayNote}`;
@@ -1656,7 +1935,7 @@ export const CourseExam = {
             `;
             CourseExam.speak(resultSpeech);
 
-            alert(resultSpeech);
+            alert((force ? 'Time is up. Your answers were submitted automatically.\n\n' : '') + resultSpeech);
 
             document.getElementById('accessibleExamOverlay').classList.add('hidden');
             const callback = CourseExam.accOnComplete;

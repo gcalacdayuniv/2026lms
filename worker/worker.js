@@ -1,7 +1,7 @@
 // worker/worker.js
 import { authorize, signToken, authEnabled } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
-import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion } from './grading.js';
+import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary } from './grading.js';
 // worker/upload-guard.js
 // Cheap checks that run BEFORE any upload bytes are streamed to Google Drive.
 // Uses a few small D1 queries and no heavy CPU work, so it fits the free Workers plan.
@@ -794,20 +794,43 @@ async function ensureAccessibleExamTables(env) {
     await ensureManualMarksColumn(env);
 }
 
-// Essay marks given by the lecturer: JSON { "<question index>": points }. Added to existing databases once.
-let manualMarksChecked = false;
+// Columns added after the first release. Each is added once to an existing database.
+//   Manual_Marks: essay marks given by the lecturer, JSON { "<question index>": points }
+//   Time_Limit:   minutes allowed for the exam (empty = no limit)
+//   Started_At:   when the student opened the exam (ISO time), used for the countdown
+const EXTRA_COLUMNS = [
+    ["Exam_Assignments", "Manual_Marks", "TEXT"],
+    ["Exam_Assignments", "Started_At", "TEXT"],
+    ["Class_Exams", "Time_Limit", "INTEGER"]
+];
+let extraColumnsChecked = false;
 async function ensureManualMarksColumn(env) {
-    if (manualMarksChecked) return;
+    if (extraColumnsChecked) return;
     try {
-        const info = await env.DB.prepare("PRAGMA table_info(Exam_Assignments)").all();
-        const has = (info.results || []).some(c => c.name === "Manual_Marks");
-        if (!has) await env.DB.prepare("ALTER TABLE Exam_Assignments ADD COLUMN Manual_Marks TEXT").run();
-        manualMarksChecked = true;
+        for (const [table, column, type] of EXTRA_COLUMNS) {
+            const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all();
+            if (!(info.results || []).some(c => c.name === column)) {
+                await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`).run();
+            }
+        }
+        extraColumnsChecked = true;
     } catch (e) {
-        // a second request may have added it already
-        manualMarksChecked = false;
+        // another request may have added a column already; check again next time
+        extraColumnsChecked = false;
     }
 }
+
+const GRACE_SECONDS = 120;   // a submission this long after the time limit is still accepted
+const parseTime = (t) => {
+    if (!t) return null;
+    const text = String(t);
+    const ms = Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(text) ? text : text.replace(" ", "T") + "Z");
+    return Number.isFinite(ms) ? ms : null;
+};
+const cleanLimit = (v) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= 1 ? Math.min(n, 600) : null;
+};
 
 function isWithinScheduleWindow(fromDate, toDate) {
     const now = new Date();
@@ -827,7 +850,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
 
     const rows = await env.DB.prepare(
         `SELECT ea.Assignment_ID, ea.Class_Exam_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score as Recorded_Max, ea.Manual_Marks,
-                ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date,
+                ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit, ea.Started_At,
                 e.Title as Exam_Title, e.ExamData,
                 c.CourseCode, c.CourseTitle
          FROM Exam_Assignments ea
@@ -875,6 +898,8 @@ async function getStudentAccessibleExamsList(env, studentId) {
             regularCount,
             bonusCount,
             totalPoints: examMaxPoints(parsed),
+            timeLimit: r.Time_Limit || null,
+            startedAt: r.Started_At || null,
             essayPending: r.Status === 'Completed' && essayIndexes(parsed).length > 0 && scoreExam(parsed, [], safeJson(r.Manual_Marks)).pending > 0,
             questions
         });
@@ -1144,6 +1169,8 @@ export default {
                     toDate,
                     assignments
                 } = body;
+                const timeLimit = cleanLimit(body.timeLimit);
+                const timeLimitGiven = Object.prototype.hasOwnProperty.call(body, "timeLimit");
 
                 if (!courseId || !examId) {
                     return new Response(JSON.stringify({ error: "Course and Exam are required." }), { status: 400, headers: corsHeaders });
@@ -1206,14 +1233,14 @@ export default {
                 if (existingClassExam) {
                     await env.DB.prepare(
                         `UPDATE Class_Exams
-                         SET Assessment_ID = ?, Term = ?, Category = ?, Is_Active = ?, From_Date = ?, To_Date = ?
+                         SET Assessment_ID = ?, Term = ?, Category = ?, Is_Active = ?, From_Date = ?, To_Date = ?, Time_Limit = ?
                          WHERE Class_Exam_ID = ?`
-                    ).bind(assessmentId, selectedTerm, selectedCategory, activeFlag, fromDate || null, toDate || null, classExamId).run();
+                    ).bind(assessmentId, selectedTerm, selectedCategory, activeFlag, fromDate || null, toDate || null, timeLimitGiven ? timeLimit : (existingClassExam.Time_Limit || null), classExamId).run();
                 } else {
                     await env.DB.prepare(
-                        `INSERT INTO Class_Exams (Class_Exam_ID, Course_ID, Exam_ID, Assessment_ID, Term, Category, Is_Active, From_Date, To_Date)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-                    ).bind(classExamId, courseId, examId, assessmentId, selectedTerm, selectedCategory, activeFlag, fromDate || null, toDate || null).run();
+                        `INSERT INTO Class_Exams (Class_Exam_ID, Course_ID, Exam_ID, Assessment_ID, Term, Category, Is_Active, From_Date, To_Date, Time_Limit)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                    ).bind(classExamId, courseId, examId, assessmentId, selectedTerm, selectedCategory, activeFlag, fromDate || null, toDate || null, timeLimit).run();
                 }
 
                 if (Array.isArray(assignments)) {
@@ -1271,7 +1298,7 @@ export default {
 
                 await env.DB.prepare(
                     `UPDATE Exam_Assignments
-                     SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Manual_Marks = NULL, Submitted_At = NULL
+                     SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Manual_Marks = NULL, Started_At = NULL, Submitted_At = NULL
                      WHERE Class_Exam_ID = ? AND Student_ID = ?`
                 ).bind(classExamId, studentId).run();
 
@@ -1327,6 +1354,110 @@ export default {
                     success: true,
                     student: user,
                     exams: availableExams
+                }), { status: 200, headers: corsHeaders });
+            }
+
+            // The student opens the exam: the clock starts once and keeps running if the page is closed or reloaded.
+            if (request.method === "POST" && path === "/api/start-accessible-exam") {
+                const body = await request.json();
+                const { assignmentId, studentId } = body;
+                if (!assignmentId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Invalid request." }), { status: 400, headers: corsHeaders });
+                }
+                await ensureAccessibleExamTables(env);
+
+                const record = await env.DB.prepare(
+                    `SELECT ea.Assignment_ID, ea.Status, ea.Is_Enabled, ea.Started_At, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit
+                     FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
+                     WHERE ea.Assignment_ID = ? AND ea.Student_ID = ?`
+                ).bind(assignmentId, studentId).first();
+                if (!record) {
+                    return new Response(JSON.stringify({ error: "Exam assignment not found." }), { status: 404, headers: corsHeaders });
+                }
+                if (!record.Is_Enabled || !record.Is_Active || record.Status === "Completed" || !isWithinScheduleWindow(record.From_Date, record.To_Date)) {
+                    return new Response(JSON.stringify({ error: "This exam is not open." }), { status: 403, headers: corsHeaders });
+                }
+
+                let startedAt = record.Started_At;
+                if (!startedAt) {
+                    startedAt = new Date().toISOString();
+                    await env.DB.prepare("UPDATE Exam_Assignments SET Started_At = ? WHERE Assignment_ID = ? AND Started_At IS NULL").bind(startedAt, assignmentId).run();
+                    const again = await env.DB.prepare("SELECT Started_At FROM Exam_Assignments WHERE Assignment_ID = ?").bind(assignmentId).first();
+                    startedAt = (again && again.Started_At) || startedAt;
+                }
+
+                const limit = record.Time_Limit || null;
+                let remainingSeconds = null;
+                if (limit) {
+                    const began = parseTime(startedAt) ?? Date.now();
+                    remainingSeconds = Math.max(0, Math.round((began + limit * 60 * 1000 - Date.now()) / 1000));
+                }
+                return new Response(JSON.stringify({ success: true, startedAt, timeLimit: limit, remainingSeconds }), { status: 200, headers: corsHeaders });
+            }
+
+            // Results of one class exam: class summary, score spread and an analysis of every question.
+            if (request.method === "GET" && path === "/api/exam-results") {
+                const classExamId = url.searchParams.get("classExamId");
+                if (!classExamId) {
+                    return new Response(JSON.stringify({ error: "Missing classExamId" }), { status: 400, headers: corsHeaders });
+                }
+                await ensureAccessibleExamTables(env);
+
+                const ce = await env.DB.prepare(
+                    `SELECT ce.Class_Exam_ID, ce.Time_Limit, e.Title as Exam_Title, e.ExamData
+                     FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID WHERE ce.Class_Exam_ID = ?`
+                ).bind(classExamId).first();
+                if (!ce) {
+                    return new Response(JSON.stringify({ error: "Class exam not found." }), { status: 404, headers: corsHeaders });
+                }
+                const questions = safeJson(ce.ExamData) || [];
+
+                const rows = await env.DB.prepare(
+                    `SELECT ea.Student_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ea.Started_At, ea.Submitted_At, u.Name, u.Student_Number
+                     FROM Exam_Assignments ea LEFT JOIN Users u ON u.User_ID = ea.Student_ID
+                     WHERE ea.Class_Exam_ID = ? AND ea.Is_Enabled = 1
+                     ORDER BY u.Name`
+                ).bind(classExamId).all();
+                const all = rows.results || [];
+                const done = all.filter(r => r.Status === "Completed");
+
+                const answerSets = done.map(r => { const a = safeJson(r.Answers_JSON); return Array.isArray(a) ? a : []; });
+                const markSets = done.map(r => safeJson(r.Manual_Marks) || {});
+                const stats = questions.map((q, i) => questionStats(
+                    q, i,
+                    answerSets.map(a => a[i] ?? ""),
+                    markSets.map(m => (Object.prototype.hasOwnProperty.call(m, i) ? m[i] : null))
+                ));
+
+                const students = all.map(r => {
+                    const began = parseTime(r.Started_At);
+                    const ended = parseTime(r.Submitted_At);
+                    const completed = r.Status === "Completed";
+                    return {
+                        studentId: r.Student_ID,
+                        name: r.Name || r.Student_ID,
+                        studentNumber: r.Student_Number || "",
+                        status: completed ? "Completed" : (r.Started_At ? "In progress" : "Not started"),
+                        score: completed ? r.Final_Score : null,
+                        max: completed ? r.Max_Score : null,
+                        percent: completed && r.Max_Score > 0 ? Math.round((r.Final_Score / r.Max_Score) * 1000) / 10 : null,
+                        minutes: completed && began !== null && ended !== null && ended >= began ? Math.round(((ended - began) / 60000) * 10) / 10 : null
+                    };
+                });
+
+                const summary = scoreSummary(done.map(r => ({ score: Number(r.Final_Score) || 0, max: Number(r.Max_Score) || 0 })));
+                const times = students.filter(s => s.minutes !== null).map(s => s.minutes);
+
+                return new Response(JSON.stringify({
+                    success: true,
+                    examTitle: ce.Exam_Title,
+                    timeLimit: ce.Time_Limit || null,
+                    assigned: all.length,
+                    submitted: done.length,
+                    summary,
+                    avgMinutes: times.length ? Math.round((times.reduce((a, b) => a + b, 0) / times.length) * 10) / 10 : null,
+                    questions: stats,
+                    students
                 }), { status: 200, headers: corsHeaders });
             }
 
@@ -1463,7 +1594,7 @@ export default {
                 await ensureAccessibleExamTables(env);
 
                 const record = await env.DB.prepare(
-                    `SELECT ea.*, ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date,
+                    `SELECT ea.*, ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit,
                             e.Title as Exam_Title, e.ExamData
                      FROM Exam_Assignments ea
                      JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
@@ -1485,6 +1616,13 @@ export default {
 
                 if (!isWithinScheduleWindow(record.From_Date, record.To_Date)) {
                     return new Response(JSON.stringify({ error: "This exam is outside the scheduled date window and is closed." }), { status: 403, headers: corsHeaders });
+                }
+
+                if (record.Time_Limit && record.Started_At) {
+                    const began = parseTime(record.Started_At);
+                    if (began !== null && Date.now() > began + (record.Time_Limit * 60 + GRACE_SECONDS) * 1000) {
+                        return new Response(JSON.stringify({ error: "Time is up and this attempt was too late to be accepted. Ask your lecturer to re-open the exam." }), { status: 403, headers: corsHeaders });
+                    }
                 }
 
                 let quizData = [];

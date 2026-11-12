@@ -396,7 +396,7 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
                                     <h3 class="text-lg sm:text-xl font-black text-white mt-2">${escapeHtml(ex.examTitle)}</h3>
                                     <p class="text-xs text-indigo-200 font-medium mt-0.5">${escapeHtml(ex.courseTitle)}</p>
                                     <div class="text-xs text-yellow-300 font-bold mt-2">
-                                        Questions: ${ex.regularCount}${ex.bonusCount > 0 ? ` + ${ex.bonusCount} Bonus` : ''} &nbsp;|&nbsp; Max Score: ${ex.maxScore}
+                                        Questions: ${ex.regularCount}${ex.bonusCount > 0 ? ` + ${ex.bonusCount} Bonus` : ''} &nbsp;|&nbsp; Max Score: ${ex.maxScore}${ex.timeLimit ? ` &nbsp;|&nbsp; <i class="fa-regular fa-clock" aria-hidden="true"></i> ${ex.timeLimit} min${ex.startedAt && !isDone ? ' (started)' : ''}` : ''}
                                     </div>
                                 </div>
                                 ${isDone ? `

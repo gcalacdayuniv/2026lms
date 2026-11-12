@@ -898,6 +898,7 @@ export const ExamBuilder = {
                         <select id="ebLinkCategory" class="${inp}">${cats.map(c => opt(c[0], c[1], l.category)).join('')}</select></div>
                     <div><label class="${lab}" for="ebLinkWho">Who can take it</label>
                         <select id="ebLinkWho" class="${inp}">${l.linked ? opt('keep', 'Keep current students', l.audience) : ''}${opt('blind', 'Legally Blind students only', l.audience)}${opt('all', 'All students', l.audience)}</select></div>
+                    <div><label class="${lab}" for="ebLinkTime">Time limit (minutes)</label><input type="number" id="ebLinkTime" min="1" max="600" step="1" placeholder="No limit" class="${inp}" value="${esc(l.timeLimit ?? '')}"></div>
                     <div><label class="${lab}" for="ebLinkFrom">Available from</label><input type="date" id="ebLinkFrom" class="${inp}" value="${esc(l.fromDate || '')}"></div>
                     <div><label class="${lab}" for="ebLinkTo">Available until</label><input type="date" id="ebLinkTo" class="${inp}" value="${esc(l.toDate || '')}"></div>
                     <p class="sm:col-span-2 lg:col-span-3 text-[11px] text-indigo-800">The exam title above is the name shown in Record Scores. You can pick individual students later with Link &amp; Assign Students.</p>
@@ -910,7 +911,7 @@ export const ExamBuilder = {
         const s = ExamBuilder.s;
         const l = s && s.link;
         if (!l) return false;
-        const map = { ebLinkOn: 'enabled', ebLinkTerm: 'term', ebLinkCategory: 'category', ebLinkWho: 'audience', ebLinkFrom: 'fromDate', ebLinkTo: 'toDate' };
+        const map = { ebLinkTime: 'timeLimit', ebLinkOn: 'enabled', ebLinkTerm: 'term', ebLinkCategory: 'category', ebLinkWho: 'audience', ebLinkFrom: 'fromDate', ebLinkTo: 'toDate' };
         const key = map[t.id];
         if (!key) return false;
         l[key] = t.id === 'ebLinkOn' ? t.checked : t.value;

@@ -105,7 +105,7 @@ export const ExamUI = {
 
                     <div id="ecaAlert" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-indigo-50 p-3 rounded-lg border border-indigo-200 mb-3 flex-shrink-0">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 bg-indigo-50 p-3 rounded-lg border border-indigo-200 mb-3 flex-shrink-0">
                         <div class="flex items-center">
                             <label class="flex items-center space-x-2 cursor-pointer text-xs font-black text-indigo-900">
                                 <input type="checkbox" id="ecaIsActive" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" checked>
@@ -138,6 +138,10 @@ export const ExamUI = {
                             <label class="block text-[10px] font-bold text-indigo-700 uppercase mb-1">To Date (Auto-Close)</label>
                             <input type="date" id="ecaToDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white">
                         </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-indigo-700 uppercase mb-1" for="ecaTimeLimit">Time limit (minutes)</label>
+                            <input type="number" id="ecaTimeLimit" min="1" max="600" step="1" placeholder="No limit" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white">
+                        </div>
                     </div>
 
                     <div class="flex flex-wrap justify-between items-center gap-2 mb-2 flex-shrink-0">
@@ -162,6 +166,20 @@ export const ExamUI = {
                             <i class="fa-solid fa-floppy-disk mr-2"></i> Save Class Link & Student Access
                         </button>
                     </div>
+                </div>
+
+                <!-- Sub-View 4: Results -->
+                <div id="examResultsView" class="hidden flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-teal-600">Exam Results</span>
+                            <h4 id="erTitle" class="text-base font-black text-gray-800"></h4>
+                        </div>
+                        <button type="button" id="backFromExamResultsBtn" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-bold transition">
+                            <i class="fa-solid fa-arrow-left mr-1"></i> Back to Exams
+                        </button>
+                    </div>
+                    <div id="erBody" class="flex-1 overflow-y-auto space-y-4 min-h-[220px]"></div>
                 </div>
 
                 <!-- Sub-View 3: Grade Essays -->
@@ -327,6 +345,8 @@ export const ExamUI = {
                     <h1 id="accExamHeaderTitle" class="text-lg sm:text-2xl font-black text-white mt-0.5">Exam</h1>
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3">
+                    <div id="accExamTimer" class="hidden px-4 py-2 rounded-lg border-2 border-yellow-400 bg-gray-800 text-yellow-300 font-black text-lg sm:text-2xl tabular-nums" role="timer" aria-label="Time left"><i class="fa-regular fa-clock mr-2" aria-hidden="true"></i><span id="accExamTimerText">0:00</span></div>
+                    <div id="accExamTimerAnnounce" class="sr-only" role="status" aria-live="polite"></div>
                     <button type="button" id="accExamRepeatAudioBtn" class="px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black rounded-lg text-xs sm:text-sm transition focus:outline-none focus:ring-4 focus:ring-white">
                         <i class="fa-solid fa-volume-high mr-1.5"></i> Read Question Again (R)
                     </button>

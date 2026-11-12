@@ -231,3 +231,92 @@ export function studentQuestion(q, index, seed) {
     }
     return out;
 }
+
+// ---------- Results analysis ----------
+
+const pct = (n, d) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
+
+// Statistics of one question over the submitted answers.
+// answers: one student answer per entry; marks: the lecturer's essay mark per entry (or null).
+export function questionStats(q, index, answers, marks) {
+    const type = questionType(q);
+    const points = questionPoints(q);
+    const n = answers.length;
+    const out = { index, part: q[0], question: q[1], type, points, isBonus: Boolean(q[5]), submitted: n };
+
+    const earned = answers.map((a, i) => gradeQuestion(q, a, marks ? marks[i] : null));
+    const answeredCount = answers.filter(a => (Array.isArray(a) ? a.some(x => String(x).trim()) : String(a ?? "").trim() !== "")).length;
+    out.answered = answeredCount;
+
+    if (type === "essay") {
+        const marked = (marks || []).filter(m => m !== null && m !== undefined);
+        out.marked = marked.length;
+        out.avgPct = marked.length ? pct(marked.reduce((s, m) => s + Math.min(points, Number(m) || 0), 0), marked.length * points) : null;
+        out.fullPct = null;
+        return out;
+    }
+
+    out.avgPct = pct(earned.reduce((s, v) => s + v, 0), n * points);
+    out.fullPct = pct(earned.filter(v => v >= points - 1e-9).length, n);
+
+    if (type === "mc" || type === "tf" || type === "multi") {
+        const choices = Array.isArray(q[2]) ? q[2] : [];
+        const key = type === "multi" ? new Set(enumItems(q[3])) : new Set([normAnswer(q[3])]);
+        const counts = choices.map(() => 0);
+        answers.forEach(a => {
+            const picked = new Set(asList(a).map(normAnswer));
+            choices.forEach((c, i) => { if (picked.has(normAnswer(c))) counts[i]++; });
+        });
+        out.options = choices.map((c, i) => ({ text: String(c), count: counts[i], pct: pct(counts[i], n), correct: key.has(normAnswer(c)) }));
+    } else if (type === "id" || type === "num") {
+        const tally = new Map();
+        answers.forEach((a, i) => {
+            const text = String(Array.isArray(a) ? a[0] : a ?? "").trim();
+            if (!text || earned[i] >= points - 1e-9) return;
+            const k = normAnswer(text);
+            const cur = tally.get(k) || { text, count: 0 };
+            cur.count++;
+            tally.set(k, cur);
+        });
+        out.commonWrong = [...tally.values()].sort((a, b) => b.count - a.count).slice(0, 3);
+    } else if (type === "match") {
+        const pairs = pairsOf(q);
+        out.parts = pairs.map((p, i) => ({
+            label: `${p[0]} → ${p[1]}`,
+            pct: pct(answers.filter(a => asList(a).map(normAnswer)[i] === normAnswer(p[1])).length, n)
+        }));
+    } else if (type === "order") {
+        const key = enumItems(q[3]);
+        out.parts = key.map((item, i) => ({
+            label: `${i + 1}. ${q[3][i]}`,
+            pct: pct(answers.filter(a => asList(a).map(normAnswer)[i] === item).length, n)
+        }));
+    }
+    return out;
+}
+
+const median = (sorted) => {
+    if (!sorted.length) return null;
+    const m = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+};
+
+// Class summary from the final scores. scores: [{score, max}]
+export function scoreSummary(scores, passPercent = 60) {
+    const pcts = scores.map(s => (s.max > 0 ? (s.score / s.max) * 100 : 0));
+    const sorted = pcts.slice().sort((a, b) => a - b);
+    const buckets = new Array(10).fill(0);
+    pcts.forEach(p => { buckets[Math.min(9, Math.max(0, Math.floor(p / 10)))]++; });
+    const mean = pcts.length ? pcts.reduce((s, v) => s + v, 0) / pcts.length : null;
+    const r1 = (v) => (v === null ? null : Math.round(v * 10) / 10);
+    return {
+        count: pcts.length,
+        mean: r1(mean),
+        median: r1(median(sorted)),
+        high: r1(sorted.length ? sorted[sorted.length - 1] : null),
+        low: r1(sorted.length ? sorted[0] : null),
+        passPercent,
+        passRate: pcts.length ? r1((pcts.filter(p => p >= passPercent).length / pcts.length) * 100) : null,
+        buckets
+    };
+}

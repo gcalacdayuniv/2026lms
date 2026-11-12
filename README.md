@@ -182,3 +182,9 @@ When asked to add features, debug, or refactor, you must strictly adhere to the 
 * **Essays** are scored by hand: Manage Exams > Grade Essays (shown for exams linked to the class that contain essays). Marks are stored in `Exam_Assignments.Manual_Marks` (JSON, column added automatically on first use) and the score is recalculated from the stored answers, then written to Exam_Assignments and Assessment_Scores. Until marked, an essay counts 0.
 * **Endpoints:** `GET /api/exam-essays?classExamId=` and `POST /api/grade-essay` (lecturer only, ownership checked through classExamId by `worker/auth.js`).
 * **No D1 change is needed**; re-opening an exam clears its essay marks.
+
+## Exam time limit and results
+
+* **Time limit:** set in minutes (empty = no limit) in Link & Assign Students or in the builder's Record Scores panel; stored in `Class_Exams.Time_Limit`. When a student opens a timed exam, `POST /api/start-accessible-exam` records `Exam_Assignments.Started_At` once, so the clock keeps running if the page is closed. The countdown turns amber at 5 minutes and red at 1 minute, announces 10 min, 5 min, 1 min, 30 s and 10 s to screen readers and read-aloud users, and submits automatically at zero. The worker still accepts a submission up to 2 minutes after the limit (`GRACE_SECONDS`) and rejects later ones; Re-open (Reset) clears the start time.
+* **Results:** Manage Exams > Results (for exams linked to the class) shows the class summary, score spread, an analysis of every question (average, share fully right, answer counts per choice, common wrong answers, per-pair and per-position results, essay marking progress; "Hardest first" or exam order) and a student list with CSV export. Data comes from `GET /api/exam-results?classExamId=` (lecturer only; analysis in `worker/grading.js`).
+* **D1:** `Class_Exams.Time_Limit` and `Exam_Assignments.Started_At` are added automatically the first time the exam tables are used. No manual change.
