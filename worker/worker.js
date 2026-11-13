@@ -1,7 +1,7 @@
 // worker/worker.js
 import { authorize, signToken, authEnabled } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
-import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary } from './grading.js';
+import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
 // worker/upload-guard.js
 // Cheap checks that run BEFORE any upload bytes are streamed to Google Drive.
 // Uses a few small D1 queries and no heavy CPU work, so it fits the free Workers plan.
@@ -382,6 +382,18 @@ async function ensureScanTables(env) {
     } catch (err) {
         if (!/duplicate column/i.test(String(err && err.message))) throw err;
     }
+    // Set_Keys = key and bonus flags of every printed exam set (index 0 = Set A), used to grade each sheet by its set.
+    try {
+        await env.DB.prepare("ALTER TABLE Scan_Sessions ADD COLUMN Set_Keys TEXT").run();
+    } catch (err) {
+        if (!/duplicate column/i.test(String(err && err.message))) throw err;
+    }
+    // Set_No = which printed set the student shaded on the sheet (0 = A, 1 = B ...).
+    try {
+        await env.DB.prepare("ALTER TABLE Scan_Sheets ADD COLUMN Set_No INTEGER DEFAULT 0").run();
+    } catch (err) {
+        if (!/duplicate column/i.test(String(err && err.message))) throw err;
+    }
     scanTablesReady = true;
 }
 
@@ -414,6 +426,17 @@ function gradeScan(answers, key, bonus, max) {
     });
     return { raw, bonus: bonusPoints, wrong, blank, multiple, score: Math.min(Number(max), raw + bonusPoints) };
 }
+
+const SCAN_MAX_SETS = 6;
+const isSetKeys = (list, n, c) => Array.isArray(list) && list.length >= 1 && list.length <= SCAN_MAX_SETS && list.every(s =>
+    s && Array.isArray(s.key) && s.key.length === n && s.key.every(k => Number.isInteger(k) && k >= 0 && k < c) &&
+    Array.isArray(s.bonus) && s.bonus.length === n);
+const cleanSetKeys = (list) => list.map(s => ({ key: s.key, bonus: s.bonus.map(Boolean), order: Array.isArray(s.order) && s.order.length === s.key.length && s.order.every(Number.isInteger) ? s.order : undefined }));
+// Key and bonus flags for a sheet of printed set setNo; falls back to the session's own key (Set A).
+const keyOfSet = (setKeys, setNo, key, bonus) => {
+    const s = Number.isInteger(setNo) && setNo > 0 ? setKeys[setNo] : null;
+    return s ? { key: s.key, bonus: s.bonus.map(Boolean) } : { key, bonus };
+};
 
 // Replaces ONE student's score in an assessment without touching anyone else's.
 const scanScoreStatements = (env, assessmentId, studentId, score) => [
@@ -459,14 +482,14 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
 
         const session = await env.DB.prepare(
             `SELECT s.Session_ID, s.Course_ID, s.Assessment_ID, s.Title, s.Term, s.Category, s.Num_Questions, s.Num_Choices,
-                    s.Answer_Key, s.Bonus_Flags, s.Created_At, s.Updated_At, a.Max_Score
+                    s.Answer_Key, s.Bonus_Flags, s.Set_Keys, s.Created_At, s.Updated_At, a.Max_Score
              FROM Scan_Sessions s LEFT JOIN Assessments a ON a.Assessment_ID = s.Assessment_ID
              WHERE s.Session_ID = ?`
         ).bind(sessionId).first();
         if (!session) return json(corsHeaders, { error: 'Saved scan not found.' }, 404);
 
         const rows = await env.DB.prepare(
-            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID, h.Photo_Layout, h.Scan_ID,
+            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID, h.Photo_Layout, h.Scan_ID, h.Set_No,
                     u.Name, u.Student_Number
              FROM Scan_Sheets h LEFT JOIN Users u ON u.User_ID = h.Student_ID
              WHERE h.Session_ID = ?
@@ -478,10 +501,10 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             Original_Answers: parseJsonList(r.Original_Answers),
             Answers: parseJsonList(r.Answers)
         }));
-        const { Answer_Key, Bonus_Flags, ...rest } = session;
+        const { Answer_Key, Bonus_Flags, Set_Keys, ...rest } = session;
         return json(corsHeaders, {
             success: true,
-            session: { ...rest, Answer_Key: parseJsonList(Answer_Key), Bonus_Flags: parseJsonList(Bonus_Flags) },
+            session: { ...rest, Answer_Key: parseJsonList(Answer_Key), Bonus_Flags: parseJsonList(Bonus_Flags), Set_Keys: parseJsonList(Set_Keys) },
             sheets
         });
     }
@@ -506,6 +529,11 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         }
         const key = answerKey;
         const bonusFlags = bonus.map(Boolean);
+        let setKeys = [];
+        if (body.setKeys != null) {
+            if (!isSetKeys(body.setKeys, n, c)) return json(corsHeaders, { error: 'Invalid exam set keys.' }, 400);
+            setKeys = cleanSetKeys(body.setKeys);
+        }
 
         const assessment = await env.DB.prepare(
             "SELECT Assessment_ID, Max_Score FROM Assessments WHERE Assessment_ID = ? AND Course_ID = ?"
@@ -525,6 +553,9 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
                 return json(corsHeaders, { error: 'A sheet has an invalid scan id.' }, 400);
             }
             if (!isAnswerList(sheet.answers, n, c)) return json(corsHeaders, { error: 'A sheet has invalid answers.' }, 400);
+            if (sheet.set != null && !(Number.isInteger(sheet.set) && sheet.set >= 0 && sheet.set < Math.max(1, setKeys.length))) {
+                return json(corsHeaders, { error: 'A sheet has an invalid exam set.' }, 400);
+            }
             if (sheet.originalAnswers != null && !isAnswerList(sheet.originalAnswers, n, c)) {
                 return json(corsHeaders, { error: 'A sheet has invalid original answers.' }, 400);
             }
@@ -550,7 +581,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             sessionId = existing.Session_ID;
             const oldKey = parseJsonList(existing.Answer_Key);
             const oldBonus = parseJsonList(existing.Bonus_Flags).map(Boolean);
-            keyChanged = !sameList(oldKey, key) || !sameList(oldBonus, bonusFlags);
+            keyChanged = !sameList(oldKey, key) || !sameList(oldBonus, bonusFlags) || JSON.stringify(parseJsonList(existing.Set_Keys)) !== JSON.stringify(setKeys);
 
             const others = await env.DB.prepare(
                 "SELECT COUNT(*) AS cnt FROM Scan_Sheets WHERE Session_ID = ?" + (seen.size ? ` AND Student_ID NOT IN (${[...seen].map(() => '?').join(',')})` : '')
@@ -562,14 +593,14 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             }
             statements.push(env.DB.prepare(
                 `UPDATE Scan_Sessions SET Title = ?, Term = ?, Category = ?, Num_Questions = ?, Num_Choices = ?,
-                        Answer_Key = ?, Bonus_Flags = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ?`
-            ).bind(cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), sessionId));
+                        Answer_Key = ?, Bonus_Flags = ?, Set_Keys = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ?`
+            ).bind(cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), JSON.stringify(setKeys), sessionId));
         } else {
             sessionId = crypto.randomUUID();
             statements.push(env.DB.prepare(
-                `INSERT INTO Scan_Sessions (Session_ID, Course_ID, Assessment_ID, Title, Term, Category, Num_Questions, Num_Choices, Answer_Key, Bonus_Flags)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).bind(sessionId, courseId, assessmentId, cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags)));
+                `INSERT INTO Scan_Sessions (Session_ID, Course_ID, Assessment_ID, Title, Term, Category, Num_Questions, Num_Choices, Answer_Key, Bonus_Flags, Set_Keys)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(sessionId, courseId, assessmentId, cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), JSON.stringify(setKeys)));
         }
 
         // One sheet per student per assessment. A second, different sheet for a student who already has one
@@ -590,7 +621,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
                         conflicts.push({
                             studentId: sheet.studentId, scanId: sheet.scanId || null,
                             existingScore: before.Score, existingUpdated: before.Updated_At,
-                            newScore: gradeScan(sheet.answers, key, bonusFlags, assessment.Max_Score).score
+                            newScore: (() => { const k = keyOfSet(setKeys, sheet.set, key, bonusFlags); return gradeScan(sheet.answers, k.key, k.bonus, assessment.Max_Score).score; })()
                         });
                         continue;
                     }
@@ -598,21 +629,22 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             }
             written.add(sheet.studentId);
             const original = sheet.originalAnswers || sheet.answers;
-            const graded = gradeScan(sheet.answers, key, bonusFlags, assessment.Max_Score);
+            const sk = keyOfSet(setKeys, sheet.set, key, bonusFlags);
+            const graded = gradeScan(sheet.answers, sk.key, sk.bonus, assessment.Max_Score);
             statements.push(env.DB.prepare(
-                `INSERT INTO Scan_Sheets (Sheet_ID, Session_ID, Student_ID, Student_No_Read, Original_Answers, Answers, Score, Edited, Scan_ID)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO Scan_Sheets (Sheet_ID, Session_ID, Student_ID, Student_No_Read, Original_Answers, Answers, Score, Edited, Scan_ID, Set_No)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(Session_ID, Student_ID) DO UPDATE SET
                     Student_No_Read = excluded.Student_No_Read, Original_Answers = excluded.Original_Answers,
                     Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited,
                     Photo_File_ID = CASE WHEN Scan_Sheets.Scan_ID IS excluded.Scan_ID THEN Scan_Sheets.Photo_File_ID ELSE NULL END,
                     Photo_Layout = CASE WHEN Scan_Sheets.Scan_ID IS excluded.Scan_ID THEN Scan_Sheets.Photo_Layout ELSE NULL END,
-                    Scan_ID = excluded.Scan_ID,
+                    Scan_ID = excluded.Scan_ID, Set_No = excluded.Set_No,
                     Updated_At = CURRENT_TIMESTAMP`
             ).bind(
                 crypto.randomUUID(), sessionId, sheet.studentId, String(sheet.studentNo || '').slice(0, 20),
                 JSON.stringify(original), JSON.stringify(sheet.answers), graded.score, sameList(original, sheet.answers) ? 0 : 1,
-                sheet.scanId || null
+                sheet.scanId || null, Number.isInteger(sheet.set) ? sheet.set : 0
             ));
             statements.push(...scanScoreStatements(env, assessmentId, sheet.studentId, graded.score));
         }
@@ -634,12 +666,13 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         // Nothing is written until the caller confirms (allowRegrade), because other students' scores change.
         let regraded = 0;
         if (keyChanged) {
-            const old = await env.DB.prepare("SELECT Student_ID, Answers FROM Scan_Sheets WHERE Session_ID = ?").bind(sessionId).all();
+            const old = await env.DB.prepare("SELECT Student_ID, Answers, Set_No FROM Scan_Sheets WHERE Session_ID = ?").bind(sessionId).all();
             for (const row of old.results || []) {
                 if (written.has(row.Student_ID) || removedIds.has(row.Student_ID)) continue;
                 const answers = parseJsonList(row.Answers);
                 if (!isAnswerList(answers, n, c)) continue;
-                const graded = gradeScan(answers, key, bonusFlags, assessment.Max_Score);
+                const rk = keyOfSet(setKeys, row.Set_No, key, bonusFlags);
+                const graded = gradeScan(answers, rk.key, rk.bonus, assessment.Max_Score);
                 regradeStatements.push(env.DB.prepare(
                     "UPDATE Scan_Sheets SET Score = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ? AND Student_ID = ?"
                 ).bind(graded.score, sessionId, row.Student_ID));
@@ -718,7 +751,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (!sheetId) return json(corsHeaders, { error: 'Missing sheetId' }, 400);
 
         const sheet = await env.DB.prepare(
-            `SELECT h.Sheet_ID, h.Student_ID, h.Original_Answers, s.Assessment_ID, s.Num_Questions, s.Num_Choices, s.Answer_Key, s.Bonus_Flags
+            `SELECT h.Sheet_ID, h.Student_ID, h.Original_Answers, h.Set_No, s.Assessment_ID, s.Num_Questions, s.Num_Choices, s.Answer_Key, s.Bonus_Flags, s.Set_Keys
              FROM Scan_Sheets h JOIN Scan_Sessions s ON s.Session_ID = h.Session_ID
              WHERE h.Sheet_ID = ?`
         ).bind(sheetId).first();
@@ -733,7 +766,8 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
 
         const key = parseJsonList(sheet.Answer_Key);
         const bonusFlags = parseJsonList(sheet.Bonus_Flags).map(Boolean);
-        const graded = gradeScan(answers, key, bonusFlags, assessment.Max_Score);
+        const ck = keyOfSet(parseJsonList(sheet.Set_Keys), sheet.Set_No, key, bonusFlags);
+        const graded = gradeScan(answers, ck.key, ck.bonus, assessment.Max_Score);
         const edited = sameList(parseJsonList(sheet.Original_Answers), answers) ? 0 : 1;
 
         await env.DB.batch([
@@ -801,7 +835,9 @@ async function ensureAccessibleExamTables(env) {
 const EXTRA_COLUMNS = [
     ["Exam_Assignments", "Manual_Marks", "TEXT"],
     ["Exam_Assignments", "Started_At", "TEXT"],
-    ["Class_Exams", "Time_Limit", "INTEGER"]
+    ["Class_Exams", "Time_Limit", "INTEGER"],
+    ["Class_Exams", "Adjustments", "TEXT"],   // JSON { "<question index>": "credit" | "drop" }
+    ["Class_Exams", "Release", "INTEGER"]     // 1 = students may review their answers and the right answers
 ];
 let extraColumnsChecked = false;
 async function ensureManualMarksColumn(env) {
@@ -850,7 +886,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
 
     const rows = await env.DB.prepare(
         `SELECT ea.Assignment_ID, ea.Class_Exam_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score as Recorded_Max, ea.Manual_Marks,
-                ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit, ea.Started_At,
+                ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit, ea.Started_At, ce.Adjustments, ce.Release,
                 e.Title as Exam_Title, e.ExamData,
                 c.CourseCode, c.CourseTitle
          FROM Exam_Assignments ea
@@ -900,7 +936,8 @@ async function getStudentAccessibleExamsList(env, studentId) {
             totalPoints: examMaxPoints(parsed),
             timeLimit: r.Time_Limit || null,
             startedAt: r.Started_At || null,
-            essayPending: r.Status === 'Completed' && essayIndexes(parsed).length > 0 && scoreExam(parsed, [], safeJson(r.Manual_Marks)).pending > 0,
+            essayPending: r.Status === 'Completed' && essayIndexes(parsed).length > 0 && scoreExam(parsed, [], safeJson(r.Manual_Marks), safeJson(r.Adjustments)).pending > 0,
+            release: r.Release === 1,
             questions
         });
     }
@@ -1404,7 +1441,7 @@ export default {
                 await ensureAccessibleExamTables(env);
 
                 const ce = await env.DB.prepare(
-                    `SELECT ce.Class_Exam_ID, ce.Time_Limit, e.Title as Exam_Title, e.ExamData
+                    `SELECT ce.Class_Exam_ID, ce.Time_Limit, ce.Adjustments, ce.Release, e.Title as Exam_Title, e.ExamData
                      FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID WHERE ce.Class_Exam_ID = ?`
                 ).bind(classExamId).first();
                 if (!ce) {
@@ -1428,6 +1465,10 @@ export default {
                     answerSets.map(a => a[i] ?? ""),
                     markSets.map(m => (Object.prototype.hasOwnProperty.call(m, i) ? m[i] : null))
                 ));
+
+                const analysis = itemAnalysis(questions, answerSets, markSets);
+                const adjustments = safeJson(ce.Adjustments) || {};
+                stats.forEach((s, i) => { Object.assign(s, analysis[i]); s.adjustment = adjustments[i] || null; });
 
                 const students = all.map(r => {
                     const began = parseTime(r.Started_At);
@@ -1457,8 +1498,93 @@ export default {
                     summary,
                     avgMinutes: times.length ? Math.round((times.reduce((a, b) => a + b, 0) / times.length) * 10) / 10 : null,
                     questions: stats,
+                    release: ce.Release === 1,
                     students
                 }), { status: 200, headers: corsHeaders });
+            }
+
+            // Gives everyone credit for a question, drops it from the exam, or undoes that. Every submitted exam of
+            // the class exam is scored again and the assessment scores follow.
+            if (request.method === "POST" && path === "/api/exam-adjust") {
+                const { classExamId, index, action } = await request.json();
+                const idx = Number(index);
+                if (!classExamId || !Number.isInteger(idx) || !["credit", "drop", "none"].includes(action)) {
+                    return new Response(JSON.stringify({ error: "Invalid request." }), { status: 400, headers: corsHeaders });
+                }
+                await ensureAccessibleExamTables(env);
+                const ce = await env.DB.prepare(
+                    `SELECT ce.Class_Exam_ID, ce.Assessment_ID, ce.Adjustments, e.ExamData
+                     FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID WHERE ce.Class_Exam_ID = ?`
+                ).bind(classExamId).first();
+                if (!ce) return new Response(JSON.stringify({ error: "Class exam not found." }), { status: 404, headers: corsHeaders });
+                const questions = safeJson(ce.ExamData) || [];
+                if (idx < 0 || idx >= questions.length) {
+                    return new Response(JSON.stringify({ error: "No such question." }), { status: 400, headers: corsHeaders });
+                }
+                const adjustments = safeJson(ce.Adjustments) || {};
+                if (action === "none") delete adjustments[idx]; else adjustments[idx] = action;
+
+                const done = await env.DB.prepare(
+                    "SELECT Assignment_ID, Student_ID, Max_Score, Answers_JSON, Manual_Marks FROM Exam_Assignments WHERE Class_Exam_ID = ? AND Status = 'Completed'"
+                ).bind(classExamId).all();
+                const statements = [
+                    env.DB.prepare("UPDATE Class_Exams SET Adjustments = ? WHERE Class_Exam_ID = ?").bind(JSON.stringify(adjustments), classExamId)
+                ];
+                let changed = 0;
+                for (const r of done.results || []) {
+                    const scored = scoreExam(questions, safeJson(r.Answers_JSON) || [], safeJson(r.Manual_Marks), adjustments);
+                    const maxScore = r.Max_Score > 0 ? r.Max_Score : examMaxPoints(questions);
+                    const finalScore = finalScoreOf(scored, maxScore);
+                    statements.push(env.DB.prepare(
+                        "UPDATE Exam_Assignments SET Raw_Score = ?, Bonus_Score = ?, Final_Score = ? WHERE Assignment_ID = ?"
+                    ).bind(scored.raw, scored.bonus, finalScore, r.Assignment_ID));
+                    if (ce.Assessment_ID) {
+                        statements.push(
+                            env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?").bind(ce.Assessment_ID, r.Student_ID),
+                            env.DB.prepare("INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)")
+                                .bind(crypto.randomUUID(), ce.Assessment_ID, r.Student_ID, finalScore)
+                        );
+                    }
+                    changed++;
+                }
+                await runInChunks(env, statements);
+                return new Response(JSON.stringify({ success: true, regraded: changed, adjustments }), { status: 200, headers: corsHeaders });
+            }
+
+            // Lets students review their answers and the right answers (or hides them again).
+            if (request.method === "POST" && path === "/api/exam-release") {
+                const { classExamId, release } = await request.json();
+                if (!classExamId) return new Response(JSON.stringify({ error: "Missing classExamId" }), { status: 400, headers: corsHeaders });
+                await ensureAccessibleExamTables(env);
+                await env.DB.prepare("UPDATE Class_Exams SET Release = ? WHERE Class_Exam_ID = ?").bind(release ? 1 : 0, classExamId).run();
+                return new Response(JSON.stringify({ success: true, release: Boolean(release) }), { status: 200, headers: corsHeaders });
+            }
+
+            // A student's own review of a submitted exam. Only after the lecturer released the answers.
+            if (request.method === "GET" && path === "/api/student-exam-review") {
+                const assignmentId = url.searchParams.get("assignmentId");
+                const studentId = url.searchParams.get("studentId");
+                if (!assignmentId || !studentId) {
+                    return new Response(JSON.stringify({ error: "Missing assignmentId or studentId" }), { status: 400, headers: corsHeaders });
+                }
+                await ensureAccessibleExamTables(env);
+                const rec = await env.DB.prepare(
+                    `SELECT ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ce.Release, ce.Adjustments, e.Title as Exam_Title, e.ExamData
+                     FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+                     WHERE ea.Assignment_ID = ? AND ea.Student_ID = ?`
+                ).bind(assignmentId, studentId).first();
+                if (!rec) return new Response(JSON.stringify({ error: "Exam not found." }), { status: 404, headers: corsHeaders });
+                if (rec.Status !== "Completed") return new Response(JSON.stringify({ error: "Submit the exam first." }), { status: 400, headers: corsHeaders });
+                if (rec.Release !== 1) return new Response(JSON.stringify({ error: "Your lecturer has not released the answers yet." }), { status: 403, headers: corsHeaders });
+                const questions = safeJson(rec.ExamData) || [];
+                const answers = safeJson(rec.Answers_JSON) || [];
+                const marks = safeJson(rec.Manual_Marks) || {};
+                const adjustments = safeJson(rec.Adjustments) || {};
+                const items = questions.map((q, i) => ({
+                    ...reviewQuestion(q, i, answers[i], Object.prototype.hasOwnProperty.call(marks, i) ? marks[i] : null),
+                    adjustment: adjustments[i] || null
+                }));
+                return new Response(JSON.stringify({ success: true, examTitle: rec.Exam_Title, finalScore: rec.Final_Score, maxScore: rec.Max_Score, questions: items }), { status: 200, headers: corsHeaders });
             }
 
             // Essays are scored by the lecturer. This lists the essay questions and every student's written answers.
@@ -1526,7 +1652,7 @@ export default {
                 await ensureAccessibleExamTables(env);
 
                 const record = await env.DB.prepare(
-                    `SELECT ea.Assignment_ID, ea.Status, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ce.Assessment_ID, e.ExamData
+                    `SELECT ea.Assignment_ID, ea.Status, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ce.Assessment_ID, ce.Adjustments, e.ExamData
                      FROM Exam_Assignments ea
                      JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
                      JOIN Exams e ON ce.Exam_ID = e.Exam_ID
@@ -1555,9 +1681,9 @@ export default {
                 }
 
                 const answers = safeJson(record.Answers_JSON) || [];
-                const scored = scoreExam(questions, answers, marks);
+                const scored = scoreExam(questions, answers, marks, safeJson(record.Adjustments));
                 const maxScore = record.Max_Score > 0 ? record.Max_Score : examMaxPoints(questions);
-                const finalScore = Math.min(maxScore, Math.round((scored.raw + scored.bonus) * 100) / 100);
+                const finalScore = finalScoreOf(scored, maxScore);
 
                 const statements = [
                     env.DB.prepare(
@@ -1594,7 +1720,7 @@ export default {
                 await ensureAccessibleExamTables(env);
 
                 const record = await env.DB.prepare(
-                    `SELECT ea.*, ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit,
+                    `SELECT ea.*, ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Term, ce.Category, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit, ce.Adjustments,
                             e.Title as Exam_Title, e.ExamData
                      FROM Exam_Assignments ea
                      JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
@@ -1638,7 +1764,7 @@ export default {
                     if (Array.isArray(a)) return a.slice(0, 40).map(x => String(x ?? "").slice(0, 500));
                     return String(a ?? "").slice(0, 10000);
                 });
-                const scored = scoreExam(quizData, cleanAnswers, null);
+                const scored = scoreExam(quizData, cleanAnswers, null, safeJson(record.Adjustments));
                 const rawScore = scored.raw;
                 const bonusScore = scored.bonus;
 
@@ -1676,7 +1802,7 @@ export default {
                     maxScore = assessment.Max_Score > 0 ? assessment.Max_Score : maxScore;
                 }
 
-                const finalScore = Math.min(maxScore, rawScore + bonusScore);
+                const finalScore = finalScoreOf(scored, maxScore);
 
                 await env.DB.batch([
                     env.DB.prepare(

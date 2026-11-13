@@ -50,6 +50,23 @@ export const ScannerUI = {
                         <label class="${LABEL}" for="scnExamSelect">Exam</label>
                         <select id="scnExamSelect" class="${FIELD} font-medium"></select>
                         <div id="scnExamInfo" class="mt-2 text-xs text-gray-600"></div>
+                        <div class="mt-3 border-t pt-3">
+                            <div class="flex flex-wrap items-end gap-2">
+                                <div>
+                                    <label class="${LABEL}" for="scnSetCount">Exam sets</label>
+                                    <select id="scnSetCount" class="${FIELD}">
+                                        <option value="1">1 set (no SET circles)</option>
+                                        <option value="2">2 sets (A-B)</option>
+                                        <option value="3">3 sets (A-C)</option>
+                                        <option value="4" selected>4 sets (A-D)</option>
+                                        <option value="5">5 sets (A-E)</option>
+                                        <option value="6">6 sets (A-F)</option>
+                                    </select>
+                                </div>
+                                <button type="button" id="scnPrintSetsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-bold transition"><i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Print question sets</button>
+                                <button type="button" id="scnPrintKeysBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-bold transition"><i class="fa-solid fa-key mr-1" aria-hidden="true"></i>Answer keys</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="scnTypedPanel" class="hidden space-y-3">

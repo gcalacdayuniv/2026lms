@@ -30,6 +30,11 @@ const COLUMNS = [
 ];
 const LETTER_GAP = 7;   // letters A-E are printed this far above the first row of a column
 
+// SET row (which printed exam set the student has): up to 6 circles A-F, printed only for exams with sets.
+export const MAX_SETS = 6;
+const SETROW = { u0: 120, v: 31.5, pitch: 8.5 };
+export const setBubbles = (count = MAX_SETS) => Array.from({ length: count }, (_, k) => ({ k, u: SETROW.u0 + k * SETROW.pitch, v: SETROW.v }));
+
 // Student number grid, inside column 0.
 const STU = { left: 14, colPitch: 6, gap: 3, top: 38, rowPitch: 4.4 };
 
@@ -88,7 +93,7 @@ const markerHtml = (cx, cy, size) =>
 // title = the header typed by the lecturer (printed at the top; may be empty).
 // parts = optional list with the 0-based part of each question; when the exam has more than one part,
 // a small "PART n" label is printed above the first question of each part.
-export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null }) => {
+export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null, sets = 0 }) => {
     const p = PAPERS[paper] || PAPERS.letter;
     const left = (p.w - FRAME.w) / 2;
     const top = (p.h - FRAME.h) / 2;
@@ -109,6 +114,16 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
         'Use a black or blue pen, or a dark pencil. Shade the circle completely. ' +
         'Do not fold or stain this sheet. Erase fully if you change an answer. ' +
         'Shade ONE circle per number.', 'note'));
+
+    // SET row: one circle per printed exam set, shaded by the student (same letter as on the question paper)
+    if (sets > 1) {
+        const sb = setBubbles(Math.min(MAX_SETS, sets));
+        parts.push(textHtml(SETROW.u0 - 17, SETROW.v - 1.6, 12, 'SET', 'cap right'));
+        sb.forEach(b => {
+            parts.push(textHtml(b.u + 3, b.v - 1.6, 3, String.fromCharCode(65 + b.k), 'cap'));
+            parts.push(bubbleHtml(b.u, b.v));
+        });
+    }
 
     // Student number grid (top of column 0)
     parts.push(textHtml(ANS.left + 2, STU.top - 6.5, 42, 'STUDENT NO. (00-0000)', 'cap'));

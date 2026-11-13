@@ -17,6 +17,13 @@ const fmt = (n) => Number(Number(n).toFixed(2));
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 const label = (a) => (a === BLANK ? 'blank' : a === MULTIPLE ? 'double' : LETTERS[a] || '?');
 
+// Key and bonus flags of the printed set this sheet belongs to (Set A / the session key when there are no sets).
+export const keyOfSheet = (session, sheet) => {
+    const s = (session.Set_Keys || [])[sheet && sheet.Set_No > 0 ? sheet.Set_No : 0];
+    return s ? { key: s.key, bonus: s.bonus.map(Boolean) } : { key: session.Answer_Key, bonus: (session.Bonus_Flags || []).map(Boolean) };
+};
+const SET_LETTERS = 'ABCDEF';
+
 const grade = (answers, key, bonus, max) => {
     let raw = 0, bonusPoints = 0, wrong = 0, blank = 0, multiple = 0;
     answers.forEach((a, i) => {
@@ -109,8 +116,8 @@ export const CourseScanReview = {
         const sel = $('scrvPick');
         if (!sel) return;
         const { session } = CourseScanReview.detail;
-        const key = session.Answer_Key, bonus = session.Bonus_Flags.map(Boolean);
         sel.innerHTML = CourseScanReview.order.map((s, i) => {
+            const { key, bonus } = keyOfSheet(session, s);
             const g = grade(CourseScanReview.draftOf(s), key, bonus, session.Max_Score);
             return `<option value="${i}"${i === CourseScanReview.idx ? ' selected' : ''}>${i + 1}. ${esc(s.Name || 'Unknown student')} — ${fmt(g.score)}${CourseScanReview.dirty(s) ? ' •' : ''}</option>`;
         }).join('');
@@ -131,10 +138,11 @@ export const CourseScanReview = {
     rowHtml: (sheet, q) => {
         const { session } = CourseScanReview.detail;
         const c = session.Num_Choices;
-        const key = session.Answer_Key[q];
+        const sk = keyOfSheet(session, sheet);
+        const key = sk.key[q];
         const cur = CourseScanReview.draftOf(sheet)[q];
         const orig = sheet.Original_Answers[q];
-        const bonus = Boolean(session.Bonus_Flags[q]);
+        const bonus = Boolean(sk.bonus[q]);
         const tone = cur === key ? 'is-right' : 'is-wrong';
         const opts = Array.from({ length: c }, (_, k) => {
             const cls = ['scrv-opt', cur === k ? 'is-on' : '', k === key ? 'is-key' : ''].filter(Boolean).join(' ');
@@ -235,13 +243,13 @@ export const CourseScanReview = {
         const sheet = CourseScanReview.current();
         if (!sheet) return;
         const { session } = CourseScanReview.detail;
-        const key = session.Answer_Key, bonus = session.Bonus_Flags.map(Boolean);
+        const { key, bonus } = keyOfSheet(session, sheet);
         const draft = CourseScanReview.draftOf(sheet);
         const g = grade(draft, key, bonus, session.Max_Score);
         const maxText = session.Max_Score == null ? '?' : fmt(session.Max_Score);
 
         $('scrvScore').textContent = `${fmt(g.score)}/${maxText}`;
-        $('scrvPreview').textContent = `${g.raw} correct${g.bonus ? ` + ${g.bonus} bonus` : ''}, ${g.wrong} wrong, ${g.blank} blank${g.multiple ? `, ${g.multiple} double` : ''}`;
+        $('scrvPreview').textContent = `${(session.Set_Keys || []).length > 1 ? `Set ${SET_LETTERS[sheet.Set_No || 0]}: ` : ''}${g.raw} correct${g.bonus ? ` + ${g.bonus} bonus` : ''}, ${g.wrong} wrong, ${g.blank} blank${g.multiple ? `, ${g.multiple} double` : ''}`;
         const dirty = !same(draft, sheet.Answers);
         const save = $('scrvSave');
         save.disabled = !dirty || session.Max_Score == null || CourseScanReview.busy;

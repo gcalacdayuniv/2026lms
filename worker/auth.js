@@ -79,6 +79,7 @@ export const RULES = {
     'GET /api/student-accessible-exams': { who: 'any', self: ['studentId'] },
     'POST /api/submit-accessible-exam': { who: 'any', self: ['studentId'] },
     'POST /api/start-accessible-exam': { who: 'any', self: ['studentId'] },
+    'GET /api/student-exam-review': { who: 'any', self: ['studentId'] },
     'GET /api/student-sheet-photo': { who: 'any', self: ['studentId'] },
     'POST /api/upload-submission': { who: 'any' },
     'POST /api/upload-chunk': { who: 'any' },

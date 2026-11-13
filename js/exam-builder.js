@@ -115,6 +115,8 @@ export const ExamBuilder = {
         const s = ExamBuilder.s;
         if (!s || !s.dirty || s.saving) return;
         store.set(draftKey(s.examId), JSON.stringify({ title: s.title, questions: s.questions, t: Date.now() }));
+        const note = ExamBuilder.root && ExamBuilder.root.querySelector('#ebDraftNote');
+        if (note) note.textContent = 'Draft saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     },
 
     // ---------- Shell ----------
@@ -159,6 +161,7 @@ export const ExamBuilder = {
                             ${tab('sheet', 'fa-table', 'Spreadsheet')}
                         </div>
                         <span id="ebCount" class="text-xs font-bold text-gray-500"></span>
+                        <span id="ebDraftNote" class="text-[11px] text-gray-400" aria-live="polite"></span>
                         <div class="ml-auto flex items-center gap-1.5">
                             <button type="button" id="ebImportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-import mr-1" aria-hidden="true"></i>Import CSV / Excel</button>
                             <button type="button" id="ebTemplateBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-download mr-1" aria-hidden="true"></i>Template</button>

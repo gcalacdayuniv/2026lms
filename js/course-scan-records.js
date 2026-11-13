@@ -6,7 +6,7 @@
 import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
-import { CourseScanReview } from './course-scan-review.js';
+import { CourseScanReview, keyOfSheet } from './course-scan-review.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -173,13 +173,28 @@ export const CourseScanRecords = {
         const bonus = session.Bonus_Flags.map(Boolean);
         const max = session.Max_Score;
         const c = session.Num_Choices;
+        const multiSet = (session.Set_Keys || []).length > 1;
 
-        const graded = sheets.map(sheet => ({ sheet, g: grade(sheet.Answers, key, bonus, max) }));
+        const graded = sheets.map(sheet => { const k = keyOfSheet(session, sheet); return { sheet, g: grade(sheet.Answers, k.key, k.bonus, max) }; });
         const scores = graded.map(x => x.g.score);
         const total = (field) => graded.reduce((sum, x) => sum + x.g[field], 0);
 
         const questions = key.map((k, q) => {
             const counts = Array(c + 2).fill(0);   // choices..., blank, double
+            if (multiSet) {
+                // With printed sets, question q is a different question on each set: count by Set A's question
+                // number and report right / wrong / blank / double (the letters differ between sets).
+                const tally = [0, 0, 0, 0];
+                sheets.forEach(sheet => {
+                    const sk = (session.Set_Keys || [])[sheet.Set_No || 0];
+                    const pos = sk && sk.order ? sk.order.indexOf(q) : q;
+                    if (pos < 0) return;
+                    const a = sheet.Answers[pos];
+                    const kk = keyOfSheet(session, sheet).key[pos];
+                    if (a === BLANK) tally[2]++; else if (a === MULTIPLE) tally[3]++; else if (a === kk) tally[0]++; else tally[1]++;
+                });
+                return { q, key: k, bonus: bonus[q], counts: tally, right: tally[0], pct: sheets.length ? tally[0] / sheets.length : 0, multiSet: true };
+            }
             sheets.forEach(sheet => {
                 const a = sheet.Answers[q];
                 if (a === BLANK) counts[c]++;
@@ -217,14 +232,14 @@ export const CourseScanRecords = {
     questionTable: (a) => {
         const rows = a.questions.map(item => {
             const pct = Math.round(item.pct * 100);
-            const parts = item.counts.map((n, i) => {
+            const parts = item.multiSet ? `<b class="text-green-700">right ${item.counts[0]}</b> | wrong ${item.counts[1]} | blank ${item.counts[2]} | x2 ${item.counts[3]}` : item.counts.map((n, i) => {
                 const label = i < a.c ? LETTERS[i] : (i === a.c ? 'blank' : 'x2');
                 return i === item.key ? `<b class="text-green-700">${label} ${n}</b>` : `${label} ${n}`;
             }).join(' | ');
             return `
                 <div class="grid grid-cols-12 items-center gap-1 text-[11px] py-1 border-b border-gray-100">
                     <span class="col-span-1 text-right font-bold text-gray-600">${item.q + 1}${item.bonus ? '<span class="text-amber-600" title="Bonus">*</span>' : ''}</span>
-                    <span class="col-span-1 text-center font-black text-green-700">${LETTERS[item.key]}</span>
+                    <span class="col-span-1 text-center font-black text-green-700">${item.multiSet ? '' : LETTERS[item.key]}</span>
                     <div class="col-span-3 h-2 bg-gray-200 rounded overflow-hidden"><div class="h-2 ${pct < 40 ? 'bg-red-500' : pct < 70 ? 'bg-amber-500' : 'bg-green-500'}" style="width:${pct}%"></div></div>
                     <span class="col-span-1 text-right font-mono font-bold">${pct}%</span>
                     <span class="col-span-6 text-gray-600">${parts}</span>

@@ -155,19 +155,35 @@ export function examMaxPoints(questions) {
 // Indexes of the questions the lecturer has to mark.
 export const essayIndexes = (questions) => questions.map((q, i) => (questionType(q) === "essay" ? i : -1)).filter(i => i >= 0);
 
-// answers: array (by question index); marks: { [index]: points } or null.
-export function scoreExam(questions, answers, marks) {
-    let raw = 0, bonus = 0, pending = 0;
+// answers: array (by question index); marks: { [index]: points } or null;
+// adjustments: { [index]: "credit" | "drop" } set by the lecturer after the exam.
+//   credit = every student gets full points for the question; drop = the question is not counted and the
+//   rest of the exam is scaled up to the same maximum (scale). Final score = (raw + bonus) * scale.
+export function scoreExam(questions, answers, marks, adjustments) {
+    let raw = 0, bonus = 0, pending = 0, dropped = 0;
     const markMap = marks && typeof marks === "object" ? marks : {};
+    const adj = adjustments && typeof adjustments === "object" ? adjustments : {};
     questions.forEach((q, i) => {
+        const a = adj[i];
+        if (a === "drop") { if (!q[5]) dropped += questionPoints(q); return; }
         const isEssay = questionType(q) === "essay";
-        const mark = isEssay && Object.prototype.hasOwnProperty.call(markMap, i) ? markMap[i] : null;
-        if (isEssay && mark === null) pending++;
-        const earned = gradeQuestion(q, (answers || [])[i], mark);
+        let earned;
+        if (a === "credit") {
+            earned = questionPoints(q);
+        } else {
+            const mark = isEssay && Object.prototype.hasOwnProperty.call(markMap, i) ? markMap[i] : null;
+            if (isEssay && mark === null) pending++;
+            earned = gradeQuestion(q, (answers || [])[i], mark);
+        }
         if (q[5]) bonus += earned; else raw += earned;
     });
-    return { raw: round2(raw), bonus: round2(bonus), pending };
+    const max = examMaxPoints(questions);
+    const scale = dropped > 0 && max - dropped > 0 ? max / (max - dropped) : 1;
+    return { raw: round2(raw), bonus: round2(bonus), pending, scale };
 }
+
+// Final score of one student: scaled, never above the maximum.
+export const finalScoreOf = (scored, maxScore) => Math.min(maxScore, round2((scored.raw + scored.bonus) * scored.scale));
 
 // ---------- What a student is allowed to see ----------
 
@@ -318,5 +334,59 @@ export function scoreSummary(scores, passPercent = 60) {
         passPercent,
         passRate: pcts.length ? r1((pcts.filter(p => p >= passPercent).length / pcts.length) * 100) : null,
         buckets
+    };
+}
+
+
+// ---------- Item analysis ----------
+// For every question that is not an essay: difficulty (share of the points students earned) and discrimination
+// (how much better the top 27% of students did than the bottom 27%), plus flags worth a second look.
+export function itemAnalysis(questions, answerSets, markSets) {
+    const n = answerSets.length;
+    const earned = answerSets.map((answers, s) => questions.map((q, i) => {
+        const m = markSets[s] || {};
+        return gradeQuestion(q, answers[i], Object.prototype.hasOwnProperty.call(m, i) ? m[i] : null);
+    }));
+    const totals = earned.map(row => row.reduce((a, b) => a + b, 0));
+    const order = totals.map((t, i) => i).sort((a, b) => totals[b] - totals[a]);
+    const k = Math.max(1, Math.round(n * 0.27));
+    const upper = order.slice(0, k), lower = order.slice(n - k);
+    return questions.map((q, i) => {
+        if (questionType(q) === "essay" || n === 0) return { difficulty: null, discrimination: null, flags: [] };
+        const pts = questionPoints(q);
+        const frac = (rows) => (rows.length ? rows.reduce((s, r) => s + earned[r][i] / pts, 0) / rows.length : 0);
+        const difficulty = round2(earned.reduce((s, row) => s + row[i] / pts, 0) / n);
+        const disc = n >= 8 ? round2(frac(upper) - frac(lower)) : null;
+        const flags = [];
+        if (difficulty < 0.2) flags.push("hard");
+        if (difficulty > 0.95 && n >= 5) flags.push("easy");
+        if (disc !== null && disc < 0) flags.push("negative");
+        else if (disc !== null && disc < 0.2 && difficulty <= 0.95) flags.push("weak");
+        return { difficulty, discrimination: disc, flags };
+    });
+}
+
+// One question as the student sees it in a review: their answer, the right answer, and what they earned.
+export function reviewQuestion(q, index, answer, mark) {
+    const type = questionType(q);
+    const m = meta(q);
+    let correct = null;
+    if (type === "mc" || type === "tf" || type === "id" || type === "num") correct = String(q[3] ?? "");
+    else if (type === "multi" || type === "enum" || type === "order") correct = asList(q[3]).map(String);
+    else if (type === "match") correct = pairsOf(q).map(p => `${p[0]} → ${p[1]}`);
+    return {
+        index,
+        part: q[0],
+        question: q[1],
+        type,
+        choices: Array.isArray(q[2]) ? q[2].map(String) : [],
+        isBonus: Boolean(q[5]),
+        points: questionPoints(q),
+        earned: gradeQuestion(q, answer, mark),
+        answer: Array.isArray(answer) ? answer.map(String) : String(answer ?? ""),
+        correct,
+        ordered: Boolean(q[7]),
+        explanation: String(q[4] ?? ""),
+        marked: type === "essay" ? mark !== null && mark !== undefined : true
     };
 }

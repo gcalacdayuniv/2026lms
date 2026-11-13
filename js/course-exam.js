@@ -4,6 +4,8 @@ import { CourseClass } from './course-class.js';
 import { UI } from './ui-feedback.js';
 import { ExamBuilder } from './exam-builder.js';
 import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
+import { buildExamPrintHtml } from './exam-print.js';
+import { ExamReview } from './exam-review.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -132,6 +134,17 @@ export const CourseExam = {
             CourseExam.announceDashboardExams();
         }
 
+        if (e.target.closest('.review-exam-btn')) {
+            ExamReview.open(e.target.closest('.review-exam-btn').dataset.assignmentId, AppState.user.User_ID);
+            return;
+        }
+        if (e.target.closest('#closeExamReviewBtn') || e.target.id === 'closeExamReviewBg') ExamReview.close();
+
+        if (e.target.closest('.er-adjust-btn')) {
+            await CourseExam.adjustQuestion(e.target.closest('.er-adjust-btn'));
+            return;
+        }
+
         if (e.target.closest('.start-accessible-exam-btn')) {
             const btn = e.target.closest('.start-accessible-exam-btn');
             const assignmentId = btn.dataset.assignmentId;
@@ -166,6 +179,13 @@ export const CourseExam = {
         if (e.target.closest('.export-exam-csv-btn')) {
             CourseExam.exportExamCsv(e.target.closest('.export-exam-csv-btn').dataset.examId);
         }
+
+        if (e.target.closest('.print-exam-btn')) {
+            CourseExam.openPrintDialog(e.target.closest('.print-exam-btn').dataset.examId);
+        }
+        if (e.target.closest('#closePrintExamBtn') || e.target.id === 'closePrintExamBg') CourseExam.closePrintDialog();
+        if (e.target.closest('#printExamPapersBtn')) CourseExam.printExam(CourseExam.printingId, false);
+        if (e.target.closest('#printExamKeysBtn')) CourseExam.printExam(CourseExam.printingId, true);
 
         if (e.target.closest('.duplicate-exam-btn')) {
             await CourseExam.duplicateExam(e.target.closest('.duplicate-exam-btn').dataset.examId);
@@ -291,6 +311,20 @@ export const CourseExam = {
     },
 
     handleChanges: async (e) => {
+        if (e.target.id === 'erReleaseToggle' && CourseExam.resultsData) {
+            const on = e.target.checked;
+            try {
+                const res = await apiFetch('/api/exam-release', { method: 'POST', body: JSON.stringify({ classExamId: CourseExam.resultsData.classExamId, release: on }) });
+                if (!res.success) throw new Error(res.error || 'Could not change this.');
+                CourseExam.resultsData.release = on;
+                UI.success(on ? 'Students can now review their answers.' : 'Answers are hidden from students.');
+            } catch (err) {
+                e.target.checked = !on;
+                UI.error(err.message || 'Could not change this.');
+            }
+            return;
+        }
+
         if (e.target.classList.contains('toggle-question-bonus-cb')) {
             const idx = parseInt(e.target.dataset.index, 10);
             await CourseExam.toggleQuestionBonus(idx, e.target.checked);
@@ -498,120 +532,158 @@ export const CourseExam = {
         document.getElementById('examResultsView')?.classList.add('hidden');
     },
 
+    // The list is kept on this device: it opens at once from the last copy, then refreshes from the server.
+    // When the server cannot be reached the saved copy stays on screen.
     loadExams: async () => {
         const container = document.getElementById('examListContainer');
         if (!container) return;
-        container.innerHTML = '<div class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>';
 
         const courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
+        const lecturerId = AppState.user.User_ID;
+        const cacheKey = `lms_exam_list:${lecturerId}:${courseId}`;
+        const apply = (data) => {
+            CourseExam.exams = data.exams || [];
+            CourseExam.classExams = data.classExams || [];
+            CourseExam.classAssignments = data.classAssignments || [];
+        };
+
+        let shownFromCache = false;
+        try {
+            const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+            if (cached && Array.isArray(cached.exams)) {
+                apply(cached);
+                CourseExam.renderExamList();
+                shownFromCache = true;
+            }
+        } catch (err) { /* no usable saved copy */ }
+        if (!shownFromCache) {
+            container.innerHTML = '<div class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>';
+        }
 
         try {
             const ts = new Date().getTime();
-            const lecturerId = AppState.user.User_ID;
             const requests = [apiFetch(`/api/exams?lecturerId=${lecturerId}&_t=${ts}`)];
             if (courseId) {
                 requests.push(apiFetch(`/api/class-exams?courseId=${courseId}&_t=${ts}`));
             }
 
             const [examRes, classExamRes] = await Promise.all(requests);
-            CourseExam.exams = examRes.exams || [];
-            CourseExam.classExams = classExamRes ? (classExamRes.classExams || []) : [];
-            CourseExam.classAssignments = classExamRes ? (classExamRes.assignments || []) : [];
-
-            if (CourseExam.exams.length === 0) {
-                container.innerHTML = '<div class="text-center py-10 px-4"><i class="fa-regular fa-file-lines text-3xl text-gray-300"></i><p class="mt-2 text-sm font-bold text-gray-600">No exams yet</p><p class="text-xs text-gray-500">Use Create Exam or Import from Spreadsheet above.</p></div>';
+            const fresh = {
+                exams: examRes.exams || [],
+                classExams: classExamRes ? (classExamRes.classExams || []) : [],
+                classAssignments: classExamRes ? (classExamRes.assignments || []) : []
+            };
+            apply(fresh);
+            try { localStorage.setItem(cacheKey, JSON.stringify(fresh)); } catch (err) { /* storage full or blocked */ }
+            CourseExam.renderExamList();
+        } catch (err) {
+            if (shownFromCache) {
                 const countEl = document.getElementById('examCountLabel');
-                if (countEl) countEl.textContent = '';
-                return;
+                if (countEl) countEl.textContent += ' - saved copy (offline)';
+            } else {
+                container.innerHTML = `<div class="text-red-500 font-bold text-sm text-center py-4">${esc(err.message)}</div>`;
+            }
+        }
+    },
+
+    renderExamList: () => {
+        const container = document.getElementById('examListContainer');
+        if (!container) return;
+        const courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
+        if (CourseExam.exams.length === 0) {
+            container.innerHTML = '<div class="text-center py-10 px-4"><i class="fa-regular fa-file-lines text-3xl text-gray-300"></i><p class="mt-2 text-sm font-bold text-gray-600">No exams yet</p><p class="text-xs text-gray-500">Use Create Exam or Import from Spreadsheet above.</p></div>';
+            const countEl = document.getElementById('examCountLabel');
+            if (countEl) countEl.textContent = '';
+            return;
+        }
+
+        container.innerHTML = CourseExam.exams.map(ex => {
+            let parsed = [];
+            try { parsed = JSON.parse(ex.ExamData || '[]'); } catch (e) { parsed = []; }
+            const rows = fromExamData(parsed);
+            const regCount = rows.filter(q => !q.bonus).length;
+            const bonusCount = rows.filter(q => q.bonus).length;
+            const points = rows.filter(q => !q.bonus).reduce((sum, q) => sum + pointsOf(q), 0);
+            const typeChip = (key, label, color) => {
+                const n = rows.filter(q => q.type === key).length;
+                return n ? `<span class="text-[10px] ${color} px-1.5 py-0.5 rounded font-bold">${label} ${n}</span>` : '';
+            };
+            const typeChips = typeChip('mc', 'Multiple choice', 'bg-blue-50 text-blue-700 border border-blue-100')
+                + typeChip('multi', 'Multiple answer', 'bg-sky-50 text-sky-700 border border-sky-100')
+                + typeChip('tf', 'True/False', 'bg-teal-50 text-teal-700 border border-teal-100')
+                + typeChip('id', 'Identification', 'bg-orange-50 text-orange-700 border border-orange-100')
+                + typeChip('num', 'Numeric', 'bg-lime-50 text-lime-800 border border-lime-200')
+                + typeChip('enum', 'Enumeration', 'bg-indigo-50 text-indigo-700 border border-indigo-100')
+                + typeChip('order', 'Ordering', 'bg-violet-50 text-violet-700 border border-violet-100')
+                + typeChip('match', 'Matching', 'bg-pink-50 text-pink-700 border border-pink-100')
+                + typeChip('essay', 'Essay', 'bg-rose-50 text-rose-700 border border-rose-100');
+            const essayRows = rows.map((q, i) => (q.type === 'essay' ? i : -1)).filter(i => i >= 0);
+
+            const linked = CourseExam.classExams.find(ce => ce.Exam_ID === ex.Exam_ID);
+            const enabledStudentsCount = linked
+                ? CourseExam.classAssignments.filter(a => a.Class_Exam_ID === linked.Class_Exam_ID && a.Is_Enabled === 1).length
+                : 0;
+
+            let essayPending = 0;
+            if (linked && essayRows.length) {
+                CourseExam.classAssignments.filter(a => a.Class_Exam_ID === linked.Class_Exam_ID && a.Status === 'Completed').forEach(a => {
+                    let marks = {};
+                    try { marks = JSON.parse(a.Manual_Marks || '{}') || {}; } catch (err) { marks = {}; }
+                    if (essayRows.some(i => !Object.prototype.hasOwnProperty.call(marks, i))) essayPending++;
+                });
             }
 
-            container.innerHTML = CourseExam.exams.map(ex => {
-                let parsed = [];
-                try { parsed = JSON.parse(ex.ExamData || '[]'); } catch (e) { parsed = []; }
-                const rows = fromExamData(parsed);
-                const regCount = rows.filter(q => !q.bonus).length;
-                const bonusCount = rows.filter(q => q.bonus).length;
-                const points = rows.filter(q => !q.bonus).reduce((sum, q) => sum + pointsOf(q), 0);
-                const typeChip = (key, label, color) => {
-                    const n = rows.filter(q => q.type === key).length;
-                    return n ? `<span class="text-[10px] ${color} px-1.5 py-0.5 rounded font-bold">${label} ${n}</span>` : '';
-                };
-                const typeChips = typeChip('mc', 'Multiple choice', 'bg-blue-50 text-blue-700 border border-blue-100')
-                    + typeChip('multi', 'Multiple answer', 'bg-sky-50 text-sky-700 border border-sky-100')
-                    + typeChip('tf', 'True/False', 'bg-teal-50 text-teal-700 border border-teal-100')
-                    + typeChip('id', 'Identification', 'bg-orange-50 text-orange-700 border border-orange-100')
-                    + typeChip('num', 'Numeric', 'bg-lime-50 text-lime-800 border border-lime-200')
-                    + typeChip('enum', 'Enumeration', 'bg-indigo-50 text-indigo-700 border border-indigo-100')
-                    + typeChip('order', 'Ordering', 'bg-violet-50 text-violet-700 border border-violet-100')
-                    + typeChip('match', 'Matching', 'bg-pink-50 text-pink-700 border border-pink-100')
-                    + typeChip('essay', 'Essay', 'bg-rose-50 text-rose-700 border border-rose-100');
-                const essayRows = rows.map((q, i) => (q.type === 'essay' ? i : -1)).filter(i => i >= 0);
+            const linkBadge = linked && linked.Is_Active
+                ? `<span class="text-[10px] bg-green-100 text-green-800 border border-green-300 font-bold px-2 py-0.5 rounded">Linked (${enabledStudentsCount} student${enabledStudentsCount === 1 ? '' : 's'}) | ${linked.From_Date || 'Any'} to ${linked.To_Date || 'Any'}</span>`
+                : `<span class="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 font-medium px-2 py-0.5 rounded">Not linked to this class</span>`;
 
-                const linked = CourseExam.classExams.find(ce => ce.Exam_ID === ex.Exam_ID);
-                const enabledStudentsCount = linked
-                    ? CourseExam.classAssignments.filter(a => a.Class_Exam_ID === linked.Class_Exam_ID && a.Is_Enabled === 1).length
-                    : 0;
-
-                let essayPending = 0;
-                if (linked && essayRows.length) {
-                    CourseExam.classAssignments.filter(a => a.Class_Exam_ID === linked.Class_Exam_ID && a.Status === 'Completed').forEach(a => {
-                        let marks = {};
-                        try { marks = JSON.parse(a.Manual_Marks || '{}') || {}; } catch (err) { marks = {}; }
-                        if (essayRows.some(i => !Object.prototype.hasOwnProperty.call(marks, i))) essayPending++;
-                    });
-                }
-
-                const linkBadge = linked && linked.Is_Active
-                    ? `<span class="text-[10px] bg-green-100 text-green-800 border border-green-300 font-bold px-2 py-0.5 rounded">Linked (${enabledStudentsCount} student${enabledStudentsCount === 1 ? '' : 's'}) | ${linked.From_Date || 'Any'} to ${linked.To_Date || 'Any'}</span>`
-                    : `<span class="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 font-medium px-2 py-0.5 rounded">Not linked to this class</span>`;
-
-                return `
-                    <div class="bg-white p-3 border border-gray-200 rounded-xl shadow-sm hover:border-indigo-300 transition">
-                        <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                            <div class="font-black text-gray-800 text-sm min-w-0 break-words">${esc(ex.Title)}</div>
-                            <div class="text-[11px] font-bold text-gray-500 whitespace-nowrap">${regCount} question${regCount === 1 ? '' : 's'}${points !== regCount ? ` &bull; ${points} points` : ''}${bonusCount > 0 ? ` &bull; ${bonusCount} bonus` : ''}</div>
-                        </div>
-                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${typeChips}</div>
-                        <div class="mt-1.5">${linkBadge}</div>
-                        <div class="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end gap-1.5">
-                            ${courseId ? `
-                                <button type="button" class="assign-class-exam-btn col-span-2 sm:col-span-1 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-2 rounded-md text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                    <i class="fa-solid fa-universal-access mr-1" aria-hidden="true"></i> Link &amp; Assign Students
-                                </button>
-                            ` : ''}
-                            ${linked && essayRows.length ? `
-                                <button type="button" class="grade-essays-btn bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
-                                    <i class="fa-solid fa-pen-ruler mr-1" aria-hidden="true"></i> Grade Essays${essayPending ? ` (${essayPending} to mark)` : ''}
-                                </button>` : ''}
-                            ${linked ? `
-                                <button type="button" class="exam-results-btn bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
-                                    <i class="fa-solid fa-chart-column mr-1" aria-hidden="true"></i> Results
-                                </button>` : ''}
-                            <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
-                            </button>
-                            <button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                <i class="fa-solid fa-pen-to-square mr-1" aria-hidden="true"></i> Edit
-                            </button>
-                            <button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                                <i class="fa-solid fa-star mr-1" aria-hidden="true"></i> Bonus Qs
-                            </button>
-                            <button type="button" class="export-exam-csv-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Export ${esc(ex.Title)} as CSV">
-                                <i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i> CSV
-                            </button>
-                            <button type="button" class="duplicate-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Duplicate ${esc(ex.Title)}">
-                                <i class="fa-regular fa-copy mr-1" aria-hidden="true"></i> Copy
-                            </button>
-                        </div>
+            return `
+                <div class="bg-white p-3 border border-gray-200 rounded-xl shadow-sm hover:border-indigo-300 transition">
+                    <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                        <div class="font-black text-gray-800 text-sm min-w-0 break-words">${esc(ex.Title)}</div>
+                        <div class="text-[11px] font-bold text-gray-500 whitespace-nowrap">${regCount} question${regCount === 1 ? '' : 's'}${points !== regCount ? ` &bull; ${points} points` : ''}${bonusCount > 0 ? ` &bull; ${bonusCount} bonus` : ''}</div>
                     </div>
-                `;
-            }).join('');
-            const countEl = document.getElementById('examCountLabel');
-            if (countEl) countEl.textContent = `${CourseExam.exams.length} exam${CourseExam.exams.length === 1 ? '' : 's'}`;
+                    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${typeChips}</div>
+                    <div class="mt-1.5">${linkBadge}</div>
+                    <div class="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end gap-1.5">
+                        ${courseId ? `
+                            <button type="button" class="assign-class-exam-btn col-span-2 sm:col-span-1 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-2 rounded-md text-xs font-bold transition shadow-sm" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                                <i class="fa-solid fa-universal-access mr-1" aria-hidden="true"></i> Link &amp; Assign Students
+                            </button>
+                        ` : ''}
+                        ${linked && essayRows.length ? `
+                            <button type="button" class="grade-essays-btn bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
+                                <i class="fa-solid fa-pen-ruler mr-1" aria-hidden="true"></i> Grade Essays${essayPending ? ` (${essayPending} to mark)` : ''}
+                            </button>` : ''}
+                        ${linked ? `
+                            <button type="button" class="exam-results-btn bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
+                                <i class="fa-solid fa-chart-column mr-1" aria-hidden="true"></i> Results
+                            </button>` : ''}
+                        <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                            <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
+                        </button>
+                        <button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                            <i class="fa-solid fa-pen-to-square mr-1" aria-hidden="true"></i> Edit
+                        </button>
+                        <button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                            <i class="fa-solid fa-star mr-1" aria-hidden="true"></i> Bonus Qs
+                        </button>
+                        <button type="button" class="export-exam-csv-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Export ${esc(ex.Title)} as CSV">
+                            <i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i> CSV
+                        </button>
+                        <button type="button" class="print-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Print ${esc(ex.Title)}">
+                            <i class="fa-solid fa-print mr-1" aria-hidden="true"></i> Print
+                        </button>
+                        <button type="button" class="duplicate-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Duplicate ${esc(ex.Title)}">
+                            <i class="fa-regular fa-copy mr-1" aria-hidden="true"></i> Copy
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        const countEl = document.getElementById('examCountLabel');
+        if (countEl) countEl.textContent = `${CourseExam.exams.length} exam${CourseExam.exams.length === 1 ? '' : 's'}`;
 
-        } catch (err) {
-            container.innerHTML = `<div class="text-red-500 font-bold text-sm text-center py-4">${esc(err.message)}</div>`;
-        }
     },
 
     openClassAssignView: async (examId, title) => {
@@ -862,6 +934,31 @@ export const CourseExam = {
         }
     },
 
+    adjustQuestion: async (btn) => {
+        const d = CourseExam.resultsData;
+        if (!d) return;
+        const { index, action, no } = btn.dataset;
+        if (action !== 'none') {
+            const ok = await UI.confirm({
+                title: action === 'credit' ? 'Give everyone credit' : 'Drop question',
+                message: action === 'credit'
+                    ? `Every student gets full points for question ${no}. All submitted scores are recalculated.`
+                    : `Question ${no} is removed from scoring and the rest of the exam is scaled to the same maximum. All submitted scores are recalculated.`,
+                confirmText: action === 'credit' ? 'Give credit' : 'Drop it',
+                danger: action === 'drop'
+            });
+            if (!ok) return;
+        }
+        try {
+            const res = await apiFetch('/api/exam-adjust', { method: 'POST', body: JSON.stringify({ classExamId: d.classExamId, index: Number(index), action }) });
+            if (!res.success) throw new Error(res.error || 'Could not change the question.');
+            UI.success(`Scores recalculated (${res.regraded}).`);
+            await CourseExam.openResultsView(d.classExamId, d.title);
+        } catch (err) {
+            UI.error(err.message || 'Could not change the question.');
+        }
+    },
+
     renderResults: () => {
         const d = CourseExam.resultsData;
         const body = document.getElementById('erBody');
@@ -875,6 +972,7 @@ export const CourseExam = {
         }
 
         const tile = (label, value, sub = '') => `<div class="bg-white border border-gray-200 rounded-xl p-3 text-center"><div class="text-[10px] font-bold uppercase tracking-wider text-gray-500">${label}</div><div class="text-xl font-black text-gray-900 mt-0.5">${value}</div>${sub ? `<div class="text-[10px] text-gray-500">${sub}</div>` : ''}</div>`;
+        const releaseRow = `<label class="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-700 cursor-pointer"><input type="checkbox" id="erReleaseToggle" class="w-4 h-4" ${d.release ? 'checked' : ''}> Let students review their answers and the right answers</label>`;
         const tiles = `
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                 ${tile('Submitted', `${d.submitted}/${d.assigned}`)}
@@ -934,6 +1032,22 @@ export const CourseExam = {
             return '';
         };
 
+        const flagText = { hard: 'Very hard: check the key', easy: 'Very easy', negative: 'Top students did worse than weak ones: check the key', weak: 'Does not separate strong from weak students' };
+        const analysisHtml = (q) => {
+            if (q.type === 'essay') return '';
+            const flags = (q.flags || []).map(f => `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${f === 'negative' || f === 'hard' ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}">${flagText[f]}</span>`).join(' ');
+            const disc = q.discrimination === null || q.discrimination === undefined ? 'needs 8+ students' : q.discrimination;
+            const state = q.adjustment === 'credit' ? '<span class="text-[11px] font-bold text-indigo-700">Everyone gets full credit</span>'
+                : q.adjustment === 'drop' ? '<span class="text-[11px] font-bold text-indigo-700">Dropped: not counted</span>' : '';
+            const btn = (action, label, cls) => `<button type="button" class="er-adjust-btn px-2 py-1 rounded text-[11px] font-bold border ${cls}" data-index="${q.index}" data-action="${action}" data-no="${q.no}">${label}</button>`;
+            const buttons = q.adjustment
+                ? btn('none', 'Undo', 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
+                : btn('credit', 'Give everyone credit', 'bg-white text-indigo-700 border-indigo-300 hover:bg-indigo-50') + btn('drop', 'Drop question', 'bg-white text-red-700 border-red-300 hover:bg-red-50');
+            return `<div class="mt-2 flex flex-wrap items-center gap-2">
+                <span class="text-[11px] text-gray-600">Discrimination: <b>${disc}</b></span>${flags}${state}
+                <span class="ml-auto flex gap-1.5">${buttons}</span></div>`;
+        };
+
         const list = d.questions.map((q, i) => ({ ...q, no: i + 1 }));
         if (CourseExam.resultsSort === 'hardest') list.sort((a, b) => (a.avgPct ?? 101) - (b.avgPct ?? 101));
         const sortBtn = (key, label) => `<button type="button" data-sort="${key}" class="er-sort-btn px-2.5 py-1 text-[11px] font-bold rounded ${CourseExam.resultsSort === key ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}" aria-pressed="${CourseExam.resultsSort === key}">${label}</button>`;
@@ -948,6 +1062,7 @@ export const CourseExam = {
                     <span class="text-xs font-black text-gray-800 w-28 text-right">${fmt(q.avgPct, '%')} average</span>
                 </div>
                 <div class="mt-1 text-[11px] text-gray-500">${q.fullPct === null ? '' : `${q.fullPct}% got it fully right. `}${q.answered} of ${q.submitted} answered.</div>
+                ${analysisHtml(q)}
                 ${detail(q)}
             </div>`).join('');
 
@@ -961,6 +1076,7 @@ export const CourseExam = {
             </tr>`).join('');
 
         body.innerHTML = `
+            ${releaseRow}
             ${tiles}
             ${distribution}
             <div>
@@ -1272,6 +1388,56 @@ export const CourseExam = {
         try { rows = JSON.parse(ex.ExamData || '[]'); } catch (e) { rows = []; }
         const name = (ex.Title || 'exam').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'exam';
         ExamBuilder.download(`${name}.csv`, toCsv(fromExamData(rows)));
+    },
+
+    // Prints the exam as a paper test (all question types) or, with withKey, its answer key.
+    openPrintDialog: (examId) => {
+        CourseExam.printingId = examId;
+        let m = document.getElementById('printExamModal');
+        if (!m) {
+            m = document.createElement('div');
+            m.id = 'printExamModal';
+            m.className = 'fixed inset-0 z-[80] flex items-center justify-center p-4';
+            m.setAttribute('role', 'dialog');
+            m.setAttribute('aria-modal', 'true');
+            m.setAttribute('aria-label', 'Print exam');
+            m.innerHTML = `<div id="closePrintExamBg" class="absolute inset-0 bg-gray-900 bg-opacity-50"></div>
+                <div class="relative bg-white rounded-lg shadow-xl w-full max-w-sm p-4">
+                    <div class="flex items-center justify-between mb-3"><h4 class="font-bold text-gray-800">Print exam</h4>
+                        <button type="button" id="closePrintExamBtn" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button></div>
+                    <label for="printExamSets" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sets</label>
+                    <select id="printExamSets" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3">
+                        <option value="1">1 set</option><option value="2">2 sets (A-B)</option><option value="3">3 sets (A-C)</option>
+                        <option value="4">4 sets (A-D)</option><option value="5">5 sets (A-E)</option><option value="6">6 sets (A-F)</option>
+                    </select>
+                    <p class="text-[11px] text-gray-500 mb-3">Using the answer-sheet scanner? Print the sets from Scan Answer Sheets instead, so the keys match.</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="printExamPapersBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-print mr-1" aria-hidden="true"></i>Questions</button>
+                        <button type="button" id="printExamKeysBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-key mr-1" aria-hidden="true"></i>Answer keys</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+        }
+        m.classList.remove('hidden');
+    },
+
+    closePrintDialog: () => {
+        const m = document.getElementById('printExamModal');
+        if (m) m.classList.add('hidden');
+    },
+
+    printExam: (examId, withKey) => {
+        const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
+        if (!ex) return;
+        let rows = [];
+        try { rows = JSON.parse(ex.ExamData || '[]'); } catch (e) { rows = []; }
+        const questions = fromExamData(rows);
+        if (!questions.length) { UI.warning('This exam has no questions to print.'); return; }
+        const w = window.open('', '_blank');
+        if (!w) { UI.warning('The pop-up was blocked. Allow pop-ups for this site, then try again.'); return; }
+        w.document.open();
+        w.document.write(buildExamPrintHtml({ title: String(ex.Title || ''), questions, withKey, sets: Number((document.getElementById('printExamSets') || {}).value) || 1, seed: ex.Exam_ID }));
+        w.document.close();
     },
 
     duplicateExam: async (examId) => {
