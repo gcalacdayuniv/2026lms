@@ -3,6 +3,7 @@
 // question papers printed now and the answer keys used when scanning later always agree.
 // Set A is the exam as written. The other sets reorder the questions inside each part and shuffle the choices.
 import { escapeHtml as esc } from './html-utils.js';
+import { PRINT_CSS, partTitle } from './print-preview.js';
 
 export const MAX_SETS = 6;
 export const SET_LETTERS = 'ABCDEF';
@@ -78,45 +79,24 @@ export const buildSets = (items, { seed = 'exam', count = 4 } = {}) => {
     return sets;
 };
 
-const CSS = `
-@page { margin: 14mm; }
-* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-body { font-family: Arial, sans-serif; color: #000; font-size: 11pt; margin: 0; }
-.set { page-break-after: always; }
-.set:last-child { page-break-after: auto; }
-h1 { font-size: 15pt; margin: 0 0 2mm; }
-.badge { float: right; border: 2px solid #000; border-radius: 4px; padding: 1mm 5mm; font-size: 20pt; font-weight: bold; }
-.meta { display: flex; gap: 6mm; margin: 3mm 0 4mm; font-size: 10pt; }
-.meta span.ul { flex: 1; border-bottom: 1px solid #000; }
-.part { font-weight: bold; margin: 5mm 0 2mm; padding-bottom: 1mm; border-bottom: 1px solid #000; text-transform: uppercase; font-size: 10pt; }
-.q { margin: 0 0 3.2mm; break-inside: avoid; }
-.q b { display: inline-block; min-width: 8mm; }
-.c { margin: 0.8mm 0 0 8mm; }
-.keyg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1mm 6mm; font-size: 10.5pt; margin-top: 3mm; }
-.note { font-size: 9pt; color: #333; }
-`;
-
-// mode: 'papers' = question papers to give out; 'keys' = answer keys (teacher copy).
-export const buildSetsHtml = ({ title = '', sets, mode = 'papers' }) => {
-    const multiPart = sets.length && new Set(sets[0].parts).size > 1;
-    const body = sets.map(set => {
-        if (mode === 'keys') {
-            return `<section class="set"><span class="badge">SET ${set.letter}</span><h1>${esc(title)} - Answer Key</h1>
-<div class="note">Teacher copy. Number = position in Set ${set.letter}.</div>
-<div class="keyg">${set.key.map((k, i) => `<div><b>${i + 1}.</b> ${'ABCDE'[k]}${set.bonus[i] ? ' *' : ''}</div>`).join('')}</div>
-${set.bonus.some(Boolean) ? '<p class="note">* bonus question</p>' : ''}</section>`;
-        }
-        let lastPart = null;
-        const qs = set.items.map((it, i) => {
-            const head = multiPart && it.part !== lastPart ? `<div class="part">Part ${it.part + 1}</div>` : '';
-            lastPart = it.part;
-            return `${head}<div class="q"><b>${i + 1}.</b>${esc(it.text)}${it.bonus ? ' <i>(bonus)</i>' : ''}
-${it.choices.map((c, k) => `<div class="c">${'ABCDE'[k]}. ${esc(c)}</div>`).join('')}</div>`;
+// mode: 'papers' = question paper of ONE set; 'keys' = its answer key (teacher copy).
+// set = index of the set to print (0 = A). Two columns, like a normal paper test.
+export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = 'papers' }) => {
+    const sel = sets[Math.min(sets.length - 1, Math.max(0, set))];
+    const subtitle = esc(title).toUpperCase() + (sets.length > 1 ? ` - SET ${sel.letter}` : '') + (mode === 'keys' ? ' - ANSWER KEY' : '');
+    const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle}</div></div>`;
+    let inner;
+    if (mode === 'keys') {
+        inner = `${head}<div class="keyg">${sel.key.map((k, i) => `<div class="k">${i + 1}. ${'abcde'[k]}${sel.bonus[i] ? ' *' : ''}</div>`).join('')}</div>${sel.bonus.some(Boolean) ? '<p style="font-size:9pt">* bonus question</p>' : ''}`;
+    } else {
+        const byPart = new Map();
+        sel.items.forEach((it, i) => { if (!byPart.has(it.part)) byPart.set(it.part, []); byPart.get(it.part).push({ it, no: i + 1 }); });
+        const paper = [...byPart.keys()].sort((a, b) => a - b).map(p => {
+            const list = byPart.get(p);
+            return `<div class="part">${esc(partTitle(p, list.map(() => 'mc')))}</div>` + list.map(({ it, no }) =>
+                `<div class="q">${no}. ${esc(it.text)}${it.bonus ? ' <i>(bonus)</i>' : ''}${it.choices.map((c, k) => `<div class="c">${'abcde'[k]}. ${esc(c)}</div>`).join('')}</div>`).join('');
         }).join('');
-        return `<section class="set"><span class="badge">SET ${set.letter}</span><h1>${esc(title)}</h1>
-<div class="meta"><span>Name:</span><span class="ul"></span><span>Date:</span><span class="ul" style="max-width:35mm"></span></div>
-<div class="note">Write your SET letter (${set.letter}) on the answer sheet by shading its circle. Shade ONE circle per number.</div>${qs}</section>`;
-    }).join('');
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${mode === 'keys' ? 'Answer Keys' : 'Exam Sets'} | ${esc(title)}</title><style>${CSS}</style></head>
-<body>${body}<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>`;
+        inner = `${head}<div class="cols">${paper}</div>`;
+    }
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${PRINT_CSS}</style></head><body>${inner}</body></html>`;
 };

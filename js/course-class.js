@@ -6,6 +6,7 @@ import { CoursePending } from './course-pending.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
+import { showPrintPreview } from './print-preview.js';
 
 // ---- Saved copy of the class screen, so reopening a class paints at once (see loadClassScreen). ----
 const CLASS_CACHE_PREFIX = 'class_cache:';
@@ -278,12 +279,6 @@ export const CourseClass = {
                 return nameA.localeCompare(nameB);
             });
 
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                UI.warning("Please allow pop-ups to print the roster.");
-                return;
-            }
-
             const html = `
                 <!DOCTYPE html>
                 <html lang="en">
@@ -355,8 +350,7 @@ export const CourseClass = {
                 </html>
             `;
 
-            printWindow.document.write(html);
-            printWindow.document.close();
+            showPrintPreview(html.replace(/<script>[\s\S]*?<\/script>/g, ''), `Class roster - ${data.course.CourseCode}`);
 
         } catch (err) {
             UI.error('Failed to generate export: ' + err.message);

@@ -12,6 +12,7 @@ import { ScanQueue } from './course-scan-queue.js';
 import { ScanPhotos } from './course-scan-photos.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
 import { scannableItems, buildSets, buildSetsHtml } from './exam-sets.js';
+import { showPrintPreview } from './print-preview.js';
 import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
 
 // Live camera settings
@@ -446,11 +447,19 @@ export const CourseScanner = {
         const items = scannableItems(exam.ExamData, MAX_CHOICES);
         if (!items.length) { CourseScanner.setAlert('This exam has no multiple-choice question that can be printed in sets.', false); return; }
         const sets = buildSets(items, { seed: exam.Exam_ID, count: Number(val('scnSetCount')) || 4 });
-        const w = window.open('', '_blank');
-        if (!w) { UI.warning('The pop-up was blocked. Allow pop-ups for this site, then try again.'); return; }
-        w.document.open();
-        w.document.write(buildSetsHtml({ title: String(exam.Title || ''), sets, mode }));
-        w.document.close();
+        const set = Math.min(sets.length - 1, Math.max(0, Number(val('scnPrintSet')) || 0));
+        const title = String(exam.Title || '');
+        showPrintPreview(buildSetsHtml({ title, sets, set, mode }), `${title} - Set ${'ABCDEF'[set]}${mode === 'keys' ? ' (key)' : ''}`);
+    },
+
+    // The "Print set" list follows the number of sets: 2 sets = A-B, 3 sets = A-C ...
+    fillPrintSets: () => {
+        const sel = document.getElementById('scnPrintSet');
+        if (!sel) return;
+        const count = Number(val('scnSetCount')) || 1;
+        const keep = sel.value;
+        sel.innerHTML = Array.from({ length: count }, (_, k) => `<option value="${k}">Set ${'ABCDEF'[k]}</option>`).join('');
+        if (Number(keep) < count) sel.value = keep;
     },
 
     printSheet: async () => {
@@ -473,14 +482,7 @@ export const CourseScanner = {
             parts: cfg.parts || null,
             sets: cfg.sets ? cfg.sets.length : 0
         });
-        const w = window.open('', '_blank');
-        if (!w) {
-            UI.warning('The pop-up was blocked. Allow pop-ups for this site, then try again.');
-            return;
-        }
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
+        showPrintPreview(html.replace(/<script>[\s\S]*?<\/script>/g, ''), `Answer sheet - ${header || cfg.title || ''}`);
     },
 
     startScanning: async () => {
@@ -1378,6 +1380,7 @@ export const CourseScanner = {
     handleClicks: async (e) => {
         if (e.target.closest('#openScannerBtn')) {
             await CourseScanner.open();
+            CourseScanner.fillPrintSets();
             return;
         }
         if (!e.target.closest('#scannerModal')) return;
@@ -1446,6 +1449,7 @@ export const CourseScanner = {
     handleChanges: async (e) => {
         const t = e.target;
         if (!t.closest || !t.closest('#scannerModal')) return;
+        if (t.id === 'scnSetCount') CourseScanner.fillPrintSets();
 
         if (t.name === 'scnMode') {
             CourseScanner.mode = t.value === 'typed' ? 'typed' : 'exam';

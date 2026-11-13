@@ -63,6 +63,10 @@ export const ScannerUI = {
                                         <option value="6">6 sets (A-F)</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label class="${LABEL}" for="scnPrintSet">Print set</label>
+                                    <select id="scnPrintSet" class="${FIELD}"></select>
+                                </div>
                                 <button type="button" id="scnPrintSetsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-bold transition"><i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Print question sets</button>
                                 <button type="button" id="scnPrintKeysBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-bold transition"><i class="fa-solid fa-key mr-1" aria-hidden="true"></i>Answer keys</button>
                             </div>

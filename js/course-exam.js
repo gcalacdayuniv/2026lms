@@ -6,6 +6,7 @@ import { ExamBuilder } from './exam-builder.js';
 import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
 import { buildExamPrintHtml } from './exam-print.js';
 import { ExamReview } from './exam-review.js';
+import { showPrintPreview } from './print-preview.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -311,6 +312,7 @@ export const CourseExam = {
     },
 
     handleChanges: async (e) => {
+        if (e.target.id === 'printExamSets') { CourseExam.fillPrintSets(); return; }
         if (e.target.id === 'erReleaseToggle' && CourseExam.resultsData) {
             const on = e.target.checked;
             try {
@@ -1410,6 +1412,8 @@ export const CourseExam = {
                         <option value="1">1 set</option><option value="2">2 sets (A-B)</option><option value="3">3 sets (A-C)</option>
                         <option value="4">4 sets (A-D)</option><option value="5">5 sets (A-E)</option><option value="6">6 sets (A-F)</option>
                     </select>
+                    <div id="printExamSetWrap" class="hidden"><label for="printExamSet" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Print set</label>
+                    <select id="printExamSet" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3"></select></div>
                     <p class="text-[11px] text-gray-500 mb-3">Using the answer-sheet scanner? Print the sets from Scan Answer Sheets instead, so the keys match.</p>
                     <div class="grid grid-cols-2 gap-2">
                         <button type="button" id="printExamPapersBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-print mr-1" aria-hidden="true"></i>Questions</button>
@@ -1418,6 +1422,7 @@ export const CourseExam = {
                 </div>`;
             document.body.appendChild(m);
         }
+        CourseExam.fillPrintSets();
         m.classList.remove('hidden');
     },
 
@@ -1433,11 +1438,23 @@ export const CourseExam = {
         try { rows = JSON.parse(ex.ExamData || '[]'); } catch (e) { rows = []; }
         const questions = fromExamData(rows);
         if (!questions.length) { UI.warning('This exam has no questions to print.'); return; }
-        const w = window.open('', '_blank');
-        if (!w) { UI.warning('The pop-up was blocked. Allow pop-ups for this site, then try again.'); return; }
-        w.document.open();
-        w.document.write(buildExamPrintHtml({ title: String(ex.Title || ''), questions, withKey, sets: Number((document.getElementById('printExamSets') || {}).value) || 1, seed: ex.Exam_ID }));
-        w.document.close();
+        const count = Number((document.getElementById('printExamSets') || {}).value) || 1;
+        const set = Math.min(count - 1, Math.max(0, Number((document.getElementById('printExamSet') || {}).value) || 0));
+        const title = String(ex.Title || '');
+        CourseExam.closePrintDialog();
+        showPrintPreview(buildExamPrintHtml({ title, questions, withKey, set, sets: count, seed: ex.Exam_ID }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
+    },
+
+    // The "Print set" list follows the number of sets: 2 sets = A-B, 3 sets = A-C ...
+    fillPrintSets: () => {
+        const count = Number((document.getElementById('printExamSets') || {}).value) || 1;
+        const sel = document.getElementById('printExamSet');
+        const wrap = document.getElementById('printExamSetWrap');
+        if (!sel || !wrap) return;
+        const keep = sel.value;
+        sel.innerHTML = Array.from({ length: count }, (_, k) => `<option value="${k}">Set ${'ABCDEF'[k]}</option>`).join('');
+        if (Number(keep) < count) sel.value = keep;
+        wrap.classList.toggle('hidden', count < 2);
     },
 
     duplicateExam: async (examId) => {

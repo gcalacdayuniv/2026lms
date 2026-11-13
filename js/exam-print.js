@@ -2,12 +2,13 @@
 // Print an exam as a paper test (all question types), with an optional answer key on its own page.
 import { escapeHtml as esc } from './html-utils.js';
 import { pointsOf } from './exam-builder-model.js';
+import { PRINT_CSS, partTitle } from './print-preview.js';
 
 export const PRINT_MAX_SETS = 6;
 const SET_LETTERS = 'ABCDEF';
 const FIXED = /\b(all|none|both|neither)\b.*\b(above|these|them)\b|\bany of the above\b/i;
 
-const L = 'ABCDEFGHIJ';
+const L = 'abcdefghij';
 const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const shuffledBy = (arr, seed) => {
     let s = seed;
@@ -63,7 +64,7 @@ const body = (q, n) => {
                 pairs.map((p, i) => `<div class="c">____ ${i + 1}. ${esc(p.l)}</div>`).join('') + '</div><div>' +
                 right.map((r, k) => `<div class="c">${L[k]}. ${esc(r)}</div>`).join('') + '</div></div>';
         }
-        case 'essay': return lines(6);
+        case 'essay': return lines(4);
         default: return '';
     }
 };
@@ -82,35 +83,30 @@ const keyOf = (q) => {
     }
 };
 
-const CSS = `@page{margin:14mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:Arial,sans-serif;color:#000;font-size:11pt;margin:0}h1{font-size:15pt;margin:0 0 2mm}
-.meta{display:flex;gap:6mm;margin:3mm 0 4mm;font-size:10pt}.meta .ul{flex:1;border-bottom:1px solid #000}
-.part{font-weight:bold;margin:5mm 0 2mm;padding-bottom:1mm;border-bottom:1px solid #000;text-transform:uppercase;font-size:10pt}
-.q{margin:0 0 4mm;break-inside:avoid}.q b{display:inline-block;min-width:8mm}.pts{color:#444;font-size:9pt}
-.c{margin:.8mm 0 0 8mm}.hint{margin:1mm 0 0 8mm;font-size:9pt;color:#333;font-style:italic}
-.ln{margin:5mm 0 0 8mm;border-bottom:1px solid #000;height:0}.ln span{position:relative;top:-4mm;font-size:10pt}
-.badge{float:right;border:2px solid #000;border-radius:4px;padding:1mm 5mm;font-size:20pt;font-weight:bold}.set{page-break-after:always}.set:last-child{page-break-after:auto}
-.mt{display:grid;grid-template-columns:1fr 1fr;gap:0 8mm}.key{page-break-before:always}.k{margin:0 0 2mm}`;
 
-// sets = number of sets to print (1 = a single paper without a SET badge). seed = exam id, so sets stay the same.
-export const buildExamPrintHtml = ({ title = '', questions, withKey = false, showPoints = true, sets = 1, seed = 'exam' }) => {
-    const count = Math.min(PRINT_MAX_SETS, Math.max(1, sets));
-    const sections = Array.from({ length: count }, (_, si) => {
-        const qs = makeSet(questions, si, seed);
-        const badge = count > 1 ? `<span class="badge">SET ${SET_LETTERS[si]}</span>` : '';
-        const multiPart = new Set(qs.map(q => q.part)).size > 1;
-        if (withKey) {
-            return `<section class="set">${badge}<h1>${esc(title)} - Answer Key</h1>${qs.map((q, i) => `<div class="k"><b>${i + 1}.</b> ${esc(keyOf(q))}</div>`).join('')}</section>`;
-        }
-        let last = null, n = 0;
-        const paper = qs.map(q => {
+
+// set = which set to print (0 = A, 1 = B ...; makeSet makes it from the exam, the same every time).
+// sets = how many sets the exam has (only decides whether the SET letter is shown). course = optional first title line.
+export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey = false, set = 0, sets = 1, seed = 'exam' }) => {
+    const qs = makeSet(questions, Math.min(PRINT_MAX_SETS - 1, Math.max(0, set)), seed);
+    const subtitle = esc(title) + (sets > 1 ? ` - SET ${SET_LETTERS[set]}` : '');
+    const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle.toUpperCase()}${withKey ? ' - ANSWER KEY' : ''}</div></div>`;
+    if (withKey) {
+        return doc(title, `${head}<div class="keyg">${qs.map((q, i) => `<div class="k">${i + 1}. ${esc(keyOf(q))}</div>`).join('')}</div>`);
+    }
+    const byPart = new Map();
+    qs.forEach(q => { if (!byPart.has(q.part)) byPart.set(q.part, []); byPart.get(q.part).push(q); });
+    let n = 0;
+    const paper = [...byPart.keys()].sort((a, b) => a - b).map(p => {
+        const list = byPart.get(p);
+        const items = list.map(q => {
             n++;
-            const head = multiPart && q.part !== last ? `<div class="part">Part ${q.part + 1}</div>` : '';
-            last = q.part;
-            const pts = showPoints ? ` <span class="pts">(${pointsOf(q)} pt${pointsOf(q) === 1 ? '' : 's'})</span>` : '';
-            return `${head}<div class="q"><b>${n}.</b>${esc(q.text)}${q.bonus ? ' <i>(bonus)</i>' : ''}${pts}${body(q, n)}</div>`;
+            const pts = pointsOf(q) !== 1 ? ` <span class="pts">(${pointsOf(q)} pts)</span>` : '';
+            return `<div class="q">${n}. ${esc(q.text)}${q.bonus ? ' <i>(bonus)</i>' : ''}${pts}${body(q, n)}</div>`;
         }).join('');
-        return `<section class="set">${badge}<h1>${esc(title)}</h1><div class="meta"><span>Name:</span><span class="ul"></span><span>Section:</span><span class="ul" style="max-width:30mm"></span><span>Date:</span><span class="ul" style="max-width:30mm"></span><span>Score:</span><span class="ul" style="max-width:20mm"></span></div>${paper}</section>`;
+        return `<div class="part">${esc(partTitle(p, list.map(q => q.type)))}</div>${items}`;
     }).join('');
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${CSS}</style></head><body>${sections}<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>`;
+    return doc(title, `${head}<div class="cols">${paper}</div>`);
 };
+
+const doc = (title, inner) => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${PRINT_CSS}</style></head><body>${inner}</body></html>`;
