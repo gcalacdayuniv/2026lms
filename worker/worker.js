@@ -397,6 +397,62 @@ async function ensureScanTables(env) {
     scanTablesReady = true;
 }
 
+// ---- Login rate limit ---------------------------------------------------------------------------
+// Too many wrong passwords for one account (or from one address) lock further tries for a while.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_PER_ACCOUNT = 5;
+const LOGIN_MAX_PER_IP = 30;
+let loginTableReady = false;
+
+async function ensureLoginTable(env) {
+    if (loginTableReady) return;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Login_Attempts (Attempt_Key TEXT PRIMARY KEY, Fails INTEGER NOT NULL, First_At INTEGER NOT NULL)").run();
+    loginTableReady = true;
+}
+
+const loginKeys = (request, identifier) => {
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    return [
+        { key: `u:${String(identifier || "").trim().toLowerCase().slice(0, 80)}`, max: LOGIN_MAX_PER_ACCOUNT },
+        { key: `ip:${ip}`, max: LOGIN_MAX_PER_IP }
+    ];
+};
+
+// Seconds until the next try is allowed, 0 when allowed.
+async function loginLockedFor(env, keys) {
+    await ensureLoginTable(env);
+    const now = Date.now();
+    let wait = 0;
+    for (const k of keys) {
+        const row = await env.DB.prepare("SELECT Fails, First_At FROM Login_Attempts WHERE Attempt_Key = ?").bind(k.key).first();
+        if (row && now - row.First_At < LOGIN_WINDOW_MS && row.Fails >= k.max) {
+            wait = Math.max(wait, Math.ceil((row.First_At + LOGIN_WINDOW_MS - now) / 1000));
+        }
+    }
+    return wait;
+}
+
+async function loginFailed(env, keys) {
+    await ensureLoginTable(env);
+    const now = Date.now();
+    for (const k of keys) {
+        await env.DB.prepare(
+            `INSERT INTO Login_Attempts (Attempt_Key, Fails, First_At) VALUES (?, 1, ?)
+             ON CONFLICT(Attempt_Key) DO UPDATE SET
+                Fails = CASE WHEN ? - First_At >= ? THEN 1 ELSE Fails + 1 END,
+                First_At = CASE WHEN ? - First_At >= ? THEN ? ELSE First_At END`
+        ).bind(k.key, now, now, LOGIN_WINDOW_MS, now, LOGIN_WINDOW_MS, now).run();
+    }
+}
+
+const loginCleared = async (env, keys) => {
+    await env.DB.prepare("DELETE FROM Login_Attempts WHERE Attempt_Key = ?").bind(keys[0].key).run();
+};
+
+const tooManyTries = (corsHeaders, wait) => new Response(JSON.stringify({
+    error: `Too many wrong attempts. Try again in ${Math.ceil(wait / 60)} minute${Math.ceil(wait / 60) === 1 ? "" : "s"}.`
+}), { status: 429, headers: { ...corsHeaders, "Retry-After": String(wait) } });
+
 const SCAN_PHOTO_MAX_B64 = 900000; // about 650 KB of image; the app sends about 100 to 200 KB
 
 const parseJsonList = (text) => {
@@ -1374,12 +1430,18 @@ export default {
                     return new Response(JSON.stringify({ error: "Please enter your identifier and password." }), { status: 400, headers: corsHeaders });
                 }
 
+                const lk = loginKeys(request, id);
+                const locked = await loginLockedFor(env, lk);
+                if (locked) return tooManyTries(corsHeaders, locked);
+
                 const user = await findUserByCredentials(env, id, body.password,
                     "User_ID, Username, Name, Student_Number, account_status, role, course, year, section, eye_condition");
 
                 if (!user) {
+                    await loginFailed(env, lk);
                     return new Response(JSON.stringify({ error: "Invalid credentials." }), { status: 401, headers: corsHeaders });
                 }
+                await loginCleared(env, lk);
 
                 if (user.account_status.toLowerCase() !== 'active') {
                     return new Response(JSON.stringify({ error: `Account is ${user.account_status}.` }), { status: 403, headers: corsHeaders });
@@ -2013,6 +2075,9 @@ export default {
             if (request.method === "POST" && path === "/api/login") {
                 const body = await request.json();
                 const id = body.identifier;
+                const lk = loginKeys(request, id);
+                const locked = await loginLockedFor(env, lk);
+                if (locked) return tooManyTries(corsHeaders, locked);
 
                 const user = (id && body.password)
                     ? await findUserByCredentials(env, id, body.password,
@@ -2020,8 +2085,10 @@ export default {
                     : null;
 
                 if (!user) {
+                    await loginFailed(env, lk);
                     return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: corsHeaders });
                 }
+                await loginCleared(env, lk);
 
                 if (user.account_status.toLowerCase() !== 'active') {
                     let errorMessage = "";
