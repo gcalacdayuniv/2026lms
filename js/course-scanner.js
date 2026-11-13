@@ -221,13 +221,14 @@ export const CourseScanner = {
                 skipped++;
                 return;
             }
-            items.push({ idx, bonus: Boolean(q[5]), c: choices.length });
+            items.push({ idx, bonus: Boolean(q[5]), c: choices.length, part: Math.max(0, parseInt(q[0], 10) || 0) });
         });
         return {
             n: items.length,
             c: Math.max(2, ...items.map(i => i.c)),
             key: items.map(i => i.idx),
             bonus: items.map(i => i.bonus),
+            parts: items.map(i => i.part),
             skipped
         };
     },
@@ -264,7 +265,7 @@ export const CourseScanner = {
             if (a.n > MAX_QUESTIONS) return { ok: false, error: `The sheet holds up to ${MAX_QUESTIONS} questions; this exam has ${a.n}.` };
             const maxRegular = a.bonus.filter(b => !b).length;
             if (maxRegular < 1) return { ok: false, error: 'Every question in this exam is a bonus question.' };
-            cfg = { mode: 'exam', examId: exam.Exam_ID, title: String(exam.Title || '').trim(), n: a.n, c: a.c, key: a.key, bonus: a.bonus, maxRegular, skipped: a.skipped };
+            cfg = { mode: 'exam', examId: exam.Exam_ID, title: String(exam.Title || '').trim(), n: a.n, c: a.c, key: a.key, bonus: a.bonus, parts: a.parts, maxRegular, skipped: a.skipped };
         } else {
             const t = CourseScanner.typed;
             const title = val('scnTypedTitle').trim();
@@ -447,7 +448,8 @@ export const CourseScanner = {
             title: header,
             n: cfg.n,
             c: cfg.c,
-            paper: val('scnPaper') || 'letter'
+            paper: val('scnPaper') || 'letter',
+            parts: cfg.parts || null
         });
         const w = window.open('', '_blank');
         if (!w) {

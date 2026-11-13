@@ -15,13 +15,14 @@
 //   "CPU / Central Processing Unit" (space, slash, space).
 //
 // One spreadsheet / CSV row (same columns in the builder grid, the CSV upload and the CSV export):
-//   Part | Type | Question | Choice A ... Choice H | Answer | Explanation | Bonus | Points
+//   Part | Type | Question | Choice A ... Choice J | Answer | Explanation | Bonus | Points
+//   Part is shown and written from 1 (Part 1 is stored as 0 in the exam row). A file written with Choice A-H still imports.
 
-export const MAX_OPTIONS = 8;
+export const MAX_OPTIONS = 10;
 export const MIN_OPTIONS = 2;
 export const MAX_ITEMS = 30;
 export const MIN_ITEMS = 2;
-export const MAX_PAIRS = 8;
+export const MAX_PAIRS = 10;
 export const MIN_PAIRS = 2;
 export const MAX_POINTS = 100;
 export const ESSAY_POINTS = 5;
@@ -258,7 +259,7 @@ export const validate = (title, questions) => {
 
 // ---------- Spreadsheet view ----------
 // Column order of the grid, the CSV and a paste.
-export const COLUMNS = ['part', 'type', 'text', 'o0', 'o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'answer', 'expl', 'bonus', 'points'];
+export const COLUMNS = ['part', 'type', 'text', 'o0', 'o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'o8', 'o9', 'answer', 'expl', 'bonus', 'points'];
 
 export const letter = (i) => String.fromCharCode(65 + i);
 
@@ -319,7 +320,7 @@ export const changeType = (q, key) => {
     return q;
 };
 
-const LETTERS_ONLY = /^[A-Ha-h]([\s,;]+[A-Ha-h])*$/;
+const LETTERS_ONLY = /^[A-Ja-j]([\s,;]+[A-Ja-j])*$/;
 
 // "9.8 ± 0.1", "9.8 +- 0.1" or "9.8" -> { value, tol }
 const splitNumeric = (value) => {
@@ -331,13 +332,13 @@ const splitNumeric = (value) => {
 export const setCell = (q, col, raw) => {
     const value = String(raw ?? '');
     if (col === 'part') {
-        q.part = parseInt(value, 10) || 0;
+        q.part = Math.max(0, (parseInt(value, 10) || 1) - 1);   // shown from 1, stored from 0
     } else if (col === 'type') {
         const t = parseTypeWord(value);
         if (t) changeType(q, t);
     } else if (col === 'text') {
         q.text = value;
-    } else if (/^o[0-7]$/.test(col)) {
+    } else if (/^o\d$/.test(col)) {
         const idx = parseInt(col.slice(1), 10);
         if (q.type === 'mc' || q.type === 'multi') {
             while (q.options.length <= idx) q.options.push('');
@@ -351,14 +352,14 @@ export const setCell = (q, col, raw) => {
         if (q.type === 'mc') {
             const v = value.trim();
             let idx = -1;
-            if (/^[A-Ha-h]$/.test(v)) idx = v.toUpperCase().charCodeAt(0) - 65;
+            if (/^[A-Ja-j]$/.test(v)) idx = v.toUpperCase().charCodeAt(0) - 65;
             else idx = q.options.findIndex(o => o.trim().toLowerCase() === v.toLowerCase());
             q.correct = idx >= 0 && idx < q.options.length ? idx : -1;
         } else if (q.type === 'multi') {
             const v = value.trim();
             const tokens = LETTERS_ONLY.test(v) ? v.split(/[\s,;]+/) : splitItems(v);
             q.corrects = [...new Set(tokens.map(t => {
-                if (/^[A-Ha-h]$/.test(t)) return t.toUpperCase().charCodeAt(0) - 65;
+                if (/^[A-Ja-j]$/.test(t)) return t.toUpperCase().charCodeAt(0) - 65;
                 return q.options.findIndex(o => o.trim().toLowerCase() === t.toLowerCase());
             }).filter(i => i >= 0 && i < q.options.length))];
         } else if (q.type === 'tf') {
@@ -389,10 +390,10 @@ export const setCell = (q, col, raw) => {
 
 // The text of one grid cell (the inverse of setCell). Used by the CSV export.
 export const cellText = (q, col) => {
-    if (col === 'part') return String(q.part);
+    if (col === 'part') return String(q.part + 1);
     if (col === 'type') return typeLabel(q);
     if (col === 'text') return q.text;
-    if (/^o[0-7]$/.test(col)) {
+    if (/^o\d$/.test(col)) {
         const idx = parseInt(col.slice(1), 10);
         if (q.type === 'mc' || q.type === 'multi') return q.options[idx] || '';
         if (q.type === 'match') {
@@ -477,7 +478,6 @@ const inferKey = (options, answer) => {
     return 'mc';
 };
 
-const POINTS_COL = 3 + MAX_OPTIONS + 3;
 
 // CSV rows (already split into cells) -> { questions, skipped }.
 // Reads the new layout (header has a Type column) and the old 6-column layout:
@@ -490,8 +490,19 @@ export const fromCsvRows = (rows) => {
 
     const head = clean[0].map(c => String(c).trim().toLowerCase());
     const isNew = head[1] === 'type';
+    // The number of Choice columns comes from the header, so files with Choice A-H and Choice A-J both import.
+    const answerAt = head.indexOf('answer');
+    const nOpt = isNew && answerAt >= 3 ? answerAt - 3 : MAX_OPTIONS;
     const hasHeader = isNew || !/^\d+$/.test(head[0] || '');
     const body = hasHeader ? clean.slice(1) : clean;
+
+    // Parts are written from 1. An older file that uses 0 means Part 1 is written as 0, so it is read as it is.
+    const zeroBased = body.some(r => /^0+$/.test(String(r[0] ?? '').trim()));
+    const partOf = (v) => {
+        const n = parseInt(v, 10);
+        if (!Number.isFinite(n)) return 0;
+        return zeroBased ? Math.max(0, n) : Math.max(0, n - 1);
+    };
 
     body.forEach(r => {
         const cell = (i) => String(r[i] ?? '').trim();
@@ -500,10 +511,10 @@ export const fromCsvRows = (rows) => {
         if (isNew) {
             const text = String(r[2] ?? '').replace(/^'(?=[=+\-@])/, '');
             if (!text.trim()) { skipped++; return; }
-            const options = Array.from({ length: MAX_OPTIONS }, (_, k) => plain(3 + k));
-            const answer = plain(3 + MAX_OPTIONS);
+            const options = Array.from({ length: nOpt }, (_, k) => plain(3 + k));
+            const answer = plain(3 + nOpt);
             const key = parseTypeWord(cell(1)) || inferKey(options.filter(Boolean), answer);
-            const q = blankQuestion('mc', parseInt(cell(0), 10) || 0);
+            const q = blankQuestion('mc', partOf(cell(0)));
             setCell(q, 'type', key);
             q.text = text.trim();
             if (q.type === 'mc' || q.type === 'multi') q.options = [];
@@ -516,9 +527,9 @@ export const fromCsvRows = (rows) => {
                 while (q.pairs.length < MIN_PAIRS) q.pairs.push({ l: '', r: '' });
             }
             setCell(q, 'answer', answer);
-            q.expl = plain(4 + MAX_OPTIONS);
-            setCell(q, 'bonus', cell(5 + MAX_OPTIONS));
-            setCell(q, 'points', cell(POINTS_COL));
+            q.expl = plain(4 + nOpt);
+            setCell(q, 'bonus', cell(5 + nOpt));
+            setCell(q, 'points', cell(6 + nOpt));
             questions.push(q);
         } else {
             if (r.length < 4 || !String(r[1] ?? '').trim()) { skipped++; return; }

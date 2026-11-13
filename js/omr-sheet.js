@@ -86,7 +86,9 @@ const markerHtml = (cx, cy, size) =>
 
 // Complete printable HTML document for one answer sheet.
 // title = the header typed by the lecturer (printed at the top; may be empty).
-export const buildSheetHtml = ({ title = '', n, c, paper = 'letter' }) => {
+// parts = optional list with the 0-based part of each question; when the exam has more than one part,
+// a small "PART n" label is printed above the first question of each part.
+export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null }) => {
     const p = PAPERS[paper] || PAPERS.letter;
     const left = (p.w - FRAME.w) / 2;
     const top = (p.h - FRAME.h) / 2;
@@ -126,7 +128,11 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter' }) => {
             parts.push(textHtml(u0 + ANS.firstK + k * ANS.kPitch - 3, COLUMNS[b].top - LETTER_GAP, 6, String.fromCharCode(65 + k), 'cap center'));
         }
     }
+    const showParts = Array.isArray(qParts) && new Set(qParts.slice(0, n)).size > 1;
     rows.forEach(r => {
+        if (showParts && (r.q === 0 || qParts[r.q] !== qParts[r.q - 1])) {
+            parts.push(textHtml(r.u0, r.v - 4.3, 10, 'PART ' + (Number(qParts[r.q]) + 1), 'part'));
+        }
         parts.push(textHtml(r.u0, r.v - 1.6, 9, String(r.q + 1), 'num right'));
         r.bubbles.forEach(bb => parts.push(bubbleHtml(bb.u, bb.v)));
     });
@@ -148,6 +154,7 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-s
 .note { font-size: 2.5mm; line-height: 3mm; color: #222; }
 .cap { font-size: 2.8mm; font-weight: bold; }
 .num { font-size: 2.6mm; }
+.part { font-size: 1.9mm; line-height: 2mm; font-weight: bold; white-space: nowrap; }
 .right { text-align: right; }
 .center { text-align: center; }
 .hyphen { font-size: 4mm; font-weight: bold; }

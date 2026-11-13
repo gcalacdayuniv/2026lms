@@ -123,7 +123,7 @@ export const ExamBuilder = {
         if (ExamBuilder.root && ExamBuilder.root.isConnected) return ExamBuilder.root;
         const root = document.createElement('div');
         root.id = ROOT_ID;
-        root.className = 'hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0 sm:p-4';
+        root.className = 'hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0';
         document.body.appendChild(root);
         root.addEventListener('click', ExamBuilder.onClick);
         root.addEventListener('input', ExamBuilder.onInput);
@@ -143,7 +143,7 @@ export const ExamBuilder = {
             </button>`;
         root.innerHTML = `
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeExamBuilderBg"></div>
-            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full ${s.view === 'sheet' ? 'sm:max-w-7xl' : 'sm:max-w-3xl'} h-full sm:h-[94vh] relative z-10 sheet-panel app-page flex flex-col overflow-hidden" id="ebPanel">
+            <div class="bg-white rounded-none shadow-xl w-full h-full relative z-10 sheet-panel app-page flex flex-col overflow-hidden" id="ebPanel">
                 <div class="flex items-center gap-3 px-4 py-3 border-b app-page-header shrink-0">
                     <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate"><i class="fa-solid fa-wand-magic-sparkles text-indigo-600 mr-2" aria-hidden="true"></i>${s.examId ? 'Edit Exam' : 'Create Exam'}</h3>
                     <button type="button" id="closeExamBuilderBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
@@ -161,6 +161,7 @@ export const ExamBuilder = {
                         <span id="ebCount" class="text-xs font-bold text-gray-500"></span>
                         <div class="ml-auto flex items-center gap-1.5">
                             <button type="button" id="ebImportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-import mr-1" aria-hidden="true"></i>Import CSV / Excel</button>
+                            <button type="button" id="ebTemplateBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-download mr-1" aria-hidden="true"></i>Template</button>
                             <button type="button" id="ebExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
                             <input type="file" id="ebCsvInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden">
                         </div>
@@ -170,13 +171,21 @@ export const ExamBuilder = {
                 </div>
                 <div id="ebBody" class="flex-1 min-h-0 overflow-auto bg-indigo-50/60 p-3 sm:p-4"></div>
                 <div class="shrink-0 border-t bg-white px-3 py-2 flex flex-wrap items-center gap-2" style="padding-bottom:max(0.5rem,env(safe-area-inset-bottom))">
-                    <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span class="text-[11px] font-bold text-gray-500 uppercase hidden sm:inline shrink-0">Add</span>
-                        <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5" role="group" aria-label="Add a question">
-                            ${M.TYPES.map(t => `<button type="button" data-add="${t.id}" class="eb-add shrink-0 px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold transition whitespace-nowrap"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>${ADD_LABEL[t.id] || t.label}</button>`).join('')}
+                    <div class="flex-1 min-w-0"></div>
+                    <button type="button" id="ebSaveBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-md text-sm font-bold shadow-sm transition disabled:opacity-50"><i class="fa-solid fa-floppy-disk mr-1" aria-hidden="true"></i>Save exam</button>
+                </div>
+                <button type="button" id="ebFab" aria-label="Add question" aria-haspopup="dialog" class="absolute right-5 w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 flex justify-center items-center focus:outline-none focus-visible:ring-4 ring-purple-300 transition-colors z-20" style="bottom:calc(4.5rem + env(safe-area-inset-bottom))"><i class="fa-solid fa-plus text-2xl" aria-hidden="true"></i></button>
+                <div id="ebTypeModal" class="hidden absolute inset-0 z-30 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-label="Choose question type">
+                    <div class="absolute inset-0 bg-gray-900 bg-opacity-50" id="closeEbTypeBg"></div>
+                    <div class="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-lg shadow-xl max-h-full overflow-y-auto">
+                        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white">
+                            <h4 class="font-bold text-gray-800">Add question</h4>
+                            <button type="button" id="closeEbTypeBtn" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
+                            ${M.TYPES.map(t => `<button type="button" data-add="${t.id}" class="eb-add flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold text-center transition"><i class="fa-solid ${t.icon} text-xl" aria-hidden="true"></i>${ADD_LABEL[t.id] || t.label}</button>`).join('')}
                         </div>
                     </div>
-                    <button type="button" id="ebSaveBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-md text-sm font-bold shadow-sm transition disabled:opacity-50"><i class="fa-solid fa-floppy-disk mr-1" aria-hidden="true"></i>Save exam</button>
                 </div>
             </div>`;
     },
@@ -210,7 +219,7 @@ export const ExamBuilder = {
     formHtml: () => {
         const s = ExamBuilder.s;
         if (s.questions.length === 0) {
-            return '<div class="text-center text-sm text-gray-500 py-10">No questions yet. Use the Add buttons below.</div>';
+            return '<div class="text-center text-sm text-gray-500 py-10">No questions yet. Tap the + button to add one.</div>';
         }
         return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards">${s.questions.map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
     },
@@ -328,7 +337,7 @@ export const ExamBuilder = {
                     <span class="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1">Q${i + 1}</span>
                     <select class="eb-type text-xs font-bold border border-gray-300 rounded-md px-2 py-1.5 bg-white" aria-label="Question type">${typeOptions}</select>
                     <label class="text-[11px] font-bold text-gray-500 flex items-center gap-1">Part
-                        <input type="number" min="0" max="99" class="eb-field w-14 border border-gray-300 rounded px-1.5 py-1 text-xs bg-white" data-col="part" value="${q.part}" aria-label="Part number">
+                        <input type="number" min="1" max="99" class="eb-field w-14 border border-gray-300 rounded px-1.5 py-1 text-xs bg-white" data-col="part" value="${q.part + 1}" aria-label="Part number">
                     </label>
                     <label class="text-[11px] font-bold text-gray-500 flex items-center gap-1">Points
                         <input type="text" inputmode="decimal" class="eb-field w-16 border border-gray-300 rounded px-1.5 py-1 text-xs bg-white" data-col="points" value="${esc(q.points)}" placeholder="${M.defaultPoints(q)}" aria-label="Points for this question">
@@ -400,7 +409,7 @@ export const ExamBuilder = {
         return `
             <tr data-qid="${q.id}" class="eb-row">
                 <td class="border border-gray-200 bg-gray-50 text-center font-bold text-gray-500 px-1">${i + 1}</td>
-                <td class="border border-gray-200 p-0"><input type="number" min="0" max="99" class="${CELL}" data-col="part" value="${q.part}" aria-label="Part"></td>
+                <td class="border border-gray-200 p-0"><input type="number" min="1" max="99" class="${CELL}" data-col="part" value="${q.part + 1}" aria-label="Part"></td>
                 <td class="border border-gray-200 p-0"><select class="${CELL} eb-type" data-col="type" aria-label="Type">${typeOptions}</select></td>
                 <td class="border border-gray-200 p-0"><textarea rows="1" class="${CELL} resize-none" data-col="text" aria-label="Question">${esc(q.text)}</textarea></td>
                 ${optCells}
@@ -450,6 +459,9 @@ export const ExamBuilder = {
         if (t.closest('#ebSaveBtn')) { await ExamBuilder.save(); return; }
         if (t.closest('#ebImportBtn')) { ExamBuilder.root.querySelector('#ebCsvInput').click(); return; }
         if (t.closest('#ebExportBtn')) { ExamBuilder.exportCsv(); return; }
+        if (t.closest('#ebTemplateBtn')) { ExamBuilder.downloadTemplate(); return; }
+        if (t.closest('#ebFab')) { ExamBuilder.toggleTypes(true); return; }
+        if (t.closest('#closeEbTypeBtn') || t.id === 'closeEbTypeBg') { ExamBuilder.toggleTypes(false); return; }
 
         const viewBtn = t.closest('.eb-view-btn');
         if (viewBtn) {
@@ -465,6 +477,7 @@ export const ExamBuilder = {
 
         const addBtn = t.closest('.eb-add');
         if (addBtn) {
+            ExamBuilder.toggleTypes(false);
             const last = s.questions[s.questions.length - 1];
             ExamBuilder.insertQuestion(M.blankQuestion(addBtn.dataset.add, last ? last.part : 0), s.questions.length);
             return;
@@ -668,8 +681,20 @@ export const ExamBuilder = {
         }
     },
 
+    toggleTypes: (open) => {
+        const m = ExamBuilder.root && ExamBuilder.root.querySelector('#ebTypeModal');
+        if (!m) return;
+        m.classList.toggle('hidden', !open);
+        if (open) { const b = m.querySelector('.eb-add'); if (b) b.focus(); }
+        else { const f = ExamBuilder.root.querySelector('#ebFab'); if (f) f.focus(); }
+    },
+
     onKeydown: (e) => {
         const s = ExamBuilder.s;
+        if (s && e.key === 'Escape') {
+            const m = ExamBuilder.root.querySelector('#ebTypeModal');
+            if (m && !m.classList.contains('hidden')) { e.stopPropagation(); ExamBuilder.toggleTypes(false); return; }
+        }
         if (!s || e.key !== 'Enter' || e.shiftKey) return;
         const t = e.target;
         if (t.classList && t.classList.contains('eb-item')) {

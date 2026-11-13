@@ -128,18 +128,6 @@ export const CourseExam = {
     },
 
     handleClicks: async (e) => {
-        if (e.target.closest('#downloadExamCsvTemplateBtn')) {
-            CourseExam.downloadCsvTemplate();
-        }
-
-        if (e.target.closest('#toggleExamCsvGuideBtn')) {
-            const panel = document.getElementById('examCsvGuidePanel');
-            if (panel) {
-                panel.classList.toggle('hidden');
-                e.target.closest('#toggleExamCsvGuideBtn').setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
-            }
-        }
-
         if (e.target.closest('#readDashboardExamsBtn')) {
             CourseExam.announceDashboardExams();
         }

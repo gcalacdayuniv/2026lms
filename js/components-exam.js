@@ -18,68 +18,9 @@ export const ExamUI = {
                 <!-- Main Exam List View -->
                 <div id="examManagerMainView" class="flex-1 flex flex-col min-h-0 overflow-hidden">
                     <div class="mb-3 flex-shrink-0">
-                        <button type="button" id="openExamBuilderBtn" class="w-full text-left bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl p-4 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                            <div class="flex items-center gap-3">
-                                <span class="w-10 h-10 shrink-0 rounded-full bg-white/20 flex items-center justify-center"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
-                                <span>
-                                    <span class="block text-sm font-black">Create Exam</span>
-                                    <span class="block text-xs text-indigo-100 mt-0.5">Build it like a Google Form or a spreadsheet, import or export CSV inside, and set the Record Scores details for this class.</span>
-                                </span>
-                            </div>
+                        <button type="button" id="openExamBuilderBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-3 text-sm font-black shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <i class="fa-solid fa-plus mr-2" aria-hidden="true"></i>Create Exam
                         </button>
-                    </div>
-
-                    <div class="mb-3 flex flex-wrap items-center gap-2 flex-shrink-0">
-                        <button type="button" id="downloadExamCsvTemplateBtn" class="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md text-xs font-bold transition shadow-sm flex items-center">
-                            <i class="fa-solid fa-download mr-1.5" aria-hidden="true"></i> Download CSV Template
-                        </button>
-                        <button type="button" id="toggleExamCsvGuideBtn" class="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md text-xs font-bold transition shadow-sm flex items-center" aria-expanded="false" aria-controls="examCsvGuidePanel">
-                            <i class="fa-solid fa-circle-question mr-1.5" aria-hidden="true"></i> Spreadsheet Guide
-                        </button>
-                        <span class="text-[11px] text-gray-500">Types: Multiple choice, Multiple answer, True or False, Identification, Numeric, Enumeration, Ordering, Matching, Essay</span>
-                    </div>
-
-                    <!-- Collapsible Spreadsheet Guide -->
-                    <div id="examCsvGuidePanel" class="hidden mb-3 bg-white p-3 rounded-lg border border-gray-200 text-xs text-gray-700 space-y-3 flex-shrink-0 max-h-[40vh] overflow-y-auto">
-                        <div class="font-black text-gray-900 uppercase tracking-wider text-[11px]">The same columns are used in the builder's Spreadsheet view, the CSV import and the CSV export</div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse border border-gray-200 text-[11px]">
-                                <thead class="bg-gray-100 text-gray-800 font-bold">
-                                    <tr><th class="border border-gray-200 px-2 py-1">Column</th><th class="border border-gray-200 px-2 py-1">What to put there</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Part</td><td class="border border-gray-200 px-2 py-1">A number: <code class="bg-gray-100 px-1 rounded">0</code> is Part 1, <code class="bg-gray-100 px-1 rounded">1</code> is Part 2, and so on.</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Type</td><td class="border border-gray-200 px-2 py-1"><code class="bg-gray-100 px-1 rounded">Multiple choice</code>, <code class="bg-gray-100 px-1 rounded">Multiple answer</code>, <code class="bg-gray-100 px-1 rounded">True or False</code>, <code class="bg-gray-100 px-1 rounded">Identification</code>, <code class="bg-gray-100 px-1 rounded">Numeric</code>, <code class="bg-gray-100 px-1 rounded">Enumeration</code>, <code class="bg-gray-100 px-1 rounded">Ordering</code>, <code class="bg-gray-100 px-1 rounded">Matching</code> or <code class="bg-gray-100 px-1 rounded">Essay</code>. Add <code class="bg-gray-100 px-1 rounded">(all or nothing)</code> to Multiple answer or Ordering, or <code class="bg-gray-100 px-1 rounded">(ordered)</code> to Enumeration. Left empty, it is worked out from the other cells.</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Question</td><td class="border border-gray-200 px-2 py-1">The question text. A cell may hold several lines.</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Choice A to H</td><td class="border border-gray-200 px-2 py-1">One choice per cell for Multiple choice and Multiple answer (up to 8). For <strong>Matching</strong>, one pair per cell written <code class="bg-gray-100 px-1 rounded">left | right</code> (up to 8).</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Answer</td><td class="border border-gray-200 px-2 py-1">See the next table.</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Explanation</td><td class="border border-gray-200 px-2 py-1">Optional. Shown after the answer.</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Bonus</td><td class="border border-gray-200 px-2 py-1">Optional. Write <code class="bg-gray-100 px-1 rounded">Yes</code> to make it a bonus question.</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold whitespace-nowrap">Points</td><td class="border border-gray-200 px-2 py-1">Optional. Points for the whole question (0.01 to 100). Empty uses the default in the next table.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse border border-gray-200 text-[11px]">
-                                <thead class="bg-gray-100 text-gray-800 font-bold">
-                                    <tr><th class="border border-gray-200 px-2 py-1">Type</th><th class="border border-gray-200 px-2 py-1">Answer cell</th><th class="border border-gray-200 px-2 py-1">Default points</th></tr>
-                                </thead>
-                                <tbody>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Multiple choice</td><td class="border border-gray-200 px-2 py-1">The letter of the right choice, like <code class="bg-gray-100 px-1 rounded">B</code> (or its exact text)</td><td class="border border-gray-200 px-2 py-1">1</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Multiple answer</td><td class="border border-gray-200 px-2 py-1">The letters of all right choices, like <code class="bg-gray-100 px-1 rounded">A, C</code>. Partial credit: each wrong tick takes a share away. "(all or nothing)" gives credit only for the exact set.</td><td class="border border-gray-200 px-2 py-1">1</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">True or False</td><td class="border border-gray-200 px-2 py-1"><code class="bg-gray-100 px-1 rounded">True</code> or <code class="bg-gray-100 px-1 rounded">False</code></td><td class="border border-gray-200 px-2 py-1">1</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Identification</td><td class="border border-gray-200 px-2 py-1">The exact answer (capital letters are ignored). Accept other answers with <code class="bg-gray-100 px-1 rounded"> / </code>, like <code class="bg-gray-100 px-1 rounded">CPU / processor</code></td><td class="border border-gray-200 px-2 py-1">1</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Numeric</td><td class="border border-gray-200 px-2 py-1">The number, with an optional tolerance: <code class="bg-gray-100 px-1 rounded">9.8 ± 0.1</code> (or <code class="bg-gray-100 px-1 rounded">9.8 +- 0.1</code>)</td><td class="border border-gray-200 px-2 py-1">1</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Enumeration</td><td class="border border-gray-200 px-2 py-1">The items separated by <code class="bg-gray-100 px-1 rounded">|</code>, like <code class="bg-gray-100 px-1 rounded">Red | Green | Blue</code>. Any order, unless "Enumeration (ordered)". An item may have alternatives: <code class="bg-gray-100 px-1 rounded">Green / Lime</code></td><td class="border border-gray-200 px-2 py-1">1 for each correct item</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Ordering</td><td class="border border-gray-200 px-2 py-1">The items in the correct order, separated by <code class="bg-gray-100 px-1 rounded">|</code>. Students see them shuffled. Partial credit for each item in the right place; "(all or nothing)" needs the exact order.</td><td class="border border-gray-200 px-2 py-1">1</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Matching</td><td class="border border-gray-200 px-2 py-1">Pairs go in the Choice cells as <code class="bg-gray-100 px-1 rounded">left | right</code>. Answer holds optional extra wrong choices separated by <code class="bg-gray-100 px-1 rounded">|</code>.</td><td class="border border-gray-200 px-2 py-1">1 for each correct pair</td></tr>
-                                    <tr><td class="border border-gray-200 px-2 py-1 font-bold">Essay</td><td class="border border-gray-200 px-2 py-1">A model answer or rubric (only you see it). You score each essay by hand in <strong>Grade Essays</strong>.</td><td class="border border-gray-200 px-2 py-1">5 by default</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="text-[11px] text-gray-600">
-                            <strong>Tip:</strong> Download the template, replace the sample rows and keep Row 1 as the header. Import the file from inside Create Exam: a <strong>CSV</strong> or an <strong>Excel (.xlsx)</strong> file works (the first sheet is read). Files in the older 6-column layout (Part Index, Question, Choices, Answer, Explanation, Bonus) still import.
-                        </div>
                     </div>
 
                     <div class="flex items-center justify-between mb-1.5 flex-shrink-0">
