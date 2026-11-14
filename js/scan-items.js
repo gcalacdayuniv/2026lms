@@ -74,10 +74,26 @@ export const numberShape = (value) => {
     return { neg: m[1] === '-', int: m[2] ? int : '0', dec, digits };
 };
 
+// How many question numbers an item uses: one per answer part (enumeration answers, matching pairs, items to
+// order, correct choices of a multiple-answer question) or one per point when points are set on a single-answer item.
+export const spanOfRow = (q, type = rowType(q)) => {
+    if (type === 'enum' || type === 'order') return Math.max(1, clean(q[3]).length);
+    if (type === 'match') return Math.max(1, pairsOf(q).length);
+    if (type === 'multi') return Math.max(1, new Set(clean(Array.isArray(q[3]) ? q[3] : [q[3]]).map(norm)).size);
+    if (type === 'essay') return 1;
+    const p = Number(metaOf(q).points);
+    return Number.isInteger(p) && p > 1 && p <= 50 ? p : 1;
+};
+// "12" or "12-14" for an item whose first number is no and that uses sp numbers.
+export const itemLabel = (it) => {
+    const no = Number(it.no) || 0, sp = Number(it.sp ?? it.span) || 1;
+    return sp > 1 ? `${no}-${no + sp - 1}` : String(no);
+};
+
 // One saved row -> item. `scannable` items get cells; the rest are marked by hand.
 const makeItem = (q, orig, no, rng) => {
     const type = rowType(q);
-    const base = { t: 'manual', orig, no, part: Math.max(0, parseInt(q[0], 10) || 0), bonus: Boolean(q[5]), text: String(q[1] ?? ''), type, row: q.slice(), cells: [], key: [] };
+    const base = { t: 'manual', orig, no, span: spanOfRow(q, type), part: Math.max(0, parseInt(q[0], 10) || 0), bonus: Boolean(q[5]), text: String(q[1] ?? ''), type, row: q.slice(), cells: [], key: [] };
     if (!SCANNABLE.includes(type)) return base;
     const choices = Array.isArray(q[2]) ? q[2].map(String) : [];
 
@@ -136,8 +152,27 @@ const makeItem = (q, orig, no, rng) => {
     return { ...base, t: 'num', cells, key, digits: D };
 };
 
+// Can this saved row be shaded on the answer sheet? -> { ok, why } (why = short note for the exam builder)
+export const scanCheck = (row) => {
+    const type = rowType(row);
+    if (type === 'essay') return { ok: false, why: 'Written: the lecturer marks it by hand.' };
+    if (type === 'enum') return { ok: false, why: 'Enumeration is written: the lecturer marks it by hand.' };
+    if (type === 'id') return { ok: false, why: 'Identification is written: the lecturer marks it by hand.' };
+    if (!SCANNABLE.includes(type)) return { ok: false, why: 'Not shaded on the answer sheet: marked by hand.' };
+    if (makeItem(row, 0, 0, rngOf(1)).t !== 'manual') return { ok: true, why: 'Can be shaded on the scan answer sheet.' };
+    const why = {
+        mc: 'Needs 2 to 10 choices and one correct answer to be scanned.',
+        multi: 'Needs 2 to 10 choices and at least one correct answer to be scanned.',
+        tf: 'Pick True or False to be scanned.',
+        match: 'Needs 2 to 10 pairs (10 choices at most with extras) to be scanned.',
+        order: 'Needs 2 to 10 items to be scanned.',
+        num: 'Needs a number with up to 4 decimals and 6 digits to be scanned.'
+    }[type];
+    return { ok: false, why: `Not scannable yet. ${why}` };
+};
+
 // Same-shaped items can swap places between sets.
-const shapeOf = (it) => it.t + ':' + it.cells.map(c => c[0] + c[1]).join(',');
+const shapeOf = (it) => it.t + '#' + it.span + ':' + it.cells.map(c => c[0] + c[1]).join(',');
 
 // Builds every set. rows = saved exam rows (array or JSON text).
 // -> { sets: [{ letter, items, key }], cells: [...], manual: n, scannable: n }
@@ -161,7 +196,8 @@ export const buildScanSets = (examData, { seed = 'exam', count = 4 } = {}) => {
             order = base.map((_, i) => i);
             slots.forEach(pos => { const sh = shuffled(pos, rng); pos.forEach((p, j) => { order[p] = sh[j]; }); });
         }
-        const items = order.map((srcIdx, pos) => {
+        let nextNo = 1;
+        const items = order.map((srcIdx) => {
             let it = base[srcIdx];
             // choices of mc / multi are shuffled in the other sets, except "all of the above" style lists
             if (s > 0 && (it.t === 'mc' || it.t === 'multi') && !it.shown.some(c => FIXED.test(c))) {
@@ -170,7 +206,8 @@ export const buildScanSets = (examData, { seed = 'exam', count = 4 } = {}) => {
                 const key = it.t === 'mc' ? [perm.indexOf(it.key[0])] : [multiCode(maskIdx(it.key[0]).map(i => perm.indexOf(i)))];
                 it = { ...it, shown: perm.map(i => it.shown[i]), key };
             }
-            const placed = { ...it, no: pos + 1 };
+            const placed = { ...it, no: nextNo };
+            nextNo += placed.span;
             if (placed.t === 'mc' || placed.t === 'multi' || placed.t === 'tf') {
                 placed.row = placed.row.slice();
                 placed.row[2] = placed.shown.slice();
@@ -181,7 +218,12 @@ export const buildScanSets = (examData, { seed = 'exam', count = 4 } = {}) => {
         const flat = [], key = [];
         items.forEach(it => {
             it.s = flat.length;
-            it.cells = it.cells.map((c, sub) => [c[0], c[1], it.no, sub, it.part, c[5] || '']);
+            // printed row label: 12, 12-14 (several numbers on one row), 12 + sub for matching / ordering rows, 12.dec for numeric digits
+            it.cells = it.cells.map((c, sub) => {
+                const split = it.t === 'match' || it.t === 'order';
+                const label = split ? String(it.no + sub) : c[5] ? `${it.no}.${c[5]}` : itemLabel({ no: it.no, sp: it.span });
+                return [c[0], c[1], it.no, sub, it.part, label];
+            });
             it.cells.forEach(c => flat.push(c));
             it.key.forEach(k => key.push(k));
             n += it.cells.length;
@@ -195,11 +237,19 @@ export const buildScanSets = (examData, { seed = 'exam', count = 4 } = {}) => {
 
 const maskIdx = (code) => { const out = []; for (let k = 0; k < 10; k++) if ((code - 1000) & (1 << k)) out.push(k); return out; };
 
+// Question numbers answered by handwriting on the sheet (identification, enumeration ...). Essays are written on the paper.
+export const writtenLabels = (built) => {
+    const first = built.sets[0] ? built.sets[0].items : [];
+    const out = [];
+    first.forEach(it => { if (it.t === 'manual' && it.type !== 'essay') for (let k = 0; k < it.span; k++) out.push(String(it.no + k)); });
+    return out;
+};
+
 // What gets stored with a session and sent to the Worker for grading: per set only what grading needs.
 export const gradingSets = (built) => built.sets.map(set => ({
     key: set.key,
     bonus: set.items.flatMap(it => it.cells.map(() => it.bonus)),
-    items: set.items.map(it => ({ t: it.t, no: it.no, o: it.orig, s: it.s, n: it.cells.length, b: it.bonus, row: stripRow(it), shown: it.shown }))
+    items: set.items.map(it => ({ t: it.t, no: it.no, sp: it.span, o: it.orig, s: it.s, n: it.cells.length, b: it.bonus, row: stripRow(it), shown: it.shown }))
 }));
 const stripRow = (it) => { const r = it.row.slice(); r[1] = ''; if (it.t === 'match') r[3] = pairsOf(it.row).map(p => [String(p[0]), String(p[1])]); return r; };
 
@@ -214,8 +264,9 @@ export const cellLabels = (cell) => {
 };
 export const cellName = (cells, q) => {
     const c = cells[q];
+    if (c[5]) return c[5];
     const same = (cells[q - 1] && cells[q - 1][2] === c[2]) || (cells[q + 1] && cells[q + 1][2] === c[2]);
-    return same ? `${c[2]}.${c[5] || c[3] + 1}` : String(c[2]);
+    return same ? `${c[2]}.${c[3] + 1}` : String(c[2]);
 };
 // Text of a key / answer code of one cell: "B", "A, C", "blank".
 export const codeText = (cell, code) => {

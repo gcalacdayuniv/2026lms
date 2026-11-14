@@ -4,6 +4,7 @@
 import { apiFetch, AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
 import * as M from './exam-builder-model.js';
+import { scanCheck } from './scan-items.js';
 
 const ROOT_ID = 'examBuilderModal';
 const VIEW_KEY = 'exam_builder_view';
@@ -224,7 +225,7 @@ export const ExamBuilder = {
         if (s.questions.length === 0) {
             return '<div class="text-center text-sm text-gray-500 py-10">No questions yet. Tap the + button to add one.</div>';
         }
-        return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards">${s.questions.map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
+        return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards"><p class="text-[11px] text-gray-700 flex flex-wrap gap-2 items-center"><span class="px-2 py-0.5 rounded font-bold text-green-800" style="background:rgba(34,197,94,0.2)">Green: can be scanned from the answer sheet</span><span class="px-2 py-0.5 rounded font-bold text-orange-800" style="background:rgba(249,115,22,0.2)">Orange: written or not scannable, marked by hand</span></p>${s.questions.map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
     },
 
     cardHtml: (q, i) => {
@@ -334,8 +335,10 @@ export const ExamBuilder = {
                     <input type="text" class="${INPUT} eb-field" data-col="answer" value="${esc(q.answer)}" placeholder="Type the exact answer" aria-label="Correct answer">
                 </div>`;
         }
+        const scanInfo = ExamBuilder.scanInfo(q), scanLook = ExamBuilder.scanLook(scanInfo);
         return `
-            <div class="eb-card bg-white rounded-xl border border-gray-200 border-l-4 border-l-transparent focus-within:border-l-indigo-600 shadow-sm p-3 sm:p-4" data-qid="${q.id}">
+            <div class="eb-card rounded-xl border border-gray-200 border-l-4 border-l-transparent focus-within:border-l-indigo-600 shadow-sm p-3 sm:p-4" style="background:${scanLook.bg}" data-qid="${q.id}">
+                <div class="eb-scan text-[11px] font-bold ${scanLook.cls} mb-2 flex items-center gap-1"><i class="fa-solid ${scanLook.icon}" aria-hidden="true"></i><span>${esc(scanInfo.why)}</span></div>
                 <div class="flex flex-wrap items-center gap-2 mb-2">
                     <span class="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1">Q${i + 1}</span>
                     <select class="eb-type text-xs font-bold border border-gray-300 rounded-md px-2 py-1.5 bg-white" aria-label="Question type">${typeOptions}</select>
@@ -361,6 +364,27 @@ export const ExamBuilder = {
                     <button type="button" class="eb-act w-9 h-9 rounded hover:bg-red-50 hover:text-red-600" data-act="del" aria-label="Delete question"><i class="fa-regular fa-trash-can" aria-hidden="true"></i></button>
                 </div>
             </div>`;
+    },
+
+    // Green card = can be shaded on the scan answer sheet, orange = written / not scannable (20% tint).
+    scanInfo: (q) => {
+        try { return scanCheck(M.toRow(q)); } catch (e) { return { ok: false, why: 'Not scannable yet.' }; }
+    },
+    scanLook: (info) => ({
+        bg: info.ok ? 'rgba(34,197,94,0.2)' : 'rgba(249,115,22,0.2)',
+        cls: info.ok ? 'text-green-800' : 'text-orange-800',
+        icon: info.ok ? 'fa-camera' : 'fa-pen'
+    }),
+    paintScan: (q) => {
+        const card = ExamBuilder.root && ExamBuilder.root.querySelector(`.eb-card[data-qid="${q.id}"]`);
+        if (!card) return;
+        const info = ExamBuilder.scanInfo(q), look = ExamBuilder.scanLook(info);
+        card.style.background = look.bg;
+        const note = card.querySelector('.eb-scan');
+        if (note) {
+            note.className = `eb-scan text-[11px] font-bold ${look.cls} mb-2 flex items-center gap-1`;
+            note.innerHTML = `<i class="fa-solid ${look.icon}" aria-hidden="true"></i><span>${esc(info.why)}</span>`;
+        }
     },
 
     refreshCard: (qid, focusSel) => {
@@ -594,6 +618,7 @@ export const ExamBuilder = {
         if (t.tagName === 'SELECT' || t.type === 'checkbox' || t.type === 'radio') return;
         const q = ExamBuilder.qOf(t);
         if (!q) return;
+        queueMicrotask(() => ExamBuilder.paintScan(q));
         if (t.classList.contains('eb-item')) {
             q.items[parseInt(t.dataset.i, 10)] = t.value;
             ExamBuilder.touch();
@@ -637,6 +662,7 @@ export const ExamBuilder = {
         }
         const q = ExamBuilder.qOf(t);
         if (!q) return;
+        queueMicrotask(() => ExamBuilder.paintScan(q));
         const inSheet = s.view === 'sheet';
 
         if (t.classList.contains('eb-correct-multi')) {

@@ -12,7 +12,7 @@ import { ScanQueue } from './course-scan-queue.js';
 import { ScanPhotos } from './course-scan-photos.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
 import { scannableItems, buildSets } from './exam-sets.js';
-import { buildScanSets, gradingSets } from './scan-items.js';
+import { buildScanSets, gradingSets, itemLabel } from './scan-items.js';
 import { gradeScanSet, setMaxPoints } from './scan-grade.js';
 import { questionPoints } from './grading.js';
 import { sheetFits } from './omr-sheet.js';
@@ -942,7 +942,7 @@ export const CourseScanner = {
     cellName: (cells, q) => {
         const c = cells[q];
         const same = (cells[q - 1] && cells[q - 1][2] === c[2]) || (cells[q + 1] && cells[q + 1][2] === c[2]);
-        return same ? `${c[2]}.${c[5] || c[3] + 1}` : String(c[2]);
+        return c[5] || (same ? `${c[2]}.${c[3] + 1}` : String(c[2]));
     },
 
     // Questions that are written on the paper (identification, enumeration, essay): the lecturer types the points.
@@ -955,8 +955,8 @@ export const CourseScanner = {
         const pts = (it) => questionPoints(it.row);
         return `<div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
             <div class="text-[11px] font-bold text-amber-800 mb-1">Marked by hand (check the question paper)</div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${items.map(({ it, i }) => `<label class="text-[11px] text-gray-700">Q${it.no} <span class="text-gray-500">/ ${fmt(pts(it))}</span>
-                <input type="number" min="0" max="${pts(it)}" step="0.5" inputmode="decimal" class="scn-mark-input w-full px-1 py-0.5 border border-gray-300 rounded text-xs" data-row="${row.id}" data-i="${i}" value="${row.marks && row.marks[i] !== undefined ? row.marks[i] : ''}" aria-label="Points for question ${it.no}"></label>`).join('')}</div></div>`;
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${items.map(({ it, i }) => `<label class="text-[11px] text-gray-700">Q${itemLabel(it)} <span class="text-gray-500">/ ${fmt(pts(it))}</span>
+                <input type="number" min="0" max="${pts(it)}" step="0.5" inputmode="decimal" class="scn-mark-input w-full px-1 py-0.5 border border-gray-300 rounded text-xs" data-row="${row.id}" data-i="${i}" value="${row.marks && row.marks[i] !== undefined ? row.marks[i] : ''}" aria-label="Points for question ${itemLabel(it)}"></label>`).join('')}</div></div>`;
     },
 
     answerSelectHtml: (row, q) => {

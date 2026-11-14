@@ -32,7 +32,8 @@ const LETTER_GAP = 7;   // letters A-E are printed this far above the first row 
 
 // SET row (which printed exam set the student has): up to 6 circles A-F, printed only for exams with sets.
 export const MAX_SETS = 6;
-const SETROW = { u0: 120, v: 31.5, pitch: 8.5 };
+// It sits in the left column, above the student number grid (the instructions move to the right of it).
+const SETROW = { u0: 15.5, v: 24.6, pitch: 6, capV: 17.6 };
 export const setBubbles = (count = MAX_SETS) => Array.from({ length: count }, (_, k) => ({ k, u: SETROW.u0 + k * SETROW.pitch, v: SETROW.v }));
 
 // Student number grid, inside column 0.
@@ -105,7 +106,7 @@ export const planSheet = (cells) => {
         if (sl.block === 0) {
             r.u0 = u0; r.v = v; r.placed = true;
             const single = !(cells[sl.cell - 1] && cells[sl.cell - 1][2] === cell[2]) && !(cells[sl.cell + 1] && cells[sl.cell + 1][2] === cell[2]);
-            r.text = single ? String(cell[2]) : `${cell[2]}.${cell[5] || cell[3] + 1}`;
+            r.text = cell[5] || (single ? String(cell[2]) : `${cell[2]}.${cell[3] + 1}`);
         }
         if (sl.block > 0 && !r.cont) r.cont = [];
         if (sl.block > 0) r.cont.push({ u0, v, text: r.text });
@@ -115,7 +116,35 @@ export const planSheet = (cells) => {
         row++;
     }
     const placed = rows.every(r => r.placed);
-    return { ok: placed, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders };
+    if (ci < COLUMNS.length && row >= COLUMNS[ci].rows) { ci++; row = 0; }
+    return { ok: placed, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, row } };
+};
+
+// ---- Written answers ----
+// Items the scanner cannot read (identification, enumeration ...) get a lined portion of the sheet after the last
+// bubble row: one line per question number. labels = the numbers (strings). -> { lines, left: labels that did not fit, heads }
+const WRITE = { pitch: 8.7, head: 5.5, lineLeft: 11, lineRight: 2 };
+export const planWritten = (cells, labels) => {
+    const plan = planSheet(cells);
+    const out = { lines: [], heads: [], left: [] };
+    if (!plan.ok || !labels || !labels.length) return out;
+    let { ci, row } = plan.end;
+    let v = ci < COLUMNS.length ? COLUMNS[ci].top + row * ANS.pitch + (row > 0 ? 0.5 : -3) : 0;
+    let first = true;
+    const bottom = (c) => COLUMNS[c].top + COLUMNS[c].rows * ANS.pitch;
+    for (let k = 0; k < labels.length; k++) {
+        if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
+        if (v + WRITE.head * (first ? 1 : 0) + WRITE.pitch > bottom(ci)) {
+            ci++;
+            if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
+            v = COLUMNS[ci].top - 3; first = true;
+        }
+        const u0 = ANS.left + ci * ANS.blockW;
+        if (first) { out.heads.push({ u0, v, cont: out.heads.length > 0 }); v += WRITE.head; first = false; }
+        v += WRITE.pitch;
+        out.lines.push({ u0, v, label: String(labels[k]) });
+    }
+    return out;
 };
 
 // Capacity check used by the scanner setup: number of header + answer rows the cells need.
@@ -159,7 +188,7 @@ const noteOf = (multi, cells) => {
     return t;
 };
 
-export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null, sets = 0, multi = false, cells: given = null }) => {
+export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null, sets = 0, multi = false, cells: given = null, written = null }) => {
     const p = PAPERS[paper] || PAPERS.letter;
     const left = (p.w - FRAME.w) / 2;
     const top = (p.h - FRAME.h) / 2;
@@ -172,21 +201,22 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
 
     // Header, then ONE line for name / year and section / date, then the instructions.
     if (String(title).trim()) parts.push(textHtml(9, 5, 162, escapeHtml(String(title).trim()), 'title'));
-    parts.push(`<div class="hl" style="left:${mm(9)};top:${mm(14)};width:${mm(162)}">` +
+    const withSets = sets > 1;
+    parts.push(`<div class="hl" style="left:${mm(9)};top:${mm(withSets ? 11.2 : 14)};width:${mm(162)}">` +
         '<span>Name:</span><span class="ul" style="flex:3"></span>' +
         '<span>Year &amp; Section:</span><span class="ul" style="flex:1.3"></span>' +
         '<span>Date:</span><span class="ul" style="flex:1.1"></span></div>');
-    parts.push(textHtml(9, 22, 162,
+    parts.push(textHtml(withSets ? 52 : 9, withSets ? 16.4 : 22, withSets ? 119 : 162,
         'Use a black or blue pen, or a dark pencil. Shade the circle completely. ' +
         'Do not fold or stain this sheet. Erase fully if you change an answer. ' +
         noteOf(multi, given), 'note'));
 
     // SET row: one circle per printed exam set, shaded by the student (same letter as on the question paper)
-    if (sets > 1) {
+    if (withSets) {
         const sb = setBubbles(Math.min(MAX_SETS, sets));
-        parts.push(textHtml(SETROW.u0 - 17, SETROW.v - 1.6, 12, 'SET', 'cap right'));
+        parts.push(textHtml(ANS.left + 1, SETROW.v - 1.6, 10, 'SET', 'cap'));
         sb.forEach(b => {
-            parts.push(textHtml(b.u + 3, b.v - 1.6, 3, String.fromCharCode(65 + b.k), 'cap'));
+            parts.push(textHtml(b.u - 3, SETROW.capV, 6, String.fromCharCode(65 + b.k), 'cap center'));
             parts.push(bubbleHtml(b.u, b.v));
         });
     }
@@ -214,11 +244,22 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
         const c = r.cell;
         const first = r.q === 0 || cells[r.q - 1][4] !== c[4];
         if (showParts && first) parts.push(textHtml(r.u0, r.v - 4.3, 10, 'PART ' + (Number(c[4]) + 1), 'part'));
-        parts.push(textHtml(r.u0, r.v - 1.6, 9, r.text, 'num right'));
-        (r.cont || []).forEach(ct => parts.push(textHtml(ct.u0, ct.v - 1.6, 9, ct.text, 'num right')));
+        parts.push(textHtml(r.u0 - 3, r.v - 1.6, 12, r.text, 'num right'));
+        (r.cont || []).forEach(ct => parts.push(textHtml(ct.u0 - 3, ct.v - 1.6, 12, ct.text, 'num right')));
         r.bubbles.forEach(bb => parts.push(bubbleHtml(bb.u, bb.v)));
     });
     if (!plan.ok) parts.push(textHtml(9, 36, 162, 'This exam has too many answer rows for one sheet.', 'note'));
+
+    // Portion for answers that are written, not shaded (the lecturer marks them by hand)
+    if (written && written.length && plan.ok) {
+        const w = planWritten(cells, written);
+        w.heads.forEach(h => parts.push(textHtml(h.u0 + 1, h.v, ANS.blockW - 2, h.cont ? 'WRITTEN ANSWERS (cont.)' : 'WRITTEN ANSWERS (not shaded)', 'cap small')));
+        w.lines.forEach(l => {
+            parts.push(textHtml(l.u0 - 3, l.v - 3.4, 12, escapeHtml(l.label), 'num right'));
+            parts.push(`<div class="wl" style="left:${mm(l.u0 + WRITE.lineLeft)};top:${mm(l.v)};width:${mm(ANS.blockW - WRITE.lineLeft - WRITE.lineRight)}"></div>`);
+        });
+        if (w.left.length) parts.push(textHtml(9, 233, 162, `Write the answers to ${escapeHtml(w.left.join(', '))} on the question paper.`, 'note'));
+    }
 
     return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Answer Sheet${title ? ' | ' + escapeHtml(title) : ''}</title>
@@ -236,6 +277,8 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-s
 .ul { display: block; height: 3.6mm; border-bottom: 0.3mm solid #000; }
 .note { font-size: 2.5mm; line-height: 3mm; color: #222; }
 .cap { font-size: 2.8mm; font-weight: bold; }
+.small { font-size: 2.2mm; white-space: nowrap; }
+.wl { position: absolute; border-top: 0.3mm solid #000; height: 0; }
 .num { font-size: 2.6mm; }
 .part { font-size: 1.9mm; line-height: 2mm; font-weight: bold; white-space: nowrap; }
 .right { text-align: right; }

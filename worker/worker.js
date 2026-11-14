@@ -485,7 +485,7 @@ const cleanLayout = (cells) => {
     for (const c of cells) {
         if (!Array.isArray(c) || typeof c[0] !== "string" || !SCAN_KINDS.includes(c[0]) || c[0].length !== 1) return null;
         if (!Number.isInteger(c[1]) || c[1] < 2 || c[1] > SCAN_MAX_OPTIONS) return null;
-        out.push([c[0], c[1], Number(c[2]) || 0, Number(c[3]) || 0, Number(c[4]) || 0, String(c[5] || "").slice(0, 8)]);
+        out.push([c[0], c[1], Number(c[2]) || 0, Number(c[3]) || 0, Number(c[4]) || 0, String(c[5] || "").slice(0, 12)]);
     }
     return out;
 };
@@ -540,7 +540,7 @@ const isMixedSets = (list, n) => Array.isArray(list) && list.length >= 1 && list
         (it.shown === undefined || (Array.isArray(it.shown) && it.shown.length <= SCAN_MAX_OPTIONS))));
 const cleanMixedSets = (list) => list.map(s => ({
     key: s.key, bonus: s.bonus.map(Boolean),
-    items: s.items.map(it => ({ t: String(it.t), no: Number(it.no) || 0, o: Number(it.o) || 0, s: it.s, n: it.n, b: Boolean(it.b), row: it.row, shown: it.shown }))
+    items: s.items.map(it => ({ t: String(it.t), no: Number(it.no) || 0, o: Number(it.o) || 0, s: it.s, n: it.n, b: Boolean(it.b), row: it.row, shown: it.shown, sp: Math.max(1, Math.min(50, Number(it.sp) || 1)) }))
 }));
 // Grades one sheet: a mixed-type sheet (layout) by its set's items, a plain sheet by key and bonus flags.
 const gradeSheetAny = (ctx, answers, setNo, marks, max) => {

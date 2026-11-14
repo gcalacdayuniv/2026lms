@@ -42,6 +42,19 @@ export const makeSet = (questions, setIndex, seed = 'exam') => {
     return out;
 };
 
+// Question numbers an item uses: one per enumeration answer, matching pair, item to order or correct choice;
+// one per point for other types when points are set to a whole number above 1 (essays always use one).
+const spanOf = (q) => {
+    switch (q.type) {
+        case 'enum': case 'order': return Math.max(1, clean(q.items || []).length);
+        case 'match': return Math.max(1, (q.pairs || []).filter(p => p.l.trim() && p.r.trim()).length);
+        case 'multi': return Math.max(1, (q.corrects || []).length);
+        case 'essay': return 1;
+        default: { const p = pointsOf(q); return Number.isInteger(p) && p > 1 && p <= 50 ? p : 1; }
+    }
+};
+const rangeOf = (n, sp) => (sp > 1 ? `${n}-${n + sp - 1}` : String(n));
+
 const lines = (n) => Array.from({ length: n }, () => '<div class="ln"></div>').join('');
 const clean = (list) => list.map(x => String(x ?? '').trim()).filter(Boolean);
 
@@ -52,17 +65,17 @@ const body = (q, n) => {
         case 'tf': return '<div class="c">True &nbsp;&nbsp;/&nbsp;&nbsp; False</div>';
         case 'id': case 'num': return '<div class="ln"></div>';
         case 'enum': return `<div class="hint">List ${clean(q.items).length} item${clean(q.items).length === 1 ? '' : 's'}${q.ordered ? ' in order' : ''}.</div>` +
-            clean(q.items).map((_, i) => `<div class="ln"><span>${i + 1}.</span></div>`).join('');
+            clean(q.items).map((_, i) => `<div class="ln"><span>${n + i}.</span></div>`).join('');
         case 'order': {
             const items = shuffledBy(clean(q.items), seeded(q.text + 'o' + (q.salt || '')));
             return '<div class="hint">Write the numbers 1, 2, 3... to put the items in the right order.</div>' +
-                items.map(i => `<div class="c">____ ${esc(i)}</div>`).join('');
+                items.map((i, k) => `<div class="c">${n + k}. ____ ${esc(i)}</div>`).join('');
         }
         case 'match': {
             const pairs = q.pairs.filter(p => p.l.trim() && p.r.trim());
             const right = shuffledBy(clean(pairs.map(p => p.r).concat(q.extra || [])), seeded(q.text + 'm' + (q.salt || '')));
             return '<div class="hint">Write the letter of the matching item.</div><div class="mt"><div>' +
-                pairs.map((p, i) => `<div class="c">____ ${i + 1}. ${esc(p.l)}</div>`).join('') + '</div><div>' +
+                pairs.map((p, i) => `<div class="c">${n + i}. ____ ${esc(p.l)}</div>`).join('') + '</div><div>' +
                 right.map((r, k) => `<div class="c">${letter(k)}. ${esc(r)}</div>`).join('') + '</div></div>';
         }
         case 'essay': return lines(4);
@@ -93,7 +106,7 @@ export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey
     const subtitle = esc(title) + (sets > 1 ? ` - SET ${SET_LETTERS[set]}` : '');
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle.toUpperCase()}${withKey ? ' - ANSWER KEY' : ''}</div></div>`;
     if (withKey) {
-        return doc(title, `${head}<div class="keyg">${qs.map((q, i) => `<div class="k">${i + 1}. ${esc(keyOf(q))}</div>`).join('')}</div>`);
+        return doc(title, `${head}<div class="keyg">${(() => { let k = 1; return qs.map(q => { const sp = spanOf(q); const t = `<div class="k">${rangeOf(k, sp)}. ${esc(keyOf(q))}</div>`; k += sp; return t; }).join(''); })()}</div>`);
     }
     const byPart = new Map();
     qs.forEach(q => { if (!byPart.has(q.part)) byPart.set(q.part, []); byPart.get(q.part).push(q); });
@@ -101,9 +114,10 @@ export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey
     const paper = [...byPart.keys()].sort((a, b) => a - b).map(p => {
         const list = byPart.get(p);
         const items = list.map(q => {
-            n++;
+            const start = n + 1, sp = spanOf(q);
+            n += sp;
             const pts = pointsOf(q) !== 1 ? ` <span class="pts">(${pointsOf(q)} pts)</span>` : '';
-            return `<div class="q">${n}. ${esc(q.text)}${q.bonus ? ' <i>(bonus)</i>' : ''}${pts}${body(q, n)}</div>`;
+            return `<div class="q">${rangeOf(start, sp)}. ${esc(q.text)}${q.bonus ? ' <i>(bonus)</i>' : ''}${pts}${body(q, start)}</div>`;
         }).join('');
         return `<div class="part">${esc(partTitle(p, list.map(q => q.type)))}</div>${items}`;
     }).join('');

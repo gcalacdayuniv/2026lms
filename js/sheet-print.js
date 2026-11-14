@@ -2,6 +2,7 @@
 // Printing helpers shared by Manage Exams (print dialog) and the scanner (typed key): the answer-sheet header
 // question, the number of printed sets remembered per exam, and the bubble answer sheet of an exam.
 import { escapeHtml as esc } from './html-utils.js';
+import { writtenLabels } from './scan-items.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES, sheetFits } from './omr-sheet.js';
 import { buildScanSets } from './scan-items.js';
 import { scannableItems } from './exam-sets.js';
@@ -79,7 +80,7 @@ export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'letter' } 
     if (header === null) return '';
     try { localStorage.setItem('omr_sheet_header', header); } catch (e) { /* storage unavailable */ }
     const html = buildSheetHtml(mixed
-        ? { title: header, cells: built.cells, paper, sets: sets > 1 ? sets : 0 }
+        ? { title: header, cells: built.cells, paper, sets: sets > 1 ? sets : 0, written: writtenLabels(built) }
         : { title: header, n: items.length, c: Math.max(2, ...items.map(i => i.choices.length)), paper, parts: items.map(i => i.part), sets: sets > 1 ? sets : 0 });
     showPrintPreview(html.replace(/<script>[\s\S]*?<\/script>/g, ''), `Answer sheet - ${header || exam.Title || ''}`);
     return '';

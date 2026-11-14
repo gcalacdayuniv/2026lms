@@ -8,6 +8,7 @@ import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { CourseScanReview, keyOfSheet } from './course-scan-review.js';
 import { gradeScanSet } from './scan-grade.js';
+import { itemLabel } from './scan-items.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -182,7 +183,7 @@ export const CourseScanRecords = {
                 const st = idx >= 0 && g.per[idx] ? g.per[idx].state : '';
                 if (st === 'right') tally[0]++; else if (st === 'blank') tally[2]++; else if (st === 'wrong' || st === 'partial') tally[1]++;
             });
-            return { q: it0.no - 1, key: '', bonus: it0.b, counts: tally, right: tally[0], pct: sheets.length ? tally[0] / sheets.length : 0, multiSet: true, manual: it0.t === 'manual' };
+            return { q: it0.no - 1, label: itemLabel(it0), key: '', bonus: it0.b, counts: tally, right: tally[0], pct: sheets.length ? tally[0] / sheets.length : 0, multiSet: true, manual: it0.t === 'manual' };
         });
         return {
             key: [], bonus: [], max, c: 0, graded, questions, count: sheets.length,
@@ -267,7 +268,7 @@ export const CourseScanRecords = {
             }).join(' | ');
             return `
                 <div class="grid grid-cols-12 items-center gap-1 text-[11px] py-1 border-b border-gray-100">
-                    <span class="col-span-1 text-right font-bold text-gray-600">${item.q + 1}${item.bonus ? '<span class="text-amber-600" title="Bonus">*</span>' : ''}</span>
+                    <span class="col-span-1 text-right font-bold text-gray-600">${item.label || item.q + 1}${item.bonus ? '<span class="text-amber-600" title="Bonus">*</span>' : ''}</span>
                     <span class="col-span-1 text-center font-black text-green-700">${item.multiSet ? '' : LETTERS[item.key]}</span>
                     <div class="col-span-3 h-2 bg-gray-200 rounded overflow-hidden"><div class="h-2 ${pct < 40 ? 'bg-red-500' : pct < 70 ? 'bg-amber-500' : 'bg-green-500'}" style="width:${pct}%"></div></div>
                     <span class="col-span-1 text-right font-mono font-bold">${pct}%</span>
@@ -285,7 +286,7 @@ export const CourseScanRecords = {
         const maxText = session.Max_Score == null ? '?' : fmt(session.Max_Score);
 
         const hardest = a.questions.slice().sort((x, y) => x.pct - y.pct || x.q - y.q).slice(0, 5)
-            .map(item => `<span class="inline-block mr-1 mb-1 px-2 py-0.5 rounded bg-red-50 border border-red-200 text-red-700 text-[11px] font-bold">Q${item.q + 1} ${Math.round(item.pct * 100)}%</span>`).join('');
+            .map(item => `<span class="inline-block mr-1 mb-1 px-2 py-0.5 rounded bg-red-50 border border-red-200 text-red-700 text-[11px] font-bold">Q${item.label || item.q + 1} ${Math.round(item.pct * 100)}%</span>`).join('');
         const noneRight = a.count >= 3 ? a.questions.filter(item => item.right === 0) : [];
 
         const visible = a.graded.filter(x => !CourseScanRecords.onlyAttention || CourseScanRecords.needsAttention(x));
@@ -319,7 +320,7 @@ export const CourseScanRecords = {
             <details class="mb-3 bg-white border border-gray-200 rounded-lg p-3">
                 <summary class="text-xs font-bold text-blue-700 cursor-pointer">Question analysis (how many got each question right)</summary>
                 <div class="mt-2 text-[11px] text-gray-600">Hardest questions: ${hardest || 'none'}</div>
-                ${noneRight.length ? `<div class="mt-1 p-2 rounded bg-amber-50 border border-amber-300 text-[11px] font-bold text-amber-800">Nobody got ${noneRight.map(i => `Q${i.q + 1}`).join(', ')} right. Check that the answer key is correct.</div>` : ''}
+                ${noneRight.length ? `<div class="mt-1 p-2 rounded bg-amber-50 border border-amber-300 text-[11px] font-bold text-amber-800">Nobody got ${noneRight.map(i => `Q${i.label || i.q + 1}`).join(', ')} right. Check that the answer key is correct.</div>` : ''}
                 ${CourseScanRecords.questionTable(a)}
             </details>
 

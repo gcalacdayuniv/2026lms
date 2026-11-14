@@ -10,7 +10,7 @@ import { PhotoCache, ScanPhotos } from './course-scan-photos.js';
 import { answerRows } from './omr-sheet.js';
 import { gradeScanSet } from './scan-grade.js';
 import { questionPoints } from './grading.js';
-import { cellLabels, cellName, codeText } from './scan-items.js';
+import { cellLabels, cellName, codeText, itemLabel } from './scan-items.js';
 import { cropBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
 const LETTERS = 'ABCDE';
@@ -210,8 +210,8 @@ export const CourseScanReview = {
         const marks = CourseScanReview.marksOf(sheet);
         return `<div class="m-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <div class="text-xs font-bold text-amber-800 mb-2">Marked by hand: check the question paper and type the points</div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${items.map(({ it, i }) => `<label class="text-xs text-gray-700">Q${it.no} <span class="text-gray-500">/ ${fmt(questionPoints(it.row))}</span>
-                <input type="number" min="0" max="${questionPoints(it.row)}" step="0.5" inputmode="decimal" class="scrv-mark w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white" data-i="${i}" value="${marks[i] !== undefined ? marks[i] : ''}" aria-label="Points for question ${it.no}"></label>`).join('')}</div></div>`;
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${items.map(({ it, i }) => `<label class="text-xs text-gray-700">Q${itemLabel(it)} <span class="text-gray-500">/ ${fmt(questionPoints(it.row))}</span>
+                <input type="number" min="0" max="${questionPoints(it.row)}" step="0.5" inputmode="decimal" class="scrv-mark w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white" data-i="${i}" value="${marks[i] !== undefined ? marks[i] : ''}" aria-label="Points for question ${itemLabel(it)}"></label>`).join('')}</div></div>`;
     },
 
     show: async () => {

@@ -226,3 +226,10 @@ Answer sheets now read multiple choice, multiple answer, true/false, matching, o
 
 ## Archive classes
 Class card > "Archive class" moves it out of the main list ("Show archived classes" brings it back; Restore puts it back). New column `Courses.Archived`, endpoint `POST /api/archive-course`. Archived classes are no longer offered to students for enrollment.
+
+## Question numbers, set bubble, written answers, scan-capable cards
+- **Numbering**: enumeration (one number per answer), matching (per pair), ordering (per item), multiple answer (per correct choice) and any single-answer question with whole-number points above 1 use that many numbers. 10 multiple choice + a 3-answer enumeration = 11-13, next question 14. Applies to the printed paper, answer key, answer sheet rows (matching/ordering rows are numbered 14, 15, 16; others show 11-13), review, marks and records. Sets keep identical numbering because only same-shaped items swap.
+- **Answer sheet**: the SET circles (A-F) are now in the left column above the student number (instructions moved to the right of them). Sheets without sets are unchanged. Sheets with sets printed before this update must be reprinted.
+- **Written answers**: identification and enumeration answers get a lined "WRITTEN ANSWERS (not shaded)" portion after the last bubble row (one line per number). The question paper says "Write your answer on the answer sheet" for those. If the sheet has no room left, the paper keeps the lines and the sheet says so. Essays stay on the paper.
+- **Exam builder**: each question card is tinted green (20%) when it can be shaded on the answer sheet and orange (20%) when it is written or not scannable yet, with a one-line reason. It updates as you type.
+- Files: scan-items.js, scan-paper.js, omr-sheet.js, sheet-print.js, exam-print.js, exam-builder.js, course-scanner.js, course-scan-review.js, course-scan-records.js, worker/worker.js (keeps `sp` and longer row labels).
