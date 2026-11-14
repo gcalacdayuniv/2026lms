@@ -19,17 +19,55 @@ export const PRINT_CSS = `@page{size:letter;margin:12mm}
 body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.18;color:#000;margin:0}
 @media screen{body{padding:12mm;background:#fff}}
 .hd{text-align:center;font-weight:bold;margin:0 0 3.5mm}.hd div{margin-bottom:1mm}
-.cols{column-count:2;column-gap:9mm;text-align:justify}
-.part{font-weight:bold;margin:0 0 2.2mm;break-after:avoid;text-align:left}
-.q{margin:0 0 2.4mm;break-inside:avoid}
+.part{font-weight:bold;margin:0 0 2.2mm;text-align:left}
+.q{margin:0 0 2.4mm;text-align:justify}
 .c{margin:0;text-align:left}
 .pts{font-size:8.5pt;color:#333}
 .hint{font-size:8.5pt;font-style:italic;color:#333;text-align:left}
 .ln{margin:4.6mm 0 0;border-bottom:1px solid #000;height:0}.ln span{position:relative;top:-3.8mm;font-size:9pt}
 .mt{display:grid;grid-template-columns:1fr 1fr;gap:0 4mm}
 .k{margin:0 0 1.6mm}
-.keyg{column-count:4;column-gap:6mm}
-.set{break-after:page}.set:last-child{break-after:auto}`;
+.keyg{display:grid;grid-template-columns:repeat(4,1fr);gap:0 6mm}
+#src{column-count:2;column-gap:9mm}
+.page{width:191.9mm;height:254.4mm;overflow:hidden;display:flex;flex-direction:column;break-after:page;page-break-after:always}
+.page:last-child{break-after:auto;page-break-after:auto}
+.pcols{flex:1;min-height:0;display:flex;gap:9mm}
+.pcol{flex:1 1 0;min-width:0;height:100%;overflow:hidden}
+@media screen{.page{border-bottom:1px dashed #aaa;margin-bottom:8mm}}`;
+
+// Lays the questions out in two columns on fixed-size pages. Done with script instead of CSS columns because
+// iPhone printing ignores CSS columns. Items inside #src: .hd (title), then .part and .q in order.
+export const PAGINATE_SCRIPT = `<script>(function(){
+var src=document.getElementById('src');if(!src)return;
+var hd=null,units=[],kids=[].slice.call(src.children);
+kids.forEach(function(k){
+ if(k.classList.contains('hd')){hd=k;return;}
+ var u=units[units.length-1];
+ if(u&&u.length===1&&u[0].classList.contains('part')){u.push(k);}else{units.push([k]);}
+});
+var first=true,cols,ci;
+function newPage(){
+ var pg=document.createElement('div');pg.className='page';
+ if(hd&&first){pg.appendChild(hd);}first=false;
+ var w=document.createElement('div');w.className='pcols';
+ cols=[document.createElement('div'),document.createElement('div')];
+ cols[0].className='pcol';cols[1].className='pcol';w.appendChild(cols[0]);w.appendChild(cols[1]);
+ pg.appendChild(w);document.body.appendChild(pg);ci=0;
+}
+function over(c){return c.scrollHeight>c.clientHeight+1;}
+newPage();
+units.forEach(function(u){
+ for(var t=0;t<3;t++){
+  var c=cols[ci],empty=c.children.length===0;
+  u.forEach(function(e){c.appendChild(e);});
+  if(!over(c)||empty&&t>=1)break;
+  if(empty)break;
+  u.forEach(function(e){c.removeChild(e);});
+  if(ci===0){ci=1;}else{newPage();}
+ }
+});
+document.body.removeChild(src);
+})();<\/script>`;
 
 export const closePrintPreview = () => {
     const o = document.getElementById('printPreviewOverlay');

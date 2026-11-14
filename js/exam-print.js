@@ -2,13 +2,14 @@
 // Print an exam as a paper test (all question types), with an optional answer key on its own page.
 import { escapeHtml as esc } from './html-utils.js';
 import { pointsOf } from './exam-builder-model.js';
-import { PRINT_CSS, partTitle } from './print-preview.js';
+import { PRINT_CSS, PAGINATE_SCRIPT, partTitle } from './print-preview.js';
 
 export const PRINT_MAX_SETS = 6;
 const SET_LETTERS = 'ABCDEF';
 const FIXED = /\b(all|none|both|neither)\b.*\b(above|these|them)\b|\bany of the above\b/i;
 
-const L = 'abcdefghij';
+// a, b, c ... z, then aa, ab ... (matching can have more choices than 10 when decoys are added)
+const letter = (k) => (k < 26 ? String.fromCharCode(97 + k) : String.fromCharCode(97 + Math.floor(k / 26) - 1) + String.fromCharCode(97 + (k % 26)));
 const seeded = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const shuffledBy = (arr, seed) => {
     let s = seed;
@@ -46,8 +47,8 @@ const clean = (list) => list.map(x => String(x ?? '').trim()).filter(Boolean);
 
 const body = (q, n) => {
     switch (q.type) {
-        case 'mc': return q.options.map((o, k) => `<div class="c">${L[k]}. ${esc(o)}</div>`).join('');
-        case 'multi': return '<div class="hint">Select all that apply.</div>' + q.options.map((o, k) => `<div class="c">${L[k]}. ${esc(o)}</div>`).join('');
+        case 'mc': return q.options.map((o, k) => `<div class="c">${letter(k)}. ${esc(o)}</div>`).join('');
+        case 'multi': return '<div class="hint">Select all that apply.</div>' + q.options.map((o, k) => `<div class="c">${letter(k)}. ${esc(o)}</div>`).join('');
         case 'tf': return '<div class="c">True &nbsp;&nbsp;/&nbsp;&nbsp; False</div>';
         case 'id': case 'num': return '<div class="ln"></div>';
         case 'enum': return `<div class="hint">List ${clean(q.items).length} item${clean(q.items).length === 1 ? '' : 's'}${q.ordered ? ' in order' : ''}.</div>` +
@@ -62,7 +63,7 @@ const body = (q, n) => {
             const right = shuffledBy(clean(pairs.map(p => p.r).concat(q.extra || [])), seeded(q.text + 'm' + (q.salt || '')));
             return '<div class="hint">Write the letter of the matching item.</div><div class="mt"><div>' +
                 pairs.map((p, i) => `<div class="c">____ ${i + 1}. ${esc(p.l)}</div>`).join('') + '</div><div>' +
-                right.map((r, k) => `<div class="c">${L[k]}. ${esc(r)}</div>`).join('') + '</div></div>';
+                right.map((r, k) => `<div class="c">${letter(k)}. ${esc(r)}</div>`).join('') + '</div></div>';
         }
         case 'essay': return lines(4);
         default: return '';
@@ -71,8 +72,8 @@ const body = (q, n) => {
 
 const keyOf = (q) => {
     switch (q.type) {
-        case 'mc': return q.correct >= 0 ? `${L[q.correct]}. ${q.options[q.correct] || ''}` : '';
-        case 'multi': return q.corrects.map(k => L[k]).join(', ');
+        case 'mc': return q.correct >= 0 ? `${letter(q.correct)}. ${q.options[q.correct] || ''}` : '';
+        case 'multi': return q.corrects.map(k => letter(k)).join(', ');
         case 'tf': return q.tf;
         case 'id': case 'num': return q.answer + (q.type === 'num' && q.tol ? ` (±${q.tol})` : '');
         case 'enum': return clean(q.items).join(q.ordered ? ' → ' : ', ');
@@ -106,7 +107,7 @@ export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey
         }).join('');
         return `<div class="part">${esc(partTitle(p, list.map(q => q.type)))}</div>${items}`;
     }).join('');
-    return doc(title, `${head}<div class="cols">${paper}</div>`);
+    return doc(title, `<div id="src">${head}${paper}</div>`, true);
 };
 
-const doc = (title, inner) => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${PRINT_CSS}</style></head><body>${inner}</body></html>`;
+const doc = (title, inner, paginate = false) => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${PRINT_CSS}</style></head><body>${inner}${paginate ? PAGINATE_SCRIPT : ''}</body></html>`;

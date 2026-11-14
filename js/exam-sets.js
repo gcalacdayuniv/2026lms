@@ -3,7 +3,7 @@
 // question papers printed now and the answer keys used when scanning later always agree.
 // Set A is the exam as written. The other sets reorder the questions inside each part and shuffle the choices.
 import { escapeHtml as esc } from './html-utils.js';
-import { PRINT_CSS, partTitle } from './print-preview.js';
+import { PRINT_CSS, PAGINATE_SCRIPT, partTitle } from './print-preview.js';
 
 export const MAX_SETS = 6;
 export const SET_LETTERS = 'ABCDEF';
@@ -96,7 +96,7 @@ export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = '
             return `<div class="part">${esc(partTitle(p, list.map(() => 'mc')))}</div>` + list.map(({ it, no }) =>
                 `<div class="q">${no}. ${esc(it.text)}${it.bonus ? ' <i>(bonus)</i>' : ''}${it.choices.map((c, k) => `<div class="c">${'abcde'[k]}. ${esc(c)}</div>`).join('')}</div>`).join('');
         }).join('');
-        inner = `${head}<div class="cols">${paper}</div>`;
+        inner = `<div id="src">${head}${paper}</div>${PAGINATE_SCRIPT}`;
     }
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${PRINT_CSS}</style></head><body>${inner}</body></html>`;
 };

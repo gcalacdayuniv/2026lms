@@ -205,3 +205,7 @@ When asked to add features, debug, or refactor, you must strictly adhere to the 
 ## Class roster tools
 
 `js/course-roster-tools.js` (started in `app.js`): search (name, student number, seat, group, topic), a Show filter (Legally Blind, not present today, no seat yet, each group) and a Select mode with bulk attendance (Present, Late, Excused, Absent) and bulk exam access (Enable or Disable an exam already linked to the class, via `POST /api/class-exams` for the selected students only). Filtering only hides rows, so Save All still saves everyone; Mark All Present acts on the rows shown while a filter is on.
+
+## Printing fixes
+- Printed questionnaires are now laid out in two columns by script on fixed Letter pages, so iPhone/iPad (which ignores CSS columns) matches PC and Android.
+- Matching items with decoys now keep lettering past j (a-z, then aa, ab...), no more "undefined".
