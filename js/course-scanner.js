@@ -11,7 +11,8 @@ import { CourseScanRecords } from './course-scan-records.js';
 import { ScanQueue } from './course-scan-queue.js';
 import { ScanPhotos } from './course-scan-photos.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
-import { scannableItems, buildSets, buildSetsHtml } from './exam-sets.js';
+import { scannableItems, buildSets } from './exam-sets.js';
+import { askSheetHeader, getSetCount, saveSetCount } from './sheet-print.js';
 import { showPrintPreview } from './print-preview.js';
 import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
 
@@ -197,7 +198,7 @@ export const CourseScanner = {
             ]);
             CourseScanner.course = details.course || null;
             CourseScanner.students = CourseSummary.sortStudents(details.students || []);
-            CourseScanner.exams = examRes.exams || [];
+            CourseScanner.exams = (examRes.exams || []).filter(e => Number(e.Archived) !== 1);   // archived exams are hidden
             CourseScanner.assessments = assessRes.assessments || [];
             CourseScanner.classExams = classExamRes.classExams || [];
         } catch (err) {
@@ -362,6 +363,7 @@ export const CourseScanner = {
         const isExam = CourseScanner.mode === 'exam';
         $('scnExamPanel')?.classList.toggle('hidden', !isExam);
         $('scnTypedPanel')?.classList.toggle('hidden', isExam);
+        $('scnPrintBtn')?.classList.toggle('hidden', isExam);   // exam sheets are printed from Manage Exams
 
         const info = $('scnExamInfo');
         if (info) {
@@ -394,73 +396,7 @@ export const CourseScanner = {
         }
     },
 
-    // Small dialog asking what to print at the top of the sheet. Resolves with the text ('' = no header)
-    // or null when cancelled. The last header used is remembered on this device.
-    askHeader: () => new Promise((resolve) => {
-        let remembered = '';
-        try { remembered = localStorage.getItem('omr_sheet_header') || ''; } catch (e) { /* storage unavailable */ }
-        const previousFocus = document.activeElement;
-
-        const overlay = document.createElement('div');
-        overlay.className = 'fixed inset-0 z-[310] flex items-center justify-center p-4 fade-in';
-        overlay.style.zIndex = '310';   // inline: see UI.confirm
-        overlay.setAttribute('role', 'dialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.setAttribute('aria-label', 'Answer sheet header');
-        overlay.innerHTML = `
-            <div class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-5 relative z-10">
-                <h4 class="text-base font-bold text-gray-800 mb-1">Answer sheet header</h4>
-                <p class="text-xs text-gray-500 mb-3">What should be printed at the top of the sheet? Leave it blank for no header.</p>
-                <input type="text" id="scnHeaderInput" maxlength="80" value="${esc(remembered)}" placeholder="e.g. Midterm Examination - Prof. Dela Cruz" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" aria-label="Header text">
-                <div class="mt-4 flex gap-2 justify-end">
-                    <button type="button" id="closeScnHeaderBtn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-bold transition">Cancel</button>
-                    <button type="button" id="scnHeaderOkBtn" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-md text-sm font-bold transition"><i class="fa-solid fa-print mr-2"></i>Print</button>
-                </div>
-            </div>`;
-        document.body.appendChild(overlay);
-
-        const input = overlay.querySelector('#scnHeaderInput');
-        let finished = false;
-        const finish = (value) => {
-            if (finished) return;
-            finished = true;
-            overlay.remove();
-            if (previousFocus && previousFocus.focus) previousFocus.focus();
-            resolve(value);
-        };
-        overlay.querySelector('#scnHeaderOkBtn').addEventListener('click', () => finish(input.value.trim()));
-        overlay.querySelector('#closeScnHeaderBtn').addEventListener('click', () => finish(null));
-        overlay.firstElementChild.addEventListener('click', () => finish(null));
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); finish(input.value.trim()); }
-            if (e.key === 'Escape') { e.preventDefault(); finish(null); }
-        });
-        input.focus();
-        input.select();
-    }),
-
-    // Question papers (or answer keys) for the chosen number of sets of the selected exam.
-    printSets: (mode) => {
-        const exam = CourseScanner.exams.find(e => e.Exam_ID === val('scnExamSelect'));
-        if (!exam) { CourseScanner.setAlert('Choose an exam first.', false); return; }
-        const items = scannableItems(exam.ExamData, MAX_CHOICES);
-        if (!items.length) { CourseScanner.setAlert('This exam has no multiple-choice question that can be printed in sets.', false); return; }
-        const sets = buildSets(items, { seed: exam.Exam_ID, count: Number(val('scnSetCount')) || 4 });
-        const set = Math.min(sets.length - 1, Math.max(0, Number(val('scnPrintSet')) || 0));
-        const title = String(exam.Title || '');
-        showPrintPreview(buildSetsHtml({ title, course: (CourseScanner.course && CourseScanner.course.CourseTitle) || '', sets, set, mode }), `${title} - Set ${'ABCDEF'[set]}${mode === 'keys' ? ' (key)' : ''}`);
-    },
-
-    // The "Print set" list follows the number of sets: 2 sets = A-B, 3 sets = A-C ...
-    fillPrintSets: () => {
-        const sel = document.getElementById('scnPrintSet');
-        if (!sel) return;
-        const count = Number(val('scnSetCount')) || 1;
-        const keep = sel.value;
-        sel.innerHTML = Array.from({ length: count }, (_, k) => `<option value="${k}">Set ${'ABCDEF'[k]}</option>`).join('');
-        if (Number(keep) < count) sel.value = keep;
-    },
+    askHeader: askSheetHeader,
 
     printSheet: async () => {
         const cfg = CourseScanner.getConfig();
@@ -1380,7 +1316,6 @@ export const CourseScanner = {
     handleClicks: async (e) => {
         if (e.target.closest('#openScannerBtn')) {
             await CourseScanner.open();
-            CourseScanner.fillPrintSets();
             return;
         }
         if (!e.target.closest('#scannerModal')) return;
@@ -1392,8 +1327,6 @@ export const CourseScanner = {
 
         if (e.target.closest('#scnKeyQuickBtn')) CourseScanner.applyQuickKey();
         if (e.target.closest('#scnPrintBtn')) await CourseScanner.printSheet();
-        if (e.target.closest('#scnPrintSetsBtn')) CourseScanner.printSets('papers');
-        if (e.target.closest('#scnPrintKeysBtn')) CourseScanner.printSets('keys');
         if (e.target.closest('#scnStartBtn')) await CourseScanner.startScanning();
         if (e.target.closest('#scnBackBtn')) {
             CourseScanner.stopLive();
@@ -1449,13 +1382,17 @@ export const CourseScanner = {
     handleChanges: async (e) => {
         const t = e.target;
         if (!t.closest || !t.closest('#scannerModal')) return;
-        if (t.id === 'scnSetCount') CourseScanner.fillPrintSets();
 
         if (t.name === 'scnMode') {
             CourseScanner.mode = t.value === 'typed' ? 'typed' : 'exam';
             CourseScanner.refreshSetup();
             return;
         }
+        if (t.id === 'scnExamSelect' && t.value) {
+            const sc = $('scnSetCount');
+            if (sc) sc.value = String(getSetCount(t.value, Number(sc.value) || 4));
+        }
+        if (t.id === 'scnSetCount' && val('scnExamSelect')) saveSetCount(val('scnExamSelect'), Number(t.value) || 1);
         if (t.id === 'scnExamSelect' || t.id === 'scnTerm' || t.id === 'scnCategory' || t.id === 'scnDate') {
             CourseScanner.refreshSetup();
             return;

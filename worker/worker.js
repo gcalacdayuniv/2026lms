@@ -893,7 +893,8 @@ const EXTRA_COLUMNS = [
     ["Exam_Assignments", "Started_At", "TEXT"],
     ["Class_Exams", "Time_Limit", "INTEGER"],
     ["Class_Exams", "Adjustments", "TEXT"],   // JSON { "<question index>": "credit" | "drop" }
-    ["Class_Exams", "Release", "INTEGER"]     // 1 = students may review their answers and the right answers
+    ["Class_Exams", "Release", "INTEGER"],    // 1 = students may review their answers and the right answers
+    ["Exams", "Archived", "INTEGER"]          // 1 = hidden from the lecturer's exam list (kept, can be restored)
 ];
 let extraColumnsChecked = false;
 async function ensureManualMarksColumn(env) {
@@ -1185,8 +1186,36 @@ export default {
 
             if (request.method === "GET" && path === "/api/exams") {
                 const lecturerId = url.searchParams.get("lecturerId");
-                const exams = await env.DB.prepare("SELECT Exam_ID, Title, ExamData, Created_At FROM Exams WHERE Lecturer_ID = ? ORDER BY Created_At DESC").bind(lecturerId).all();
+                await ensureAccessibleExamTables(env);
+                // Uses = how many times the exam was assigned to a class. An exam that was never assigned can be deleted.
+                const exams = await env.DB.prepare(
+                    `SELECT e.Exam_ID, e.Title, e.ExamData, e.Created_At, COALESCE(e.Archived, 0) AS Archived,
+                            (SELECT COUNT(*) FROM Class_Exams ce WHERE ce.Exam_ID = e.Exam_ID) AS Uses
+                     FROM Exams e WHERE e.Lecturer_ID = ? ORDER BY e.Created_At DESC`
+                ).bind(lecturerId).all();
                 return new Response(JSON.stringify({ success: true, exams: exams.results }), { status: 200, headers: corsHeaders });
+            }
+
+            if (request.method === "POST" && (path === "/api/exams/archive" || path === "/api/exams/delete")) {
+                const body = await request.json();
+                await ensureAccessibleExamTables(env);
+                const exam = await env.DB.prepare("SELECT Lecturer_ID FROM Exams WHERE Exam_ID = ?").bind(body.examId).first();
+                if (!exam) {
+                    return new Response(JSON.stringify({ error: "Exam not found." }), { status: 404, headers: corsHeaders });
+                }
+                if (exam.Lecturer_ID !== body.lecturerId) {
+                    return new Response(JSON.stringify({ error: "Only the lecturer who owns this exam can change it." }), { status: 403, headers: corsHeaders });
+                }
+                if (path === "/api/exams/archive") {
+                    await env.DB.prepare("UPDATE Exams SET Archived = ? WHERE Exam_ID = ?").bind(body.archived ? 1 : 0, body.examId).run();
+                    return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+                }
+                const used = await env.DB.prepare("SELECT COUNT(*) AS n FROM Class_Exams WHERE Exam_ID = ?").bind(body.examId).first();
+                if (used && used.n > 0) {
+                    return new Response(JSON.stringify({ error: "This exam has class records and cannot be deleted. Archive it instead." }), { status: 409, headers: corsHeaders });
+                }
+                await env.DB.prepare("DELETE FROM Exams WHERE Exam_ID = ?").bind(body.examId).run();
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "GET" && path === "/api/exam-data") {

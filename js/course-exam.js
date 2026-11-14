@@ -7,6 +7,9 @@ import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js'
 import { buildExamPrintHtml } from './exam-print.js';
 import { ExamReview } from './exam-review.js';
 import { showPrintPreview } from './print-preview.js';
+import { scannableItems, buildSets, buildSetsHtml } from './exam-sets.js';
+import { getSetCount, saveSetCount, printExamAnswerSheet } from './sheet-print.js';
+import { MAX_CHOICES } from './omr-sheet.js';
 
 const esc = (v) => String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -199,6 +202,22 @@ export const CourseExam = {
         if (e.target.closest('#closePrintExamBtn') || e.target.id === 'closePrintExamBg') CourseExam.closePrintDialog();
         if (e.target.closest('#printExamPapersBtn')) CourseExam.printExam(CourseExam.printingId, false);
         if (e.target.closest('#printExamKeysBtn')) CourseExam.printExam(CourseExam.printingId, true);
+        if (e.target.closest('#printExamSheetBtn')) await CourseExam.printSheet(CourseExam.printingId);
+
+        if (e.target.closest('#toggleArchivedBtn')) {
+            CourseExam.showArchived = !CourseExam.showArchived;
+            CourseExam.renderExamList();
+            return;
+        }
+        if (e.target.closest('.archive-exam-btn')) {
+            const b = e.target.closest('.archive-exam-btn');
+            await CourseExam.archiveExam(b.dataset.examId, b.dataset.archive === '1');
+            return;
+        }
+        if (e.target.closest('.delete-exam-btn')) {
+            await CourseExam.deleteExam(e.target.closest('.delete-exam-btn').dataset.examId);
+            return;
+        }
 
         if (e.target.closest('.duplicate-exam-btn')) {
             await CourseExam.duplicateExam(e.target.closest('.duplicate-exam-btn').dataset.examId);
@@ -604,14 +623,19 @@ export const CourseExam = {
         const container = document.getElementById('examListContainer');
         if (!container) return;
         const courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
+        const archivedCount = CourseExam.exams.filter(e => Number(e.Archived) === 1).length;
+        const shown = CourseExam.exams.filter(e => CourseExam.showArchived || Number(e.Archived) !== 1);
+        const countEl0 = document.getElementById('examCountLabel');
         if (CourseExam.exams.length === 0) {
             container.innerHTML = '<div class="text-center py-10 px-4"><i class="fa-regular fa-file-lines text-3xl text-gray-300"></i><p class="mt-2 text-sm font-bold text-gray-600">No exams yet</p><p class="text-xs text-gray-500">Use Create Exam or Import from Spreadsheet above.</p></div>';
-            const countEl = document.getElementById('examCountLabel');
-            if (countEl) countEl.textContent = '';
+            if (countEl0) countEl0.textContent = '';
             return;
         }
+        const archiveBar = archivedCount ? `<div class="flex justify-end"><button type="button" id="toggleArchivedBtn" class="text-xs font-bold text-gray-600 hover:text-indigo-700 underline" aria-pressed="${CourseExam.showArchived ? 'true' : 'false'}"><i class="fa-solid fa-box-archive mr-1" aria-hidden="true"></i>${CourseExam.showArchived ? 'Hide' : 'Show'} archived (${archivedCount})</button></div>` : '';
+        const emptyNote = shown.length ? '' : '<div class="text-center py-8 px-4 text-sm text-gray-500">All exams are archived. Use "Show archived" to see them.</div>';
 
-        container.innerHTML = CourseExam.exams.map(ex => {
+        container.innerHTML = archiveBar + emptyNote + shown.map(ex => {
+            const archived = Number(ex.Archived) === 1;
             let parsed = [];
             try { parsed = JSON.parse(ex.ExamData || '[]'); } catch (e) { parsed = []; }
             const rows = fromExamData(parsed);
@@ -654,7 +678,7 @@ export const CourseExam = {
             return `
                 <div class="bg-white p-3 border border-gray-200 rounded-xl shadow-sm hover:border-indigo-300 transition">
                     <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                        <div class="font-black text-gray-800 text-sm min-w-0 break-words">${esc(ex.Title)}</div>
+                        <div class="font-black text-gray-800 text-sm min-w-0 break-words">${esc(ex.Title)}${archived ? ' <span class="ml-1 text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded align-middle">Archived</span>' : ''}</div>
                         <div class="text-[11px] font-bold text-gray-500 whitespace-nowrap">${regCount} question${regCount === 1 ? '' : 's'}${points !== regCount ? ` &bull; ${points} points` : ''}${bonusCount > 0 ? ` &bull; ${bonusCount} bonus` : ''}</div>
                     </div>
                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${typeChips}</div>
@@ -695,13 +719,20 @@ export const CourseExam = {
                         <button type="button" class="duplicate-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Duplicate ${esc(ex.Title)}">
                             <i class="fa-regular fa-copy mr-1" aria-hidden="true"></i> Copy
                         </button>
+                        <button type="button" class="archive-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-archive="${archived ? '0' : '1'}" aria-label="${archived ? 'Restore' : 'Archive'} ${esc(ex.Title)}">
+                            <i class="fa-solid ${archived ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i> ${archived ? 'Restore' : 'Archive'}
+                        </button>
+                        ${Number(ex.Uses) === 0 ? `<button type="button" class="delete-exam-btn bg-white text-red-600 hover:bg-red-50 border border-red-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Delete ${esc(ex.Title)}">
+                            <i class="fa-regular fa-trash-can mr-1" aria-hidden="true"></i> Delete
+                        </button>` : ''}
                         </div>
                     </div>
                 </div>
             `;
         }).join('');
         const countEl = document.getElementById('examCountLabel');
-        if (countEl) countEl.textContent = `${CourseExam.exams.length} exam${CourseExam.exams.length === 1 ? '' : 's'}`;
+        const active = CourseExam.exams.length - archivedCount;
+        if (countEl) countEl.textContent = `${active} exam${active === 1 ? '' : 's'}${archivedCount ? ` (+${archivedCount} archived)` : ''}`;
 
     },
 
@@ -1431,14 +1462,36 @@ export const CourseExam = {
                     </select>
                     <div id="printExamSetWrap" class="hidden"><label for="printExamSet" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Print set</label>
                     <select id="printExamSet" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3"></select></div>
-                    <p class="text-[11px] text-gray-500 mb-3">Using the answer-sheet scanner? Print the sets from Scan Answer Sheets instead, so the keys match.</p>
+                    <div id="printExamScanWrap" class="hidden mb-3 p-2 bg-rose-50 border border-rose-100 rounded-md">
+                        <label class="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
+                            <input type="checkbox" id="printExamScan" class="mt-0.5">
+                            <span><b>For the answer-sheet scanner</b> (multiple-choice only). The papers and keys then match the scanner exactly.</span>
+                        </label>
+                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <button type="button" id="printExamPapersBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-print mr-1" aria-hidden="true"></i>Questions</button>
                         <button type="button" id="printExamKeysBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-key mr-1" aria-hidden="true"></i>Answer keys</button>
                     </div>
+                    <div id="printExamSheetWrap" class="hidden mt-3 pt-3 border-t border-gray-100">
+                        <div class="flex items-end gap-2">
+                            <div class="w-24"><label for="printExamPaper" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Paper</label>
+                            <select id="printExamPaper" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white"><option value="letter">Letter</option><option value="a4">A4</option></select></div>
+                            <button type="button" id="printExamSheetBtn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-table-cells mr-1" aria-hidden="true"></i>Answer sheet (bubbles)</button>
+                        </div>
+                        <p class="text-[11px] text-gray-500 mt-2">Students shade this sheet; scan it from Scan Answer Sheets. It shows SET circles when there are 2 or more sets.</p>
+                    </div>
                 </div>`;
             document.body.appendChild(m);
         }
+        const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
+        const items = ex ? scannableItems(ex.ExamData, MAX_CHOICES) : [];
+        let total = 0;
+        try { total = JSON.parse((ex && ex.ExamData) || '[]').length; } catch (err) { total = 0; }
+        CourseExam.printScannable = items.length > 0;
+        document.getElementById('printExamSets').value = String(getSetCount(examId, 4));
+        document.getElementById('printExamScanWrap').classList.toggle('hidden', !items.length);
+        document.getElementById('printExamSheetWrap').classList.toggle('hidden', !items.length);
+        document.getElementById('printExamScan').checked = items.length > 0 && items.length === total;
         CourseExam.fillPrintSets();
         m.classList.remove('hidden');
     },
@@ -1456,6 +1509,7 @@ export const CourseExam = {
         const questions = fromExamData(rows);
         if (!questions.length) { UI.warning('This exam has no questions to print.'); return; }
         const count = Number((document.getElementById('printExamSets') || {}).value) || 1;
+        saveSetCount(examId, count);
         const set = Math.min(count - 1, Math.max(0, Number((document.getElementById('printExamSet') || {}).value) || 0));
         const title = String(ex.Title || '');
         CourseExam.closePrintDialog();
@@ -1469,7 +1523,23 @@ export const CourseExam = {
             } catch (err) { CourseExam.courseTitle = ''; }
         }
         const course = courseId && CourseExam.courseTitleFor === courseId ? CourseExam.courseTitle : '';
+        if (CourseExam.printScannable && (document.getElementById('printExamScan') || {}).checked) {
+            const sets = buildSets(scannableItems(ex.ExamData, MAX_CHOICES), { seed: ex.Exam_ID, count });
+            showPrintPreview(buildSetsHtml({ title, course, sets, set: Math.min(sets.length - 1, set), mode: withKey ? 'keys' : 'papers' }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
+            return;
+        }
         showPrintPreview(buildExamPrintHtml({ title, course, questions, withKey, set, sets: count, seed: ex.Exam_ID }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
+    },
+
+    printSheet: async (examId) => {
+        const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
+        if (!ex) return;
+        const count = Number((document.getElementById('printExamSets') || {}).value) || 1;
+        saveSetCount(examId, count);
+        const paper = (document.getElementById('printExamPaper') || {}).value || 'letter';
+        CourseExam.closePrintDialog();
+        const err = await printExamAnswerSheet(ex, { sets: count, paper });
+        if (err) UI.warning(err);
     },
 
     // The "Print set" list follows the number of sets: 2 sets = A-B, 3 sets = A-C ...
@@ -1482,6 +1552,31 @@ export const CourseExam = {
         sel.innerHTML = Array.from({ length: count }, (_, k) => `<option value="${k}">Set ${'ABCDEF'[k]}</option>`).join('');
         if (Number(keep) < count) sel.value = keep;
         wrap.classList.toggle('hidden', count < 2);
+    },
+
+    archiveExam: async (examId, archived) => {
+        try {
+            await apiFetch('/api/exams/archive', { method: 'POST', body: JSON.stringify({ examId, lecturerId: AppState.user.User_ID, archived }) });
+            UI.success(archived ? 'Exam archived' : 'Exam restored');
+            await CourseExam.loadExams();
+        } catch (err) {
+            UI.error(err.message || 'Could not update the exam.');
+        }
+    },
+
+    // Only an exam that was never assigned to a class can be deleted (the server checks this too).
+    deleteExam: async (examId) => {
+        const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
+        if (!ex) return;
+        const ok = await UI.confirm({ title: 'Delete exam', message: `Delete "${ex.Title}" permanently? This exam has no class records. This cannot be undone.`, confirmText: 'Delete', danger: true });
+        if (!ok) return;
+        try {
+            await apiFetch('/api/exams/delete', { method: 'POST', body: JSON.stringify({ examId, lecturerId: AppState.user.User_ID }) });
+            UI.success('Exam deleted');
+            await CourseExam.loadExams();
+        } catch (err) {
+            UI.error(err.message || 'Could not delete the exam.');
+        }
     },
 
     duplicateExam: async (examId) => {

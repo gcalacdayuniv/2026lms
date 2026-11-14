@@ -209,3 +209,8 @@ When asked to add features, debug, or refactor, you must strictly adhere to the 
 ## Printing fixes
 - Printed questionnaires are now laid out in two columns by script on fixed Letter pages, so iPhone/iPad (which ignores CSS columns) matches PC and Android.
 - Matching items with decoys now keep lettering past j (a-z, then aa, ab...), no more "undefined".
+
+## Archive / delete exams, printing in one place
+- Manage Exams > More: **Archive / Restore** (hides the exam from the list and the scanner; "Show archived" brings it back) and **Delete** (shown only for exams never assigned to a class; the server refuses otherwise). Worker: `POST /api/exams/archive`, `POST /api/exams/delete`; `GET /api/exams` now returns `Archived` and `Uses`. New column `Exams.Archived` is added automatically.
+- All printing is now in Manage Exams > More > Print: questions, answer keys and the bubble answer sheet, with the number of sets remembered per exam. "For the answer-sheet scanner" keeps papers/keys identical to the scanner's. Scan Answer Sheets keeps the set count and scanning; for a typed key it still prints its own sheet.
+- New file js/sheet-print.js.
