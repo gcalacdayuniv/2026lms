@@ -8,7 +8,7 @@ import { SET_LETTERS, itemLabel, writtenLabels } from './scan-items.js';
 import { planWritten } from './omr-sheet.js';
 import { questionPoints } from './grading.js';
 
-const LET = 'ABCDEFGHIJ';
+const LET = 'ABCDEFGHIJKLMNOPQRST';
 const lines = (n) => Array.from({ length: n }, () => '<div class="ln"></div>').join('');
 const clean = (list) => (Array.isArray(list) ? list : []).map(x => String(x ?? '').trim()).filter(Boolean);
 
@@ -18,13 +18,14 @@ const numbered = (it, n) => Array.from({ length: n }, (_, i) => `<div class="ln"
 const bodyOf = (it, onSheet) => {
     const r = it.row;
     switch (it.t) {
-        case 'mc': return it.shown.map((o, k) => `<div class="c">${LET[k]}. ${esc(o)}</div>`).join('');
-        case 'multi': return '<div class="hint">Select all that apply.</div>' + it.shown.map((o, k) => `<div class="c">${LET[k]}. ${esc(o)}</div>`).join('');
-        case 'tf': return '<div class="hint">Shade T for True or F for False.</div>';
-        case 'match': return `<div class="hint">Shade the letter of the matching item (numbers ${it.no} to ${it.no + it.cells.length - 1}).</div><div class="mt"><div>` +
-            it.lefts.map((l, i) => `<div class="c">${it.no + i}. ${esc(l)}</div>`).join('') + '</div><div>' +
-            it.shown.map((o, k) => `<div class="c">${LET[k]}. ${esc(o)}</div>`).join('') + '</div></div>';
-        case 'order': return `<div class="hint">Shade the position (1 = first) of each item (numbers ${it.no} to ${it.no + it.cells.length - 1}).</div>` +
+        case 'mc': return '<div class="hint">Shade the letter of your answer on the answer sheet.</div>' + it.shown.map((o, k) => `<div class="c">${LET[k]}. ${esc(o)}</div>`).join('');
+        case 'multi': return '<div class="hint">Select all that apply: shade every correct letter on the answer sheet.</div>' + it.shown.map((o, k) => `<div class="c">${LET[k]}. ${esc(o)}</div>`).join('');
+        case 'tf': return '<div class="hint">Shade T for True or F for False on the answer sheet.</div>';
+        case 'match': return `<div class="hint">For each number (${it.no} to ${it.no + it.cells.length - 1}), shade the letter of the matching choice on the answer sheet.</div>` +
+            it.lefts.map((l, i) => `<div class="c">${it.no + i}. ${esc(l)}</div>`).join('') +
+            '<div class="hint" style="margin-top:2mm">Choices:</div>' +
+            it.shown.map((o, k) => `<div class="c">${LET[k]}. ${esc(o)}</div>`).join('');
+        case 'order': return `<div class="hint">For each item (${it.no} to ${it.no + it.cells.length - 1}), shade its position in the correct order (1 = first) on the answer sheet.</div>` +
             it.shown.map((o, i) => `<div class="c">${it.no + i}. ${esc(o)}</div>`).join('');
         case 'num': return '<div class="hint">Shade the sign, the decimal places and every digit of your answer on the answer sheet.</div>';
         default:
@@ -60,7 +61,7 @@ export const buildScanPaperHtml = ({ title = '', course = '', built, set = 0, mo
         inner = `${head}<div class="keyg">${sel.items.map(it => `<div class="k">${itemLabel(it)}${it.t === 'match' || it.t === 'order' ? ':' : '.'} ${esc(keyOf(it))}${it.bonus ? ' *' : ''}</div>`).join('')}</div>${sel.items.some(i => i.bonus) ? '<p style="font-size:9pt">* bonus question</p>' : ''}`;
     } else {
         // numbers that have lines on the answer sheet (written there instead of on the paper)
-        const w = planWritten(built.cells, writtenLabels(built));
+        const w = planWritten(built.cells, writtenLabels(built), built.sets.length);
         const onSheetNos = new Set(w.lines.map(l => l.label));
         const byPart = new Map();
         sel.items.forEach(it => { if (!byPart.has(it.part)) byPart.set(it.part, []); byPart.get(it.part).push(it); });

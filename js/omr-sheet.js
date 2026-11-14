@@ -28,16 +28,22 @@ const COLUMNS = [
     { top: 41, rows: 32 },
     { top: 41, rows: 32 }
 ];
-const LETTER_GAP = 7;   // letters A-E are printed this far above the first row of a column
+const LETTER_GAP = 7;
+const HDR_A = 4.0, HDR_B = 3.9;   // label row squeezed between two answer rows: distance below the row above / above the row below   // letters A-E are printed this far above the first row of a column
 
 // SET row (which printed exam set the student has): up to 6 circles A-F, printed only for exams with sets.
 export const MAX_SETS = 6;
-// It sits in the left column, above the student number grid (the instructions move to the right of it).
-const SETROW = { u0: 15.5, v: 24.6, pitch: 6, capV: 17.6 };
+// It sits in the left column, below the instructions and above the student number grid.
+const SETROW = { u0: 15.5, v: 43.5, pitch: 6, capV: 36.3 };
 export const setBubbles = (count = MAX_SETS) => Array.from({ length: count }, (_, k) => ({ k, u: SETROW.u0 + k * SETROW.pitch, v: SETROW.v }));
 
 // Student number grid, inside column 0.
 const STU = { left: 14, colPitch: 6, gap: 3, top: 38, rowPitch: 4.4 };
+
+// Sheets with SET circles push the student grid and column 0 down to make room for them.
+const GEO_SETS = { stuTop: 55, cols: [{ top: 106, rows: 22 }, COLUMNS[1], COLUMNS[2], COLUMNS[3]] };
+const GEO_BASE = { stuTop: STU.top, cols: COLUMNS };
+const geoOf = (sets) => (sets > 1 ? GEO_SETS : GEO_BASE);
 
 const PAPERS = {
     letter: { w: 215.9, h: 279.4, label: 'Letter' },
@@ -62,20 +68,27 @@ const labelsOf = (fam, count) => {
     const b = Number(fam.slice(1)) || 0;
     if (fam === 'T') return ['T', 'F'];
     if (fam === 'S') return ['+', '\u2212'];
-    const all = fam[0] === 'L' ? 'ABCDEFGHIJ'.split('') : fam[0] === 'P' ? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] : '0123456789'.split('');
+    const all = fam[0] === 'L' ? 'ABCDEFGHIJKLMNOPQRST'.split('') : fam[0] === 'P' ? Array.from({ length: 20 }, (_, k) => String(k + 1)) : '0123456789'.split('');
     return all.slice(b * 5, Math.min(b * 5 + 5, count));
 };
 const famOf = (kind, block) => (kind === 'a' || kind === 'm' ? 'L' + block : kind === 't' ? 'T' : kind === 'p' ? 'P' + block : kind === 's' ? 'S' : 'D' + block);
 
 // -> { ok, error, rows: [{ q, u0, v, text, bubbles: [{ k, u, v }] }], headers: [{ u0, v, labels }], columnHeaders: [labels|null] }
-export const planSheet = (cells) => {
+export const planSheet = (cells, sets = 0) => {
+    const COLUMNS = geoOf(sets).cols;
     const slots = [];
     let i = 0;
     while (i < cells.length) {
         let j = i;
         while (j < cells.length && cells[j][2] === cells[i][2]) j++;
         const blocks = Math.max(...cells.slice(i, j).map(c => Math.ceil(c[1] / 5)));
-        for (let b = 0; b < blocks; b++) for (let k = i; k < j; k++) if (b === 0 || cells[k][1] > 5 * b) slots.push({ cell: k, block: b });
+        const itemMajor = cells[i][0] === 'a' || cells[i][0] === 'p';
+        if (itemMajor) {
+            // matching / ordering: all rows of one number together (A-E, then F-J ...), then the next number
+            for (let k = i; k < j; k++) for (let b = 0; b < Math.ceil(cells[k][1] / 5); b++) slots.push({ cell: k, block: b });
+        } else {
+            for (let b = 0; b < blocks; b++) for (let k = i; k < j; k++) if (b === 0 || cells[k][1] > 5 * b) slots.push({ cell: k, block: b });
+        }
         i = j;
     }
     const letterMax = Math.max(0, ...cells.filter(c => c[0] === 'a' || c[0] === 'm').map(c => c[1]));
@@ -84,57 +97,59 @@ export const planSheet = (cells) => {
 
     const rows = cells.map((c, q) => ({ q, u0: 0, v: 0, text: '', bubbles: [], cell: c }));
     const headers = [], columnHeaders = [];
-    let ci = 0, row = 0, last = null;
+    // y = centre of the previous row inside the column, in mm from the column top. A label row between answer rows is
+    // squeezed in (HDR_A below the previous row, HDR_B above the next one) instead of taking a whole row.
+    let ci = 0, yPrev = null, last = null;
+    const maxY = (c) => (COLUMNS[c].rows - 1) * ANS.pitch;
     for (const sl of slots) {
         const cell = cells[sl.cell];
         const fam = famOf(cell[0], sl.block);
         if (ci >= COLUMNS.length) break;
-        if (row >= COLUMNS[ci].rows) { ci++; row = 0; last = null; }
-        if (ci < COLUMNS.length && row > 0 && fam !== last) {
-            if (row + 1 >= COLUMNS[ci].rows) { ci++; row = 0; last = null; }
-            else {
-                const u0h = ANS.left + ci * ANS.blockW;
-                headers.push({ u0: u0h, v: COLUMNS[ci].top + row * ANS.pitch, labels: labelsOf(fam, countOf(fam)) });
-                row++; last = fam;
-            }
-        }
+        let yHdr = null, y = yPrev === null ? 0 : yPrev + ANS.pitch;
+        if (yPrev !== null && fam !== last) { yHdr = yPrev + HDR_A; y = yHdr + HDR_B; }
+        if (y > maxY(ci) + 0.01) { ci++; yPrev = null; last = null; yHdr = null; y = 0; }
         if (ci >= COLUMNS.length) break;
-        if (row === 0) { columnHeaders[ci] = labelsOf(fam, countOf(fam)); last = fam; }
+        if (yHdr !== null) {
+            headers.push({ u0: ANS.left + ci * ANS.blockW, v: COLUMNS[ci].top + yHdr, labels: labelsOf(fam, countOf(fam)) });
+        }
+        if (yPrev === null) columnHeaders[ci] = labelsOf(fam, countOf(fam));
+        last = fam;
         const u0 = ANS.left + ci * ANS.blockW;
-        const v = COLUMNS[ci].top + row * ANS.pitch;
+        const v = COLUMNS[ci].top + y;
         const r = rows[sl.cell];
         if (sl.block === 0) {
             r.u0 = u0; r.v = v; r.placed = true;
             const single = !(cells[sl.cell - 1] && cells[sl.cell - 1][2] === cell[2]) && !(cells[sl.cell + 1] && cells[sl.cell + 1][2] === cell[2]);
             r.text = cell[5] || (single ? String(cell[2]) : `${cell[2]}.${cell[3] + 1}`);
         }
+        // the extra rows of one number (F-J, K-O ...) do not repeat the number
         if (sl.block > 0 && !r.cont) r.cont = [];
-        if (sl.block > 0) r.cont.push({ u0, v, text: r.text });
+        if (sl.block > 0) r.cont.push({ u0, v, text: '' });
         for (let k = sl.block * 5; k < Math.min(cell[1], sl.block * 5 + 5); k++) {
             r.bubbles.push({ k, u: u0 + ANS.firstK + (k - sl.block * 5) * ANS.kPitch, v });
         }
-        row++;
+        yPrev = y;
     }
     const placed = rows.every(r => r.placed);
-    if (ci < COLUMNS.length && row >= COLUMNS[ci].rows) { ci++; row = 0; }
-    return { ok: placed, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, row } };
+    return { ok: placed, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, y: yPrev } };
 };
 
 // ---- Written answers ----
 // Items the scanner cannot read (identification, enumeration ...) get a lined portion of the sheet after the last
 // bubble row: one line per question number. labels = the numbers (strings). -> { lines, left: labels that did not fit, heads }
 const WRITE = { pitch: 8.7, head: 5.5, lineLeft: 11, lineRight: 2 };
-export const planWritten = (cells, labels) => {
-    const plan = planSheet(cells);
+export const planWritten = (cells, labels, sets = 0) => {
+    const COLUMNS = geoOf(sets).cols;
+    const plan = planSheet(cells, sets);
     const out = { lines: [], heads: [], left: [] };
     if (!plan.ok || !labels || !labels.length) return out;
-    let { ci, row } = plan.end;
-    let v = ci < COLUMNS.length ? COLUMNS[ci].top + row * ANS.pitch + (row > 0 ? 0.5 : -3) : 0;
+    let { ci, y } = plan.end;
+    let v = ci < COLUMNS.length ? COLUMNS[ci].top + (y === null ? -3 : y + ANS.pitch + 0.5) : 0;
     let first = true;
     const bottom = (c) => COLUMNS[c].top + COLUMNS[c].rows * ANS.pitch;
     for (let k = 0; k < labels.length; k++) {
         if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
-        if (v + WRITE.head * (first ? 1 : 0) + WRITE.pitch > bottom(ci)) {
+        if (v + WRITE.head * (first ? 1 : 0) + WRITE.pitch > bottom(ci) + 3) {
             ci++;
             if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
             v = COLUMNS[ci].top - 3; first = true;
@@ -148,20 +163,21 @@ export const planWritten = (cells, labels) => {
 };
 
 // Capacity check used by the scanner setup: number of header + answer rows the cells need.
-export const sheetFits = (cells) => planSheet(cells).ok;
+export const sheetFits = (cells, sets = 0) => planSheet(cells, sets).ok;
 
 const plainCells = (n, c, parts = null) => Array.from({ length: n }, (_, i) => ['a', c, i + 1, 0, parts ? Number(parts[i]) || 0 : 0, '']);
 
 // One entry per answer row: where each choice bubble is. answerRows(n, c) = n rows of c choices (plain multiple choice);
 // answerRows(cells) = the rows of a mixed-type sheet.
-export const answerRows = (n, c) => planSheet(Array.isArray(n) ? n : plainCells(n, c)).rows;
+export const answerRows = (n, c, sets = 0) => planSheet(Array.isArray(n) ? n : plainCells(n, c), Array.isArray(n) ? (Number(c) || 0) : sets).rows;
 
 // One entry per digit column of the student number (00-0000 = 6 columns, digits 0-9 top to bottom).
-export const studentCols = () => Array.from({ length: STUDENT_DIGITS }, (_, col) => {
+export const studentCols = (sets = 0) => Array.from({ length: STUDENT_DIGITS }, (_, col) => {
+    const top = geoOf(sets).stuTop;
     const u = STU.left + col * STU.colPitch + (col >= 2 ? STU.gap : 0);
     return {
         col, u,
-        bubbles: Array.from({ length: 10 }, (_, d) => ({ digit: d, u, v: STU.top + d * STU.rowPitch }))
+        bubbles: Array.from({ length: 10 }, (_, d) => ({ digit: d, u, v: top + d * STU.rowPitch }))
     };
 });
 
@@ -202,11 +218,11 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
     // Header, then ONE line for name / year and section / date, then the instructions.
     if (String(title).trim()) parts.push(textHtml(9, 5, 162, escapeHtml(String(title).trim()), 'title'));
     const withSets = sets > 1;
-    parts.push(`<div class="hl" style="left:${mm(9)};top:${mm(withSets ? 11.2 : 14)};width:${mm(162)}">` +
+    parts.push(`<div class="hl" style="left:${mm(9)};top:${mm(14)};width:${mm(162)}">` +
         '<span>Name:</span><span class="ul" style="flex:3"></span>' +
         '<span>Year &amp; Section:</span><span class="ul" style="flex:1.3"></span>' +
         '<span>Date:</span><span class="ul" style="flex:1.1"></span></div>');
-    parts.push(textHtml(withSets ? 52 : 9, withSets ? 16.4 : 22, withSets ? 119 : 162,
+    parts.push(textHtml(9, 22, 162,
         'Use a black or blue pen, or a dark pencil. Shade the circle completely. ' +
         'Do not fold or stain this sheet. Erase fully if you change an answer. ' +
         noteOf(multi, given), 'note'));
@@ -222,37 +238,39 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
     }
 
     // Student number grid (top of column 0)
-    parts.push(textHtml(ANS.left + 2, STU.top - 6.5, 42, 'STUDENT NO. (00-0000)', 'cap'));
-    const cols = studentCols();
+    const stuTop = geoOf(sets).stuTop;
+    parts.push(textHtml(ANS.left + 2, stuTop - 6.5, 42, 'STUDENT NO. (00-0000)', 'cap'));
+    const cols = studentCols(sets);
     for (let d = 0; d < 10; d++) {
-        parts.push(textHtml(ANS.left + 2, STU.top + d * STU.rowPitch - 1.4, 4, String(d), 'num'));
+        parts.push(textHtml(ANS.left + 2, stuTop + d * STU.rowPitch - 1.4, 4, String(d), 'num'));
     }
     cols.forEach(col => col.bubbles.forEach(b => parts.push(bubbleHtml(b.u, b.v, STU_BUBBLE_D))));
-    parts.push(textHtml(STU.left + 1.5 * STU.colPitch + STU.gap / 2 - 2, STU.top + 4.5 * STU.rowPitch - 2, 4, '-', 'hyphen center'));
+    parts.push(textHtml(STU.left + 1.5 * STU.colPitch + STU.gap / 2 - 2, stuTop + 4.5 * STU.rowPitch - 2, 4, '-', 'hyphen center'));
 
     // Answers: labels above the first row of every column in use, label rows where the labels change, then the rows
     const cells = given || plainCells(n, c, qParts);
-    const plan = planSheet(cells);
+    const plan = planSheet(cells, sets);
+    const COLUMNS = geoOf(sets).cols;
     plan.columnHeaders.forEach((labels, b) => {
         if (!labels) return;
         const u0 = ANS.left + b * ANS.blockW;
         labels.forEach((t, k) => parts.push(textHtml(u0 + ANS.firstK + k * ANS.kPitch - 3, COLUMNS[b].top - LETTER_GAP, 6, t, 'cap center')));
     });
-    plan.headers.forEach(h => h.labels.forEach((t, k) => parts.push(textHtml(h.u0 + ANS.firstK + k * ANS.kPitch - 3, h.v - 1.6, 6, t, 'cap center'))));
+    plan.headers.forEach(h => h.labels.forEach((t, k) => parts.push(textHtml(h.u0 + ANS.firstK + k * ANS.kPitch - 3, h.v - 1.3, 6, t, 'cap center hd'))));
     const showParts = new Set(cells.map(c => c[4])).size > 1;
     plan.rows.forEach(r => {
         const c = r.cell;
         const first = r.q === 0 || cells[r.q - 1][4] !== c[4];
         if (showParts && first) parts.push(textHtml(r.u0, r.v - 4.3, 10, 'PART ' + (Number(c[4]) + 1), 'part'));
         parts.push(textHtml(r.u0 - 3, r.v - 1.6, 12, r.text, 'num right'));
-        (r.cont || []).forEach(ct => parts.push(textHtml(ct.u0 - 3, ct.v - 1.6, 12, ct.text, 'num right')));
+        
         r.bubbles.forEach(bb => parts.push(bubbleHtml(bb.u, bb.v)));
     });
     if (!plan.ok) parts.push(textHtml(9, 36, 162, 'This exam has too many answer rows for one sheet.', 'note'));
 
     // Portion for answers that are written, not shaded (the lecturer marks them by hand)
     if (written && written.length && plan.ok) {
-        const w = planWritten(cells, written);
+        const w = planWritten(cells, written, sets);
         w.heads.forEach(h => parts.push(textHtml(h.u0 + 1, h.v, ANS.blockW - 2, h.cont ? 'WRITTEN ANSWERS (cont.)' : 'WRITTEN ANSWERS (not shaded)', 'cap small')));
         w.lines.forEach(l => {
             parts.push(textHtml(l.u0 - 3, l.v - 3.4, 12, escapeHtml(l.label), 'num right'));
@@ -278,6 +296,7 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-s
 .note { font-size: 2.5mm; line-height: 3mm; color: #222; }
 .cap { font-size: 2.8mm; font-weight: bold; }
 .small { font-size: 2.2mm; white-space: nowrap; }
+.hd { font-size: 2.3mm; line-height: 2.6mm; }
 .wl { position: absolute; border-top: 0.3mm solid #000; height: 0; }
 .num { font-size: 2.6mm; }
 .part { font-size: 1.9mm; line-height: 2mm; font-weight: bold; white-space: nowrap; }

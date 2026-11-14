@@ -14,6 +14,7 @@ import { multiCode } from './scan-codes.js';
 export const MAX_SETS = 6;
 export const SET_LETTERS = 'ABCDEF';
 export const MAX_OPTIONS = 10;
+export const MAX_WIDE = 20;   // matching choices / items to order: 5 bubbles per row, as many rows as needed
 export const NUM_DIGITS = 4;       // digit rows of a numeric answer (more when the answer needs them, up to 6)
 export const MAX_DECIMALS = 4;
 
@@ -117,7 +118,7 @@ const makeItem = (q, orig, no, rng) => {
         const pairs = pairsOf(q);
         const opts0 = clean(pairs.map(p => p[1]).concat(clean(metaOf(q).extra)));
         const opts = scrambled(opts0, rng);
-        if (pairs.length < 2 || pairs.length > MAX_OPTIONS || opts.length > MAX_OPTIONS) return base;
+        if (pairs.length < 2 || pairs.length > MAX_WIDE || opts.length > MAX_WIDE) return base;
         const used = new Array(opts.length).fill(false);
         const key = pairs.map(p => {
             let at = opts.findIndex((o, i) => !used[i] && norm(o) === norm(p[1]));
@@ -129,7 +130,7 @@ const makeItem = (q, orig, no, rng) => {
     }
     if (type === 'order') {
         const items = clean(q[3]);
-        if (items.length < 2 || items.length > MAX_OPTIONS) return base;
+        if (items.length < 2 || items.length > MAX_WIDE) return base;
         const list = scrambled(items, rng);
         const used = new Array(items.length).fill(false);
         const key = list.map(it => {
@@ -164,8 +165,8 @@ export const scanCheck = (row) => {
         mc: 'Needs 2 to 10 choices and one correct answer to be scanned.',
         multi: 'Needs 2 to 10 choices and at least one correct answer to be scanned.',
         tf: 'Pick True or False to be scanned.',
-        match: 'Needs 2 to 10 pairs (10 choices at most with extras) to be scanned.',
-        order: 'Needs 2 to 10 items to be scanned.',
+        match: 'Needs 2 to 20 pairs and 20 choices at most (with extras) to be scanned.',
+        order: 'Needs 2 to 20 items to be scanned.',
         num: 'Needs a number with up to 4 decimals and 6 digits to be scanned.'
     }[type];
     return { ok: false, why: `Not scannable yet. ${why}` };
@@ -260,7 +261,7 @@ export const cellLabels = (cell) => {
     if (kind === 's') return ['+', '-'];
     if (kind === 'p') return Array.from({ length: c }, (_, k) => String(k + 1));
     if (kind === 'd' || kind === 'x') return Array.from({ length: c }, (_, k) => String(k));
-    return Array.from({ length: c }, (_, k) => 'ABCDEFGHIJ'[k]);
+    return Array.from({ length: c }, (_, k) => 'ABCDEFGHIJKLMNOPQRST'[k]);
 };
 export const cellName = (cells, q) => {
     const c = cells[q];

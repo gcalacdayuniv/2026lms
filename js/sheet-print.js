@@ -74,7 +74,7 @@ export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'letter' } 
     const items = scannableItems(exam.ExamData, MAX_CHOICES);
     if (!mixed && !items.length) return 'This exam has no question that an answer sheet can hold.';
     if (mixed && !built.cells.length) return 'This exam has no question that an answer sheet can hold.';
-    if (mixed && !sheetFits(built.cells)) return 'This exam needs more answer rows than one sheet holds.';
+    if (mixed && !sheetFits(built.cells, sets)) return 'This exam needs more answer rows than one sheet holds.';
     if (!mixed && items.length > MAX_QUESTIONS) return `The sheet holds up to ${MAX_QUESTIONS} questions; this exam has ${items.length}.`;
     const header = await askSheetHeader();
     if (header === null) return '';

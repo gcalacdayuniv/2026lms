@@ -273,7 +273,7 @@ export const CourseScanner = {
             if (built.sets[0] && built.sets[0].items.some(i => i.t !== 'mc')) {
                 // Mixed question types: one sheet layout, per-set items, graded like an online exam.
                 if (!built.cells.length) return { ok: false, error: 'This exam has no question that an answer sheet can hold.' };
-                if (!sheetFits(built.cells)) return { ok: false, error: 'This exam needs more answer rows than one sheet holds. Remove some questions or split the exam.' };
+                if (!sheetFits(built.cells, setCount0)) return { ok: false, error: 'This exam needs more answer rows than one sheet holds. Remove some questions or split the exam.' };
                 const gsets = gradingSets(built);
                 const maxRegular = setMaxPoints(gsets[0]);
                 if (!(maxRegular > 0)) return { ok: false, error: 'Every question in this exam is a bonus question.' };
@@ -500,7 +500,7 @@ export const CourseScanner = {
 
     buildRow: async (file) => {
         const cfg = CourseScanner.cfg;
-        const result = await scanImage(file, cfg.cells || cfg.n, cfg.c);
+        const result = await scanImage(file, cfg.cells || cfg.n, cfg.c, cfg.sets ? cfg.sets.length : 0);
         return CourseScanner.rowFromResult(file.name || 'Photo', result);
     },
 
@@ -825,7 +825,7 @@ export const CourseScanner = {
 
         try {
             const video = $('scnLiveVideo');
-            const result = scanSource(video, video.videoWidth, video.videoHeight, cfg.cells || cfg.n, cfg.c);
+            const result = scanSource(video, video.videoWidth, video.videoHeight, cfg.cells || cfg.n, cfg.c, cfg.sets ? cfg.sets.length : 0);
             if (!result.ok) {
                 result.canvas.width = 0;
                 live.steady = 0;
@@ -936,7 +936,7 @@ export const CourseScanner = {
         if (kind === 's') return ['+', '-'];
         if (kind === 'p') return Array.from({ length: c }, (_, k) => String(k + 1));
         if (kind === 'd' || kind === 'x') return Array.from({ length: c }, (_, k) => String(k));
-        return Array.from({ length: c }, (_, k) => 'ABCDEFGHIJ'[k]);
+        return Array.from({ length: c }, (_, k) => 'ABCDEFGHIJKLMNOPQRST'[k]);
     },
 
     cellName: (cells, q) => {

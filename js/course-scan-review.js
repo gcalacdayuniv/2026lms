@@ -74,7 +74,8 @@ export const CourseScanReview = {
         CourseScanReview.markDrafts = {};
         CourseScanReview.onChange = onChange || null;
         const { session } = detail;
-        CourseScanReview.rows = session.Layout ? answerRows(session.Layout) : answerRows(session.Num_Questions, session.Num_Choices);
+        const nSets = (session.Set_Keys || []).length;
+        CourseScanReview.rows = session.Layout ? answerRows(session.Layout, nSets) : answerRows(session.Num_Questions, session.Num_Choices, nSets);
         PhotoCache.purge().catch(() => {});
 
         const wrap = document.createElement('div');

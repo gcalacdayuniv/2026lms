@@ -475,7 +475,7 @@ const parseJsonList = (text) => {
 };
 
 const SCAN_MAX_CELLS = 130;
-const SCAN_MAX_OPTIONS = 10;
+const SCAN_MAX_OPTIONS = 20;
 const SCAN_KINDS = "amtpsxd";
 
 // Answer cells of a mixed-type sheet: [kind, choices, itemNo, sub, part, tag]. Returns the cleaned list or null.

@@ -1467,7 +1467,7 @@ export const CourseExam = {
                     <div id="printExamScanWrap" class="hidden mb-3 p-2 bg-rose-50 border border-rose-100 rounded-md">
                         <label class="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
                             <input type="checkbox" id="printExamScan" class="mt-0.5">
-                            <span><b>For the answer-sheet scanner</b> (multiple-choice only). The papers and keys then match the scanner exactly.</span>
+                            <span><b>For the answer-sheet scanner</b> (every type that can be shaded). The papers and keys then match the scanner exactly.</span>
                         </label>
                     </div>
                     <div class="grid grid-cols-2 gap-2">

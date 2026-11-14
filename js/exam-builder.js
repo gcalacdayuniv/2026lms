@@ -4,7 +4,6 @@
 import { apiFetch, AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
 import * as M from './exam-builder-model.js';
-import { scanCheck } from './scan-items.js';
 
 const ROOT_ID = 'examBuilderModal';
 const VIEW_KEY = 'exam_builder_view';
@@ -22,6 +21,16 @@ const store = {
 };
 
 const draftKey = (examId) => `exam_builder_draft_${AppState.user ? AppState.user.User_ID : ''}_${examId || 'new'}`;
+
+// Question types an answer sheet can hold (shaded and scanned) and the ones written by hand (marked by the lecturer).
+const SCAN_TYPES = ['mc', 'multi', 'tf', 'num', 'order', 'match'];
+const BASE_OF = { multia: 'multi', enumo: 'enum', ordera: 'order' };
+const isScanType = (key) => SCAN_TYPES.includes(BASE_OF[key] || key);
+const GROUPS = [{ scan: true, label: 'Scannable (shaded on the answer sheet)' }, { scan: false, label: 'Written (marked by hand)' }];
+const grouped = (list, keyOf, optionHtml) => GROUPS.map(g => {
+    const items = list.filter(t => isScanType(keyOf(t)) === g.scan);
+    return items.length ? `<optgroup label="${g.label}">${items.map(optionHtml).join('')}</optgroup>` : '';
+}).join('');
 
 const ADD_LABEL = { mc: 'Multiple choice', multi: 'Multi-answer', tf: 'T/F', id: 'Identification', num: 'Numeric', enum: 'Enumeration', order: 'Ordering', match: 'Matching', essay: 'Essay' };
 
@@ -186,8 +195,8 @@ export const ExamBuilder = {
                             <h4 class="font-bold text-gray-800">Add question</h4>
                             <button type="button" id="closeEbTypeBtn" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
                         </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
-                            ${M.TYPES.map(t => `<button type="button" data-add="${t.id}" class="eb-add flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold text-center transition"><i class="fa-solid ${t.icon} text-xl" aria-hidden="true"></i>${ADD_LABEL[t.id] || t.label}</button>`).join('')}
+                        <div class="p-3 space-y-3">
+                            ${GROUPS.map(g => `<div><p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">${g.label}</p><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${M.TYPES.filter(t => isScanType(t.id) === g.scan).map(t => `<button type="button" data-add="${t.id}" class="eb-add flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold text-center transition"><i class="fa-solid ${t.icon} text-xl" aria-hidden="true"></i>${ADD_LABEL[t.id] || t.label}</button>`).join('')}</div></div>`).join('')}
                         </div>
                     </div>
                 </div>
@@ -225,12 +234,12 @@ export const ExamBuilder = {
         if (s.questions.length === 0) {
             return '<div class="text-center text-sm text-gray-500 py-10">No questions yet. Tap the + button to add one.</div>';
         }
-        return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards"><p class="text-[11px] text-gray-700 flex flex-wrap gap-2 items-center"><span class="px-2 py-0.5 rounded font-bold text-green-800" style="background:rgba(34,197,94,0.2)">Green: can be scanned from the answer sheet</span><span class="px-2 py-0.5 rounded font-bold text-orange-800" style="background:rgba(249,115,22,0.2)">Orange: written or not scannable, marked by hand</span></p>${s.questions.map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
+        return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards">${s.questions.map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
     },
 
     cardHtml: (q, i) => {
         const s = ExamBuilder.s;
-        const typeOptions = M.TYPES.map(t => `<option value="${t.id}" ${q.type === t.id ? 'selected' : ''}>${t.label}</option>`).join('');
+        const typeOptions = grouped(M.TYPES, t => t.id, t => `<option value="${t.id}" ${q.type === t.id ? 'selected' : ''}>${t.label}</option>`);
         let answerArea = '';
         const pts = M.pointsOf(q);
         const ptsText = `${pts} point${pts === 1 ? '' : 's'}`;
@@ -335,10 +344,8 @@ export const ExamBuilder = {
                     <input type="text" class="${INPUT} eb-field" data-col="answer" value="${esc(q.answer)}" placeholder="Type the exact answer" aria-label="Correct answer">
                 </div>`;
         }
-        const scanInfo = ExamBuilder.scanInfo(q), scanLook = ExamBuilder.scanLook(scanInfo);
         return `
-            <div class="eb-card rounded-xl border border-gray-200 border-l-4 border-l-transparent focus-within:border-l-indigo-600 shadow-sm p-3 sm:p-4" style="background:${scanLook.bg}" data-qid="${q.id}">
-                <div class="eb-scan text-[11px] font-bold ${scanLook.cls} mb-2 flex items-center gap-1"><i class="fa-solid ${scanLook.icon}" aria-hidden="true"></i><span>${esc(scanInfo.why)}</span></div>
+            <div class="eb-card bg-white rounded-xl border border-gray-200 border-l-4 border-l-transparent focus-within:border-l-indigo-600 shadow-sm p-3 sm:p-4" data-qid="${q.id}">
                 <div class="flex flex-wrap items-center gap-2 mb-2">
                     <span class="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1">Q${i + 1}</span>
                     <select class="eb-type text-xs font-bold border border-gray-300 rounded-md px-2 py-1.5 bg-white" aria-label="Question type">${typeOptions}</select>
@@ -364,27 +371,6 @@ export const ExamBuilder = {
                     <button type="button" class="eb-act w-9 h-9 rounded hover:bg-red-50 hover:text-red-600" data-act="del" aria-label="Delete question"><i class="fa-regular fa-trash-can" aria-hidden="true"></i></button>
                 </div>
             </div>`;
-    },
-
-    // Green card = can be shaded on the scan answer sheet, orange = written / not scannable (20% tint).
-    scanInfo: (q) => {
-        try { return scanCheck(M.toRow(q)); } catch (e) { return { ok: false, why: 'Not scannable yet.' }; }
-    },
-    scanLook: (info) => ({
-        bg: info.ok ? 'rgba(34,197,94,0.2)' : 'rgba(249,115,22,0.2)',
-        cls: info.ok ? 'text-green-800' : 'text-orange-800',
-        icon: info.ok ? 'fa-camera' : 'fa-pen'
-    }),
-    paintScan: (q) => {
-        const card = ExamBuilder.root && ExamBuilder.root.querySelector(`.eb-card[data-qid="${q.id}"]`);
-        if (!card) return;
-        const info = ExamBuilder.scanInfo(q), look = ExamBuilder.scanLook(info);
-        card.style.background = look.bg;
-        const note = card.querySelector('.eb-scan');
-        if (note) {
-            note.className = `eb-scan text-[11px] font-bold ${look.cls} mb-2 flex items-center gap-1`;
-            note.innerHTML = `<i class="fa-solid ${look.icon}" aria-hidden="true"></i><span>${esc(info.why)}</span>`;
-        }
     },
 
     refreshCard: (qid, focusSel) => {
@@ -416,7 +402,7 @@ export const ExamBuilder = {
 
     rowHtml: (q, i) => {
         const s = ExamBuilder.s;
-        const typeOptions = M.SHEET_TYPES.map(t => `<option value="${t.key}" ${M.typeKey(q) === t.key ? 'selected' : ''}>${t.label}</option>`).join('');
+        const typeOptions = grouped(M.SHEET_TYPES, t => t.key, t => `<option value="${t.key}" ${M.typeKey(q) === t.key ? 'selected' : ''}>${t.label}</option>`);
         const optCells = Array.from({ length: M.MAX_OPTIONS }, (_, k) => {
             const on = q.type === 'mc' || q.type === 'multi' || q.type === 'match';
             const ph = q.type === 'match' ? 'left | right' : '';
@@ -618,7 +604,6 @@ export const ExamBuilder = {
         if (t.tagName === 'SELECT' || t.type === 'checkbox' || t.type === 'radio') return;
         const q = ExamBuilder.qOf(t);
         if (!q) return;
-        queueMicrotask(() => ExamBuilder.paintScan(q));
         if (t.classList.contains('eb-item')) {
             q.items[parseInt(t.dataset.i, 10)] = t.value;
             ExamBuilder.touch();
@@ -662,7 +647,6 @@ export const ExamBuilder = {
         }
         const q = ExamBuilder.qOf(t);
         if (!q) return;
-        queueMicrotask(() => ExamBuilder.paintScan(q));
         const inSheet = s.view === 'sheet';
 
         if (t.classList.contains('eb-correct-multi')) {

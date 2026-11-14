@@ -203,7 +203,7 @@ export const readAnswers = (fills, multiRows = null) => fills.map((f, i) => {
 });
 
 // Reads a grey image. n = number of questions, c = choices per question.
-export const decodeGray = (gray, w, h, n, c) => {
+export const decodeGray = (gray, w, h, n, c, sets = 0) => {
     const bin = adaptiveBinary(gray, w, h);
     const markers = findMarkers(findBlobs(bin, w, h), w, h);
     if (!markers) {
@@ -213,21 +213,21 @@ export const decodeGray = (gray, w, h, n, c) => {
     const H = solveHomography(frame, markers);
     if (!H) return { ok: false, error: 'The sheet position could not be worked out. Take the photo again.' };
 
-    const studentFills = studentCols().map(col => col.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
+    const studentFills = studentCols(sets).map(col => col.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
     const digits = studentFills.map(pickMark);
     const d = digits.map(x => (x >= 0 ? String(x) : '?'));
     const studentNo = `${d[0]}${d[1]}-${d[2]}${d[3]}${d[4]}${d[5]}`;
 
     // n can be the list of answer cells of a mixed-type sheet (see scan-items.js) instead of a number of questions
     const cells = Array.isArray(n) ? n : null;
-    const fills = (cells ? answerRows(cells) : answerRows(n, c)).map(r => r.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
+    const fills = (cells ? answerRows(cells, sets) : answerRows(n, c, sets)).map(r => r.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
     const answers = readAnswers(fills, cells ? cells.map(x => x[0] === 'm') : null);
 
     // Which printed exam set was shaded (index, BLANK or MULTIPLE). Sheets without a SET row read as blank.
     const setFills = setBubbles().map(b => bubbleFill(bin, w, h, H, b.u, b.v));
     const setPick = pickMark(setFills);
 
-    return { ok: true, w, h, H, markers, studentFills, studentDigits: digits, studentNo, fills, answers, setFills, setPick, cells };
+    return { ok: true, w, h, H, markers, studentFills, studentDigits: digits, studentNo, fills, answers, setFills, setPick, cells, sets };
 };
 
 // Quick check used by the live camera: the 4 marker centres, or null. Cheap enough to run on a small frame.
@@ -241,7 +241,7 @@ export const meanBrightness = (gray) => {
 
 // Reads any drawable (image, canvas or live <video>) of size sw x sh.
 // Adds result.canvas (the shrunken picture) for the preview.
-export const scanSource = (source, sw, sh, n, c) => {
+export const scanSource = (source, sw, sh, n, c, sets = 0) => {
     const scale = Math.min(1, MAX_SIDE / Math.max(sw, sh));
     const w = Math.max(1, Math.round(sw * scale));
     const h = Math.max(1, Math.round(sh * scale));
@@ -252,20 +252,20 @@ export const scanSource = (source, sw, sh, n, c) => {
     ctx.drawImage(source, 0, 0, w, h);
 
     const gray = toGray(ctx.getImageData(0, 0, w, h).data, w, h);
-    const result = decodeGray(gray, w, h, n, c);
+    const result = decodeGray(gray, w, h, n, c, sets);
     result.canvas = canvas;
     return result;
 };
 
 // Reads a photo file.
-export const scanImage = async (file, n, c) => {
+export const scanImage = async (file, n, c, sets = 0) => {
     let bmp;
     try {
         bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
     } catch (e) {
         bmp = await createImageBitmap(file);
     }
-    const result = scanSource(bmp, bmp.width, bmp.height, n, c);
+    const result = scanSource(bmp, bmp.width, bmp.height, n, c, sets);
     if (bmp.close) bmp.close();
     return result;
 };
@@ -294,14 +294,14 @@ export const drawOverlay = (result, answers, key, digits) => {
         ctx.fillRect(x - 5, y - 5, 10, 10);
     });
 
-    studentCols().forEach((col, i) => {
+    studentCols(result.sets || 0).forEach((col, i) => {
         const dg = digits ? digits[i] : result.studentDigits[i];
         if (dg >= 0) ring(col.bubbles[dg].u, col.bubbles[dg].v, '#16a34a', 2, STU_BUBBLE_D);
     });
 
     if (result.setPick >= 0) { const sb = setBubbles()[result.setPick]; ring(sb.u, sb.v, '#7c3aed', 2); }
 
-    (result.cells ? answerRows(result.cells) : answerRows(answers.length, result.fills[0] ? result.fills[0].length : 0)).forEach(row => {
+    (result.cells ? answerRows(result.cells, result.sets || 0) : answerRows(answers.length, result.fills[0] ? result.fills[0].length : 0, result.sets || 0)).forEach(row => {
         const a = answers[row.q];
         const k = key ? key[row.q] : -1;
         if (a >= MULTI_BASE) {
