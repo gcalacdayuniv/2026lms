@@ -319,6 +319,9 @@ const lecturerCourseCardHtml = (c) => `
                         <a href="#class-${c.Course_ID}" class="card-action border-x border-gray-100" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
                         <a href="#class-${c.Course_ID}" class="card-action" data-intent="openScoresModalBtn"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Scores</a>
                     </div>
+                    <div class="border-t border-gray-100 px-3 py-1.5 text-right">
+                        <button type="button" class="archive-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-archive="${Number(c.Archived) === 1 ? '0' : '1'}" aria-label="${Number(c.Archived) === 1 ? 'Restore' : 'Archive'} ${escapeHtml(c.CourseCode)}"><i class="fa-solid ${Number(c.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i>${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}</button>
+                    </div>
                 </div>
             `;
 
@@ -441,7 +444,30 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
     return assignedExamsSectionHtml;
 };
 
+// Archive / restore a class (lecturer). Archived classes leave the main list; nothing is deleted.
+document.addEventListener('click', async (e) => {
+    const toggle = e.target.closest && e.target.closest('#toggleArchivedCoursesBtn');
+    if (toggle) {
+        CourseDashboard.showArchivedCourses = !CourseDashboard.showArchivedCourses;
+        if (CourseDashboard.repaintLecturer) CourseDashboard.repaintLecturer();
+        return;
+    }
+    const btn = e.target.closest && e.target.closest('.archive-course-btn');
+    if (!btn) return;
+    const archive = btn.dataset.archive === '1';
+    try {
+        await apiFetch('/api/archive-course', { method: 'POST', body: JSON.stringify({ courseId: btn.dataset.courseId, lecturerId: AppState.user.User_ID, archived: archive }) });
+        const course = CourseDashboard.lecturerData && CourseDashboard.lecturerData.courses.find(c => c.Course_ID === btn.dataset.courseId);
+        if (course) course.Archived = archive ? 1 : 0;
+        UI.success(archive ? 'Class archived' : 'Class restored');
+        if (CourseDashboard.repaintLecturer) CourseDashboard.repaintLecturer();
+    } catch (err) {
+        UI.error(err.message || 'Could not update the class.');
+    }
+});
+
 export const CourseDashboard = {
+    showArchivedCourses: false,
     loadGroupMembersForUpload: async (courseId) => {
         const section = document.getElementById('groupUploadSection');
         const list = document.getElementById('groupMembersList');
@@ -710,9 +736,20 @@ export const CourseDashboard = {
         const paint = (data) => {
             sortCoursesBySchedule(data.courses);
 
-            let coursesHtml = data.courses.map(lecturerCourseCardHtml).join('');
+            CourseDashboard.lecturerData = data;
+            CourseDashboard.repaintLecturer = () => paint(CourseDashboard.lecturerData);
+            const archivedCourses = data.courses.filter(c => Number(c.Archived) === 1);
+            const activeCourses = data.courses.filter(c => Number(c.Archived) !== 1);
+            let coursesHtml = activeCourses.map(lecturerCourseCardHtml).join('');
+            const archivedHtml = archivedCourses.length ? `
+                    <div class="mt-8">
+                        <button type="button" id="toggleArchivedCoursesBtn" class="inline-flex items-center text-sm font-bold text-gray-600 hover:text-indigo-700" aria-expanded="${CourseDashboard.showArchivedCourses ? 'true' : 'false'}"><i class="fa-solid fa-box-archive mr-2" aria-hidden="true"></i>${CourseDashboard.showArchivedCourses ? 'Hide' : 'Show'} archived classes (${archivedCourses.length})</button>
+                        <div class="${CourseDashboard.showArchivedCourses ? '' : 'hidden'} grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-4 opacity-80">${archivedCourses.map(lecturerCourseCardHtml).join('')}</div>
+                    </div>` : '';
 
-            if (!coursesHtml) {
+            if (!coursesHtml && archivedCourses.length) {
+                coursesHtml = '<div class="col-span-full p-6 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">All your classes are archived. Create a new class or restore one below.</div>';
+            } else if (!coursesHtml) {
                 coursesHtml = `<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><div class="mx-auto mb-3 w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i></div><p class="mb-1 font-bold text-gray-700">No courses yet</p><p class="mb-4 text-sm">Create your first course to start taking attendance.</p><button type="button" id="emptyNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button></div>`;
             }
 
@@ -726,6 +763,7 @@ export const CourseDashboard = {
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         ${coursesHtml}
                     </div>
+                    ${archivedHtml}
                 </div>
             `;
         };

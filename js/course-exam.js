@@ -8,6 +8,8 @@ import { buildExamPrintHtml } from './exam-print.js';
 import { ExamReview } from './exam-review.js';
 import { showPrintPreview } from './print-preview.js';
 import { scannableItems, buildSets, buildSetsHtml } from './exam-sets.js';
+import { buildScanSets } from './scan-items.js';
+import { buildScanPaperHtml } from './scan-paper.js';
 import { getSetCount, saveSetCount, printExamAnswerSheet } from './sheet-print.js';
 import { MAX_CHOICES } from './omr-sheet.js';
 
@@ -1484,14 +1486,15 @@ export const CourseExam = {
             document.body.appendChild(m);
         }
         const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
-        const items = ex ? scannableItems(ex.ExamData, MAX_CHOICES) : [];
+        const probe = ex ? buildScanSets(ex.ExamData, { seed: ex.Exam_ID, count: 1 }) : { scannable: 0, manual: 0 };
+        const items = new Array(probe.scannable).fill(0);
         let total = 0;
         try { total = JSON.parse((ex && ex.ExamData) || '[]').length; } catch (err) { total = 0; }
         CourseExam.printScannable = items.length > 0;
         document.getElementById('printExamSets').value = String(getSetCount(examId, 4));
         document.getElementById('printExamScanWrap').classList.toggle('hidden', !items.length);
         document.getElementById('printExamSheetWrap').classList.toggle('hidden', !items.length);
-        document.getElementById('printExamScan').checked = items.length > 0 && items.length === total;
+        document.getElementById('printExamScan').checked = items.length > 0;
         CourseExam.fillPrintSets();
         m.classList.remove('hidden');
     },
@@ -1524,6 +1527,12 @@ export const CourseExam = {
         }
         const course = courseId && CourseExam.courseTitleFor === courseId ? CourseExam.courseTitle : '';
         if (CourseExam.printScannable && (document.getElementById('printExamScan') || {}).checked) {
+            const built = buildScanSets(ex.ExamData, { seed: ex.Exam_ID, count });
+            const label = `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`;
+            if (built.sets[0] && built.sets[0].items.some(i => i.t !== 'mc')) {
+                showPrintPreview(buildScanPaperHtml({ title, course, built, set: Math.min(built.sets.length - 1, set), mode: withKey ? 'keys' : 'papers' }), label);
+                return;
+            }
             const sets = buildSets(scannableItems(ex.ExamData, MAX_CHOICES), { seed: ex.Exam_ID, count });
             showPrintPreview(buildSetsHtml({ title, course, sets, set: Math.min(sets.length - 1, set), mode: withKey ? 'keys' : 'papers' }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
             return;

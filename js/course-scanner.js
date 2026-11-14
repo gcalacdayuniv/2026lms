@@ -12,6 +12,10 @@ import { ScanQueue } from './course-scan-queue.js';
 import { ScanPhotos } from './course-scan-photos.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
 import { scannableItems, buildSets } from './exam-sets.js';
+import { buildScanSets, gradingSets } from './scan-items.js';
+import { gradeScanSet, setMaxPoints } from './scan-grade.js';
+import { questionPoints } from './grading.js';
+import { sheetFits } from './omr-sheet.js';
 import { askSheetHeader, getSetCount, saveSetCount } from './sheet-print.js';
 import { showPrintPreview } from './print-preview.js';
 import { scanImage, scanSource, detectMarkers, meanBrightness, toGray, drawOverlay, BLANK, MULTIPLE } from './omr-scan.js';
@@ -259,11 +263,29 @@ export const CourseScanner = {
         const term = val('scnTerm') || 'MidTerm';
         const category = val('scnCategory') || 'Written';
         const date = val('scnDate') || getLocalDateString();
-        let cfg;
+        let cfg = null;
 
         if (CourseScanner.mode === 'exam') {
             const exam = CourseScanner.exams.find(e => e.Exam_ID === val('scnExamSelect'));
             if (!exam) return { ok: false, error: 'Choose an exam.' };
+            const setCount0 = Number(val('scnSetCount')) || 1;
+            const built = buildScanSets(exam.ExamData, { seed: exam.Exam_ID, count: setCount0 });
+            if (built.sets[0] && built.sets[0].items.some(i => i.t !== 'mc')) {
+                // Mixed question types: one sheet layout, per-set items, graded like an online exam.
+                if (!built.cells.length) return { ok: false, error: 'This exam has no question that an answer sheet can hold.' };
+                if (!sheetFits(built.cells)) return { ok: false, error: 'This exam needs more answer rows than one sheet holds. Remove some questions or split the exam.' };
+                const gsets = gradingSets(built);
+                const maxRegular = setMaxPoints(gsets[0]);
+                if (!(maxRegular > 0)) return { ok: false, error: 'Every question in this exam is a bonus question.' };
+                cfg = {
+                    mode: 'exam', mixed: true, examId: exam.Exam_ID, title: String(exam.Title || '').trim(),
+                    n: built.cells.length, c: Math.max(2, ...built.cells.map(c => c[1])), key: gsets[0].key, bonus: gsets[0].bonus,
+                    cells: built.cells, sets: gsets, multiSet: setCount0 > 1, maxRegular, manual: built.manual, skipped: 0
+                };
+            }
+        }
+        if (CourseScanner.mode === 'exam' && !cfg) {
+            const exam = CourseScanner.exams.find(e => e.Exam_ID === val('scnExamSelect'));
             const a = CourseScanner.analyzeExam(exam);
             if (a.n < 1) return { ok: false, error: 'This exam has no multiple-choice question that can be scanned.' };
             if (a.n > MAX_QUESTIONS) return { ok: false, error: `The sheet holds up to ${MAX_QUESTIONS} questions; this exam has ${a.n}.` };
@@ -275,7 +297,7 @@ export const CourseScanner = {
                 ? buildSets(scannableItems(exam.ExamData, MAX_CHOICES), { seed: exam.Exam_ID, count: setCount }).map(s => ({ key: s.key, bonus: s.bonus, order: s.order }))
                 : null;
             cfg = { mode: 'exam', examId: exam.Exam_ID, title: String(exam.Title || '').trim(), n: a.n, c: a.c, key: a.key, bonus: a.bonus, parts: a.parts, sets, maxRegular, skipped: a.skipped };
-        } else {
+        } else if (CourseScanner.mode !== 'exam') {
             const t = CourseScanner.typed;
             const title = val('scnTypedTitle').trim();
             if (!title) return { ok: false, error: 'Enter a title for the exam.' };
@@ -391,7 +413,7 @@ export const CourseScanner = {
                     ? `Scores will be added to the existing assessment "${cfg.existing.Title}" (${TERM_LABELS[cfg.existing.Term] || cfg.existing.Term}, max ${fmt(cfg.cap)}).`
                     : `A new assessment "${cfg.title}" will be created (${TERM_LABELS[cfg.term]}, ${CATEGORY_LABELS[cfg.category]}, max ${fmt(cfg.cap)}).`;
                 const saveExam = cfg.mode === 'typed' ? ' The exam will also be saved in Manage Exams.' : '';
-                summary.textContent = `${cfg.n} questions, choices A-${LETTERS[cfg.c - 1]}, max ${fmt(cfg.maxRegular)}${bonusCount ? ` (+${bonusCount} bonus, total capped at the max)` : ''}. ${target}${saveExam}`;
+                summary.textContent = cfg.mixed ? `${cfg.n} answer rows (mixed question types)${cfg.manual ? `, ${cfg.manual} question${cfg.manual === 1 ? '' : 's'} to mark by hand` : ''}, max ${fmt(cfg.maxRegular)} points. ${target}${saveExam}` : `${cfg.n} questions, choices A-${LETTERS[cfg.c - 1]}, max ${fmt(cfg.maxRegular)}${bonusCount ? ` (+${bonusCount} bonus, total capped at the max)` : ''}. ${target}${saveExam}`;
             }
         }
     },
@@ -478,18 +500,21 @@ export const CourseScanner = {
 
     buildRow: async (file) => {
         const cfg = CourseScanner.cfg;
-        const result = await scanImage(file, cfg.n, cfg.c);
+        const result = await scanImage(file, cfg.cells || cfg.n, cfg.c);
         return CourseScanner.rowFromResult(file.name || 'Photo', result);
     },
+
+    // More than one printed set? (A mixed-type exam always keeps its set list for grading, even with one set.)
+    hasSets: (cfg) => Boolean(cfg && (cfg.mixed ? cfg.multiSet : cfg.sets)),
 
     // Key and bonus flags for the printed set of this sheet (Set A when the exam has no sets).
     keyFor: (row, cfg = CourseScanner.cfg) => {
         const s = cfg.sets && cfg.sets[row.set > 0 ? row.set : 0];
-        return s ? { key: s.key, bonus: s.bonus } : { key: cfg.key, bonus: cfg.bonus };
+        return s ? { key: s.key, bonus: s.bonus, set: s } : { key: cfg.key, bonus: cfg.bonus };
     },
 
     // True when the exam has sets but this sheet's SET circle was not read: the lecturer must pick it.
-    needsSet: (row, cfg = CourseScanner.cfg) => Boolean(cfg && cfg.sets && row.ok && !(row.set >= 0)),
+    needsSet: (row, cfg = CourseScanner.cfg) => Boolean(cfg && CourseScanner.hasSets(cfg) && row.ok && !(row.set >= 0)),
 
     // Turns a reading (from a photo or a live frame) into a review row.
     rowFromResult: async (name, result) => {
@@ -506,6 +531,7 @@ export const CourseScanner = {
             studentText: '',
             studentId: '',
             set: 0,
+            marks: {},
             photoUrl: '',
             overlayUrl: '',
             result: null
@@ -520,7 +546,7 @@ export const CourseScanner = {
         row.studentText = result.studentNo;
         row.studentId = CourseScanner.matchStudent(row.studentText);
         const sc = CourseScanner.cfg;
-        row.set = sc && sc.sets ? (result.setPick >= 0 && result.setPick < sc.sets.length ? result.setPick : -1) : 0;
+        row.set = sc && CourseScanner.hasSets(sc) ? (result.setPick >= 0 && result.setPick < sc.sets.length ? result.setPick : -1) : 0;
         row.result = { H: result.H, markers: result.markers, fills: result.fills, studentDigits: result.studentDigits, setPick: result.setPick };
         result.canvas.width = 0;
         await CourseScanner.renderPreview(row);
@@ -544,7 +570,7 @@ export const CourseScanner = {
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
         canvas.getContext('2d').drawImage(img, 0, 0);
-        drawOverlay({ canvas, ok: true, ...row.result }, row.answers, CourseScanner.keyFor(row, cfg).key, row.result.studentDigits);
+        drawOverlay({ canvas, ok: true, ...row.result, cells: (row.cfg || cfg).cells }, row.answers, CourseScanner.keyFor(row, cfg).key, row.result.studentDigits);
         const url = await toUrl(canvas);
         canvas.width = 0;
         if (row.overlayUrl) URL.revokeObjectURL(row.overlayUrl);
@@ -799,7 +825,7 @@ export const CourseScanner = {
 
         try {
             const video = $('scnLiveVideo');
-            const result = scanSource(video, video.videoWidth, video.videoHeight, cfg.n, cfg.c);
+            const result = scanSource(video, video.videoWidth, video.videoHeight, cfg.cells || cfg.n, cfg.c);
             if (!result.ok) {
                 result.canvas.width = 0;
                 live.steady = 0;
@@ -836,6 +862,10 @@ export const CourseScanner = {
     scoreRow: (row, cap) => {
         const cfg = CourseScanner.cfg;
         const k = CourseScanner.keyFor(row, cfg);
+        if (cfg.mixed) {
+            const g = gradeScanSet(k.set, row.answers, row.marks, cap);
+            return { raw: g.raw, bonus: g.bonus, blank: g.blank, multi: g.multiple, pending: g.pending, final: g.score, points: true };
+        }
         let raw = 0, bonus = 0, blank = 0, multi = 0;
         row.answers.forEach((a, i) => {
             if (a === BLANK) blank++;
@@ -862,7 +892,7 @@ export const CourseScanner = {
         const cfg = CourseScanner.cfg;
         const s = CourseScanner.scoreRow(row, cfg.cap);
         return `<span class="text-lg font-black text-gray-800 font-mono">${fmt(s.final)}</span><span class="text-xs text-gray-500"> / ${fmt(cfg.cap)}</span>` +
-            `<div class="text-[10px] text-gray-500">${s.raw} correct${s.bonus ? ` + ${s.bonus} bonus` : ''}</div>`;
+            `<div class="text-[10px] text-gray-500">${s.raw} ${s.points ? 'pts' : 'correct'}${s.bonus ? ` + ${s.bonus} bonus` : ''}</div>`;
     },
 
     flagsHtml: (row, dups) => {
@@ -872,6 +902,7 @@ export const CourseScanner = {
         if (!row.studentId) out.push(badge('bg-amber-50 text-amber-800 border-amber-300', 'No student matched - pick one'));
         else if (dups.has(row.studentId)) out.push(badge('bg-red-50 text-red-700 border-red-300', 'Duplicate - another sheet has this student'));
         if (CourseScanner.needsSet(row)) out.push(badge('bg-amber-50 text-amber-800 border-amber-300', 'Set not shaded - pick the set'));
+        if (s.pending) out.push(badge('bg-amber-50 text-amber-800 border-amber-300', `${s.pending} to mark by hand`));
         if (s.multi) out.push(badge('bg-amber-50 text-amber-800 border-amber-300', `${s.multi} double-shaded`));
         if (s.blank) out.push(badge('bg-gray-100 text-gray-600 border-gray-300', `${s.blank} blank`));
         const st = row.saveState;
@@ -898,10 +929,56 @@ export const CourseScanner = {
         return 'border-gray-200';
     },
 
+    // Labels of the options of one answer cell (see scan-items.js).
+    cellLabels: (cell) => {
+        const [kind, c] = cell;
+        if (kind === 't') return ['T', 'F'];
+        if (kind === 's') return ['+', '-'];
+        if (kind === 'p') return Array.from({ length: c }, (_, k) => String(k + 1));
+        if (kind === 'd' || kind === 'x') return Array.from({ length: c }, (_, k) => String(k));
+        return Array.from({ length: c }, (_, k) => 'ABCDEFGHIJ'[k]);
+    },
+
+    cellName: (cells, q) => {
+        const c = cells[q];
+        const same = (cells[q - 1] && cells[q - 1][2] === c[2]) || (cells[q + 1] && cells[q + 1][2] === c[2]);
+        return same ? `${c[2]}.${c[5] || c[3] + 1}` : String(c[2]);
+    },
+
+    // Questions that are written on the paper (identification, enumeration, essay): the lecturer types the points.
+    manualHtml: (row) => {
+        const cfg = (row.cfg || CourseScanner.cfg);
+        if (!cfg || !cfg.mixed) return '';
+        const set = CourseScanner.keyFor(row, cfg).set;
+        const items = set.items.map((it, i) => ({ it, i })).filter(x => x.it.t === 'manual');
+        if (!items.length) return '';
+        const pts = (it) => questionPoints(it.row);
+        return `<div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+            <div class="text-[11px] font-bold text-amber-800 mb-1">Marked by hand (check the question paper)</div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${items.map(({ it, i }) => `<label class="text-[11px] text-gray-700">Q${it.no} <span class="text-gray-500">/ ${fmt(pts(it))}</span>
+                <input type="number" min="0" max="${pts(it)}" step="0.5" inputmode="decimal" class="scn-mark-input w-full px-1 py-0.5 border border-gray-300 rounded text-xs" data-row="${row.id}" data-i="${i}" value="${row.marks && row.marks[i] !== undefined ? row.marks[i] : ''}" aria-label="Points for question ${it.no}"></label>`).join('')}</div></div>`;
+    },
+
     answerSelectHtml: (row, q) => {
         const cfg = CourseScanner.cfg;
         const a = row.answers[q];
         const rk = CourseScanner.keyFor(row, cfg);
+        if (cfg.mixed) {
+            const cell = cfg.cells[q];
+            const labels = CourseScanner.cellLabels(cell);
+            const name = CourseScanner.cellName(cfg.cells, q);
+            const right = a === rk.key[q];
+            const tone = right ? 'border-green-400 bg-green-50' : (a >= 0 || a === MULTIPLE ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white');
+            if (cell[0] === 'm') {
+                const on = (k) => a >= 1000 && ((a - 1000) & (1 << k)) !== 0;
+                return `<div class="flex items-center gap-1 text-[11px] scn-multi" data-q="${q}"><span class="w-8 text-right font-bold text-gray-500">${name}</span>` +
+                    labels.map((l, k) => `<button type="button" class="scn-multi-btn w-6 h-6 rounded border text-[11px] font-bold ${on(k) ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-300'}" data-row="${row.id}" data-q="${q}" data-k="${k}" aria-pressed="${on(k)}" aria-label="Question ${name}, choice ${l}">${l}</button>`).join('') + '</div>';
+            }
+            const opts = [`<option value="${BLANK}"${a === BLANK ? ' selected' : ''}>-</option>`, `<option value="${MULTIPLE}"${a === MULTIPLE ? ' selected' : ''}>x2</option>`]
+                .concat(labels.map((l, k) => `<option value="${k}"${a === k ? ' selected' : ''}>${l}</option>`));
+            return `<label class="flex items-center gap-1 text-[11px]"><span class="w-8 text-right font-bold text-gray-500">${name}</span>
+                <select class="scn-answer-select w-full px-1 py-0.5 border rounded text-xs ${tone}" data-row="${row.id}" data-q="${q}" aria-label="Question ${name} answer">${opts.join('')}</select></label>`;
+        }
         const tone = a === rk.key[q] ? 'border-green-400 bg-green-50' : (a >= 0 || a === MULTIPLE ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white');
         const opts = [
             `<option value="${BLANK}"${a === BLANK ? ' selected' : ''}>-</option>`,
@@ -951,7 +1028,7 @@ export const CourseScanner = {
                 </div>
                 <div class="sm:col-span-3 sm:text-right" data-role="score">${CourseScanner.scoreHtml(row)}</div>
             </div>
-            ${CourseScanner.cfg && CourseScanner.cfg.sets ? `<div class="mt-2 flex items-center gap-2">
+            ${CourseScanner.hasSets(CourseScanner.cfg) ? `<div class="mt-2 flex items-center gap-2">
                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider" for="${idp}Set${row.id}">Exam set</label>
                 <select id="${idp}Set${row.id}" class="scn-set-select px-2 py-1 border border-gray-300 rounded text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500" data-row="${row.id}">
                     <option value="-1"${row.set < 0 ? ' selected' : ''}>- pick -</option>
@@ -964,6 +1041,7 @@ export const CourseScanner = {
                 <p class="mt-1 text-[10px] text-gray-500">Green = correct, red = wrong or double-shaded, blue = correct choice that was missed. Fix any misread answer below.</p>
                 <div class="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-x-2 gap-y-1">${answers}</div>
             </details>
+            <div data-role="marks">${CourseScanner.manualHtml(row)}</div>
         </div>`;
     },
 
@@ -1049,10 +1127,11 @@ export const CourseScanner = {
 
     snapshot: (cfg) => ({
         mode: cfg.mode, examId: cfg.examId || '', title: cfg.title, term: cfg.term, category: cfg.category,
-        date: cfg.date, n: cfg.n, c: cfg.c, key: cfg.key.slice(), bonus: cfg.bonus.slice(), sets: cfg.sets || null, maxRegular: cfg.maxRegular
+        date: cfg.date, n: cfg.n, c: cfg.c, key: cfg.key.slice(), bonus: cfg.bonus.slice(), sets: cfg.sets || null, maxRegular: cfg.maxRegular,
+        mixed: Boolean(cfg.mixed), cells: cfg.cells || null, multiSet: Boolean(cfg.multiSet)
     }),
 
-    groupKey: (e) => JSON.stringify([e.courseId, e.cfg.mode, e.cfg.examId, e.cfg.title, e.cfg.term, e.cfg.category, e.cfg.n, e.cfg.c, e.cfg.key, e.cfg.bonus, e.cfg.sets || null]),
+    groupKey: (e) => JSON.stringify([e.courseId, e.cfg.mode, e.cfg.examId, e.cfg.title, e.cfg.term, e.cfg.category, e.cfg.n, e.cfg.c, e.cfg.key, e.cfg.bonus, e.cfg.sets || null, e.cfg.cells || null]),
 
     rowByScan: (scanId) => CourseScanner.rows.find(r => r.scanId === scanId),
 
@@ -1080,6 +1159,7 @@ export const CourseScanner = {
                 set: row.set >= 0 ? row.set : 0,
                 originalAnswers: row.original && row.original.length ? row.original : row.answers.slice(),
                 answers: row.answers.slice(),
+                marks: row.marks && Object.keys(row.marks).length ? { ...row.marks } : undefined,
                 replace: Boolean(row.replace),
                 // The sheet was uploaded for another student first: that earlier upload is undone.
                 removeStudent: row.savedStudentId && row.savedStudentId !== row.studentId ? row.savedStudentId : null
@@ -1180,11 +1260,12 @@ export const CourseScanner = {
                     answerKey: cfg.key,
                     bonus: cfg.bonus,
                     setKeys: cfg.sets || undefined,
+                    layout: cfg.cells || undefined,
                     allowRegrade: group.some(e => e.allowRegrade),
                     removals: group.filter(e => e.removeStudent).map(e => ({ studentId: e.removeStudent, scanId: e.scanId })),
                     sheets: group.map(e => ({
                         scanId: e.scanId, studentId: e.studentId, studentNo: e.studentNo,
-                        originalAnswers: e.originalAnswers, answers: e.answers, set: e.set || 0, replace: Boolean(e.replace)
+                        originalAnswers: e.originalAnswers, answers: e.answers, set: e.set || 0, replace: Boolean(e.replace), marks: e.marks || undefined
                     }))
                 })
             });
@@ -1322,6 +1403,23 @@ export const CourseScanner = {
 
         if (e.target.closest('#closeScannerBtn') || e.target.id === 'closeScannerBg') CourseScanner.close();
 
+        const multiBtn = e.target.closest('.scn-multi-btn');
+        if (multiBtn) {
+            const row = CourseScanner.rows.find(r => r.id === Number(multiBtn.dataset.row));
+            if (row) {
+                const q = Number(multiBtn.dataset.q), k = Number(multiBtn.dataset.k);
+                const cur = row.answers[q] >= 1000 ? row.answers[q] - 1000 : 0;
+                const next = cur ^ (1 << k);
+                row.answers[q] = next ? 1000 + next : BLANK;
+                row.saveState = row.saveState ? 'dirty' : '';
+                const div = multiBtn.closest('.scn-multi');
+                div.outerHTML = CourseScanner.answerSelectHtml(row, q);
+                CourseScanner.markChange();
+                try { await CourseScanner.renderPreview(row); document.querySelectorAll(`[data-card="${row.id}"] [data-role="img"]`).forEach(img => { img.src = row.overlayUrl; }); } catch (err) { console.error(err); }
+            }
+            return;
+        }
+
         const keyBtn = e.target.closest('.scn-key-btn');
         if (keyBtn) CourseScanner.setKey(Number(keyBtn.dataset.q), Number(keyBtn.dataset.k));
 
@@ -1432,11 +1530,21 @@ export const CourseScanner = {
             CourseScanner.markChange();
             try { await CourseScanner.renderPreview(row); document.querySelectorAll(`[data-card="${row.id}"] [data-role="img"]`).forEach(img => { img.src = row.overlayUrl; }); } catch (e) { /* preview only */ }
             document.querySelectorAll(`[data-card="${row.id}"] .scn-answer-select`).forEach(sel => { sel.outerHTML = CourseScanner.answerSelectHtml(row, Number(sel.dataset.q)).match(/<select[\s\S]*<\/select>/)[0]; });
+            document.querySelectorAll(`[data-card="${row.id}"] .scn-multi`).forEach(div => { div.outerHTML = CourseScanner.answerSelectHtml(row, Number(div.dataset.q)); });
+            document.querySelectorAll(`[data-card="${row.id}"] [data-role="marks"]`).forEach(box => { box.innerHTML = CourseScanner.manualHtml(row); });
         } else if (t.classList.contains('scn-stuno-input')) {
             row.studentText = t.value.trim();
             row.studentId = CourseScanner.matchStudent(row.studentText);
             row.saveState = row.saveState ? 'dirty' : '';
             document.querySelectorAll(`.scn-student-select[data-row="${row.id}"]`).forEach(sel => { sel.value = row.studentId; });
+            CourseScanner.markChange();
+        } else if (t.classList.contains('scn-mark-input')) {
+            const i = Number(t.dataset.i);
+            const v = t.value.trim();
+            if (!row.marks) row.marks = {};
+            if (v === '' || !Number.isFinite(Number(v))) delete row.marks[i];
+            else row.marks[i] = Math.max(0, Number(v));
+            row.saveState = row.saveState ? 'dirty' : '';
             CourseScanner.markChange();
         } else if (t.classList.contains('scn-answer-select')) {
             const q = Number(t.dataset.q);

@@ -5,6 +5,7 @@
 //   2. find the 4 square corner markers (the big top-left one tells which way is up)
 //   3. build a perspective map from sheet millimetres to photo pixels
 //   4. measure how dark each circle's centre is and pick the shaded one per question
+import { MULTI_BASE } from './scan-codes.js';
 import { FRAME, BUBBLE_D, STU_BUBBLE_D, answerRows, studentCols, setBubbles } from './omr-sheet.js';
 
 const MAX_SIDE = 1600;     // the photo is shrunk to this size before reading
@@ -190,6 +191,17 @@ export const pickMark = (fills) => {
     return over[0].f - over[1].f >= CLEAR_GAP ? over[0].i : MULTIPLE;
 };
 
+// Answers from the circle fills. multiRows[i] = true when question i accepts several circles (multiple answer):
+// then every shaded circle counts and the answer is MULTI_BASE + mask (BLANK when none is shaded).
+export const readAnswers = (fills, multiRows = null) => fills.map((f, i) => {
+    if (multiRows && multiRows[i]) {
+        let mask = 0;
+        f.forEach((v, k) => { if (v >= MARK_MIN) mask |= 1 << k; });
+        return mask ? MULTI_BASE + mask : BLANK;
+    }
+    return pickMark(f);
+});
+
 // Reads a grey image. n = number of questions, c = choices per question.
 export const decodeGray = (gray, w, h, n, c) => {
     const bin = adaptiveBinary(gray, w, h);
@@ -206,14 +218,16 @@ export const decodeGray = (gray, w, h, n, c) => {
     const d = digits.map(x => (x >= 0 ? String(x) : '?'));
     const studentNo = `${d[0]}${d[1]}-${d[2]}${d[3]}${d[4]}${d[5]}`;
 
-    const fills = answerRows(n, c).map(r => r.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
-    const answers = fills.map(pickMark);
+    // n can be the list of answer cells of a mixed-type sheet (see scan-items.js) instead of a number of questions
+    const cells = Array.isArray(n) ? n : null;
+    const fills = (cells ? answerRows(cells) : answerRows(n, c)).map(r => r.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
+    const answers = readAnswers(fills, cells ? cells.map(x => x[0] === 'm') : null);
 
     // Which printed exam set was shaded (index, BLANK or MULTIPLE). Sheets without a SET row read as blank.
     const setFills = setBubbles().map(b => bubbleFill(bin, w, h, H, b.u, b.v));
     const setPick = pickMark(setFills);
 
-    return { ok: true, w, h, H, markers, studentFills, studentDigits: digits, studentNo, fills, answers, setFills, setPick };
+    return { ok: true, w, h, H, markers, studentFills, studentDigits: digits, studentNo, fills, answers, setFills, setPick, cells };
 };
 
 // Quick check used by the live camera: the 4 marker centres, or null. Cheap enough to run on a small frame.
@@ -287,14 +301,24 @@ export const drawOverlay = (result, answers, key, digits) => {
 
     if (result.setPick >= 0) { const sb = setBubbles()[result.setPick]; ring(sb.u, sb.v, '#7c3aed', 2); }
 
-    answerRows(answers.length, result.fills[0] ? result.fills[0].length : 0).forEach(row => {
+    (result.cells ? answerRows(result.cells) : answerRows(answers.length, result.fills[0] ? result.fills[0].length : 0)).forEach(row => {
         const a = answers[row.q];
         const k = key ? key[row.q] : -1;
+        if (a >= MULTI_BASE) {
+            // multiple answer: green circles are right, red are extra, blue are the ones that were missed
+            const keyMask = k >= MULTI_BASE ? k - MULTI_BASE : 0;
+            row.bubbles.forEach(b => {
+                const on = (a - MULTI_BASE) & (1 << b.k), want = keyMask & (1 << b.k);
+                if (on) ring(b.u, b.v, want ? '#16a34a' : '#dc2626');
+                else if (want) ring(b.u, b.v, '#2563eb', 2);
+            });
+            return;
+        }
         if (a === MULTIPLE) {
             row.bubbles.forEach(b => ring(b.u, b.v, '#dc2626', 2));
         } else if (a >= 0) {
             ring(row.bubbles[a].u, row.bubbles[a].v, k < 0 || a === k ? '#16a34a' : '#dc2626');
         }
-        if (k >= 0 && a !== k && row.bubbles[k]) ring(row.bubbles[k].u, row.bubbles[k].v, '#2563eb', 2);
+        if (k >= 0 && k < MULTI_BASE && a !== k && row.bubbles[k]) ring(row.bubbles[k].u, row.bubbles[k].v, '#2563eb', 2);
     });
 };

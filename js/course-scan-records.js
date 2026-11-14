@@ -7,6 +7,7 @@ import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { CourseScanReview, keyOfSheet } from './course-scan-review.js';
+import { gradeScanSet } from './scan-grade.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -166,6 +167,32 @@ export const CourseScanRecords = {
         }
     },
 
+    // Mixed question types: score every sheet with its set's items; per question count right / wrong / blank.
+    analyzeMixed: (session, sheets) => {
+        const max = session.Max_Score;
+        const sets = session.Set_Keys || [];
+        const graded = sheets.map(sheet => { const k = keyOfSheet(session, sheet); return { sheet, g: gradeScanSet(k.set, sheet.Answers, sheet.Marks, max) }; });
+        const scores = graded.map(x => x.g.score);
+        const total = (field) => graded.reduce((sum, x) => sum + x.g[field], 0);
+        const questions = (sets[0] ? sets[0].items : []).map(it0 => {
+            const tally = [0, 0, 0, 0];
+            graded.forEach(({ sheet, g }) => {
+                const set = sets[sheet.Set_No || 0] || sets[0];
+                const idx = set.items.findIndex(x => x.o === it0.o);
+                const st = idx >= 0 && g.per[idx] ? g.per[idx].state : '';
+                if (st === 'right') tally[0]++; else if (st === 'blank') tally[2]++; else if (st === 'wrong' || st === 'partial') tally[1]++;
+            });
+            return { q: it0.no - 1, key: '', bonus: it0.b, counts: tally, right: tally[0], pct: sheets.length ? tally[0] / sheets.length : 0, multiSet: true, manual: it0.t === 'manual' };
+        });
+        return {
+            key: [], bonus: [], max, c: 0, graded, questions, count: sheets.length,
+            average: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+            highest: scores.length ? Math.max(...scores) : 0, lowest: scores.length ? Math.min(...scores) : 0,
+            correct: total('raw') + total('bonus'), wrong: total('wrong'), blank: total('blank'), multiple: total('multiple'),
+            edited: sheets.filter(s => s.Edited).length
+        };
+    },
+
     // Counts per sheet, class totals and per-question answer counts, all from the saved answers.
     analyze: () => {
         const { session, sheets } = CourseScanRecords.detail;
@@ -174,6 +201,8 @@ export const CourseScanRecords = {
         const max = session.Max_Score;
         const c = session.Num_Choices;
         const multiSet = (session.Set_Keys || []).length > 1;
+
+        if (session.Layout) return CourseScanRecords.analyzeMixed(session, sheets);
 
         const graded = sheets.map(sheet => { const k = keyOfSheet(session, sheet); return { sheet, g: grade(sheet.Answers, k.key, k.bonus, max) }; });
         const scores = graded.map(x => x.g.score);
@@ -225,7 +254,7 @@ export const CourseScanRecords = {
         return a.graded.filter(x => !CourseScanRecords.onlyAttention || CourseScanRecords.needsAttention(x)).map(x => x.sheet);
     },
 
-    needsAttention: (x) => x.g.blank > 0 || x.g.multiple > 0 || Boolean(x.sheet.Edited),
+    needsAttention: (x) => x.g.blank > 0 || x.g.multiple > 0 || x.g.pending > 0 || Boolean(x.sheet.Edited),
 
     badge: (cls, text) => `<span class="text-[10px] font-bold px-2 py-0.5 rounded border ${cls}">${text}</span>`,
 

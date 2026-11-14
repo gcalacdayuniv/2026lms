@@ -214,3 +214,15 @@ When asked to add features, debug, or refactor, you must strictly adhere to the 
 - Manage Exams > More: **Archive / Restore** (hides the exam from the list and the scanner; "Show archived" brings it back) and **Delete** (shown only for exams never assigned to a class; the server refuses otherwise). Worker: `POST /api/exams/archive`, `POST /api/exams/delete`; `GET /api/exams` now returns `Archived` and `Uses`. New column `Exams.Archived` is added automatically.
 - All printing is now in Manage Exams > More > Print: questions, answer keys and the bubble answer sheet, with the number of sets remembered per exam. "For the answer-sheet scanner" keeps papers/keys identical to the scanner's. Scan Answer Sheets keeps the set count and scanning; for a typed key it still prints its own sheet.
 - New file js/sheet-print.js.
+
+## Scanner: other question types
+Answer sheets now read multiple choice, multiple answer, true/false, matching, ordering and numeric answers. Identification, enumeration and essay questions are written on the paper; the lecturer types their points while reviewing.
+- `js/scan-items.js` builds sets, answer-sheet cells and keys; `js/scan-paper.js` prints the paper/keys; `js/scan-grade.js` (same file in `worker/`) scores a sheet with the online-exam grader (`js/grading.js` is a copy of `worker/grading.js`: keep both in sync).
+- All sets share ONE printed sheet (sets only swap questions of the same shape).
+- Numbers: shade sign, decimal places (0-4) and 4+ digits with leading zeros (9.8 = 0098, 1 decimal).
+- Print everything from Manage Exams > More > Print. Scan Answer Sheets uses the same number of sets.
+- Worker: new columns `Scan_Sessions.Layout`, `Scan_Sheets.Marks` (added automatically). `/api/scan-sheets/save` accepts `layout`, per-sheet `marks`; `/api/scan-sheets/correct` accepts `marks`. Plain multiple-choice exams keep the old path.
+- Records and the review screen show the new types; marks-only changes are saved too.
+
+## Archive classes
+Class card > "Archive class" moves it out of the main list ("Show archived classes" brings it back; Restore puts it back). New column `Courses.Archived`, endpoint `POST /api/archive-course`. Archived classes are no longer offered to students for enrollment.

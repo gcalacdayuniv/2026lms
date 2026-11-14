@@ -8,6 +8,9 @@ import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { PhotoCache, ScanPhotos } from './course-scan-photos.js';
 import { answerRows } from './omr-sheet.js';
+import { gradeScanSet } from './scan-grade.js';
+import { questionPoints } from './grading.js';
+import { cellLabels, cellName, codeText } from './scan-items.js';
 import { cropBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
 const LETTERS = 'ABCDE';
@@ -20,7 +23,7 @@ const label = (a) => (a === BLANK ? 'blank' : a === MULTIPLE ? 'double' : LETTER
 // Key and bonus flags of the printed set this sheet belongs to (Set A / the session key when there are no sets).
 export const keyOfSheet = (session, sheet) => {
     const s = (session.Set_Keys || [])[sheet && sheet.Set_No > 0 ? sheet.Set_No : 0];
-    return s ? { key: s.key, bonus: s.bonus.map(Boolean) } : { key: session.Answer_Key, bonus: (session.Bonus_Flags || []).map(Boolean) };
+    return s ? { key: s.key, bonus: s.bonus.map(Boolean), set: s } : { key: session.Answer_Key, bonus: (session.Bonus_Flags || []).map(Boolean) };
 };
 const SET_LETTERS = 'ABCDEF';
 
@@ -36,6 +39,17 @@ const grade = (answers, key, bonus, max) => {
     return { raw, bonus: bonusPoints, wrong, blank, multiple, score: Math.min(cap, raw + bonusPoints) };
 };
 
+// Score of one sheet: mixed-type sheets (session.Layout) by their set's items, plain sheets by key and bonus flags.
+const gradeSheet = (session, sheet, answers, marks) => {
+    const sk = keyOfSheet(session, sheet);
+    if (session.Layout && sk.set) {
+        const g = gradeScanSet(sk.set, answers, marks, session.Max_Score);
+        return { raw: g.raw, bonus: g.bonus, wrong: g.wrong, blank: g.blank, multiple: g.multiple, pending: g.pending, score: g.score, points: true };
+    }
+    return grade(answers, sk.key, sk.bonus, session.Max_Score);
+};
+const sameMarks = (a, b) => JSON.stringify(a || {}) === JSON.stringify(b || {});
+
 const $ = (id) => document.getElementById(id);
 
 export const CourseScanReview = {
@@ -43,6 +57,7 @@ export const CourseScanReview = {
     order: [],          // sheets in the order of the list
     idx: 0,
     drafts: {},         // sheetId -> answers being edited (kept while moving between students)
+    markDrafts: {},     // sheetId -> points typed for questions marked by hand
     rows: [],           // answerRows(n, c) of the open scan
     bitmap: null,       // photo of the student on screen
     token: 0,           // guards against a slow photo arriving after the student changed
@@ -56,9 +71,10 @@ export const CourseScanReview = {
         CourseScanReview.order = order && order.length ? order : detail.sheets;
         CourseScanReview.idx = Math.max(0, CourseScanReview.order.findIndex(s => s.Sheet_ID === sheetId));
         CourseScanReview.drafts = {};
+        CourseScanReview.markDrafts = {};
         CourseScanReview.onChange = onChange || null;
         const { session } = detail;
-        CourseScanReview.rows = answerRows(session.Num_Questions, session.Num_Choices);
+        CourseScanReview.rows = session.Layout ? answerRows(session.Layout) : answerRows(session.Num_Questions, session.Num_Choices);
         PhotoCache.purge().catch(() => {});
 
         const wrap = document.createElement('div');
@@ -98,6 +114,18 @@ export const CourseScanReview = {
         document.body.appendChild(wrap);
 
         wrap.addEventListener('click', CourseScanReview.onClick);
+        wrap.addEventListener('input', (e) => {
+            const t = e.target;
+            if (!t.classList || !t.classList.contains('scrv-mark')) return;
+            const sheet = CourseScanReview.current();
+            if (!sheet) return;
+            const marks = { ...CourseScanReview.marksOf(sheet) };
+            const v = t.value.trim();
+            if (v === '' || !Number.isFinite(Number(v))) delete marks[t.dataset.i];
+            else marks[t.dataset.i] = Math.max(0, Number(v));
+            CourseScanReview.markDrafts[sheet.Sheet_ID] = marks;
+            CourseScanReview.refresh();
+        });
         wrap.querySelector('#scrvPick').addEventListener('change', (e) => CourseScanReview.go(Number(e.target.value)));
         CourseScanReview.keyHandler = (e) => { if (e.key === 'Escape' && !document.querySelector('[role="alertdialog"]')) CourseScanReview.requestClose(); };
         document.addEventListener('keydown', CourseScanReview.keyHandler);
@@ -109,7 +137,8 @@ export const CourseScanReview = {
 
     current: () => CourseScanReview.order[CourseScanReview.idx],
     draftOf: (sheet) => CourseScanReview.drafts[sheet.Sheet_ID] || sheet.Answers,
-    dirty: (sheet) => !same(CourseScanReview.draftOf(sheet), sheet.Answers),
+    marksOf: (sheet) => CourseScanReview.markDrafts[sheet.Sheet_ID] || sheet.Marks || {},
+    dirty: (sheet) => !same(CourseScanReview.draftOf(sheet), sheet.Answers) || !sameMarks(CourseScanReview.marksOf(sheet), sheet.Marks),
     anyDirty: () => CourseScanReview.order.some(s => CourseScanReview.dirty(s)),
 
     fillPicker: () => {
@@ -117,8 +146,7 @@ export const CourseScanReview = {
         if (!sel) return;
         const { session } = CourseScanReview.detail;
         sel.innerHTML = CourseScanReview.order.map((s, i) => {
-            const { key, bonus } = keyOfSheet(session, s);
-            const g = grade(CourseScanReview.draftOf(s), key, bonus, session.Max_Score);
+            const g = gradeSheet(session, s, CourseScanReview.draftOf(s), CourseScanReview.marksOf(s));
             return `<option value="${i}"${i === CourseScanReview.idx ? ' selected' : ''}>${i + 1}. ${esc(s.Name || 'Unknown student')} — ${fmt(g.score)}${CourseScanReview.dirty(s) ? ' •' : ''}</option>`;
         }).join('');
     },
@@ -137,34 +165,53 @@ export const CourseScanReview = {
 
     rowHtml: (sheet, q) => {
         const { session } = CourseScanReview.detail;
-        const c = session.Num_Choices;
+        const cell = session.Layout ? session.Layout[q] : ['a', session.Num_Choices];
+        const mixed = Boolean(session.Layout);
+        const labels = mixed ? cellLabels(cell) : Array.from({ length: session.Num_Choices }, (_, k) => LETTERS[k]);
+        const name = mixed ? cellName(session.Layout, q) : String(q + 1);
         const sk = keyOfSheet(session, sheet);
         const key = sk.key[q];
         const cur = CourseScanReview.draftOf(sheet)[q];
         const orig = sheet.Original_Answers[q];
         const bonus = Boolean(sk.bonus[q]);
         const tone = cur === key ? 'is-right' : 'is-wrong';
-        const opts = Array.from({ length: c }, (_, k) => {
-            const cls = ['scrv-opt', cur === k ? 'is-on' : '', k === key ? 'is-key' : ''].filter(Boolean).join(' ');
-            return `<button type="button" class="${cls}" data-q="${q}" data-k="${k}" aria-pressed="${cur === k}" aria-label="Question ${q + 1} choice ${LETTERS[k]}${k === key ? ' (answer key)' : ''}">${LETTERS[k]}</button>`;
+        const isOn = (k) => (cell[0] === 'm' ? cur >= 1000 && ((cur - 1000) & (1 << k)) !== 0 : cur === k);
+        const isKey = (k) => (cell[0] === 'm' ? key >= 1000 && ((key - 1000) & (1 << k)) !== 0 : k === key);
+        const opts = labels.map((l, k) => {
+            const cls = ['scrv-opt', isOn(k) ? 'is-on' : '', isKey(k) ? 'is-key' : ''].filter(Boolean).join(' ');
+            return `<button type="button" class="${cls}" data-q="${q}" data-k="${k}" aria-pressed="${isOn(k)}" aria-label="Question ${name} choice ${l}${isKey(k) ? ' (answer key)' : ''}">${l}</button>`;
         }).join('');
         const note = [
-            `key ${LETTERS[key]}${bonus ? ' (bonus)' : ''}`,
+            `key ${mixed ? codeText(cell, key) : LETTERS[key]}${bonus ? ' (bonus)' : ''}`,
             cur === BLANK ? '<b class="text-gray-600">blank</b>' : cur === MULTIPLE ? '<b class="text-amber-700">double-shaded: pick one</b>' : '',
-            orig !== cur ? `<span class="text-amber-700 font-bold">scanned: ${label(orig)}</span>` : ''
+            orig !== cur ? `<span class="text-amber-700 font-bold">scanned: ${mixed ? codeText(cell, orig) : label(orig)}</span>` : ''
         ].filter(Boolean).join(' · ');
         return `
             <div class="scrv-row ${tone}" data-row="${q}">
                 <div class="scrv-img">
-                    <span class="scrv-qn">${q + 1}</span>
+                    <span class="scrv-qn">${name}</span>
                     <canvas data-crop="${q}" width="10" height="2" aria-hidden="true"></canvas>
                     <div class="scrv-ph" data-ph="${q}"></div>
                 </div>
                 <div class="scrv-side">
-                    <div class="scrv-opts" role="group" aria-label="Question ${q + 1} answer">${opts}</div>
+                    <div class="scrv-opts" role="group" aria-label="Question ${name} answer">${opts}</div>
                     <div class="scrv-note" data-note="${q}">${note}</div>
                 </div>
             </div>`;
+    },
+
+    // Questions written on the paper (identification, enumeration, essay): the lecturer types the points.
+    marksHtml: (sheet) => {
+        const { session } = CourseScanReview.detail;
+        if (!session.Layout) return '';
+        const sk = keyOfSheet(session, sheet);
+        const items = (sk.set ? sk.set.items : []).map((it, i) => ({ it, i })).filter(x => x.it.t === 'manual');
+        if (!items.length) return '';
+        const marks = CourseScanReview.marksOf(sheet);
+        return `<div class="m-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div class="text-xs font-bold text-amber-800 mb-2">Marked by hand: check the question paper and type the points</div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${items.map(({ it, i }) => `<label class="text-xs text-gray-700">Q${it.no} <span class="text-gray-500">/ ${fmt(questionPoints(it.row))}</span>
+                <input type="number" min="0" max="${questionPoints(it.row)}" step="0.5" inputmode="decimal" class="scrv-mark w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white" data-i="${i}" value="${marks[i] !== undefined ? marks[i] : ''}" aria-label="Points for question ${it.no}"></label>`).join('')}</div></div>`;
     },
 
     show: async () => {
@@ -179,7 +226,7 @@ export const CourseScanReview = {
         $('scrvPrev').disabled = CourseScanReview.idx === 0;
         $('scrvNext').disabled = CourseScanReview.idx === CourseScanReview.order.length - 1;
 
-        $('scrvBody').innerHTML = `<div class="max-w-4xl mx-auto w-full">${CourseScanReview.rows.map(r => CourseScanReview.rowHtml(sheet, r.q)).join('')}</div>`;
+        $('scrvBody').innerHTML = `<div class="max-w-4xl mx-auto w-full">${CourseScanReview.marksHtml(sheet)}${CourseScanReview.rows.map(r => CourseScanReview.rowHtml(sheet, r.q)).join('')}</div>`;
         CourseScanReview.refresh();
 
         const note = $('scrvNote');
@@ -202,7 +249,7 @@ export const CourseScanReview = {
             if (mine !== CourseScanReview.token) return;
             if (layout !== RECT_LAYOUT) {
                 // Older plain photo: find the sheet in it and straighten it here, once; the result is kept for 7 days.
-                const fixed = await straightenLegacy(blob, session.Num_Questions, session.Num_Choices);
+                const fixed = await straightenLegacy(blob, session.Layout || session.Num_Questions, session.Num_Choices);
                 if (mine !== CourseScanReview.token) return;
                 if (fixed) {
                     blob = fixed; layout = RECT_LAYOUT;
@@ -215,7 +262,7 @@ export const CourseScanReview = {
             if (layout === RECT_LAYOUT) {
                 CourseScanReview.rows.forEach(r => {
                     const canvas = document.querySelector(`#scrvBody canvas[data-crop="${r.q}"]`);
-                    if (canvas) { drawCrop(canvas, bitmap, cropBox(r, session.Num_Choices)); canvas.classList.add('is-ready'); }
+                    if (canvas) { drawCrop(canvas, bitmap, cropBox(r, Math.min(5, r.cell ? r.cell[1] : session.Num_Choices))); canvas.classList.add('is-ready'); }
                 });
                 phs().forEach(p => p.remove());
                 if (source === 'old-cache') setNote('Could not reach the server, showing the copy kept on this device.', 'is-info');
@@ -245,12 +292,12 @@ export const CourseScanReview = {
         const { session } = CourseScanReview.detail;
         const { key, bonus } = keyOfSheet(session, sheet);
         const draft = CourseScanReview.draftOf(sheet);
-        const g = grade(draft, key, bonus, session.Max_Score);
+        const g = gradeSheet(session, sheet, draft, CourseScanReview.marksOf(sheet));
         const maxText = session.Max_Score == null ? '?' : fmt(session.Max_Score);
 
         $('scrvScore').textContent = `${fmt(g.score)}/${maxText}`;
-        $('scrvPreview').textContent = `${(session.Set_Keys || []).length > 1 ? `Set ${SET_LETTERS[sheet.Set_No || 0]}: ` : ''}${g.raw} correct${g.bonus ? ` + ${g.bonus} bonus` : ''}, ${g.wrong} wrong, ${g.blank} blank${g.multiple ? `, ${g.multiple} double` : ''}`;
-        const dirty = !same(draft, sheet.Answers);
+        $('scrvPreview').textContent = `${(session.Set_Keys || []).length > 1 ? `Set ${SET_LETTERS[sheet.Set_No || 0]}: ` : ''}${g.raw} ${g.points ? 'pts' : 'correct'}${g.bonus ? ` + ${g.bonus} bonus` : ''}, ${g.wrong} wrong, ${g.blank} blank${g.multiple ? `, ${g.multiple} double` : ''}${g.pending ? `, ${g.pending} to mark` : ''}`;
+        const dirty = CourseScanReview.dirty(sheet);
         const save = $('scrvSave');
         save.disabled = !dirty || session.Max_Score == null || CourseScanReview.busy;
         save.textContent = dirty ? 'Save' : (sheet.Edited ? 'Saved' : 'Save');
@@ -259,10 +306,12 @@ export const CourseScanReview = {
         draft.forEach((cur, q) => {
             const row = document.querySelector(`#scrvBody [data-row="${q}"]`);
             if (!row) return;
+            const cell = session.Layout ? session.Layout[q] : null;
             row.classList.toggle('is-right', cur === key[q]);
             row.classList.toggle('is-wrong', cur !== key[q]);
             row.querySelectorAll('.scrv-opt').forEach(b => {
-                const on = Number(b.dataset.k) === cur;
+                const kk = Number(b.dataset.k);
+                const on = cell && cell[0] === 'm' ? cur >= 1000 && ((cur - 1000) & (1 << kk)) !== 0 : kk === cur;
                 b.classList.toggle('is-on', on);
                 b.setAttribute('aria-pressed', on ? 'true' : 'false');
             });
@@ -270,9 +319,9 @@ export const CourseScanReview = {
             const noteEl = row.querySelector('[data-note]');
             if (noteEl) {
                 noteEl.innerHTML = [
-                    `key ${LETTERS[key[q]]}${bonus[q] ? ' (bonus)' : ''}`,
+                    `key ${cell ? codeText(cell, key[q]) : LETTERS[key[q]]}${bonus[q] ? ' (bonus)' : ''}`,
                     cur === BLANK ? '<b class="text-gray-600">blank</b>' : cur === MULTIPLE ? '<b class="text-amber-700">double-shaded: pick one</b>' : '',
-                    orig !== cur ? `<span class="text-amber-700 font-bold">scanned: ${label(orig)}</span>` : ''
+                    orig !== cur ? `<span class="text-amber-700 font-bold">scanned: ${cell ? codeText(cell, orig) : label(orig)}</span>` : ''
                 ].filter(Boolean).join(' · ');
             }
         });
@@ -287,8 +336,16 @@ export const CourseScanReview = {
         const sheet = CourseScanReview.current();
         if (!sheet) return;
         const draft = CourseScanReview.draftOf(sheet).slice();
-        // Tapping the chosen letter again clears the answer (blank).
-        draft[q] = draft[q] === k ? BLANK : k;
+        const { session } = CourseScanReview.detail;
+        if (session.Layout && session.Layout[q][0] === 'm') {
+            // Multiple answer: every tap turns one choice on or off.
+            const cur = draft[q] >= 1000 ? draft[q] - 1000 : 0;
+            const next = cur ^ (1 << k);
+            draft[q] = next ? 1000 + next : BLANK;
+        } else {
+            // Tapping the chosen letter again clears the answer (blank).
+            draft[q] = draft[q] === k ? BLANK : k;
+        }
         CourseScanReview.drafts[sheet.Sheet_ID] = draft;
         CourseScanReview.refresh();
     },
@@ -297,6 +354,8 @@ export const CourseScanReview = {
         const sheet = CourseScanReview.current();
         if (!sheet) return;
         CourseScanReview.drafts[sheet.Sheet_ID] = sheet.Original_Answers.slice();
+        delete CourseScanReview.markDrafts[sheet.Sheet_ID];
+        if (sheet.Marks && Object.keys(sheet.Marks).length) CourseScanReview.markDrafts[sheet.Sheet_ID] = { ...sheet.Marks };
         CourseScanReview.refresh();
     },
 
@@ -304,14 +363,18 @@ export const CourseScanReview = {
         const sheet = CourseScanReview.current();
         if (!sheet || CourseScanReview.busy) return;
         const draft = CourseScanReview.draftOf(sheet);
-        if (same(draft, sheet.Answers)) return;
+        if (!CourseScanReview.dirty(sheet)) return;
+        const { session: sess } = CourseScanReview.detail;
+        const marks = CourseScanReview.marksOf(sheet);
         CourseScanReview.busy = true;
         const btn = $('scrvSave');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>';
         try {
-            const res = await apiFetch('/api/scan-sheets/correct', { method: 'POST', body: JSON.stringify({ sheetId: sheet.Sheet_ID, answers: draft }) });
+            const res = await apiFetch('/api/scan-sheets/correct', { method: 'POST', body: JSON.stringify({ sheetId: sheet.Sheet_ID, answers: draft, marks: sess.Layout ? marks : undefined }) });
             sheet.Answers = draft.slice();
+            sheet.Marks = { ...marks };
+            delete CourseScanReview.markDrafts[sheet.Sheet_ID];
             sheet.Score = res.score;
             sheet.Edited = res.edited ? 1 : 0;
             delete CourseScanReview.drafts[sheet.Sheet_ID];

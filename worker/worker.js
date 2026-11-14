@@ -1,6 +1,7 @@
 // worker/worker.js
 import { authorize, signToken, authEnabled } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { gradeScanSet } from './scan-grade.js';
 import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
 // worker/upload-guard.js
 // Cheap checks that run BEFORE any upload bytes are streamed to Google Drive.
@@ -394,6 +395,15 @@ async function ensureScanTables(env) {
     } catch (err) {
         if (!/duplicate column/i.test(String(err && err.message))) throw err;
     }
+    // Layout = answer cells of a mixed-question-type sheet (null for a plain multiple-choice sheet);
+    // Marks = points the lecturer typed for questions marked by hand on one sheet.
+    for (const [table, col] of [["Scan_Sessions", "Layout"], ["Scan_Sheets", "Marks"]]) {
+        try {
+            await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${col} TEXT`).run();
+        } catch (err) {
+            if (!/duplicate column/i.test(String(err && err.message))) throw err;
+        }
+    }
     scanTablesReady = true;
 }
 
@@ -464,8 +474,46 @@ const parseJsonList = (text) => {
     }
 };
 
-const isAnswerList = (list, n, c) =>
-    Array.isArray(list) && list.length === n && list.every(a => Number.isInteger(a) && a >= SCAN_MULTIPLE && a < c);
+const SCAN_MAX_CELLS = 130;
+const SCAN_MAX_OPTIONS = 10;
+const SCAN_KINDS = "amtpsxd";
+
+// Answer cells of a mixed-type sheet: [kind, choices, itemNo, sub, part, tag]. Returns the cleaned list or null.
+const cleanLayout = (cells) => {
+    if (!Array.isArray(cells) || cells.length < 1 || cells.length > SCAN_MAX_CELLS) return null;
+    const out = [];
+    for (const c of cells) {
+        if (!Array.isArray(c) || typeof c[0] !== "string" || !SCAN_KINDS.includes(c[0]) || c[0].length !== 1) return null;
+        if (!Number.isInteger(c[1]) || c[1] < 2 || c[1] > SCAN_MAX_OPTIONS) return null;
+        out.push([c[0], c[1], Number(c[2]) || 0, Number(c[3]) || 0, Number(c[4]) || 0, String(c[5] || "").slice(0, 8)]);
+    }
+    return out;
+};
+
+const isAnswerList = (list, n, c, cells = null) => {
+    if (!Array.isArray(list) || list.length !== n) return false;
+    if (!cells) return list.every(a => Number.isInteger(a) && a >= SCAN_MULTIPLE && a < c);
+    return list.every((a, i) => {
+        if (!Number.isInteger(a)) return false;
+        if (a === SCAN_BLANK || a === SCAN_MULTIPLE) return true;
+        const cell = cells[i];
+        if (cell[0] === "m") return a >= 1000 && a < 1000 + (1 << cell[1]);
+        return a >= 0 && a < cell[1];
+    });
+};
+
+// Points typed by the lecturer for questions marked by hand: { "3": 4.5 } (index of the question in the set).
+const cleanMarks = (m) => {
+    const out = {};
+    if (m && typeof m === "object" && !Array.isArray(m)) {
+        Object.keys(m).slice(0, 200).forEach(k => {
+            const v = Number(m[k]);
+            if (/^\d{1,3}$/.test(k) && Number.isFinite(v) && v >= 0 && v <= 1000) out[k] = Math.round(v * 100) / 100;
+        });
+    }
+    return out;
+};
+const parseMarks = (text) => { try { return cleanMarks(JSON.parse(text || "{}")); } catch (e) { return {}; } };
 
 const sameList = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -484,6 +532,26 @@ function gradeScan(answers, key, bonus, max) {
 }
 
 const SCAN_MAX_SETS = 6;
+// Sets of a mixed-type exam: [{ key, bonus, items: [{ t, s, n, b, row, shown }] }]
+const isMixedSets = (list, n) => Array.isArray(list) && list.length >= 1 && list.length <= SCAN_MAX_SETS && JSON.stringify(list).length < 600000 && list.every(s =>
+    s && Array.isArray(s.key) && s.key.length === n && s.key.every(k => Number.isInteger(k) && k >= 0) &&
+    Array.isArray(s.bonus) && s.bonus.length === n &&
+    Array.isArray(s.items) && s.items.length <= 200 && s.items.every(it => it && typeof it.t === "string" && Array.isArray(it.row) && Number.isInteger(it.s) && it.s >= 0 && Number.isInteger(it.n) && it.n >= 0 && it.s + it.n <= n &&
+        (it.shown === undefined || (Array.isArray(it.shown) && it.shown.length <= SCAN_MAX_OPTIONS))));
+const cleanMixedSets = (list) => list.map(s => ({
+    key: s.key, bonus: s.bonus.map(Boolean),
+    items: s.items.map(it => ({ t: String(it.t), no: Number(it.no) || 0, o: Number(it.o) || 0, s: it.s, n: it.n, b: Boolean(it.b), row: it.row, shown: it.shown }))
+}));
+// Grades one sheet: a mixed-type sheet (layout) by its set's items, a plain sheet by key and bonus flags.
+const gradeSheetAny = (ctx, answers, setNo, marks, max) => {
+    if (ctx.layout) {
+        const set = Number.isInteger(setNo) && setNo > 0 && ctx.setKeys[setNo] ? ctx.setKeys[setNo] : ctx.setKeys[0];
+        const g = gradeScanSet(set, answers, marks, max);
+        return { raw: g.raw, bonus: g.bonus, wrong: g.wrong, blank: g.blank, multiple: g.multiple, pending: g.pending, score: g.score };
+    }
+    const k = keyOfSet(ctx.setKeys, setNo, ctx.key, ctx.bonus);
+    return gradeScan(answers, k.key, k.bonus, max);
+};
 const isSetKeys = (list, n, c) => Array.isArray(list) && list.length >= 1 && list.length <= SCAN_MAX_SETS && list.every(s =>
     s && Array.isArray(s.key) && s.key.length === n && s.key.every(k => Number.isInteger(k) && k >= 0 && k < c) &&
     Array.isArray(s.bonus) && s.bonus.length === n);
@@ -538,14 +606,14 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
 
         const session = await env.DB.prepare(
             `SELECT s.Session_ID, s.Course_ID, s.Assessment_ID, s.Title, s.Term, s.Category, s.Num_Questions, s.Num_Choices,
-                    s.Answer_Key, s.Bonus_Flags, s.Set_Keys, s.Created_At, s.Updated_At, a.Max_Score
+                    s.Answer_Key, s.Bonus_Flags, s.Set_Keys, s.Layout, s.Created_At, s.Updated_At, a.Max_Score
              FROM Scan_Sessions s LEFT JOIN Assessments a ON a.Assessment_ID = s.Assessment_ID
              WHERE s.Session_ID = ?`
         ).bind(sessionId).first();
         if (!session) return json(corsHeaders, { error: 'Saved scan not found.' }, 404);
 
         const rows = await env.DB.prepare(
-            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID, h.Photo_Layout, h.Scan_ID, h.Set_No,
+            `SELECT h.Sheet_ID, h.Student_ID, h.Student_No_Read, h.Original_Answers, h.Answers, h.Score, h.Edited, h.Updated_At, h.Photo_File_ID, h.Photo_Layout, h.Scan_ID, h.Set_No, h.Marks,
                     u.Name, u.Student_Number
              FROM Scan_Sheets h LEFT JOIN Users u ON u.User_ID = h.Student_ID
              WHERE h.Session_ID = ?
@@ -555,12 +623,13 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         const sheets = (rows.results || []).map(r => ({
             ...r,
             Original_Answers: parseJsonList(r.Original_Answers),
-            Answers: parseJsonList(r.Answers)
+            Answers: parseJsonList(r.Answers),
+            Marks: parseMarks(r.Marks)
         }));
-        const { Answer_Key, Bonus_Flags, Set_Keys, ...rest } = session;
+        const { Answer_Key, Bonus_Flags, Set_Keys, Layout, ...rest } = session;
         return json(corsHeaders, {
             success: true,
-            session: { ...rest, Answer_Key: parseJsonList(Answer_Key), Bonus_Flags: parseJsonList(Bonus_Flags), Set_Keys: parseJsonList(Set_Keys) },
+            session: { ...rest, Answer_Key: parseJsonList(Answer_Key), Bonus_Flags: parseJsonList(Bonus_Flags), Set_Keys: parseJsonList(Set_Keys), Layout: Layout ? parseJsonList(Layout) : null },
             sheets
         });
     }
@@ -571,12 +640,14 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         const { courseId, assessmentId, title, term, category, numQuestions, numChoices, answerKey, bonus, sheets, allowRegrade } = body;
         const removals = Array.isArray(body.removals) ? body.removals.filter(r => r && r.studentId && r.scanId) : [];
 
-        const n = Number(numQuestions);
-        const c = Number(numChoices);
+        const layout = body.layout != null ? cleanLayout(body.layout) : null;
+        if (body.layout != null && !layout) return json(corsHeaders, { error: 'Invalid answer sheet layout.' }, 400);
+        const n = layout ? layout.length : Number(numQuestions);
+        const c = layout ? Math.max(...layout.map(x => x[1])) : Number(numChoices);
         if (!courseId || !assessmentId) return json(corsHeaders, { error: 'Missing course or assessment.' }, 400);
-        if (!Number.isInteger(n) || n < 1 || n > SCAN_MAX_QUESTIONS) return json(corsHeaders, { error: `Questions must be 1 to ${SCAN_MAX_QUESTIONS}.` }, 400);
-        if (!Number.isInteger(c) || c < 2 || c > SCAN_MAX_CHOICES) return json(corsHeaders, { error: `Choices must be 2 to ${SCAN_MAX_CHOICES}.` }, 400);
-        if (!Array.isArray(answerKey) || answerKey.length !== n || !answerKey.every(k => Number.isInteger(k) && k >= 0 && k < c)) {
+        if (!Number.isInteger(n) || n < 1 || n > (layout ? SCAN_MAX_CELLS : SCAN_MAX_QUESTIONS)) return json(corsHeaders, { error: `Questions must be 1 to ${SCAN_MAX_QUESTIONS}.` }, 400);
+        if (!Number.isInteger(c) || c < 2 || c > (layout ? SCAN_MAX_OPTIONS : SCAN_MAX_CHOICES)) return json(corsHeaders, { error: `Choices must be 2 to ${SCAN_MAX_CHOICES}.` }, 400);
+        if (!Array.isArray(answerKey) || answerKey.length !== n || !answerKey.every(k => Number.isInteger(k) && k >= 0 && (layout || k < c))) {
             return json(corsHeaders, { error: 'Invalid answer key.' }, 400);
         }
         if (!Array.isArray(bonus) || bonus.length !== n) return json(corsHeaders, { error: 'Invalid bonus flags.' }, 400);
@@ -586,10 +657,14 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         const key = answerKey;
         const bonusFlags = bonus.map(Boolean);
         let setKeys = [];
-        if (body.setKeys != null) {
+        if (layout) {
+            if (!isMixedSets(body.setKeys, n)) return json(corsHeaders, { error: 'Invalid exam set keys.' }, 400);
+            setKeys = cleanMixedSets(body.setKeys);
+        } else if (body.setKeys != null) {
             if (!isSetKeys(body.setKeys, n, c)) return json(corsHeaders, { error: 'Invalid exam set keys.' }, 400);
             setKeys = cleanSetKeys(body.setKeys);
         }
+        const ctx = { layout, setKeys, key, bonus: bonusFlags };
 
         const assessment = await env.DB.prepare(
             "SELECT Assessment_ID, Max_Score FROM Assessments WHERE Assessment_ID = ? AND Course_ID = ?"
@@ -608,11 +683,11 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             if (sheet.scanId != null && (typeof sheet.scanId !== 'string' || sheet.scanId.length > 64)) {
                 return json(corsHeaders, { error: 'A sheet has an invalid scan id.' }, 400);
             }
-            if (!isAnswerList(sheet.answers, n, c)) return json(corsHeaders, { error: 'A sheet has invalid answers.' }, 400);
+            if (!isAnswerList(sheet.answers, n, c, layout)) return json(corsHeaders, { error: 'A sheet has invalid answers.' }, 400);
             if (sheet.set != null && !(Number.isInteger(sheet.set) && sheet.set >= 0 && sheet.set < Math.max(1, setKeys.length))) {
                 return json(corsHeaders, { error: 'A sheet has an invalid exam set.' }, 400);
             }
-            if (sheet.originalAnswers != null && !isAnswerList(sheet.originalAnswers, n, c)) {
+            if (sheet.originalAnswers != null && !isAnswerList(sheet.originalAnswers, n, c, layout)) {
                 return json(corsHeaders, { error: 'A sheet has invalid original answers.' }, 400);
             }
         }
@@ -629,7 +704,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         const savedBefore = new Map();
         if (existing) {
             const prior = await env.DB.prepare(
-                "SELECT Student_ID, Scan_ID, Answers, Score, Updated_At FROM Scan_Sheets WHERE Session_ID = ?"
+                "SELECT Student_ID, Scan_ID, Answers, Marks, Score, Updated_At FROM Scan_Sheets WHERE Session_ID = ?"
             ).bind(existing.Session_ID).all();
             (prior.results || []).forEach(r => savedBefore.set(r.Student_ID, r));
         }
@@ -637,26 +712,26 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             sessionId = existing.Session_ID;
             const oldKey = parseJsonList(existing.Answer_Key);
             const oldBonus = parseJsonList(existing.Bonus_Flags).map(Boolean);
-            keyChanged = !sameList(oldKey, key) || !sameList(oldBonus, bonusFlags) || JSON.stringify(parseJsonList(existing.Set_Keys)) !== JSON.stringify(setKeys);
+            keyChanged = !sameList(oldKey, key) || !sameList(oldBonus, bonusFlags) || JSON.stringify(parseJsonList(existing.Set_Keys)) !== JSON.stringify(setKeys) || (existing.Layout || null) !== (layout ? JSON.stringify(layout) : null);
 
             const others = await env.DB.prepare(
                 "SELECT COUNT(*) AS cnt FROM Scan_Sheets WHERE Session_ID = ?" + (seen.size ? ` AND Student_ID NOT IN (${[...seen].map(() => '?').join(',')})` : '')
             ).bind(sessionId, ...seen).first();
-            if (others && others.cnt > 0 && (existing.Num_Questions !== n || existing.Num_Choices !== c)) {
+            if (others && others.cnt > 0 && (existing.Num_Questions !== n || existing.Num_Choices !== c || (existing.Layout || null) !== (layout ? JSON.stringify(layout) : null))) {
                 return json(corsHeaders, {
                     error: `This assessment already has saved sheets for a ${existing.Num_Questions}-question sheet with ${existing.Num_Choices} choices. Use the same sheet size, or delete the saved scan first.`
                 }, 409);
             }
             statements.push(env.DB.prepare(
                 `UPDATE Scan_Sessions SET Title = ?, Term = ?, Category = ?, Num_Questions = ?, Num_Choices = ?,
-                        Answer_Key = ?, Bonus_Flags = ?, Set_Keys = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ?`
-            ).bind(cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), JSON.stringify(setKeys), sessionId));
+                        Answer_Key = ?, Bonus_Flags = ?, Set_Keys = ?, Layout = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ?`
+            ).bind(cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), JSON.stringify(setKeys), layout ? JSON.stringify(layout) : null, sessionId));
         } else {
             sessionId = crypto.randomUUID();
             statements.push(env.DB.prepare(
-                `INSERT INTO Scan_Sessions (Session_ID, Course_ID, Assessment_ID, Title, Term, Category, Num_Questions, Num_Choices, Answer_Key, Bonus_Flags, Set_Keys)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).bind(sessionId, courseId, assessmentId, cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), JSON.stringify(setKeys)));
+                `INSERT INTO Scan_Sessions (Session_ID, Course_ID, Assessment_ID, Title, Term, Category, Num_Questions, Num_Choices, Answer_Key, Bonus_Flags, Set_Keys, Layout)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(sessionId, courseId, assessmentId, cleanTitle, term || null, category || null, n, c, JSON.stringify(key), JSON.stringify(bonusFlags), JSON.stringify(setKeys), layout ? JSON.stringify(layout) : null));
         }
 
         // One sheet per student per assessment. A second, different sheet for a student who already has one
@@ -669,7 +744,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             if (before) {
                 const sameCapture = before.Scan_ID && before.Scan_ID === sheet.scanId;
                 if (!sameCapture) {
-                    if (sameList(parseJsonList(before.Answers), sheet.answers)) {
+                    if (sameList(parseJsonList(before.Answers), sheet.answers) && JSON.stringify(parseMarks(before.Marks)) === JSON.stringify(cleanMarks(sheet.marks))) {
                         unchanged++;
                         continue;
                     }
@@ -677,7 +752,7 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
                         conflicts.push({
                             studentId: sheet.studentId, scanId: sheet.scanId || null,
                             existingScore: before.Score, existingUpdated: before.Updated_At,
-                            newScore: (() => { const k = keyOfSet(setKeys, sheet.set, key, bonusFlags); return gradeScan(sheet.answers, k.key, k.bonus, assessment.Max_Score).score; })()
+                            newScore: gradeSheetAny(ctx, sheet.answers, sheet.set, cleanMarks(sheet.marks), assessment.Max_Score).score
                         });
                         continue;
                     }
@@ -685,22 +760,22 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
             }
             written.add(sheet.studentId);
             const original = sheet.originalAnswers || sheet.answers;
-            const sk = keyOfSet(setKeys, sheet.set, key, bonusFlags);
-            const graded = gradeScan(sheet.answers, sk.key, sk.bonus, assessment.Max_Score);
+            const sheetMarks = cleanMarks(sheet.marks);
+            const graded = gradeSheetAny(ctx, sheet.answers, sheet.set, sheetMarks, assessment.Max_Score);
             statements.push(env.DB.prepare(
-                `INSERT INTO Scan_Sheets (Sheet_ID, Session_ID, Student_ID, Student_No_Read, Original_Answers, Answers, Score, Edited, Scan_ID, Set_No)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO Scan_Sheets (Sheet_ID, Session_ID, Student_ID, Student_No_Read, Original_Answers, Answers, Score, Edited, Scan_ID, Set_No, Marks)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(Session_ID, Student_ID) DO UPDATE SET
                     Student_No_Read = excluded.Student_No_Read, Original_Answers = excluded.Original_Answers,
                     Answers = excluded.Answers, Score = excluded.Score, Edited = excluded.Edited,
                     Photo_File_ID = CASE WHEN Scan_Sheets.Scan_ID IS excluded.Scan_ID THEN Scan_Sheets.Photo_File_ID ELSE NULL END,
                     Photo_Layout = CASE WHEN Scan_Sheets.Scan_ID IS excluded.Scan_ID THEN Scan_Sheets.Photo_Layout ELSE NULL END,
-                    Scan_ID = excluded.Scan_ID, Set_No = excluded.Set_No,
+                    Scan_ID = excluded.Scan_ID, Set_No = excluded.Set_No, Marks = excluded.Marks,
                     Updated_At = CURRENT_TIMESTAMP`
             ).bind(
                 crypto.randomUUID(), sessionId, sheet.studentId, String(sheet.studentNo || '').slice(0, 20),
                 JSON.stringify(original), JSON.stringify(sheet.answers), graded.score, sameList(original, sheet.answers) ? 0 : 1,
-                sheet.scanId || null, Number.isInteger(sheet.set) ? sheet.set : 0
+                sheet.scanId || null, Number.isInteger(sheet.set) ? sheet.set : 0, JSON.stringify(sheetMarks)
             ));
             statements.push(...scanScoreStatements(env, assessmentId, sheet.studentId, graded.score));
         }
@@ -722,13 +797,12 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         // Nothing is written until the caller confirms (allowRegrade), because other students' scores change.
         let regraded = 0;
         if (keyChanged) {
-            const old = await env.DB.prepare("SELECT Student_ID, Answers, Set_No FROM Scan_Sheets WHERE Session_ID = ?").bind(sessionId).all();
+            const old = await env.DB.prepare("SELECT Student_ID, Answers, Set_No, Marks FROM Scan_Sheets WHERE Session_ID = ?").bind(sessionId).all();
             for (const row of old.results || []) {
                 if (written.has(row.Student_ID) || removedIds.has(row.Student_ID)) continue;
                 const answers = parseJsonList(row.Answers);
-                if (!isAnswerList(answers, n, c)) continue;
-                const rk = keyOfSet(setKeys, row.Set_No, key, bonusFlags);
-                const graded = gradeScan(answers, rk.key, rk.bonus, assessment.Max_Score);
+                if (!isAnswerList(answers, n, c, layout)) continue;
+                const graded = gradeSheetAny(ctx, answers, row.Set_No, parseMarks(row.Marks), assessment.Max_Score);
                 regradeStatements.push(env.DB.prepare(
                     "UPDATE Scan_Sheets SET Score = ?, Updated_At = CURRENT_TIMESTAMP WHERE Session_ID = ? AND Student_ID = ?"
                 ).bind(graded.score, sessionId, row.Student_ID));
@@ -803,11 +877,11 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
 
     // Corrects one student's answers later; the score in the assessment is updated too.
     if (method === 'POST' && path === '/api/scan-sheets/correct') {
-        const { sheetId, answers } = await request.json();
+        const { sheetId, answers, marks } = await request.json();
         if (!sheetId) return json(corsHeaders, { error: 'Missing sheetId' }, 400);
 
         const sheet = await env.DB.prepare(
-            `SELECT h.Sheet_ID, h.Student_ID, h.Original_Answers, h.Set_No, s.Assessment_ID, s.Num_Questions, s.Num_Choices, s.Answer_Key, s.Bonus_Flags, s.Set_Keys
+            `SELECT h.Sheet_ID, h.Student_ID, h.Original_Answers, h.Set_No, h.Marks, s.Assessment_ID, s.Num_Questions, s.Num_Choices, s.Answer_Key, s.Bonus_Flags, s.Set_Keys, s.Layout
              FROM Scan_Sheets h JOIN Scan_Sessions s ON s.Session_ID = h.Session_ID
              WHERE h.Sheet_ID = ?`
         ).bind(sheetId).first();
@@ -816,20 +890,21 @@ async function handleScanSheets(request, env, path, url, corsHeaders) {
         const assessment = await env.DB.prepare("SELECT Max_Score FROM Assessments WHERE Assessment_ID = ?").bind(sheet.Assessment_ID).first();
         if (!assessment) return json(corsHeaders, { error: 'The assessment of this scan no longer exists.' }, 404);
 
-        if (!isAnswerList(answers, sheet.Num_Questions, sheet.Num_Choices)) {
+        const layoutC = sheet.Layout ? cleanLayout(parseJsonList(sheet.Layout)) : null;
+        if (!isAnswerList(answers, sheet.Num_Questions, sheet.Num_Choices, layoutC)) {
             return json(corsHeaders, { error: 'Invalid answers.' }, 400);
         }
 
         const key = parseJsonList(sheet.Answer_Key);
         const bonusFlags = parseJsonList(sheet.Bonus_Flags).map(Boolean);
-        const ck = keyOfSet(parseJsonList(sheet.Set_Keys), sheet.Set_No, key, bonusFlags);
-        const graded = gradeScan(answers, ck.key, ck.bonus, assessment.Max_Score);
-        const edited = sameList(parseJsonList(sheet.Original_Answers), answers) ? 0 : 1;
+        const newMarks = marks !== undefined ? cleanMarks(marks) : parseMarks(sheet.Marks);
+        const graded = gradeSheetAny({ layout: layoutC, setKeys: parseJsonList(sheet.Set_Keys), key, bonus: bonusFlags }, answers, sheet.Set_No, newMarks, assessment.Max_Score);
+        const edited = sameList(parseJsonList(sheet.Original_Answers), answers) && JSON.stringify(newMarks) === JSON.stringify(parseMarks(sheet.Marks)) ? 0 : 1;
 
         await env.DB.batch([
             env.DB.prepare(
-                "UPDATE Scan_Sheets SET Answers = ?, Score = ?, Edited = ?, Updated_At = CURRENT_TIMESTAMP WHERE Sheet_ID = ?"
-            ).bind(JSON.stringify(answers), graded.score, edited, sheetId),
+                "UPDATE Scan_Sheets SET Answers = ?, Score = ?, Edited = ?, Marks = ?, Updated_At = CURRENT_TIMESTAMP WHERE Sheet_ID = ?"
+            ).bind(JSON.stringify(answers), graded.score, edited, JSON.stringify(newMarks), sheetId),
             ...scanScoreStatements(env, sheet.Assessment_ID, sheet.Student_ID, graded.score)
         ]);
         return json(corsHeaders, { success: true, score: graded.score, edited: Boolean(edited), counts: graded });
@@ -1145,10 +1220,13 @@ function resolveAllowedOrigin(env, requestOrigin) {
 let courseRoomReady = false;
 async function ensureCourseRoom(env) {
     if (courseRoomReady) return;
-    try {
-        await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Room TEXT").run();
-    } catch (err) {
-        if (!/duplicate column/i.test(String(err && err.message))) throw err;
+    // Archived = 1: the lecturer put the class away (hidden from the main list, nothing deleted).
+    for (const col of ["Room TEXT", "Archived INTEGER"]) {
+        try {
+            await env.DB.prepare(`ALTER TABLE Courses ADD COLUMN ${col}`).run();
+        } catch (err) {
+            if (!/duplicate column/i.test(String(err && err.message))) throw err;
+        }
     }
     courseRoomReady = true;
 }
@@ -1180,7 +1258,7 @@ export default {
                 return new Response(JSON.stringify({ error: gate.error }), { status: gate.status, headers: corsHeaders });
             }
 
-            if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room" || path === "/api/update-course") {
+            if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room" || path === "/api/update-course" || path === "/api/archive-course") {
                 await ensureCourseRoom(env);
             }
 
@@ -2370,6 +2448,19 @@ export default {
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && path === "/api/archive-course") {
+                const body = await request.json();
+                const course = await env.DB.prepare("SELECT Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+                if (course.Lecturer_ID !== body.lecturerId) {
+                    return new Response(JSON.stringify({ error: "Only the lecturer of this class can archive it." }), { status: 403, headers: corsHeaders });
+                }
+                await env.DB.prepare("UPDATE Courses SET Archived = ? WHERE Course_ID = ?").bind(body.archived ? 1 : 0, body.courseId).run();
+                return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "GET" && path === "/api/courses") {
                 const studentId = url.searchParams.get("studentId");
 
@@ -2390,7 +2481,8 @@ export default {
                         `SELECT c.*, u.Name as LecturerName
                          FROM Courses c
                          JOIN Users u ON c.Lecturer_ID = u.User_ID
-                         WHERE (c.Target_Course IS NULL OR TRIM(c.Target_Course) = '' OR TRIM(c.Target_Course) COLLATE NOCASE = ?)
+                         WHERE COALESCE(c.Archived, 0) = 0
+                           AND (c.Target_Course IS NULL OR TRIM(c.Target_Course) = '' OR TRIM(c.Target_Course) COLLATE NOCASE = ?)
                            AND (c.Target_Year IS NULL OR TRIM(c.Target_Year) = '' OR TRIM(c.Target_Year) COLLATE NOCASE = ?)
                            AND (c.Target_Section IS NULL OR TRIM(c.Target_Section) = '' OR TRIM(c.Target_Section) COLLATE NOCASE = ?)`
                     ).bind(sCourse, sYear, sSection).all();
