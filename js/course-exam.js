@@ -135,6 +135,18 @@ export const CourseExam = {
             CourseExam.announceDashboardExams();
         }
 
+        if (e.target.closest('.exam-more-btn')) {
+            const btn = e.target.closest('.exam-more-btn');
+            const panel = btn.parentElement.querySelector('.exam-more-panel');
+            if (panel) {
+                const open = panel.classList.toggle('hidden') === false;
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                const chev = btn.querySelector('.fa-chevron-down');
+                if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+            }
+            return;
+        }
+
         if (e.target.closest('.review-exam-btn')) {
             ExamReview.open(e.target.closest('.review-exam-btn').dataset.assignmentId, AppState.user.User_ID);
             return;
@@ -661,24 +673,29 @@ export const CourseExam = {
                             <button type="button" class="exam-results-btn bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
                                 <i class="fa-solid fa-chart-column mr-1" aria-hidden="true"></i> Results
                             </button>` : ''}
-                        <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
-                            <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
-                        </button>
                         <button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
                             <i class="fa-solid fa-pen-to-square mr-1" aria-hidden="true"></i> Edit
+                        </button>
+                        <button type="button" class="exam-more-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" aria-expanded="false" aria-label="More actions for ${esc(ex.Title)}">
+                            <i class="fa-solid fa-ellipsis mr-1" aria-hidden="true"></i> More <i class="fa-solid fa-chevron-down text-[9px] ml-1 transition-transform" aria-hidden="true"></i>
+                        </button>
+                        <div class="exam-more-panel hidden col-span-2 sm:w-full flex flex-wrap sm:justify-end gap-1.5 pt-2 mt-0.5 border-t border-gray-100">
+                        <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                            <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
                         </button>
                         <button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
                             <i class="fa-solid fa-star mr-1" aria-hidden="true"></i> Bonus Qs
                         </button>
-                        <button type="button" class="export-exam-csv-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Export ${esc(ex.Title)} as CSV">
-                            <i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i> CSV
-                        </button>
                         <button type="button" class="print-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Print ${esc(ex.Title)}">
                             <i class="fa-solid fa-print mr-1" aria-hidden="true"></i> Print
+                        </button>
+                        <button type="button" class="export-exam-csv-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Export ${esc(ex.Title)} as CSV">
+                            <i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i> CSV
                         </button>
                         <button type="button" class="duplicate-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Duplicate ${esc(ex.Title)}">
                             <i class="fa-regular fa-copy mr-1" aria-hidden="true"></i> Copy
                         </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1431,7 +1448,7 @@ export const CourseExam = {
         if (m) m.classList.add('hidden');
     },
 
-    printExam: (examId, withKey) => {
+    printExam: async (examId, withKey) => {
         const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
         if (!ex) return;
         let rows = [];
@@ -1442,7 +1459,17 @@ export const CourseExam = {
         const set = Math.min(count - 1, Math.max(0, Number((document.getElementById('printExamSet') || {}).value) || 0));
         const title = String(ex.Title || '');
         CourseExam.closePrintDialog();
-        showPrintPreview(buildExamPrintHtml({ title, questions, withKey, set, sets: count, seed: ex.Exam_ID }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
+        // First title line = the course name (kept after the first time; the paper still prints without it).
+        const courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
+        if (courseId && CourseExam.courseTitleFor !== courseId) {
+            try {
+                const d = await apiFetch(`/api/course-details?courseId=${encodeURIComponent(courseId)}&_t=${Date.now()}`);
+                CourseExam.courseTitle = (d.course && d.course.CourseTitle) || '';
+                CourseExam.courseTitleFor = courseId;
+            } catch (err) { CourseExam.courseTitle = ''; }
+        }
+        const course = courseId && CourseExam.courseTitleFor === courseId ? CourseExam.courseTitle : '';
+        showPrintPreview(buildExamPrintHtml({ title, course, questions, withKey, set, sets: count, seed: ex.Exam_ID }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
     },
 
     // The "Print set" list follows the number of sets: 2 sets = A-B, 3 sets = A-C ...

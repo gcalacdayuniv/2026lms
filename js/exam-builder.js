@@ -352,7 +352,9 @@ export const ExamBuilder = {
                 <textarea rows="2" class="eb-field w-full border border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none rounded-md px-2 py-2 text-sm bg-gray-50 focus:bg-white" data-col="text" placeholder="Question" aria-label="Question">${esc(q.text)}</textarea>
                 ${answerArea}
                 <input type="text" class="${INPUT} eb-field mt-3 text-xs" data-col="expl" value="${esc(q.expl)}" placeholder="Explanation shown after the answer (optional)" aria-label="Explanation">
-                <div class="mt-2 pt-2 border-t border-gray-100 flex items-center justify-end gap-1 text-gray-500">
+                <div class="mt-2 pt-2 border-t border-gray-100 flex items-center gap-1 text-gray-500">
+                    <button type="button" class="eb-act h-9 px-3 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold" data-act="addsame" aria-label="Add a new ${esc((M.TYPES.find(t => t.id === q.type) || {}).label || 'question')} question after question ${i + 1}"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>${esc((ADD_LABEL[q.type]) || (M.TYPES.find(t => t.id === q.type) || {}).label || 'Question')}</button>
+                    <span class="flex-1"></span>
                     <button type="button" class="eb-act w-9 h-9 rounded hover:bg-gray-100 disabled:opacity-30" data-act="up" ${i === 0 ? 'disabled' : ''} aria-label="Move question up"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
                     <button type="button" class="eb-act w-9 h-9 rounded hover:bg-gray-100 disabled:opacity-30" data-act="down" ${i === s.questions.length - 1 ? 'disabled' : ''} aria-label="Move question down"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
                     <button type="button" class="eb-act w-9 h-9 rounded hover:bg-gray-100" data-act="dup" aria-label="Duplicate question"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
@@ -375,7 +377,7 @@ export const ExamBuilder = {
     sheetHtml: () => {
         const s = ExamBuilder.s;
         const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points', ''];
-        const widths = ['w-10', 'w-16', 'w-44', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
+        const widths = ['w-10', 'w-16', 'min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
         return `
             <p class="text-[11px] text-gray-500 mb-2">Type straight into the cells. Copy rows from Excel or Google Sheets and paste them into any cell: they fill to the right and down, and add rows as needed. Enter moves down. Choice A-H hold the choices; for Matching type each pair as <b>left | right</b> (wrong extra choices go in Answer, separated by |). Answer: a letter for multiple choice, letters like <b>A, C</b> for multiple answer, items separated by | for enumeration and ordering, <b>9.8 ± 0.1</b> for numeric. Use " / " for alternative answers. Leave Points empty for the default.</p>
             <div class="bg-white border border-gray-300 rounded-md overflow-auto">
@@ -499,6 +501,9 @@ export const ExamBuilder = {
                 s.questions.splice(i, 1);
                 ExamBuilder.touch();
                 ExamBuilder.renderBody();
+            } else if (act === 'addsame') {
+                // a blank question of the same type and part, right after this one
+                ExamBuilder.insertQuestion(M.blankQuestion(q.type, q.part), i + 1);
             } else if (act === 'dup') {
                 const copy = JSON.parse(JSON.stringify(q));
                 copy.id = M.newId();

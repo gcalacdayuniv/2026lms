@@ -546,32 +546,101 @@ export const CourseClass = {
     }
 };
 
-// Lecturer edits the classroom of a class from the class page.
-document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('#editRoomBtn');
-    if (!btn) return;
-    const text = document.getElementById('classRoomText');
-    const current = text ? (text.dataset.room || '') : '';
-    const answer = window.prompt('Classroom (leave blank to clear):', current);
-    if (answer === null) return;
-    const room = answer.trim().slice(0, 60);
-    if (room === current) return;
-    btn.disabled = true;
+// Lecturer edits the details of a class (code, title, schedule, room, target audience) from the class page.
+const FIELD = 'w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm';
+const LABEL = 'block text-xs font-bold text-gray-500 uppercase tracking-wider';
+
+const closeEditClass = () => { const m = document.getElementById('editClassModal'); if (m) m.remove(); };
+
+const openEditClass = async (btn) => {
+    closeEditClass();
+    const d = btn.dataset;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const m = document.createElement('div');
+    m.id = 'editClassModal';
+    m.className = 'fixed inset-0 z-[70] flex items-center justify-center fade-in p-0 sm:p-4';
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-modal', 'true');
+    m.setAttribute('aria-label', 'Edit class details');
+    m.innerHTML = `<div id="closeEditClassBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
+        <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-lg h-full sm:h-auto p-4 sm:p-6 relative z-10 max-h-full sm:max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center gap-3 mb-5 border-b pb-3">
+                <h3 class="min-w-0 flex-1 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-pen-to-square text-blue-600 mr-2"></i>Edit Class Details</h3>
+                <button id="closeEditClassBtn" type="button" aria-label="Back" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
+            </div>
+            <form id="editClassForm" class="space-y-4">
+                <div id="ecError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
+                <div><label class="${LABEL}" for="ecCode">Course Code</label><input type="text" id="ecCode" required maxlength="40" class="${FIELD}" value="${escapeHtml(d.code)}"></div>
+                <div><label class="${LABEL}" for="ecTitle">Course Title</label><input type="text" id="ecTitle" required maxlength="200" class="${FIELD}" value="${escapeHtml(d.title)}"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="${LABEL}" for="ecDay">Schedule Day</label>
+                        <select id="ecDay" class="${FIELD}">${days.map(x => `<option${x === d.day ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
+                    <div><label class="${LABEL}" for="ecTime">Time Period</label><input type="text" id="ecTime" required maxlength="60" class="${FIELD}" value="${escapeHtml(d.time)}" placeholder="9:00 AM - 12:00 PM"></div>
+                </div>
+                <div><label class="${LABEL}" for="ecRoom">Classroom <span class="font-normal normal-case text-gray-400">(optional)</span></label><input type="text" id="ecRoom" maxlength="60" class="${FIELD}" value="${escapeHtml(d.room)}"></div>
+                <div class="border-t border-gray-200 pt-4">
+                    <p class="text-xs font-bold text-gray-800 mb-2 uppercase">Target Audience (Restriction)</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div><label class="${LABEL}" for="ecTargetCourse">Target Course</label>
+                            <select id="ecTargetCourse" class="${FIELD}"><option value="">All Courses</option>${d.targetCourse ? `<option value="${escapeHtml(d.targetCourse)}" selected>${escapeHtml(d.targetCourse)}</option>` : ''}</select></div>
+                        <div><label class="${LABEL}" for="ecTargetYear">Target Year</label><input type="text" id="ecTargetYear" maxlength="20" class="${FIELD}" value="${escapeHtml(d.targetYear)}" placeholder="e.g. 1"></div>
+                    </div>
+                    <div class="mt-4"><label class="${LABEL}" for="ecTargetSection">Target Section</label><input type="text" id="ecTargetSection" maxlength="20" class="${FIELD}" value="${escapeHtml(d.targetSection)}" placeholder="e.g. A"></div>
+                    <p class="text-[10px] text-gray-500 mt-1 italic">*Leave blank to make it available to all students. Students already enrolled stay enrolled.</p>
+                </div>
+                <button type="submit" id="ecSaveBtn" data-course-id="${escapeHtml(d.courseId)}" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors">Save changes</button>
+            </form>
+        </div>`;
+    document.body.appendChild(m);
+    // Fill the target course list with the programs (the current value stays selected).
     try {
-        const res = await apiFetch('/api/update-course-room', {
-            method: 'POST',
-            body: JSON.stringify({ courseId: btn.dataset.courseId, room, lecturerId: AppState.user.User_ID })
-        });
-        const saved = (res && typeof res.room === 'string') ? res.room : room;
-        if (text) {
-            text.dataset.room = saved;
-            text.innerHTML = saved ? escapeHtml(saved) : '<span class="italic text-gray-400">No room assigned</span>';
+        const pr = await apiFetch(`/api/programs?_t=${Date.now()}`);
+        const sel = document.getElementById('ecTargetCourse');
+        if (sel && pr.programs) {
+            sel.innerHTML = '<option value="">All Courses</option>' +
+                pr.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
+            if (d.targetCourse && !pr.programs.some(p => p.ProgramCode === d.targetCourse)) {
+                sel.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(d.targetCourse)}">${escapeHtml(d.targetCourse)}</option>`);
+            }
+            sel.value = d.targetCourse || '';
         }
-        try { localStorage.removeItem(classCacheKey(btn.dataset.courseId)); } catch (err) { /* storage blocked */ }
-        UI.success(saved ? 'Classroom saved' : 'Classroom cleared');
-    } catch (err) {
-        UI.error(err.message || 'Could not save the classroom');
-    } finally {
+    } catch (err) { /* the current value is still listed */ }
+};
+
+const saveEditClass = async (form) => {
+    const btn = document.getElementById('ecSaveBtn');
+    const err = document.getElementById('ecError');
+    const v = (id) => document.getElementById(id).value.trim();
+    err.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    const courseId = btn.dataset.courseId;
+    try {
+        await apiFetch('/api/update-course', {
+            method: 'POST',
+            body: JSON.stringify({
+                courseId, lecturerId: AppState.user.User_ID,
+                courseCode: v('ecCode'), courseTitle: v('ecTitle'), scheduleDay: document.getElementById('ecDay').value, timePeriod: v('ecTime'),
+                room: v('ecRoom'), targetCourse: v('ecTargetCourse'), targetYear: v('ecTargetYear'), targetSection: v('ecTargetSection')
+            })
+        });
+        try { localStorage.removeItem(classCacheKey(courseId)); } catch (e) { /* storage blocked */ }
+        closeEditClass();
+        UI.success('Class details saved');
+        await CourseClass.loadClassScreen(courseId, true);
+    } catch (e) {
+        err.textContent = e.message || 'Could not save the class details';
+        err.classList.remove('hidden');
         btn.disabled = false;
+        btn.textContent = 'Save changes';
     }
+};
+
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#editRoomBtn');
+    if (btn) { openEditClass(btn); return; }
+    if (e.target.closest('#closeEditClassBtn') || e.target.id === 'closeEditClassBg') closeEditClass();
+});
+document.addEventListener('submit', (e) => {
+    if (e.target.id === 'editClassForm') { e.preventDefault(); saveEditClass(e.target); }
 });

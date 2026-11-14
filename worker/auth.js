@@ -89,6 +89,7 @@ export const RULES = {
     'POST /api/exams': { who: 'lecturer', mine: ['lecturerId'] },
     'POST /api/courses': { who: 'lecturer', mine: ['lecturerId'] },
     'POST /api/update-course-room': { who: 'lecturer', mine: ['lecturerId'] },
+    'POST /api/update-course': { who: 'lecturer', mine: ['lecturerId'] },
     'POST /api/update-student-details': { who: 'lecturer', mine: ['lecturerId'] }
     // Everything else (attendance, assessments, scores, exams admin, scans, user admin ...) is lecturer-only
     // and checked against the courses, exams and sheets the lecturer owns.

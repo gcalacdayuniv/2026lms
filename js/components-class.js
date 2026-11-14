@@ -906,7 +906,7 @@ export const ClassComponents = {
                         </h2>
                         <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(course.ScheduleDay)} | ${escapeHtml(course.TimePeriod)}
                             <span class="mx-1">|</span><i class="fa-solid fa-door-open mr-1"></i><span id="classRoomText" data-room="${escapeHtml(course.Room || '')}">${course.Room ? escapeHtml(course.Room) : '<span class="italic text-gray-400">No room assigned</span>'}</span>
-                            <button type="button" id="editRoomBtn" data-course-id="${escapeHtml(course.Course_ID)}" class="ml-1 px-1.5 py-0.5 text-blue-600 hover:text-blue-800 focus:outline-none" aria-label="Edit classroom"><i class="fa-solid fa-pen text-[11px]"></i></button>
+                            <button type="button" id="editRoomBtn" data-course-id="${escapeHtml(course.Course_ID)}" data-code="${escapeHtml(course.CourseCode || '')}" data-title="${escapeHtml(course.CourseTitle || '')}" data-day="${escapeHtml(course.ScheduleDay || '')}" data-time="${escapeHtml(course.TimePeriod || '')}" data-room="${escapeHtml(course.Room || '')}" data-target-course="${escapeHtml(course.Target_Course || '')}" data-target-year="${escapeHtml(course.Target_Year || '')}" data-target-section="${escapeHtml(course.Target_Section || '')}" class="ml-1 px-1.5 py-0.5 text-blue-600 hover:text-blue-800 text-xs font-bold focus:outline-none" aria-label="Edit class details"><i class="fa-solid fa-pen text-[11px] mr-1"></i>Edit details</button>
                         </p>
                     </div>
                 </div>

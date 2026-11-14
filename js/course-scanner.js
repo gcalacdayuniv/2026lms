@@ -449,7 +449,7 @@ export const CourseScanner = {
         const sets = buildSets(items, { seed: exam.Exam_ID, count: Number(val('scnSetCount')) || 4 });
         const set = Math.min(sets.length - 1, Math.max(0, Number(val('scnPrintSet')) || 0));
         const title = String(exam.Title || '');
-        showPrintPreview(buildSetsHtml({ title, sets, set, mode }), `${title} - Set ${'ABCDEF'[set]}${mode === 'keys' ? ' (key)' : ''}`);
+        showPrintPreview(buildSetsHtml({ title, course: (CourseScanner.course && CourseScanner.course.CourseTitle) || '', sets, set, mode }), `${title} - Set ${'ABCDEF'[set]}${mode === 'keys' ? ' (key)' : ''}`);
     },
 
     // The "Print set" list follows the number of sets: 2 sets = A-B, 3 sets = A-C ...

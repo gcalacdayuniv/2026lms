@@ -1179,7 +1179,7 @@ export default {
                 return new Response(JSON.stringify({ error: gate.error }), { status: gate.status, headers: corsHeaders });
             }
 
-            if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room") {
+            if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room" || path === "/api/update-course") {
                 await ensureCourseRoom(env);
             }
 
@@ -2290,6 +2290,39 @@ export default {
                 const room = body.room ? String(body.room).trim().slice(0, 60) : "";
                 await env.DB.prepare("UPDATE Courses SET Room = ? WHERE Course_ID = ?").bind(room, body.courseId).run();
                 return new Response(JSON.stringify({ success: true, room }), { status: 200, headers: corsHeaders });
+            }
+
+            // Lecturer edits the details of a class: code, title, schedule, room and target audience.
+            if (request.method === "POST" && path === "/api/update-course") {
+                const body = await request.json();
+                const course = await env.DB.prepare("SELECT Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+                if (course.Lecturer_ID !== body.lecturerId) {
+                    return new Response(JSON.stringify({ error: "Only the lecturer of this class can change its details." }), { status: 403, headers: corsHeaders });
+                }
+                const clean = (v, max) => (v === undefined || v === null ? "" : String(v).trim().slice(0, max));
+                const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+                const d = {
+                    code: clean(body.courseCode, 40), title: clean(body.courseTitle, 200),
+                    day: clean(body.scheduleDay, 20), time: clean(body.timePeriod, 60), room: clean(body.room, 60),
+                    tc: clean(body.targetCourse, 60), ty: clean(body.targetYear, 20), ts: clean(body.targetSection, 20)
+                };
+                if (!d.code || !d.title || !d.time) {
+                    return new Response(JSON.stringify({ error: "Course code, title and time are required." }), { status: 400, headers: corsHeaders });
+                }
+                if (!days.includes(d.day)) {
+                    return new Response(JSON.stringify({ error: "Choose a valid schedule day." }), { status: 400, headers: corsHeaders });
+                }
+                await env.DB.prepare(
+                    `UPDATE Courses SET CourseCode = ?, CourseTitle = ?, ScheduleDay = ?, TimePeriod = ?, Room = ?,
+                        Target_Course = ?, Target_Year = ?, Target_Section = ? WHERE Course_ID = ?`
+                ).bind(d.code, d.title, d.day, d.time, d.room, d.tc, d.ty, d.ts, body.courseId).run();
+                return new Response(JSON.stringify({ success: true, course: {
+                    CourseCode: d.code, CourseTitle: d.title, ScheduleDay: d.day, TimePeriod: d.time, Room: d.room,
+                    Target_Course: d.tc, Target_Year: d.ty, Target_Section: d.ts
+                } }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "POST" && path === "/api/update-course-terms") {
