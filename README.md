@@ -271,3 +271,6 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 ## Form mode performance
 - One question is open for editing; the others are a one-line summary (Q number, text, type, part, points, bonus, move up/down, delete). Tap a summary to open it (the previous one folds); the chevron in an open card folds it. New / duplicated questions open automatically; Save opens the first question with a problem.
 - Summaries are about 12 elements each instead of 40-60, plus the existing chunked rendering and content-visibility.
+
+## Scan overlay fix
+- The scan result kept for the overlay (`row.result`) now includes `geo`, so the checking circles follow the printed layout (written lines in the columns, essay band, header position) instead of the old one.

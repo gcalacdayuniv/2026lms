@@ -549,7 +549,7 @@ export const CourseScanner = {
         row.studentId = CourseScanner.matchStudent(row.studentText);
         const sc = CourseScanner.cfg;
         row.set = sc && CourseScanner.hasSets(sc) ? (result.setPick >= 0 && result.setPick < sc.sets.length ? result.setPick : -1) : 0;
-        row.result = { H: result.H, markers: result.markers, fills: result.fills, studentDigits: result.studentDigits, setPick: result.setPick };
+        row.result = { H: result.H, markers: result.markers, fills: result.fills, studentDigits: result.studentDigits, setPick: result.setPick, geo: result.geo };
         result.canvas.width = 0;
         await CourseScanner.renderPreview(row);
         return row;
