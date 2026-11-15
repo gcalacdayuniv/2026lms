@@ -2,7 +2,7 @@
 // Straightens a photographed answer sheet ("rect1" layout) and cuts out the row of one question.
 // The sheet is warped to its own frame (the 4 corner markers) at RECT_SCALE pixels per frame unit, so the same
 // geometry as the printed sheet (omr-sheet.js) tells where every question row is, on any device, later on.
-import { FRAME } from './omr-sheet.js';
+import { FRAME, setBubbles } from './omr-sheet.js';
 import { applyH, scanImage } from './omr-scan.js';
 
 export const RECT_SCALE = 5;
@@ -67,6 +67,50 @@ export const cropBox = (row, c) => {
     return { x: left * RECT_SCALE, y: top * RECT_SCALE, w: (right - left) * RECT_SCALE, h: (bottom - top) * RECT_SCALE };
 };
 
+// A question with more than 5 choices has several rows of bubbles (A-E, F-J ...). One strip per row, so the review
+// shows every choice of the question: [{x,y,w,h}, ...] in pixels of a "rect1" photo.
+export const cropBoxes = (row) => {
+    const rows = [];
+    row.bubbles.forEach(b => {
+        let r = rows.find(x => Math.abs(x.v - b.v) < 0.01);
+        if (!r) { r = { v: b.v, last: b.u }; rows.push(r); }
+        r.last = Math.max(r.last, b.u);
+    });
+    rows.sort((a, b) => a.v - b.v);
+    const right = Math.min(FRAME.w, Math.max(...rows.map(r => r.last)) + 4.2);
+    const left = Math.max(0, row.u0 - 0.5);
+    return rows.map((r, i) => {
+        const top = Math.max(0, r.v - (i === 0 && rows.length === 1 ? 3.1 : 5.6)), bottom = Math.min(FRAME.h, r.v + 3.1);
+        return { x: left * RECT_SCALE, y: top * RECT_SCALE, w: (right - left) * RECT_SCALE, h: (bottom - top) * RECT_SCALE };
+    });
+};
+
+// The SET row (letters and bubbles) of a sheet with several sets.
+export const setBox = (count) => {
+    const b = setBubbles(count);
+    const left = Math.max(0, b[0].u - 14), right = Math.min(FRAME.w, b[b.length - 1].u + 4.2);
+    const top = Math.max(0, b[0].v - 7.5), bottom = b[0].v + 3.6;
+    return { x: left * RECT_SCALE, y: top * RECT_SCALE, w: (right - left) * RECT_SCALE, h: (bottom - top) * RECT_SCALE };
+};
+
+// Draws the strips of one question one under the other into a canvas.
+export const drawCrops = (canvas, bitmap, boxes) => {
+    const gap = 3;
+    const w = Math.round(Math.max(...boxes.map(b => b.w)));
+    const h = Math.round(boxes.reduce((t, b) => t + b.h, 0)) + gap * (boxes.length - 1);
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.imageSmoothingQuality = 'high';
+    let y = 0;
+    boxes.forEach(b => {
+        ctx.drawImage(bitmap, b.x, b.y, b.w, b.h, 0, y, Math.round(b.w), Math.round(b.h));
+        y += Math.round(b.h) + gap;
+    });
+};
+
 // Draws one crop into a canvas (the canvas keeps the crop's own pixel size).
 export const drawCrop = (canvas, bitmap, box) => {
     canvas.width = Math.round(box.w);
@@ -78,9 +122,9 @@ export const drawCrop = (canvas, bitmap, box) => {
 
 // Photos saved before the straightened layout existed: find the 4 corner markers again in the stored picture and
 // straighten it now. Returns a "rect1" JPEG blob, or null when the sheet cannot be found in the picture.
-export const straightenLegacy = async (blob, numQuestions, numChoices) => {
+export const straightenLegacy = async (blob, numQuestions, numChoices, geo = 0) => {
     try {
-        const res = await scanImage(blob, numQuestions, numChoices);
+        const res = await scanImage(blob, numQuestions, numChoices, geo);
         if (!res || !res.ok || !res.H || !res.canvas) return null;
         return await rectify(res.canvas, res.H);
     } catch (e) {

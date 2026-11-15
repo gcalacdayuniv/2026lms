@@ -30,6 +30,7 @@ const COLUMNS = [
 ];
 const LETTER_GAP = 7;
 const WRITE = { pitch: 8.7 };   // distance to a line for a written answer (identification / enumeration)
+const CPITCH = 6.8, CHDR_A = 6.0, CHDR_B = 4.8;   // compact sheets: every question sits in a box, so rows and label rows are a little further apart
 const HDR_A = 4.0, HDR_B = 3.9;   // label row squeezed between two answer rows: distance below the row above / above the row below   // letters A-E are printed this far above the first row of a column
 
 // SET row (which printed exam set the student has): up to 6 circles A-F, printed only for exams with sets.
@@ -61,7 +62,7 @@ const geoOf = (g, mixed = false) => {
     if (!mixed && sets <= 1) return { compact: false, sets, band: 0, written: [], stuTop: STU.top, limit: null, cols: COLUMNS };
     const stuTop = sets > 1 ? 26 : 12;
     const limit = band > 0 ? ESSAY_BOTTOM - 5 - band : 228;       // centre of the lowest answer row
-    const cols = [stuTop + 53, 14, 14, 14].map(top => ({ top, rows: Math.max(0, Math.floor((limit - top) / ANS.pitch) + 1) }));
+    const cols = [stuTop + 53, 14, 14, 14].map(top => ({ top, rows: Math.max(0, Math.floor((limit - top) / CPITCH) + 1) }));
     return { compact: true, sets, band, written, stuTop, limit, cols };
 };
 
@@ -128,30 +129,51 @@ export const planSheet = (cells, g = 0, strict = true) => {
     const sizes = new Map();
     cells.forEach(c => sizes.set(c[2], (sizes.get(c[2]) || 0) + 1));
     const wrows = [];
-    let ci = 0, yPrev = null, last = null, lastSig = '', lastW = false, prevPart = null;
-    const maxY = (c) => (COLUMNS[c].rows - 1) * ANS.pitch;
-    for (const sl of slots) {
+    const hdrAt = new Map();   // `${u0}|${v}` of the first row under a label row -> top of those letters (they are boxed with the question)
+    let ci = 0, yPrev = null, last = null, lastSig = '', lastW = false, lastMulti = false, prevPart = null;
+    const PITCH = geo.compact ? CPITCH : ANS.pitch, HA = geo.compact ? CHDR_A : HDR_A, HB = geo.compact ? CHDR_B : HDR_B;
+    const maxY = (c) => (COLUMNS[c].rows - 1) * PITCH;
+    // digit grids (numeric answers) are laid out block-major over many rows: keep a whole item in one column when it fits
+    const runOf = new Map();
+    slots.forEach((x, i) => {
+        if (x.w || !['s', 'd', 'x'].includes(cells[x.cell][0])) return;
+        const no = cells[x.cell][2];
+        if (!runOf.has(no)) runOf.set(no, { first: i, n: 0, fams: new Set() });
+        const r = runOf.get(no);
+        r.n++; r.fams.add(famOf(cells[x.cell][0], x.block));
+    });
+    for (let si = 0; si < slots.length; si++) {
+        const sl = slots[si];
         const cell = sl.w ? ['w', 0, sl.no, 0, sl.part, ''] : cells[sl.cell];
         const fam = sl.w ? 'W' : famOf(cell[0], sl.block);
         if (ci >= COLUMNS.length) break;
-        let yHdr = null, y = yPrev === null ? 0 : yPrev + (sl.w ? WRITE.pitch : lastW ? 6.6 : ANS.pitch);
+        let yHdr = null, y = yPrev === null ? 0 : yPrev + (sl.w ? WRITE.pitch : lastW ? 6.6 : PITCH);
         const sig = `${cell[4] || 0}|${cell[0]}${sizes.get(cell[2]) > 1 ? 'G' : 'S'}`;
-        if (yPrev !== null && !sl.w && (fam !== last || (strict && sig !== lastSig))) { yHdr = yPrev + (lastW ? 5.2 : HDR_A); y = yHdr + HDR_B; }
-        while (ci < COLUMNS.length && y > maxY(ci) + 0.01) { ci++; yPrev = null; last = null; yHdr = null; y = 0; }
+        if (yPrev !== null && !sl.w && (fam !== last || (strict && sig !== lastSig))) { yHdr = yPrev + (lastW ? 5.5 : HA); y = yHdr + HB; }
+        // (compact sheets) the rows of one boxed question stay together in one column
+        let need = geo.compact && !sl.w && sl.block === 0 && !['x', 'd'].includes(cell[0]) && cell[1] > 5 ? (Math.ceil(cell[1] / 5) - 1) * (HA + HB) : 0;
+        const run = !sl.w && ['s', 'd', 'x'].includes(cell[0]) ? runOf.get(cell[2]) : null;
+        if (geo.compact && run && run.first === si) {
+            const total = (run.n - 1) * PITCH + run.fams.size * (HA + HB - PITCH);
+            if (total <= maxY(Math.min(ci, COLUMNS.length - 1))) need = total;
+        }
+        while (ci < COLUMNS.length && y + need > maxY(ci) + 0.01) { ci++; yPrev = null; last = null; yHdr = null; y = 0; }
         if (ci >= COLUMNS.length) break;
         if (yHdr !== null) {
             headers.push({ u0: ANS.left + ci * ANS.blockW, v: COLUMNS[ci].top + yHdr, labels: labelsOf(fam, countFor(fam, cell)) });
         }
         if (yPrev === null) columnHeaders[ci] = sl.w ? [] : labelsOf(fam, countFor(fam, cell));
-        last = fam; lastSig = sig; lastW = Boolean(sl.w);
+        last = fam; lastSig = sig; lastW = Boolean(sl.w); lastMulti = !sl.w && sl.block > 0;
         const u0 = ANS.left + ci * ANS.blockW;
         const newPart = (sl.w || sl.block === 0) && (Number(cell[4]) || 0) !== prevPart;
         if (sl.w || sl.block === 0) prevPart = Number(cell[4]) || 0;
         if (sl.w) { wrows.push({ no: sl.no, part: sl.part, u0, v: COLUMNS[ci].top + y, partFirst: newPart }); yPrev = y; continue; }
         const v = COLUMNS[ci].top + y;
+        if (yHdr !== null) hdrAt.set(`${u0}|${v.toFixed(2)}`, COLUMNS[ci].top + yHdr - 2.3);
+        else if (yPrev === null) hdrAt.set(`${u0}|${v.toFixed(2)}`, COLUMNS[ci].top - LETTER_GAP - 1.0);
         const r = rows[sl.cell];
         if (sl.block === 0) {
-            r.u0 = u0; r.v = v; r.placed = true; r.partFirst = newPart;
+            r.u0 = u0; r.v = v; r.placed = true; r.partFirst = newPart; r.colFirst = yPrev === null;
             const single = !(cells[sl.cell - 1] && cells[sl.cell - 1][2] === cell[2]) && !(cells[sl.cell + 1] && cells[sl.cell + 1][2] === cell[2]);
             r.text = cell[5] || (single ? String(cell[2]) : `${cell[2]}.${cell[3] + 1}`);
         }
@@ -164,7 +186,7 @@ export const planSheet = (cells, g = 0, strict = true) => {
         yPrev = y;
     }
     const placed = rows.every(r => r.placed) && wrows.length === geo.written.reduce((t, w) => t + w.lines, 0);
-    return { ok: placed, wrows, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, y: yPrev }, geo };
+    return { ok: placed, wrows, hdrAt, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, y: yPrev }, geo };
 };
 
 const plainCells = (n, c, parts = null) => Array.from({ length: n }, (_, i) => ['a', c, i + 1, 0, parts ? Number(parts[i]) || 0 : 0, '']);
@@ -270,8 +292,32 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
     plan.rows.forEach(r => {
         const c = r.cell;
         if (showParts && r.partFirst) parts.push(textHtml(r.u0 + (r.u0 > ANS.left + 1 ? 2.5 : 0), r.v - 4.3, 10, 'PART ' + (Number(c[4]) + 1), 'part'));
-        parts.push(textHtml(r.u0 - 3, r.v - 1.6, 12, r.text, 'num right'));
+        // (compact sheets) every question is boxed, number on the left; the rows of one question share one box
+        const boxed = plan.geo.compact;
+        parts.push(textHtml(r.u0 - 3 - (boxed ? 2.5 : 0), r.v - 1.6, 12, r.text, 'num right'));
         r.bubbles.forEach(bb => parts.push(bubbleHtml(bb.u, bb.v)));
+        if (boxed) {
+            const together = r.cont && r.cont.length && !['x', 'd'].includes(c[0]) && r.cont.every(x => x.u0 === r.u0);
+            const groups = together ? [r.bubbles] : [];
+            if (!together) {
+                // one box per row of bubbles; a row that continues in another column is boxed in each column
+                [...new Set(r.bubbles.map(bb => bb.v))].forEach(v => {
+                    let cur = null;
+                    r.bubbles.filter(bb => bb.v === v).sort((a, b) => a.u - b.u).forEach(bb => {
+                        if (cur && bb.u - cur[cur.length - 1].u < 2 * ANS.kPitch) cur.push(bb);
+                        else { cur = [bb]; groups.push(cur); }
+                    });
+                });
+            }
+            groups.forEach(g => {
+                const vs = g.map(bb => bb.v), us = g.map(bb => bb.u);
+                const vmin = Math.min(...vs);
+                const col = Math.floor((Math.min(...us) - ANS.left) / ANS.blockW);
+                const hv = plan.hdrAt.get(`${ANS.left + col * ANS.blockW}|${vmin.toFixed(2)}`);
+                const top = hv !== undefined ? hv : vmin - 3.0, bottom = Math.max(...vs) + 3.0, left = ANS.left + col * ANS.blockW + 7.0, right = ANS.left + col * ANS.blockW + ANS.firstK + 4 * ANS.kPitch + 3.2;   // always the width of 5 bubbles
+                parts.push(`<div class="bx" style="left:${mm(left)};top:${mm(top)};width:${mm(right - left)};height:${mm(bottom - top)}"></div>`);
+            });
+        }
     });
     if (!plan.ok) parts.push(textHtml(52, 30, 120, 'This exam has too many answer rows for one sheet.', 'note'));
 
@@ -313,6 +359,7 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-s
 .cap { font-size: 2.8mm; font-weight: bold; }
 .small { font-size: 2.2mm; white-space: nowrap; }
 .hd { font-size: 2.3mm; line-height: 2.6mm; }
+.bx { position: absolute; border: 0.3mm dashed #777; border-radius: 1.2mm; }
 .wl { position: absolute; border-top: 0.3mm solid #000; height: 0; }
 .num { font-size: 2.6mm; }
 .part { font-size: 1.9mm; line-height: 2mm; font-weight: bold; white-space: nowrap; }

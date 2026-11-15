@@ -11,7 +11,7 @@ import { answerRows } from './omr-sheet.js';
 import { gradeScanSet } from './scan-grade.js';
 import { questionPoints } from './grading.js';
 import { cellLabels, cellName, codeText, itemLabel, geoFor, writtenItems } from './scan-items.js';
-import { cropBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
+import { cropBoxes, drawCrops, setBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -76,8 +76,15 @@ export const CourseScanReview = {
         const { session } = detail;
         const sk0 = (session.Set_Keys || [])[0];
         const nSets = session.Layout && sk0 && sk0.items ? geoFor((session.Set_Keys || []).length, sk0.items) : (session.Set_Keys || []).length;
+        CourseScanReview.geo = nSets;
         CourseScanReview.rows = session.Layout ? answerRows(session.Layout, nSets) : answerRows(session.Num_Questions, session.Num_Choices, nSets);
         PhotoCache.purge().catch(() => {});
+        if (!document.getElementById('scrvExtraStyle')) {
+            const st = document.createElement('style');
+            st.id = 'scrvExtraStyle';
+            st.textContent = '.scrv-img.is-multi{border:2px solid #6366f1;background:#eef2ff}.scrv-opts.is-multi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.3rem;padding:.35rem;border:2px solid #c7d2fe;border-radius:.8rem;background:#eef2ff}.scrv-opts.is-multi .scrv-opt{height:2.2rem}.scrv-set{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:.6rem;align-items:center;padding:.55rem .75rem;background:#eef2ff;border-bottom:1px solid #c7d2fe;border-left:4px solid #6366f1}.scrv-setl{display:flex;gap:.3rem}.scrv-setc{flex:1;min-width:0;height:2.5rem;border-radius:.6rem;border:2px solid #c7d2fe;background:#fff;color:#6b7280;font-weight:800;display:flex;align-items:center;justify-content:center}.scrv-setc.is-on{background:#4f46e5;border-color:#4f46e5;color:#fff}html[data-theme="dark"] .scrv-set,html[data-theme="dark"] .scrv-opts.is-multi,html[data-theme="dark"] .scrv-img.is-multi{background:#1e2440;border-color:#4f46e5}';
+            document.head.appendChild(st);
+        }
 
         const wrap = document.createElement('div');
         wrap.id = 'scrReview';
@@ -190,16 +197,26 @@ export const CourseScanReview = {
         ].filter(Boolean).join(' · ');
         return `
             <div class="scrv-row ${tone}" data-row="${q}">
-                <div class="scrv-img">
+                <div class="scrv-img${labels.length > 5 ? ' is-multi' : ''}">
                     <span class="scrv-qn">${name}</span>
                     <canvas data-crop="${q}" width="10" height="2" aria-hidden="true"></canvas>
                     <div class="scrv-ph" data-ph="${q}"></div>
                 </div>
                 <div class="scrv-side">
-                    <div class="scrv-opts" role="group" aria-label="Question ${name} answer">${opts}</div>
+                    <div class="scrv-opts${labels.length > 5 ? ' is-multi' : ''}" role="group" aria-label="Question ${name} answer">${opts}</div>
                     <div class="scrv-note" data-note="${q}">${note}</div>
                 </div>
             </div>`;
+    },
+
+    // Which set (version) of the exam this sheet was shaded for: the SET row of the photo and the letters.
+    setHtml: (sheet) => {
+        const { session } = CourseScanReview.detail;
+        const n = (session.Set_Keys || []).length;
+        if (n < 2) return '';
+        const cur = sheet.Set_No > 0 ? sheet.Set_No : 0;
+        return `<div class="scrv-set"><div class="scrv-img"><span class="scrv-qn">SET</span><canvas data-setcrop width="10" height="2" aria-hidden="true"></canvas></div>
+            <div class="scrv-setl" role="group" aria-label="Set of this sheet">${Array.from({ length: n }, (_, k) => `<span class="scrv-setc${k === cur ? ' is-on' : ''}">${SET_LETTERS[k]}</span>`).join('')}</div></div>`;
     },
 
     // Questions written on the paper (identification, enumeration, essay): the lecturer types the points.
@@ -224,11 +241,11 @@ export const CourseScanReview = {
         if (CourseScanReview.bitmap) { try { CourseScanReview.bitmap.close(); } catch (e) { /* ignore */ } CourseScanReview.bitmap = null; }
 
         $('scrvName').textContent = sheet.Name || 'Unknown student';
-        $('scrvSub').textContent = `${sheet.Student_Number || ''}${sheet.Student_No_Read ? ` · scanned ${sheet.Student_No_Read}` : ''} · ${CourseScanReview.idx + 1} of ${CourseScanReview.order.length}`;
+        $('scrvSub').textContent = `${(session.Set_Keys || []).length > 1 ? `Set ${SET_LETTERS[sheet.Set_No > 0 ? sheet.Set_No : 0]} · ` : ''}${sheet.Student_Number || ''}${sheet.Student_No_Read ? ` · scanned ${sheet.Student_No_Read}` : ''} · ${CourseScanReview.idx + 1} of ${CourseScanReview.order.length}`;
         $('scrvPrev').disabled = CourseScanReview.idx === 0;
         $('scrvNext').disabled = CourseScanReview.idx === CourseScanReview.order.length - 1;
 
-        $('scrvBody').innerHTML = `<div class="max-w-4xl mx-auto w-full">${CourseScanReview.marksHtml(sheet)}${CourseScanReview.rows.map(r => CourseScanReview.rowHtml(sheet, r.q)).join('')}</div>`;
+        $('scrvBody').innerHTML = `<div class="max-w-4xl mx-auto w-full">${CourseScanReview.setHtml(sheet)}${CourseScanReview.marksHtml(sheet)}${CourseScanReview.rows.map(r => CourseScanReview.rowHtml(sheet, r.q)).join('')}</div>`;
         CourseScanReview.refresh();
 
         const note = $('scrvNote');
@@ -251,7 +268,7 @@ export const CourseScanReview = {
             if (mine !== CourseScanReview.token) return;
             if (layout !== RECT_LAYOUT) {
                 // Older plain photo: find the sheet in it and straighten it here, once; the result is kept for 7 days.
-                const fixed = await straightenLegacy(blob, session.Layout || session.Num_Questions, session.Num_Choices);
+                const fixed = await straightenLegacy(blob, session.Layout || session.Num_Questions, session.Num_Choices, CourseScanReview.geo);
                 if (mine !== CourseScanReview.token) return;
                 if (fixed) {
                     blob = fixed; layout = RECT_LAYOUT;
@@ -264,8 +281,10 @@ export const CourseScanReview = {
             if (layout === RECT_LAYOUT) {
                 CourseScanReview.rows.forEach(r => {
                     const canvas = document.querySelector(`#scrvBody canvas[data-crop="${r.q}"]`);
-                    if (canvas) { drawCrop(canvas, bitmap, cropBox(r, Math.min(5, r.cell ? r.cell[1] : session.Num_Choices))); canvas.classList.add('is-ready'); }
+                    if (canvas) { drawCrops(canvas, bitmap, cropBoxes(r)); canvas.classList.add('is-ready'); }
                 });
+                const sc = document.querySelector('#scrvBody canvas[data-setcrop]');
+                if (sc) { drawCrop(sc, bitmap, setBox((session.Set_Keys || []).length)); sc.classList.add('is-ready'); }
                 phs().forEach(p => p.remove());
                 if (source === 'old-cache') setNote('Could not reach the server, showing the copy kept on this device.', 'is-info');
             } else {

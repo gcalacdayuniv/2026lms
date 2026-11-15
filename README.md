@@ -274,3 +274,12 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 
 ## Scan overlay fix
 - The scan result kept for the overlay (`row.result`) now includes `geo`, so the checking circles follow the printed layout (written lines in the columns, essay band, header position) instead of the old one.
+
+## Review screen
+- A question with more than 5 choices shows every row of its bubbles in the photo (one strip per row, boxed) and its choice buttons in rows of 5 inside a box.
+- Sheets with several sets show a SET card (photo of the SET row + letters with the sheet's set highlighted) and "Set X" in the header.
+- New file in js/: omr-crop.js (was only in the repo before).
+
+## Boxed questions on the printed sheet
+- Mixed / multi-set sheets: every question (every number) is drawn in a thin dashed grey box, number on the left, always the width of 5 bubbles; the letters/numbers (A-E, 1-5, T F ...) printed above the first row of a stack of questions are inside the first box. A question with more than 5 choices has one box around all its rows (A-E, F-J, K-O ...); digit grids of numeric answers are boxed row by row and each numeric item is kept together in one column when it fits. Rows and label rows are a little further apart (about 6.8 mm), so a sheet holds slightly fewer rows than before.
+- Plain multiple-choice sheets with at most 1 set keep the old geometry (no boxes) so old printed stock still scans. Reprint mixed / multi-set sheets.
