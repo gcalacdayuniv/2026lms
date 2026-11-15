@@ -99,6 +99,7 @@ export const ExamBuilder = {
             } catch (e) { store.del(draftKey(s.examId)); }
         }
 
+        if (!s.questions.some(q => q.id === s.openId)) s.openId = s.questions.length ? s.questions[0].id : null;
         ExamBuilder.renderShell();
         ExamBuilder.renderBody();
     },
@@ -143,7 +144,7 @@ export const ExamBuilder = {
             const st = document.createElement('style');
             st.id = 'ebPerfStyle';
             // Cards that are scrolled out of view are not laid out or painted (big saving on long exams, esp. phones).
-            st.textContent = `#${ROOT_ID} .eb-card{content-visibility:auto;contain-intrinsic-size:auto 300px}#${ROOT_ID} #ebBody{overscroll-behavior:contain}`;
+            st.textContent = `#${ROOT_ID} .eb-card{content-visibility:auto;contain-intrinsic-size:auto 300px}#${ROOT_ID} .eb-sum{contain-intrinsic-size:auto 64px}#${ROOT_ID} #ebBody{overscroll-behavior:contain}`;
             document.head.appendChild(st);
         }
         root.addEventListener('click', ExamBuilder.onClick);
@@ -285,7 +286,14 @@ export const ExamBuilder = {
 
     // Q1, Q2 ... after a card was added, removed or moved.
     numberCards: () => {
-        ExamBuilder.root.querySelectorAll('#ebCards .eb-qn').forEach((el, i) => { el.textContent = `Q${i + 1}`; });
+        const cards = ExamBuilder.root.querySelectorAll('#ebCards .eb-card');
+        cards.forEach((card, i) => {
+            const qn = card.querySelector('.eb-qn');
+            if (qn) qn.textContent = `Q${i + 1}`;
+            const up = card.querySelector('[data-act="up"]'), down = card.querySelector('[data-act="down"]');
+            if (up) up.disabled = i === 0;
+            if (down) down.disabled = i === cards.length - 1;
+        });
     },
 
     // ---------- Form view ----------
@@ -298,7 +306,57 @@ export const ExamBuilder = {
         return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards">${s.questions.slice(0, limit).map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
     },
 
-    cardHtml: (q, i) => {
+    // Form view shows ONE question open for editing; the others are a light one-line summary (far fewer elements on
+    // the page, so long exams stay smooth). Tap a summary to edit it.
+    cardHtml: (q, i) => (q.id === ExamBuilder.s.openId ? ExamBuilder.fullCardHtml(q, i) : ExamBuilder.summaryHtml(q, i)),
+
+    summaryHtml: (q, i) => {
+        const s = ExamBuilder.s;
+        const type = (M.TYPES.find(t => t.id === q.type) || {}).label || '';
+        const pts = M.pointsOf(q);
+        const text = String(q.text || '').trim();
+        const last = i === s.questions.length - 1;
+        return `
+            <div class="eb-card eb-sum bg-white rounded-xl border border-gray-200 border-l-4 border-l-transparent hover:border-l-indigo-400 shadow-sm pl-1 pr-1 py-1 flex items-center gap-1" data-qid="${q.id}">
+                <button type="button" class="eb-open flex-1 min-w-0 flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-indigo-50/60 focus:outline-none focus-visible:ring-2 ring-indigo-400" aria-expanded="false" aria-label="Edit question ${i + 1}">
+                    <span class="eb-qn shrink-0 text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1">Q${i + 1}</span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm ${text ? 'text-gray-800' : 'text-gray-400 italic'}">${text ? esc(text) : 'No question text yet'}</span>
+                        <span class="block text-[11px] text-gray-500 truncate">${esc(type)} &middot; Part ${q.part + 1} &middot; ${pts} pt${pts === 1 ? '' : 's'}${q.bonus ? ' &middot; <b class="text-amber-700">Bonus</b>' : ''}</span>
+                    </span>
+                </button>
+                <button type="button" class="eb-act shrink-0 w-8 h-8 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30" data-act="up" ${i === 0 ? 'disabled' : ''} aria-label="Move question up"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+                <button type="button" class="eb-act shrink-0 w-8 h-8 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30" data-act="down" ${last ? 'disabled' : ''} aria-label="Move question down"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
+                <button type="button" class="eb-act shrink-0 w-8 h-8 rounded text-gray-500 hover:bg-red-50 hover:text-red-600" data-act="del" aria-label="Delete question"><i class="fa-regular fa-trash-can" aria-hidden="true"></i></button>
+            </div>`;
+    },
+
+    // Opens one question for editing and folds the one that was open.
+    openCard: (qid, quiet = false) => {
+        const s = ExamBuilder.s;
+        if (!s || s.view !== 'form' || s.openId === qid) return;
+        ExamBuilder.finishRender();
+        const prev = s.openId;
+        s.openId = qid;
+        if (prev) ExamBuilder.refreshCard(prev);
+        ExamBuilder.refreshCard(qid);
+        if (quiet) return;
+        const card = ExamBuilder.root.querySelector(`.eb-card[data-qid="${qid}"]`);
+        if (card) {
+            card.scrollIntoView({ block: 'nearest' });
+            card.querySelector('[data-col="text"]')?.focus({ preventScroll: true });
+        }
+    },
+
+    closeCard: (qid) => {
+        const s = ExamBuilder.s;
+        if (!s || s.openId !== qid) return;
+        s.openId = null;
+        ExamBuilder.refreshCard(qid);
+        ExamBuilder.root.querySelector(`.eb-card[data-qid="${qid}"] .eb-open`)?.focus({ preventScroll: true });
+    },
+
+    fullCardHtml: (q, i) => {
         const s = ExamBuilder.s;
         const typeOptions = grouped(M.TYPES, t => t.id, t => `<option value="${t.id}" ${q.type === t.id ? 'selected' : ''}>${t.label}</option>`);
         let answerArea = '';
@@ -421,6 +479,7 @@ export const ExamBuilder = {
                     <label class="ml-auto text-[11px] font-bold ${q.bonus ? 'text-amber-800' : 'text-gray-500'} flex items-center gap-1 cursor-pointer">
                         <input type="checkbox" class="eb-bonus rounded text-amber-600 focus:ring-amber-500" ${q.bonus ? 'checked' : ''}> Bonus
                     </label>
+                    <button type="button" class="eb-fold w-8 h-8 rounded text-gray-500 hover:bg-gray-100" aria-label="Fold question ${i + 1}" title="Fold"><i class="fa-solid fa-chevron-up" aria-hidden="true"></i></button>
                 </div>
                 <textarea rows="2" class="eb-field w-full border border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none rounded-md px-2 py-2 text-sm bg-gray-50 focus:bg-white" data-col="text" placeholder="Question" aria-label="Question">${esc(q.text)}</textarea>
                 ${answerArea}
@@ -524,6 +583,8 @@ export const ExamBuilder = {
         const s = ExamBuilder.s;
         ExamBuilder.finishRender();
         const host = s.view === 'form' ? ExamBuilder.root.querySelector('#ebCards') : null;
+        const prevOpen = s.openId;
+        if (s.view === 'form') s.openId = q.id;
         s.questions.splice(index, 0, q);
         ExamBuilder.touch();
         if (!host) { ExamBuilder.renderBody(`[data-qid="${q.id}"] [data-col="text"]`); return; }
@@ -531,6 +592,7 @@ export const ExamBuilder = {
         const tmp = document.createElement('div');
         tmp.innerHTML = ExamBuilder.cardHtml(q, index);
         host.insertBefore(tmp.firstElementChild, host.children[index] || null);
+        if (prevOpen && prevOpen !== q.id) ExamBuilder.refreshCard(prevOpen);
         ExamBuilder.numberCards();
         ExamBuilder.updateCount();
         const el = host.querySelector(`[data-qid="${q.id}"] [data-col="text"]`);
@@ -574,6 +636,10 @@ export const ExamBuilder = {
         if (!q) return;
         const i = s.questions.indexOf(q);
 
+        const openBtn = t.closest('.eb-open');
+        if (openBtn) { const c = openBtn.closest('.eb-card'); if (c) ExamBuilder.openCard(c.dataset.qid); return; }
+        const foldBtn = t.closest('.eb-fold');
+        if (foldBtn) { const c = foldBtn.closest('.eb-card'); if (c) ExamBuilder.closeCard(c.dataset.qid); return; }
         const actBtn = t.closest('.eb-act');
         if (actBtn) {
             const act = actBtn.dataset.act;
@@ -1005,6 +1071,8 @@ export const ExamBuilder = {
 
     showProblems: (problems) => {
         ExamBuilder.finishRender();
+        const firstProblem = problems.find(p => p.id);
+        if (firstProblem) ExamBuilder.openCard(firstProblem.id, true);
         const box = ExamBuilder.root.querySelector('#ebAlert');
         if (!problems.length) { box.classList.add('hidden'); box.textContent = ''; return; }
         box.innerHTML = problems.slice(0, 6).map(p => `<div>${esc(p.message)}</div>`).join('') + (problems.length > 6 ? `<div>...and ${problems.length - 6} more.</div>` : '');
