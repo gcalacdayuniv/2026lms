@@ -32,6 +32,7 @@ const grouped = (list, keyOf, optionHtml) => GROUPS.map(g => {
     return items.length ? `<optgroup label="${g.label}">${items.map(optionHtml).join('')}</optgroup>` : '';
 }).join('');
 
+const SAVE_HTML = '<i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span class="hidden sm:inline ml-1.5">Save exam</span>';
 const ADD_LABEL = { mc: 'Multiple choice', multi: 'Multi-answer', tf: 'T/F', id: 'Identification', num: 'Numeric', enum: 'Enumeration', order: 'Ordering', match: 'Matching', essay: 'Essay' };
 
 const INPUT = 'w-full border-0 border-b border-gray-300 focus:border-indigo-500 focus:ring-0 outline-none px-1 py-1.5 text-sm bg-transparent';
@@ -165,48 +166,38 @@ export const ExamBuilder = {
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60" id="closeExamBuilderBg"></div>
             <div class="bg-white rounded-none shadow-xl w-full h-full relative z-10 sheet-panel app-page flex flex-col overflow-hidden" id="ebPanel">
                 <div class="flex items-center gap-3 px-4 py-3 border-b app-page-header shrink-0">
-                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate"><i class="fa-solid fa-wand-magic-sparkles text-indigo-600 mr-2" aria-hidden="true"></i>${s.examId ? 'Edit Exam' : 'Create Exam'}</h3>
+                    <input type="text" id="ebTitle" maxlength="120" value="${esc(s.title)}" placeholder="Exam title (the name shown in Record Scores)" aria-label="Exam title" class="flex-1 min-w-0 text-base sm:text-lg font-bold text-gray-800 border-0 border-b-2 border-gray-300 focus:border-indigo-600 focus:ring-0 outline-none px-1 py-1 bg-transparent">
+                    <button type="button" id="ebSaveBtn" aria-label="Save exam" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-bold shadow-sm transition disabled:opacity-50">${SAVE_HTML}</button>
                     <button type="button" id="closeExamBuilderBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div class="px-4 pt-3 pb-2 shrink-0 bg-white border-b">
-                    <input type="text" id="ebTitle" maxlength="120" value="${esc(s.title)}" placeholder="Exam title (this is the name in Record Scores)" aria-label="Exam title" class="w-full text-lg font-bold border-0 border-b-2 border-gray-300 focus:border-indigo-600 focus:ring-0 outline-none px-1 py-1.5 bg-transparent">
-                    ${ExamBuilder.linkPanel()}
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <div class="flex w-full sm:w-auto bg-gray-100 rounded-lg p-1" role="group" aria-label="Builder view">
                             ${tab('form', 'fa-list-check', 'Form')}
                             ${tab('sheet', 'fa-table', 'Spreadsheet')}
                         </div>
                         <span id="ebCount" class="text-xs font-bold text-gray-500"></span>
                         <span id="ebDraftNote" class="text-[11px] text-gray-400" aria-live="polite"></span>
-                        <div class="ml-auto flex items-center gap-1.5">
-                            <button type="button" id="ebImportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-import mr-1" aria-hidden="true"></i>Import CSV / Excel</button>
-                            <button type="button" id="ebTemplateBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-download mr-1" aria-hidden="true"></i>Template</button>
-                            <button type="button" id="ebExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
+                        <div class="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+                            ${ExamBuilder.linkButton()}
+                            <button type="button" id="ebImportBtn" class="whitespace-nowrap px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-import mr-1" aria-hidden="true"></i>Import CSV / Excel</button>
+                            <button type="button" id="ebExportBtn" class="whitespace-nowrap px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
                             <input type="file" id="ebCsvInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden">
                         </div>
                     </div>
+                    ${ExamBuilder.linkPanel()}
                     ${s.examId ? '<p class="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>Editing changes the exam for students who have not taken it yet. Scores already recorded are not recalculated.</p>' : ''}
                     <div id="ebAlert" class="hidden mt-2 text-xs font-bold p-2 rounded bg-red-100 text-red-700" role="alert"></div>
                 </div>
                 <div id="ebBody" class="flex-1 min-h-0 overflow-auto bg-indigo-50/60 p-3 sm:p-4"></div>
-                <div class="shrink-0 border-t bg-white px-3 py-2 flex flex-wrap items-center gap-2" style="padding-bottom:max(0.5rem,env(safe-area-inset-bottom))">
-                    <div class="flex-1 min-w-0"></div>
-                    <button type="button" id="ebSaveBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-md text-sm font-bold shadow-sm transition disabled:opacity-50"><i class="fa-solid fa-floppy-disk mr-1" aria-hidden="true"></i>Save exam</button>
-                </div>
-                <button type="button" id="ebFab" aria-label="Add question" aria-haspopup="dialog" class="absolute right-5 w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 flex justify-center items-center focus:outline-none focus-visible:ring-4 ring-purple-300 transition-colors z-20" style="bottom:calc(4.5rem + env(safe-area-inset-bottom))"><i class="fa-solid fa-plus text-2xl" aria-hidden="true"></i></button>
-                <div id="ebTypeModal" class="hidden absolute inset-0 z-30 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-label="Choose question type">
-                    <div class="absolute inset-0 bg-gray-900 bg-opacity-50" id="closeEbTypeBg"></div>
-                    <div class="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-lg shadow-xl max-h-full overflow-y-auto">
-                        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white">
-                            <h4 class="font-bold text-gray-800">Add question</h4>
-                            <button type="button" id="closeEbTypeBtn" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
-                        </div>
-                        <div class="p-3 space-y-3">
-                            ${GROUPS.map(g => `<div><p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">${g.label}</p><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${M.TYPES.filter(t => isScanType(t.id) === g.scan).map(t => `<button type="button" data-add="${t.id}" class="eb-add flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold text-center transition"><i class="fa-solid ${t.icon} text-xl" aria-hidden="true"></i>${ADD_LABEL[t.id] || t.label}</button>`).join('')}</div></div>`).join('')}
-                        </div>
+                <div id="ebFabWrap" class="absolute right-4 z-20 flex flex-col items-end gap-3" style="bottom:calc(1rem + env(safe-area-inset-bottom))">
+                    <div id="ebFabBackdrop" class="hidden" style="position:fixed;inset:0;z-index:-1;background:rgba(17,24,39,.35)" aria-hidden="true"></div>
+                    <div id="ebFabMenu" role="menu" aria-label="Add question" class="hidden w-64 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 overflow-y-auto p-2" style="max-height:min(36rem,calc(100vh - 8.5rem))">
+                        ${GROUPS.map(g => `<p class="px-2 pt-1.5 pb-0.5 text-[10px] font-black uppercase tracking-wider ${g.scan ? 'text-indigo-600' : 'text-emerald-600'}">${g.scan ? 'Shaded on the sheet' : 'Written by hand'}</p>${M.TYPES.filter(t => isScanType(t.id) === g.scan).map(t => `<button type="button" role="menuitem" data-add="${t.id}" tabindex="-1" class="eb-add w-full flex items-center gap-3 px-2 py-1.5 rounded-xl text-left text-sm font-bold text-gray-800 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none transition"><span class="w-8 h-8 shrink-0 rounded-full flex items-center justify-center ${g.scan ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}"><i class="fa-solid ${t.icon}" aria-hidden="true"></i></span>${ADD_LABEL[t.id] || t.label}</button>`).join('')}`).join('')}
                     </div>
+                    <button type="button" id="ebFab" aria-label="Add question" aria-haspopup="menu" aria-expanded="false" aria-controls="ebFabMenu" title="Add question" class="w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 flex justify-center items-center focus:outline-none focus-visible:ring-4 ring-purple-300 transition-colors"><i id="ebFabIcon" class="fa-solid fa-plus text-2xl transition-transform duration-200" aria-hidden="true"></i></button>
                 </div>
             </div>`;
     },
@@ -455,7 +446,6 @@ export const ExamBuilder = {
         const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points', ''];
         const widths = ['w-10', 'w-16', 'min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
         return `
-            <p class="text-[11px] text-gray-500 mb-2">Type straight into the cells. Copy rows from Excel or Google Sheets and paste them into any cell: they fill to the right and down, and add rows as needed. Enter moves down. Choice A-H hold the choices; for Matching type each pair as <b>left | right</b> (wrong extra choices go in Answer, separated by |). Answer: a letter for multiple choice, letters like <b>A, C</b> for multiple answer, items separated by | for enumeration and ordering, <b>9.8 ± 0.1</b> for numeric. Use " / " for alternative answers. Leave Points empty for the default.</p>
             <div class="bg-white border border-gray-300 rounded-md overflow-auto">
                 <table class="border-collapse text-xs" id="ebSheet">
                     <thead class="sticky top-0 z-10">
@@ -550,9 +540,9 @@ export const ExamBuilder = {
         if (t.closest('#ebSaveBtn')) { await ExamBuilder.save(); return; }
         if (t.closest('#ebImportBtn')) { ExamBuilder.root.querySelector('#ebCsvInput').click(); return; }
         if (t.closest('#ebExportBtn')) { ExamBuilder.exportCsv(); return; }
-        if (t.closest('#ebTemplateBtn')) { ExamBuilder.downloadTemplate(); return; }
-        if (t.closest('#ebFab')) { ExamBuilder.toggleTypes(true); return; }
-        if (t.closest('#closeEbTypeBtn') || t.id === 'closeEbTypeBg') { ExamBuilder.toggleTypes(false); return; }
+        if (t.closest('#ebLinkBtn')) { ExamBuilder.toggleLink(); return; }
+        if (t.closest('#ebFab')) { const m = ExamBuilder.root.querySelector('#ebFabMenu'); ExamBuilder.toggleTypes(m.classList.contains('hidden')); return; }
+        if (t.id === 'ebFabBackdrop') { ExamBuilder.toggleTypes(false); return; }
 
         const viewBtn = t.closest('.eb-view-btn');
         if (viewBtn) {
@@ -793,17 +783,22 @@ export const ExamBuilder = {
     },
 
     toggleTypes: (open) => {
-        const m = ExamBuilder.root && ExamBuilder.root.querySelector('#ebTypeModal');
+        const r = ExamBuilder.root;
+        const m = r && r.querySelector('#ebFabMenu');
         if (!m) return;
         m.classList.toggle('hidden', !open);
+        r.querySelector('#ebFabBackdrop').classList.toggle('hidden', !open);
+        const f = r.querySelector('#ebFab');
+        f.setAttribute('aria-expanded', open ? 'true' : 'false');
+        r.querySelector('#ebFabIcon').style.transform = open ? 'rotate(45deg)' : '';
         if (open) { const b = m.querySelector('.eb-add'); if (b) b.focus(); }
-        else { const f = ExamBuilder.root.querySelector('#ebFab'); if (f) f.focus(); }
+        else if (m.contains(document.activeElement)) f.focus();
     },
 
     onKeydown: (e) => {
         const s = ExamBuilder.s;
         if (s && e.key === 'Escape') {
-            const m = ExamBuilder.root.querySelector('#ebTypeModal');
+            const m = ExamBuilder.root.querySelector('#ebFabMenu');
             if (m && !m.classList.contains('hidden')) { e.stopPropagation(); ExamBuilder.toggleTypes(false); return; }
         }
         if (!s || e.key !== 'Enter' || e.shiftKey) return;
@@ -911,7 +906,7 @@ export const ExamBuilder = {
             const text = /\.xlsx?$/i.test(file.name) ? await ExamBuilder.excelToCsv(file) : await file.text();
             const { questions, skipped } = M.fromCsvText(text);
             if (!questions.length) {
-                UI.error('No questions found in that file. Use the template for the right columns.');
+                UI.error('No questions found in that file. Use Export CSV for the right columns.');
                 return;
             }
             const onlyBlank = s.questions.length === 1 && !s.questions[0].text.trim();
@@ -1018,6 +1013,18 @@ export const ExamBuilder = {
     },
 
     // The same information as Link & Assign Students, filled in while creating the exam.
+    linkButton: () => {
+        const l = ExamBuilder.s.link;
+        if (!l) return '';
+        return `<button type="button" id="ebLinkBtn" aria-expanded="${ExamBuilder.s.linkOpen ? 'true' : 'false'}" aria-controls="ebLinkPanel" class="whitespace-nowrap px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-pen-to-square mr-1" aria-hidden="true"></i>Record Scores<span id="ebLinkState" class="${l.enabled ? '' : 'hidden'} ml-1.5 px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] leading-none align-middle">ON</span></button>`;
+    },
+    toggleLink: () => {
+        const s = ExamBuilder.s;
+        s.linkOpen = !s.linkOpen;
+        const p = ExamBuilder.root.querySelector('#ebLinkPanel');
+        if (p) p.classList.toggle('hidden', !s.linkOpen);
+        ExamBuilder.root.querySelector('#ebLinkBtn').setAttribute('aria-expanded', s.linkOpen ? 'true' : 'false');
+    },
     linkPanel: () => {
         const l = ExamBuilder.s.link;
         if (!l) return '';
@@ -1026,9 +1033,8 @@ export const ExamBuilder = {
         const lab = 'block text-[10px] font-bold text-indigo-700 uppercase mb-1';
         const inp = 'w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white font-bold';
         return `
-            <details id="ebLinkPanel" class="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg" ${l.enabled ? 'open' : ''}>
-                <summary class="px-3 py-2 text-xs font-black text-indigo-900 cursor-pointer select-none"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i>Record Scores &amp; this class <span id="ebLinkState" class="font-medium text-indigo-700">${l.enabled ? '(will be linked when saved)' : '(not linked)'}</span></summary>
-                <div class="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div id="ebLinkPanel" class="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg ${ExamBuilder.s.linkOpen ? '' : 'hidden'}">
+                <div class="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <label class="sm:col-span-2 lg:col-span-3 flex items-center gap-2 text-xs font-black text-indigo-900 cursor-pointer"><input type="checkbox" id="ebLinkOn" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" ${l.enabled ? 'checked' : ''}> Link &amp; enable for this class and record the scores</label>
                     <div><label class="${lab}" for="ebLinkTerm">Record scores term</label>
                         <select id="ebLinkTerm" class="${inp}">${opt('MidTerm', 'Mid Term', l.term)}${opt('FinalTerm', 'Final Term', l.term)}</select></div>
@@ -1041,7 +1047,7 @@ export const ExamBuilder = {
                     <div><label class="${lab}" for="ebLinkTo">Available until</label><input type="date" id="ebLinkTo" class="${inp}" value="${esc(l.toDate || '')}"></div>
                     <p class="sm:col-span-2 lg:col-span-3 text-[11px] text-indigo-800">The exam title above is the name shown in Record Scores. You can pick individual students later with Link &amp; Assign Students.</p>
                 </div>
-            </details>`;
+            </div>`;
     },
 
     // Keeps the Record Scores panel fields in the builder state.
@@ -1055,7 +1061,7 @@ export const ExamBuilder = {
         l[key] = t.id === 'ebLinkOn' ? t.checked : t.value;
         if (t.id === 'ebLinkOn') {
             const st = ExamBuilder.root.querySelector('#ebLinkState');
-            if (st) st.textContent = l.enabled ? '(will be linked when saved)' : '(not linked)';
+            if (st) st.classList.toggle('hidden', !l.enabled);
         }
         ExamBuilder.touch();
         return true;
@@ -1071,7 +1077,7 @@ export const ExamBuilder = {
         const btn = ExamBuilder.root.querySelector('#ebSaveBtn');
         s.saving = true;
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1" aria-hidden="true"></i>Saving...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span class="hidden sm:inline ml-1.5">Saving...</span>';
         try {
             const examData = s.questions.map(M.toRow);
             let savedId = s.examId;
@@ -1096,7 +1102,7 @@ export const ExamBuilder = {
         } catch (err) {
             s.saving = false;
             btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1" aria-hidden="true"></i>Save exam';
+            btn.innerHTML = SAVE_HTML;
             ExamBuilder.showProblems([{ id: null, message: err.message || 'Could not save the exam. Try again.' }]);
         }
     }

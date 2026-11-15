@@ -256,3 +256,9 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - Exam name, Name / Year & Section / Date and the instructions sit above the corner squares (not scanned).
 - Plain multiple-choice sheets with at most 1 set keep the old geometry (old printed stock still scans). Mixed or multi-set sheets printed before this version must be reprinted.
 - The scanner/review derive the layout (essay band, written lines) from the stored set items (`geoFor`).
+
+## Create Exam page layout
+- Header: back button, exam title input (`#ebTitle`) and the Save button (`#ebSaveBtn`) at the top right. The bottom bar is gone.
+- Record Scores is a toolbar button (before Import / Export) that opens the class-link panel; it shows "ON" when linked. Template button removed (Export CSV gives the columns).
+- Spreadsheet help text removed.
+- The + button opens a speed-dial list above it (Shaded on the sheet / Written by hand) instead of a modal.
