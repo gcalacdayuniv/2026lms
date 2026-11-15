@@ -200,7 +200,7 @@ export const CourseClass = {
                 <tr class="hover:bg-gray-50 transition">
                     <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${new Date(s.Timestamp + 'Z').toLocaleDateString()}</td>
                     <td class="px-3 py-2 text-center text-gray-600 truncate max-w-[150px]" title="${escapeHtml(s.Title)}">${escapeHtml(s.Title)}</td>
-                    <td class="px-3 py-2 text-center font-mono font-bold text-blue-600">${s[colName]}</td>
+                    <td class="px-3 py-2 text-center font-mono font-bold text-blue-600">${escapeHtml(s[colName])}</td>
                 </tr>
             `).join('');
             return;
@@ -284,7 +284,7 @@ export const CourseClass = {
                 <html lang="en">
                 <head>
                     <meta charset="UTF-8">
-                    <title>Class Roster | ${data.course.CourseCode}</title>
+                    <title>Class Roster | ${escapeHtml(data.course.CourseCode)}</title>
                     <style>
                         @page { size: letter; margin: 0.5in; }
                         body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #333; margin: 0; padding: 0; }
@@ -326,14 +326,14 @@ export const CourseClass = {
                                 return `
                                 <tr>
                                     <td class="photo-cell">${imgTag}</td>
-                                    <td class="center"><strong>${s.Seat_Number || ''}</strong></td>
+                                    <td class="center"><strong>${escapeHtml(s.Seat_Number || '')}</strong></td>
                                     <td>${escapeHtml(s.Student_Number)}</td>
                                     <td><strong>${escapeHtml(s.Name)}</strong></td>
-                                    <td>${`${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim()}</td>
+                                    <td>${escapeHtml(`${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim())}</td>
                                     <td><a href="mailto:${escapeHtml(s.Email)}" style="color: #000; text-decoration: none;">${escapeHtml(s.Email)}</a></td>
                                     <td>${escapeHtml(s.Group_Name)}</td>
-                                    <td>${s.Assigned_Topic || ''}</td>
-                                    <td>${s.Contact_Number || ''}</td>
+                                    <td>${escapeHtml(s.Assigned_Topic || '')}</td>
+                                    <td>${escapeHtml(s.Contact_Number || '')}</td>
                                 </tr>
                                 `;
                             }).join('')}
@@ -383,6 +383,19 @@ export const CourseClass = {
                 return;
             }
 
+            // Sort order chosen in the list header ('' keeps the server's order).
+            const sortMode = (document.getElementById('enrollSort') || {}).value || '';
+            if (sortMode) {
+                const col = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+                const keyOf = (s) => String(sortMode === 'number' ? s.Student_Number : s.Name || '').trim();
+                data.students = data.students.slice().sort((a, b) => {
+                    const ka = keyOf(a), kb = keyOf(b);
+                    if (!ka && kb) return 1;
+                    if (ka && !kb) return -1;
+                    return col.compare(ka, kb) || col.compare(String(a.Name || ''), String(b.Name || ''));
+                });
+            }
+
             const html = data.students.map(s => {
                 const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
                 const displayProgram = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
@@ -403,7 +416,7 @@ export const CourseClass = {
                             <div class="text-[11px] text-gray-500 mt-0.5">
                                 <span class="font-bold text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayCourse || 'N/A')}
                             </div>
-                            ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${displayProgram}</div>` : ''}
+                            ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${escapeHtml(displayProgram)}</div>` : ''}
                         </div>
                         <button type="button" data-student-id="${s.User_ID}" class="lecturer-enroll-btn bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition">
                             Enroll
@@ -420,7 +433,7 @@ export const CourseClass = {
             }
 
         } catch (err) {
-            listContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-sm font-medium border border-red-200 text-center">${err.message}</div>`;
+            listContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded text-sm font-medium border border-red-200 text-center">${escapeHtml(err.message)}</div>`;
         }
     },
 
@@ -492,7 +505,7 @@ export const CourseClass = {
                         const programsData = await apiFetch(`/api/programs?_t=${ts}`);
                         if (programsData.programs) {
                             filterCourseSelect.innerHTML = '<option value="">Course (All)</option>' +
-                                programsData.programs.map(p => `<option value="${p.ProgramCode}">${p.ProgramCode}</option>`).join('');
+                                programsData.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
                         }
                     } catch(e) {}
                 }
@@ -541,7 +554,7 @@ export const CourseClass = {
             // listener in course.js. Do not bind it here, or it fires twice.
 
         } catch (err) {
-            root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${err.message}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
+            root.innerHTML = `<div class="p-8 text-center mt-20"><div class="text-red-500 mb-4 text-4xl"><i class="fa-solid fa-triangle-exclamation"></i></div><p class="text-gray-800 font-bold mb-4">${escapeHtml(err.message)}</p><a href="#dashboard" class="text-blue-600 underline font-bold">Back to Dashboard</a></div>`;
         }
     }
 };

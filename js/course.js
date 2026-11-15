@@ -175,7 +175,11 @@ export const CourseModule = {
             }
         }
 
-        if (e.target.id === 'filterCourse' || e.target.id === 'filterYear' || e.target.id === 'filterSection' || e.target.id === 'filterStatus') {
+        if (e.target.id === 'enrollSort') {
+            try { localStorage.setItem('student_sort', e.target.value); } catch (err) { /* storage unavailable */ }
+        }
+
+        if (e.target.id === 'enrollSort' || e.target.id === 'filterCourse' || e.target.id === 'filterYear' || e.target.id === 'filterSection' || e.target.id === 'filterStatus') {
             const courseId = window.location.hash.replace('#class-', '');
             await CourseClass.loadUnenrolledStudents(courseId);
         }
@@ -240,7 +244,7 @@ export const CourseModule = {
                 content.classList.remove('hidden');
             } catch (err) {
                 document.getElementById('gmmLoading').classList.add('hidden');
-                document.getElementById('gmmContent').innerHTML = `<div class="text-sm text-red-500 font-bold text-center py-4">${err.message}</div>`;
+                document.getElementById('gmmContent').innerHTML = `<div class="text-sm text-red-500 font-bold text-center py-4">${escapeHtml(err.message)}</div>`;
                 document.getElementById('gmmContent').classList.remove('hidden');
             }
         }
@@ -566,17 +570,18 @@ export const CourseModule = {
 
         if (e.target.closest('#manageResetPwdBtn')) {
             const studentId = document.getElementById('manageStudentId').value;
-            if (await UI.confirm({ title: 'Reset password', message: "Reset this student's password to '123456'?", confirmText: 'Reset', danger: true })) {
+            if (await UI.confirm({ title: 'Reset password', message: "Reset this student's password? A temporary password will be shown once.", confirmText: 'Reset', danger: true })) {
                 const resetBtn = e.target.closest('#manageResetPwdBtn');
                 const originalHtml = resetBtn.innerHTML;
                 resetBtn.disabled = true;
                 resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Resetting...';
                 try {
-                    await apiFetch('/api/reset-student-password', {
+                    const res = await apiFetch('/api/reset-student-password', {
                         method: 'POST',
                         body: JSON.stringify({ studentId: studentId })
                     });
-                    UI.success("Password reset to '123456'.");
+                    // shown once: give it to the student, who should change it after signing in
+                    await UI.confirm({ title: 'Temporary password', message: `New password: ${res.tempPassword}\n\nGive it to the student now; it is not shown again. They should change it after signing in.`, confirmText: 'Done' });
                 } catch (err) {
                     UI.error("Failed to reset password: " + err.message);
                 } finally {

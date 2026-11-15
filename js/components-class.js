@@ -628,6 +628,9 @@ const ClassUI = {
                             <option value="UD">UD</option>
                             <option value="Dropped">Dropped</option>
                         </select>
+                        <select id="enrollSort" aria-label="Sort students" class="w-full sm:w-40 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                            ${[['', 'Default order'], ['name', 'Sort: Name (A-Z)'], ['number', 'Sort: Student number']].map(([v, l]) => `<option value="${v}"${v === savedStudentSort() ? ' selected' : ''}>${l}</option>`).join('')}
+                        </select>
                         <select id="filterCourse" class="w-full sm:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
                             <option value="">Course (All)</option>
                         </select>
@@ -744,6 +747,9 @@ const ClassUI = {
     `
 };
 
+// The chosen student sort (''=default, 'name', 'number') is remembered on this device.
+const savedStudentSort = () => { try { return localStorage.getItem('student_sort') || ''; } catch (e) { return ''; } };
+
 export const ClassComponents = {
     renderClassScreen: (course, students) => {
         const eyeOrder = { 'Legally Blind': 0, 'Near Sighted': 1, 'No Eye Condition': 2, 'Far Sighted': 3 };
@@ -776,6 +782,19 @@ export const ClassComponents = {
             return nameA.localeCompare(nameB);
         });
 
+        // A name / student number order picked in the list header (kept on this device) replaces the default order.
+        const sortMode = savedStudentSort();
+        if (sortMode) {
+            const col = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+            const keyOf = (s) => String(sortMode === 'number' ? s.Student_Number : s.Name || '').trim();
+            students.sort((a, b) => {
+                const ka = keyOf(a), kb = keyOf(b);
+                if (!ka && kb) return 1;
+                if (ka && !kb) return -1;
+                return col.compare(ka, kb) || col.compare(String(a.Name || ''), String(b.Name || ''));
+            });
+        }
+
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
             const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
@@ -797,7 +816,7 @@ export const ClassComponents = {
                 : `<span class="text-gray-800">None</span>`;
 
             return `
-                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}" data-search="${escapeHtml([s.Name, s.Student_Number, s.Seat_Number, s.Group_Name, s.Assigned_Topic].filter(Boolean).join(' ').toLowerCase())}" data-eye="${escapeHtml(s.eye_condition || '')}" data-group="${escapeHtml(s.Group_Name || '')}" data-seat="${escapeHtml(s.Seat_Number || '')}">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}" data-search="${escapeHtml([s.Name, s.Student_Number, s.Seat_Number, s.Group_Name, s.Assigned_Topic].filter(Boolean).join(' ').toLowerCase())}" data-eye="${escapeHtml(s.eye_condition || '')}" data-group="${escapeHtml(s.Group_Name || '')}" data-seat="${escapeHtml(s.Seat_Number || '')}" data-name="${escapeHtml(s.Name || '')}" data-number="${escapeHtml(s.Student_Number || '')}">
 
                     <div class="flex items-start justify-between w-full lg:w-1/2">
                         <div class="flex items-center space-x-3 p-1.5 -ml-1.5 rounded-lg transition">
@@ -880,8 +899,8 @@ export const ClassComponents = {
 
         const targetDisplay = [course.Target_Course, course.Target_Year, course.Target_Section].filter(Boolean).join(' ');
         const audienceBadge = targetDisplay
-            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-blue-200 uppercase align-middle ml-2 sm:ml-3">${escapeHtml(targetDisplay)} Only</span>`
-            : `<span class="inline-block bg-gray-100 text-gray-600 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md border border-gray-200 uppercase align-middle ml-2 sm:ml-3">All Students</span>`;
+            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase align-middle ml-2 whitespace-nowrap">${escapeHtml(targetDisplay)} Only</span>`
+            : `<span class="inline-block bg-gray-100 text-gray-600 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border border-gray-200 uppercase align-middle ml-2 whitespace-nowrap">All Students</span>`;
 
         return `
             <header class="bg-blue-700 shadow-md fixed top-0 w-full z-40">
@@ -894,33 +913,29 @@ export const ClassComponents = {
                             <h1 class="text-base sm:text-lg font-bold text-white truncate">${escapeHtml(course.CourseCode)}</h1>
                             <p class="text-[11px] sm:text-xs text-blue-200 truncate">${escapeHtml(course.CourseTitle)}</p>
                         </div>
+                        <div class="ml-auto pl-2 flex flex-col items-end text-[10px] sm:text-xs text-blue-100 leading-tight min-w-0 flex-shrink-0 max-w-[55%]">
+                            <span class="truncate max-w-full"><i class="fa-regular fa-clock mr-1" aria-hidden="true"></i>${escapeHtml(course.ScheduleDay)} | ${escapeHtml(course.TimePeriod)}</span>
+                            <span class="flex items-center max-w-full min-w-0">
+                                <i class="fa-solid fa-door-open mr-1" aria-hidden="true"></i><span id="classRoomText" class="truncate" data-room="${escapeHtml(course.Room || '')}">${course.Room ? escapeHtml(course.Room) : '<span class="italic text-blue-200">No room</span>'}</span>
+                                ${audienceBadge}
+                                <button type="button" id="editRoomBtn" data-course-id="${escapeHtml(course.Course_ID)}" data-code="${escapeHtml(course.CourseCode || '')}" data-title="${escapeHtml(course.CourseTitle || '')}" data-day="${escapeHtml(course.ScheduleDay || '')}" data-time="${escapeHtml(course.TimePeriod || '')}" data-room="${escapeHtml(course.Room || '')}" data-target-course="${escapeHtml(course.Target_Course || '')}" data-target-year="${escapeHtml(course.Target_Year || '')}" data-target-section="${escapeHtml(course.Target_Section || '')}" class="ml-1 w-7 h-7 inline-flex items-center justify-center rounded-md text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-white flex-shrink-0" aria-label="Edit class details" title="Edit class details"><i class="fa-solid fa-pen text-[11px]" aria-hidden="true"></i></button>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </header>
 
             <main class="pt-20 pb-36 sm:pb-28 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in relative">
-                <div class="mb-4 mt-2 sm:mt-4 px-2 sm:px-0">
-                    <div>
-                        <h2 class="text-xl sm:text-2xl font-black text-gray-800 tracking-tight flex items-center flex-wrap">
-                            Class Roster & Attendance ${audienceBadge}
-                        </h2>
-                        <p class="text-xs sm:text-sm text-gray-500 mt-2"><i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(course.ScheduleDay)} | ${escapeHtml(course.TimePeriod)}
-                            <span class="mx-1">|</span><i class="fa-solid fa-door-open mr-1"></i><span id="classRoomText" data-room="${escapeHtml(course.Room || '')}">${course.Room ? escapeHtml(course.Room) : '<span class="italic text-gray-400">No room assigned</span>'}</span>
-                            <button type="button" id="editRoomBtn" data-course-id="${escapeHtml(course.Course_ID)}" data-code="${escapeHtml(course.CourseCode || '')}" data-title="${escapeHtml(course.CourseTitle || '')}" data-day="${escapeHtml(course.ScheduleDay || '')}" data-time="${escapeHtml(course.TimePeriod || '')}" data-room="${escapeHtml(course.Room || '')}" data-target-course="${escapeHtml(course.Target_Course || '')}" data-target-year="${escapeHtml(course.Target_Year || '')}" data-target-section="${escapeHtml(course.Target_Section || '')}" class="ml-1 px-1.5 py-0.5 text-blue-600 hover:text-blue-800 text-xs font-bold focus:outline-none" aria-label="Edit class details"><i class="fa-solid fa-pen text-[11px] mr-1"></i>Edit details</button>
-                        </p>
-                    </div>
-                </div>
-
                 <div id="attendanceBar" data-dirty="false" class="sticky top-16 z-30 mb-4 px-2 sm:px-3 py-2 bg-gray-50/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
                     <div class="flex items-center gap-2">
                         <input type="date" id="attendanceDate" data-schedule-day="${escapeHtml(course.ScheduleDay || '')}" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
-                        <span id="attendanceDirtyLabel" class="ml-auto text-xs font-bold text-orange-600 whitespace-nowrap"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>Unsaved changes</span>
+                        <span id="attendanceDirtyLabel" class="hidden ml-auto text-xs font-bold text-orange-600 whitespace-nowrap"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>Unsaved changes</span>
                         <span id="attendanceDirtyStatus" class="sr-only" role="status"></span>
                         <div class="relative flex-shrink-0 sm:ml-0">
                             <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center whitespace-nowrap">
                                 <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
                             </button>
-                            <span id="attendanceDirtyDot" title="Unsaved changes" aria-hidden="true" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-400 border-2 border-white pointer-events-none"></span>
+                            <span id="attendanceDirtyDot" title="Unsaved changes" aria-hidden="true" class="hidden absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-400 border-2 border-white pointer-events-none"></span>
                         </div>
                         <button id="openCourseMenuBtn" aria-label="Menu" class="tabbar-hide flex-shrink-0 bg-gray-800 hover:bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                             <i class="fa-solid fa-bars sm:mr-2"></i><span class="hidden sm:inline">Menu</span>
@@ -952,6 +967,9 @@ export const ClassComponents = {
                             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" aria-hidden="true"></i>
                             <input type="search" id="rosterSearch" placeholder="Search name, number, seat, group..." aria-label="Search the class roster" class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
                         </div>
+                        <select id="rosterSort" aria-label="Sort students" class="px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            ${[['', 'Default order'], ['name', 'Sort: Name (A-Z)'], ['number', 'Sort: Student number']].map(([v, l]) => `<option value="${v}"${v === savedStudentSort() ? ' selected' : ''}>${l}</option>`).join('')}
+                        </select>
                         <select id="rosterFilter" aria-label="Show" class="px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
                             <option value="all">All students</option>
                             <option value="blind">Legally Blind</option>

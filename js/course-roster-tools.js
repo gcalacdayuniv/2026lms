@@ -10,6 +10,8 @@ const rows = () => Array.from(document.querySelectorAll('#rosterListContainer .s
 const isShown = (row) => row.style.display !== 'none';
 const statusOf = (row) => row.querySelector('.attendance-btn[data-selected="true"]')?.dataset.status || '';
 
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
 export const RosterTools = {
     selecting: false,
     classExams: [],
@@ -29,8 +31,28 @@ export const RosterTools = {
         return true;
     },
 
+    // Puts the rows in the chosen order ('' = the order they were listed in). Only moves rows; nothing is saved or hidden.
+    sortRows: () => {
+        const mode = $('rosterSort') ? $('rosterSort').value : '';
+        const all = rows();
+        if (!all.length) return;
+        all.forEach((row, i) => { if (row.dataset.orig === undefined) row.dataset.orig = String(i); });
+        const byOrig = (a, b) => Number(a.dataset.orig) - Number(b.dataset.orig);
+        const key = mode === 'number' ? (r) => r.dataset.number || '' : (r) => r.dataset.name || '';
+        const sorted = all.slice().sort(mode ? (a, b) => {
+            const ka = key(a), kb = key(b);
+            if (!ka && kb) return 1;           // rows without a value go last
+            if (ka && !kb) return -1;
+            return collator.compare(ka, kb) || collator.compare(a.dataset.name || '', b.dataset.name || '') || byOrig(a, b);
+        } : byOrig);
+        if (sorted.every((row, i) => row === all[i])) return;
+        const parent = all[0].parentNode;
+        sorted.forEach(row => parent.appendChild(row));
+    },
+
     apply: () => {
         if (!$('rosterTools')) return;
+        RosterTools.sortRows();
         const query = ($('rosterSearch').value || '').trim().toLowerCase();
         const filter = $('rosterFilter').value || 'all';
         const all = rows();
@@ -152,6 +174,10 @@ export const RosterTools = {
 
     onChange: (e) => {
         if (e.target.id === 'rosterFilter') RosterTools.apply();
+        else if (e.target.id === 'rosterSort') {
+            try { localStorage.setItem('student_sort', e.target.value); } catch (err) { /* storage unavailable */ }
+            RosterTools.apply();
+        }
         else if (e.target.classList && e.target.classList.contains('roster-check')) RosterTools.updateSelection();
         else if (e.target.id === 'attendanceDate') setTimeout(RosterTools.apply, 900);
     },

@@ -61,7 +61,7 @@ export const CourseRecitation = {
             CourseRecitation.drawWheel();
             CourseRecitation.updateCalledListUI();
         } catch(err) {
-            wheel.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-500 font-bold text-xs text-center p-4">${err.message}</div>`;
+            wheel.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-red-500 font-bold text-xs text-center p-4">${escapeHtml(err.message)}</div>`;
         }
     },
 

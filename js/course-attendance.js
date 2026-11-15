@@ -1,4 +1,5 @@
 // js/course-attendance.js
+import { escapeHtml } from './html-utils.js';
 import { apiFetch } from './globals.js';
 import { CourseScores } from './course-scores.js';
 import { UI } from './ui-feedback.js';
@@ -117,8 +118,14 @@ export const CourseAttendance = {
 
         const label = document.getElementById('attendanceDirtyLabel');
         if (label) label.innerHTML = `<i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>${text}`;
+        // Nothing unsaved (on screen or kept on this device): the label and the dot are hidden.
+        const anyUnsaved = dirty || others.length > 0;
+        if (label) label.classList.toggle('hidden', !anyUnsaved);
         const dot = document.getElementById('attendanceDirtyDot');
-        if (dot) dot.title = dirty && dateVal ? `Unsaved changes for ${CourseAttendance.describeDate(dateVal)}` : 'Unsaved changes';
+        if (dot) {
+            dot.classList.toggle('hidden', !anyUnsaved);
+            dot.title = dirty && dateVal ? `Unsaved changes for ${CourseAttendance.describeDate(dateVal)}` : 'Unsaved changes';
+        }
         const status = document.getElementById('attendanceDirtyStatus');
         if (status) status.textContent = text;
         return dirty;
@@ -368,7 +375,7 @@ export const CourseAttendance = {
             `).join('');
 
         } catch (err) {
-            list.innerHTML = `<div class="text-red-500 text-xs font-bold text-center py-2">${err.message}</div>`;
+            list.innerHTML = `<div class="text-red-500 text-xs font-bold text-center py-2">${escapeHtml(err.message)}</div>`;
         }
     },
 
@@ -547,6 +554,7 @@ export const CourseAttendance = {
 
             // The saved state is now on screen; remember it before any local draft is applied.
             CourseAttendance.setBaseline();
+            CourseAttendance.updateDirty();
 
             const draftStr = localStorage.getItem(`attendance_draft_${courseId}_${date}`);
             if (draftStr && !data.isNoClass) {

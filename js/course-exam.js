@@ -674,7 +674,7 @@ export const CourseExam = {
             }
 
             const linkBadge = linked && linked.Is_Active
-                ? `<span class="text-[10px] bg-green-100 text-green-800 border border-green-300 font-bold px-2 py-0.5 rounded">Linked (${enabledStudentsCount} student${enabledStudentsCount === 1 ? '' : 's'}) | ${linked.From_Date || 'Any'} to ${linked.To_Date || 'Any'}</span>`
+                ? `<span class="text-[10px] bg-green-100 text-green-800 border border-green-300 font-bold px-2 py-0.5 rounded">Linked (${enabledStudentsCount} student${enabledStudentsCount === 1 ? '' : 's'}) | ${esc(linked.From_Date || 'Any')} to ${esc(linked.To_Date || 'Any')}</span>`
                 : `<span class="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 font-medium px-2 py-0.5 rounded">Not linked to this class</span>`;
 
             return `

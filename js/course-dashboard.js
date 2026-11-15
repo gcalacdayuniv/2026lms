@@ -393,7 +393,7 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
                             <div class="dash-exam-card p-5 rounded-xl border-2 ${isDone ? 'bg-indigo-900/70 border-indigo-700' : 'bg-indigo-900 border-yellow-400'} flex flex-col justify-between gap-4 shadow-md transition hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-yellow-400 cursor-pointer" tabindex="0">
                                 <div>
                                     <div class="flex justify-between items-start gap-2">
-                                        <span class="px-2.5 py-0.5 bg-yellow-400 text-gray-950 font-black text-[10px] rounded uppercase tracking-wider">${escapeHtml(ex.courseCode)} &bull; ${ex.term}</span>
+                                        <span class="px-2.5 py-0.5 bg-yellow-400 text-gray-950 font-black text-[10px] rounded uppercase tracking-wider">${escapeHtml(ex.courseCode)} &bull; ${escapeHtml(ex.term)}</span>
                                         ${ex.toDate ? `<span class="text-[10px] text-indigo-200 font-mono">Open until: ${ex.toDate}</span>` : ''}
                                     </div>
                                     <h3 class="text-lg sm:text-xl font-black text-white mt-2">${escapeHtml(ex.examTitle)}</h3>

@@ -519,7 +519,7 @@ export const AuthModule = {
             AuthModule.usersList = data.users;
             AuthModule.renderManageUsers();
         } catch(err) {
-            list.innerHTML = `<div class="text-red-500 p-4 text-center font-bold bg-red-50 border border-red-200 rounded">${err.message}</div>`;
+            list.innerHTML = `<div class="text-red-500 p-4 text-center font-bold bg-red-50 border border-red-200 rounded">${escapeHtml(err.message)}</div>`;
         }
     },
 

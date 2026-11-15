@@ -1217,6 +1217,22 @@ function resolveAllowedOrigin(env, requestOrigin) {
     return list[0];
 }
 
+// One student's attendance for one date: update the saved row, or add it when there is none; an empty status clears it.
+function upsertAttendance(env, courseId, studentId, date, status, points) {
+    if (!status) {
+        return [env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?").bind(courseId, studentId, date)];
+    }
+    const pts = Number(points) || 0;
+    return [
+        env.DB.prepare("UPDATE Attendance SET Status = ?, Performance_Points = ? WHERE Course_ID = ? AND Student_ID = ? AND Date = ?")
+            .bind(status, pts, courseId, studentId, date),
+        env.DB.prepare(
+            `INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points)
+             SELECT ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?)`
+        ).bind(crypto.randomUUID(), courseId, studentId, date, status, pts, courseId, studentId, date)
+    ];
+}
+
 // Room = the classroom the class meets in. Added to an existing Courses table the first time it is needed.
 let courseRoomReady = false;
 async function ensureCourseRoom(env) {
@@ -1245,7 +1261,10 @@ export default {
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
             "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Submission-Meta, X-Chunk-Meta",
             "Access-Control-Max-Age": "86400",
-            "Vary": "Origin"
+            "Vary": "Origin",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+            "Cache-Control": "no-store"
         };
 
         if (request.method === "OPTIONS") {
@@ -2338,10 +2357,19 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing studentId" }), { status: 400, headers: corsHeaders });
                 }
 
-                const newHash = await hashPassword("123456", env);
+                // Only a student's password can be reset here (never another lecturer's), to a random temporary password
+                // that is shown once to the lecturer.
+                const target = await env.DB.prepare("SELECT role FROM Users WHERE User_ID = ?").bind(studentId).first();
+                if (!target || String(target.role || '').toLowerCase() !== 'student') {
+                    return new Response(JSON.stringify({ error: "Only a student's password can be reset." }), { status: 403, headers: corsHeaders });
+                }
+                const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+                const bytes = crypto.getRandomValues(new Uint8Array(10));
+                const tempPassword = Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
+                const newHash = await hashPassword(tempPassword, env);
                 await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, studentId).run();
 
-                return new Response(JSON.stringify({ success: true, message: "Password reset successfully" }), { status: 200, headers: corsHeaders });
+                return new Response(JSON.stringify({ success: true, message: "Password reset successfully", tempPassword }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "GET" && path === "/api/users") {
@@ -2832,20 +2860,15 @@ export default {
                 }
 
                 if (records && Array.isArray(records)) {
-                    await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ?").bind(courseId, date).run();
-
-                    if (records.length > 0) {
-                        const statements = [];
-                        for (const record of records) {
-                            const attId = crypto.randomUUID();
-                            statements.push(
-                                env.DB.prepare(
-                                    "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
-                                ).bind(attId, courseId, record.studentId, date, record.status, record.points)
-                            );
-                        }
-                        await env.DB.batch(statements);
-                    }
+                    // Per-student update-or-insert in one transaction: a failure leaves the saved day as it was,
+                    // and students that are not in the list are removed (the list is the whole day).
+                    const rows = records.filter(r => r && r.studentId);
+                    const statements = [
+                        env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ? AND Student_ID NOT IN (SELECT value FROM json_each(?))")
+                            .bind(courseId, date, JSON.stringify(rows.map(r => String(r.studentId))))
+                    ];
+                    for (const r of rows) statements.push(...upsertAttendance(env, courseId, r.studentId, date, r.status, r.points));
+                    await env.DB.batch(statements);
                 }
 
                 return new Response(JSON.stringify({ success: true, message: "Attendance saved" }), { status: 201, headers: corsHeaders });
@@ -2859,14 +2882,7 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
                 }
 
-                await env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?").bind(courseId, studentId, date).run();
-
-                if (status) {
-                    const attId = crypto.randomUUID();
-                    await env.DB.prepare(
-                        "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
-                    ).bind(attId, courseId, studentId, date, status, points || 0).run();
-                }
+                await env.DB.batch(upsertAttendance(env, courseId, studentId, date, status, points));
 
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
