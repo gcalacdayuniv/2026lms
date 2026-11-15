@@ -69,8 +69,17 @@ export const apiFetch = async (endpoint, options = {}) => {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     if (!config.signal) config.signal = controller.signal;
 
+    const isGet = !config.method || String(config.method).toUpperCase() === 'GET';
     try {
-        const response = await fetch(`${CONFIG.API_URL}${endpoint}`, config);
+        let response;
+        try {
+            response = await fetch(`${CONFIG.API_URL}${endpoint}`, config);
+        } catch (netErr) {
+            // A read that failed before reaching the server is tried once more; writes are never repeated.
+            if (!isGet || netErr.name === 'AbortError' || config.signal.aborted) throw netErr;
+            await new Promise(r => setTimeout(r, 800));
+            response = await fetch(`${CONFIG.API_URL}${endpoint}`, config);
+        }
 
         let data = null;
         try {
@@ -94,6 +103,9 @@ export const apiFetch = async (endpoint, options = {}) => {
         console.error(`API Error (${endpoint}):`, error);
         if (error.name === 'AbortError') {
             throw new Error('The request took too long. Please check your connection and try again.');
+        }
+        if (error instanceof TypeError) {
+            throw new Error(navigator.onLine === false ? 'You are offline. Connect to the internet and try again.' : 'Could not reach the server. Please check your connection and try again.');
         }
         throw error;
     } finally {
