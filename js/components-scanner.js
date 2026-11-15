@@ -126,6 +126,13 @@ export const ScannerUI = {
                                 <option value="legal">Legal</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="${LABEL}" for="scnCopies">Sheets per paper</label>
+                            <select id="scnCopies" class="${FIELD}">
+                                <option value="1">1 (full page)</option>
+                                <option value="2">2 (landscape, cut in half)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div id="scnSetupSummary" class="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded p-2"></div>

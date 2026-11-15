@@ -278,7 +278,7 @@ export const CourseScanner = {
                 const maxRegular = setMaxPoints(gsets[0]);
                 if (!(maxRegular > 0)) return { ok: false, error: 'Every question in this exam is a bonus question.' };
                 cfg = {
-                    mode: 'exam', mixed: true, examId: exam.Exam_ID, title: String(exam.Title || '').trim(),
+                    mode: 'exam', mixed: true, examId: exam.Exam_ID, title: String(exam.Title || '').trim(), course: String(exam.Course || '').trim(),
                     n: built.cells.length, c: Math.max(2, ...built.cells.map(c => c[1])), key: gsets[0].key, bonus: gsets[0].bonus,
                     cells: built.cells, geo: geoFor(setCount0, built), written: writtenItems(built), sets: gsets, multiSet: setCount0 > 1, maxRegular, manual: built.manual, skipped: 0
                 };
@@ -296,7 +296,7 @@ export const CourseScanner = {
             const sets = setCount > 1
                 ? buildSets(scannableItems(exam.ExamData, MAX_CHOICES), { seed: exam.Exam_ID, count: setCount }).map(s => ({ key: s.key, bonus: s.bonus, order: s.order }))
                 : null;
-            cfg = { mode: 'exam', examId: exam.Exam_ID, title: String(exam.Title || '').trim(), n: a.n, c: a.c, key: a.key, bonus: a.bonus, parts: a.parts, sets, maxRegular, skipped: a.skipped };
+            cfg = { mode: 'exam', examId: exam.Exam_ID, title: String(exam.Title || '').trim(), course: String(exam.Course || '').trim(), n: a.n, c: a.c, key: a.key, bonus: a.bonus, parts: a.parts, sets, maxRegular, skipped: a.skipped };
         } else if (CourseScanner.mode !== 'exam') {
             const t = CourseScanner.typed;
             const title = val('scnTypedTitle').trim();
@@ -428,14 +428,14 @@ export const CourseScanner = {
         }
         CourseScanner.setAlert('');
 
-        const header = await CourseScanner.askHeader();
-        if (header === null) return;
-        try { localStorage.setItem('omr_sheet_header', header); } catch (e) { /* storage unavailable */ }
+        const header = String(cfg.title || '').trim();   // the exam title is the header
 
         const html = buildSheetHtml(cfg.mixed
-            ? { title: header, cells: cfg.cells, paper: val('scnPaper') || 'letter', sets: cfg.sets && cfg.sets.length > 1 ? cfg.sets.length : 0, written: cfg.written || [] }
+            ? { title: header, course: cfg.course || (CourseScanner.course && CourseScanner.course.CourseTitle) || '', copies: Number(val('scnCopies')) === 2 ? 2 : 1, cells: cfg.cells, paper: val('scnPaper') || 'letter', sets: cfg.sets && cfg.sets.length > 1 ? cfg.sets.length : 0, written: cfg.written || [] }
             : {
                 title: header,
+                course: cfg.course || (CourseScanner.course && CourseScanner.course.CourseTitle) || '',
+                copies: Number(val('scnCopies')) === 2 ? 2 : 1,
                 n: cfg.n,
                 c: cfg.c,
                 paper: val('scnPaper') || 'letter',

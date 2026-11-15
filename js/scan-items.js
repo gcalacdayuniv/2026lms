@@ -77,11 +77,10 @@ export const numberShape = (value) => {
 };
 
 // How many question numbers an item uses: one per answer part (enumeration answers, matching pairs, items to
-// order, correct choices of a multiple-answer question) or one per point when points are set on a single-answer item.
+// order) or one per point when points are set on a single-answer item.
 export const spanOfRow = (q, type = rowType(q)) => {
     if (type === 'enum' || type === 'order') return Math.max(1, clean(q[3]).length);
     if (type === 'match') return Math.max(1, pairsOf(q).length);
-    if (type === 'multi') return Math.max(1, new Set(clean(Array.isArray(q[3]) ? q[3] : [q[3]]).map(norm)).size);
     if (type === 'essay') return 1;
     const p = Number(metaOf(q).points);
     return Number.isInteger(p) && p > 1 && p <= 50 ? p : 1;

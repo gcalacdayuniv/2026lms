@@ -108,7 +108,12 @@ export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey
     const subtitle = esc(title) + (sets > 1 ? ` - SET ${SET_LETTERS[set]}` : '');
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle.toUpperCase()}${withKey ? ' - ANSWER KEY' : ''}</div></div>`;
     if (withKey) {
-        return doc(title, `${head}<div class="keyg">${(() => { let k = 1; return qs.map(q => { const sp = spanOf(q); const t = `<div class="k">${rangeOf(k, sp)}. ${esc(keyOf(q))}</div>`; k += sp; return t; }).join(''); })()}</div>`, false, paperSize);
+        // the key is a list in the order of the paper, by part, like the answer sheet
+        const parts = new Map();
+        let k = 1;
+        qs.forEach(q => { const sp = spanOf(q); if (!parts.has(q.part)) parts.set(q.part, []); parts.get(q.part).push({ q, t: `<div class="q ak">${rangeOf(k, sp)}. ${esc(keyOf(q))}</div>` }); k += sp; });
+        const list = [...parts.keys()].sort((a, b) => a - b).map(p => `<div class="part">${esc(partTitle(p, parts.get(p).map(x => x.q.type)))}</div>${parts.get(p).map(x => x.t).join('')}`).join('');
+        return doc(title, `<div id="src">${head}${list}</div>`, true, paperSize);
     }
     const byPart = new Map();
     qs.forEach(q => { if (!byPart.has(q.part)) byPart.set(q.part, []); byPart.get(q.part).push(q); });

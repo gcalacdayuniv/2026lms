@@ -7,6 +7,7 @@ import { applyH, scanImage } from './omr-scan.js';
 
 export const RECT_SCALE = 5;
 export const RECT_LAYOUT = 'rect1';
+export const RECT_EXTRA = 10;   // frame units kept below the bottom markers, where essay lines may run (photos straightened before this were cut at the markers)
 const JPEG_QUALITY = 0.6;
 
 const loadImage = (url) => new Promise((resolve, reject) => {
@@ -17,7 +18,7 @@ const loadImage = (url) => new Promise((resolve, reject) => {
 });
 
 // H maps frame units to pixels of the photo at `url` (the same canvas the sheet was read from).
-// Returns a JPEG blob of FRAME.w*RECT_SCALE x FRAME.h*RECT_SCALE pixels.
+// Returns a JPEG blob of FRAME.w*RECT_SCALE x (FRAME.h+RECT_EXTRA)*RECT_SCALE pixels.
 export const rectify = async (source, H) => {
     // source: URL of the photo, or a canvas / image that already holds it
     const img = typeof source === 'string' ? await loadImage(source) : source;
@@ -29,7 +30,7 @@ export const rectify = async (source, H) => {
     const sd = sctx.getImageData(0, 0, sw, sh).data;
     src.width = 0;
 
-    const ow = FRAME.w * RECT_SCALE, oh = FRAME.h * RECT_SCALE;
+    const ow = FRAME.w * RECT_SCALE, oh = (FRAME.h + RECT_EXTRA) * RECT_SCALE;
     const out = document.createElement('canvas');
     out.width = ow; out.height = oh;
     const octx = out.getContext('2d');
@@ -83,6 +84,20 @@ export const cropBoxes = (row) => {
         const top = Math.max(0, r.v - (i === 0 && rows.length === 1 ? 3.1 : 5.6)), bottom = Math.min(FRAME.h, r.v + 3.1);
         return { x: left * RECT_SCALE, y: top * RECT_SCALE, w: (right - left) * RECT_SCALE, h: (bottom - top) * RECT_SCALE };
     });
+};
+
+// Written answers of one item (identification / enumeration lines, or an essay block), cut from a "rect1" photo.
+// lay = writtenLayout(...) of omr-sheet.js, item = { no, span, type }. One strip per column of lines.
+export const writtenBoxes = (lay, item) => {
+    const px = (l, t, r, b) => ({ x: Math.max(0, l) * RECT_SCALE, y: Math.max(0, t) * RECT_SCALE, w: (r - l) * RECT_SCALE, h: (b - t) * RECT_SCALE });
+    if (item.type === 'essay') {
+        const e = lay.essays.find(x => x.no === item.no);
+        return e ? [px(8, e.top - 1, 172, e.top + e.h)] : [];
+    }
+    const mine = lay.lines.filter(l => l.no >= item.no && l.no < item.no + (item.span || 1));
+    const cols = [];
+    mine.forEach(l => { let c = cols.find(x => Math.abs(x.u0 - l.u0) < 0.01); if (!c) { c = { u0: l.u0, vs: [] }; cols.push(c); } c.vs.push(l.v); });
+    return cols.map(c => px(c.u0 - 4.5, Math.min(...c.vs) - 5.5, c.u0 + lay.firstK + lay.lineW, Math.max(...c.vs) + 4));
 };
 
 // The SET row (letters and bubbles) of a sheet with several sets.

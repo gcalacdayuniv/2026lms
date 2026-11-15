@@ -969,7 +969,8 @@ const EXTRA_COLUMNS = [
     ["Class_Exams", "Time_Limit", "INTEGER"],
     ["Class_Exams", "Adjustments", "TEXT"],   // JSON { "<question index>": "credit" | "drop" }
     ["Class_Exams", "Release", "INTEGER"],    // 1 = students may review their answers and the right answers
-    ["Exams", "Archived", "INTEGER"]          // 1 = hidden from the lecturer's exam list (kept, can be restored)
+    ["Exams", "Archived", "INTEGER"],         // 1 = hidden from the lecturer's exam list (kept, can be restored)
+    ["Exams", "Course", "TEXT"]               // course line printed on the question paper, answer key and answer sheet
 ];
 let extraColumnsChecked = false;
 async function ensureManualMarksColumn(env) {
@@ -1266,8 +1267,9 @@ export default {
                 const lecturerId = url.searchParams.get("lecturerId");
                 await ensureAccessibleExamTables(env);
                 // Uses = how many times the exam was assigned to a class. An exam that was never assigned can be deleted.
+                await ensureManualMarksColumn(env);
                 const exams = await env.DB.prepare(
-                    `SELECT e.Exam_ID, e.Title, e.ExamData, e.Created_At, COALESCE(e.Archived, 0) AS Archived,
+                    `SELECT e.Exam_ID, e.Title, e.Course, e.ExamData, e.Created_At, COALESCE(e.Archived, 0) AS Archived,
                             (SELECT COUNT(*) FROM Class_Exams ce WHERE ce.Exam_ID = e.Exam_ID) AS Uses
                      FROM Exams e WHERE e.Lecturer_ID = ? ORDER BY e.Created_At DESC`
                 ).bind(lecturerId).all();
@@ -1290,7 +1292,22 @@ export default {
                 }
                 const used = await env.DB.prepare("SELECT COUNT(*) AS n FROM Class_Exams WHERE Exam_ID = ?").bind(body.examId).first();
                 if (used && used.n > 0) {
-                    return new Response(JSON.stringify({ error: "This exam has class records and cannot be deleted. Archive it instead." }), { status: 409, headers: corsHeaders });
+                    if (!body.force) {
+                        return new Response(JSON.stringify({ error: "This exam has class records.", used: used.n, needsConfirm: true }), { status: 409, headers: corsHeaders });
+                    }
+                    // Delete the exam, its class links and the students' answer records, but keep every score: any exam
+                    // score not yet in the class record is copied there first, and Assessment_Scores / scanned sheets stay.
+                    await env.DB.batch([
+                        env.DB.prepare(
+                            `INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score)
+                             SELECT lower(hex(randomblob(16))), ce.Assessment_ID, ea.Student_ID, ea.Final_Score
+                             FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
+                             WHERE ce.Exam_ID = ? AND ea.Final_Score IS NOT NULL AND COALESCE(ce.Assessment_ID, '') <> ''
+                               AND NOT EXISTS (SELECT 1 FROM Assessment_Scores s WHERE s.Assessment_ID = ce.Assessment_ID AND s.Student_ID = ea.Student_ID)`
+                        ).bind(body.examId),
+                        env.DB.prepare("DELETE FROM Exam_Assignments WHERE Class_Exam_ID IN (SELECT Class_Exam_ID FROM Class_Exams WHERE Exam_ID = ?)").bind(body.examId),
+                        env.DB.prepare("DELETE FROM Class_Exams WHERE Exam_ID = ?").bind(body.examId)
+                    ]);
                 }
                 await env.DB.prepare("DELETE FROM Exams WHERE Exam_ID = ?").bind(body.examId).run();
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
@@ -1305,7 +1322,8 @@ export default {
             if (request.method === "POST" && path === "/api/exams") {
                 const body = await request.json();
                 const id = crypto.randomUUID();
-                await env.DB.prepare("INSERT INTO Exams (Exam_ID, Lecturer_ID, Title, ExamData) VALUES (?, ?, ?, ?)").bind(id, body.lecturerId, body.title, JSON.stringify(body.examData)).run();
+                await ensureManualMarksColumn(env);
+                await env.DB.prepare("INSERT INTO Exams (Exam_ID, Lecturer_ID, Title, ExamData, Course) VALUES (?, ?, ?, ?, ?)").bind(id, body.lecturerId, body.title, JSON.stringify(body.examData), String(body.course || '').trim().slice(0, 120)).run();
                 return new Response(JSON.stringify({ success: true, examId: id }), { status: 201, headers: corsHeaders });
             }
 
@@ -1314,6 +1332,10 @@ export default {
                 const { examId, title, examData } = body;
                 if (!examId || !Array.isArray(examData)) {
                     return new Response(JSON.stringify({ error: "Missing examId or examData." }), { status: 400, headers: corsHeaders });
+                }
+                if (typeof body.course === "string") {
+                    await ensureManualMarksColumn(env);
+                    await env.DB.prepare("UPDATE Exams SET Course = ? WHERE Exam_ID = ?").bind(body.course.trim().slice(0, 120), examId).run();
                 }
 
                 if (title && String(title).trim()) {

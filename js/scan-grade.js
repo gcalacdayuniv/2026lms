@@ -2,13 +2,21 @@
 // Scores one scanned sheet of an exam with several question types. Every scanned answer is turned back into the
 // answer a student would have typed in the online exam, then graded by the same rules (grading.js), so points,
 // bonus, partial credit and numeric tolerance behave exactly like an online exam.
-import { gradeQuestion, questionPoints } from './grading.js';
+import { gradeQuestion, questionPoints, normAnswer, enumItems } from './grading.js';
 
 const BLANK = -1;
 const MULTIPLE = -2;
 const MULTI_BASE = 1000;
 const round2 = (n) => Math.round(n * 100) / 100;
 const pick = (list, code) => (Number.isInteger(code) && code >= 0 && code < list.length ? list[code] : '');
+
+// A multiple-answer question is one number worth its points whole: shading any of the correct choices earns it,
+// as long as nothing wrong is shaded too. No fractions.
+const anyCorrect = (row, given) => {
+    const key = new Set(enumItems(row[3]));
+    const picked = (Array.isArray(given) ? given : [given]).map(normAnswer).filter(Boolean);
+    return picked.length > 0 && picked.every(p => key.has(p)) ? questionPoints(row) : 0;
+};
 
 // codes = the cells of one item (see scan-items.js). Returns the answer in the saved-exam format.
 export const decodeItem = (item, codes) => {
@@ -57,7 +65,7 @@ export const gradeScanSet = (set, answers, marks, max) => {
         const codes = (answers || []).slice(it.s, it.s + it.n);
         if (codes.length && codes.every(c => c === BLANK)) { blank++; per.push({ state: 'blank', max: pts, earned: 0 }); return; }
         if (codes.some(c => c === MULTIPLE)) multiple++;
-        const e = gradeQuestion(it.row, decodeItem(it, codes));
+        const e = it.t === 'multi' ? anyCorrect(it.row, decodeItem(it, codes)) : gradeQuestion(it.row, decodeItem(it, codes));
         add(e);
         if (e >= pts) { full++; per.push({ state: 'right', max: pts, earned: e }); }
         else { wrong++; per.push({ state: e > 0 ? 'partial' : 'wrong', max: pts, earned: e }); }

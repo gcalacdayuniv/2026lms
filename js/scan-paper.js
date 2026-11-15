@@ -54,7 +54,13 @@ export const buildScanPaperHtml = ({ title = '', course = '', built, set = 0, mo
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle.toUpperCase()}${mode === 'keys' ? ' - ANSWER KEY' : ''}</div></div>`;
     let inner;
     if (mode === 'keys') {
-        inner = `${head}<div class="keyg">${sel.items.map(it => `<div class="k">${itemLabel(it)}${it.t === 'match' || it.t === 'order' ? ':' : '.'} ${esc(keyOf(it))}${it.bonus ? ' *' : ''}</div>`).join('')}</div>${sel.items.some(i => i.bonus) ? '<p style="font-size:9pt">* bonus question</p>' : ''}`;
+        const byPart = new Map();
+        sel.items.forEach(it => { if (!byPart.has(it.part)) byPart.set(it.part, []); byPart.get(it.part).push(it); });
+        const list = [...byPart.keys()].sort((a, b) => a - b).map(p => {
+            const l = byPart.get(p);
+            return `<div class="part">${esc(partTitle(p, l.map(it => (it.t === 'manual' ? it.type : it.t))))}</div>` + l.map(it => `<div class="q ak">${itemLabel(it)}${it.t === 'match' || it.t === 'order' ? ':' : '.'} ${esc(keyOf(it))}${it.bonus ? ' *' : ''}</div>`).join('');
+        }).join('');
+        inner = `<div id="src">${head}${list}${sel.items.some(i => i.bonus) ? '<p class="q ak" style="font-size:9pt">* bonus question</p>' : ''}</div>${PAGINATE_SCRIPT}`;
     } else {
         const byPart = new Map();
         sel.items.forEach(it => { if (!byPart.has(it.part)) byPart.set(it.part, []); byPart.get(it.part).push(it); });

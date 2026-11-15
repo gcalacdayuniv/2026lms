@@ -98,7 +98,10 @@ export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = '
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle}</div></div>`;
     let inner;
     if (mode === 'keys') {
-        inner = `${head}<div class="keyg">${sel.key.map((k, i) => `<div class="k">${i + 1}. ${isMulti(k) ? indexesOf(k).map(x => 'abcde'[x]).join(', ') : 'abcde'[k]}${sel.bonus[i] ? ' *' : ''}</div>`).join('')}</div>${sel.bonus.some(Boolean) ? '<p style="font-size:9pt">* bonus question</p>' : ''}`;
+        const byPart = new Map();
+        sel.key.forEach((k, i) => { const p = sel.parts[i] || 0; if (!byPart.has(p)) byPart.set(p, []); byPart.get(p).push(`<div class="q ak">${i + 1}. ${isMulti(k) ? indexesOf(k).map(x => 'abcde'[x]).join(', ') : 'abcde'[k]}${sel.bonus[i] ? ' *' : ''}</div>`); });
+        const list = [...byPart.keys()].sort((a, b) => a - b).map(p => `<div class="part">${esc(partTitle(p, byPart.get(p).map(() => 'mc')))}</div>${byPart.get(p).join('')}`).join('');
+        inner = `<div id="src">${head}${list}${sel.bonus.some(Boolean) ? '<p class="q ak" style="font-size:9pt">* bonus question</p>' : ''}</div>${PAGINATE_SCRIPT}`;
     } else {
         const byPart = new Map();
         sel.items.forEach((it, i) => { if (!byPart.has(it.part)) byPart.set(it.part, []); byPart.get(it.part).push({ it, no: i + 1 }); });

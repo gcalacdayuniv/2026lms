@@ -31,6 +31,7 @@ body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.18;colo
 .ln{margin:4.6mm 0 0;border-bottom:1px solid #000;height:0}.ln span{position:relative;top:-3.8mm;font-size:9pt}
 .mt{display:grid;grid-template-columns:1fr 1fr;gap:0 4mm}
 .k{margin:0 0 1.6mm}
+.q.ak{margin:0 0 1.2mm;text-align:left}
 .keyg{display:grid;grid-template-columns:repeat(4,1fr);gap:0 6mm}
 #src{column-count:2;column-gap:9mm}
 .page{width:${(w - 24).toFixed(1)}mm;height:${(h - 25).toFixed(1)}mm;overflow:hidden;display:flex;flex-direction:column;break-after:page;page-break-after:always}

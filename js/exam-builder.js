@@ -46,11 +46,39 @@ export const ExamBuilder = {
     // ---------- Open / close ----------
 
     // options: { examId?, title?, onSaved?, classLink? }  classLink: { enabled, term, category, fromDate, toDate, audience, linked } shows the Record Scores panel
+    // The course line printed on papers is the Course Title of one of the lecturer's classes.
+    courses: null,
+    courseOptions: () => {
+        const s = ExamBuilder.s || {};
+        const titles = [...new Set((ExamBuilder.courses || []).map(c => String(c.CourseTitle || '').trim()).filter(Boolean))];
+        if (s.course && !titles.includes(s.course)) titles.unshift(s.course);
+        return `<option value="">No course line</option>` + titles.map(t => `<option value="${esc(t)}"${t === s.course ? ' selected' : ''}>${esc(t)}</option>`).join('');
+    },
+    loadCourses: async () => {
+        try {
+            if (!ExamBuilder.courses) {
+                const d = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&_t=${Date.now()}`);
+                ExamBuilder.courses = d.courses || [];
+            }
+            const s = ExamBuilder.s;
+            if (!s) return;
+            // a new exam made from a class page starts with that class
+            if (!s.examId && !s.course) {
+                const id = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
+                const here = ExamBuilder.courses.find(c => String(c.Course_ID) === id);
+                if (here) s.course = String(here.CourseTitle || '').trim();
+            }
+            const sel = ExamBuilder.root && ExamBuilder.root.querySelector('#ebCourse');
+            if (sel) sel.innerHTML = ExamBuilder.courseOptions();
+        } catch (e) { /* the list stays as it is; the saved course line still shows */ }
+    },
+
     open: async (options = {}) => {
         const root = ExamBuilder.mount();
         ExamBuilder.s = {
             examId: options.examId || null,
             title: options.title || '',
+            course: options.course || '',
             view: store.get(VIEW_KEY) === 'sheet' ? 'sheet' : 'form',
             questions: [],
             dirty: false,
@@ -74,6 +102,7 @@ export const ExamBuilder = {
                 let rows = [];
                 try { rows = JSON.parse((data.exam && data.exam.ExamData) || '[]'); } catch (e) { rows = []; }
                 s.title = (data.exam && data.exam.Title) || s.title;
+                s.course = String((data.exam && data.exam.Course) || s.course || '').trim();
                 s.questions = M.fromExamData(rows);
             } else {
                 s.questions = [M.blankQuestion('mc', 0)];
@@ -91,6 +120,7 @@ export const ExamBuilder = {
                 const d = JSON.parse(saved);
                 if (d && Array.isArray(d.questions) && d.questions.length && await UI.confirm({ title: 'Restore draft', message: 'You have an unsaved draft of this exam on this device. Restore it?', confirmText: 'Restore' })) {
                     s.title = d.title || s.title;
+                    if (typeof d.course === 'string') s.course = d.course;
                     s.questions = d.questions;
                     s.dirty = true;
                 } else {
@@ -102,6 +132,7 @@ export const ExamBuilder = {
         if (!s.questions.some(q => q.id === s.openId)) s.openId = s.questions.length ? s.questions[0].id : null;
         ExamBuilder.renderShell();
         ExamBuilder.renderBody();
+        ExamBuilder.loadCourses();
     },
 
     close: async (force = false) => {
@@ -127,7 +158,7 @@ export const ExamBuilder = {
         clearTimeout(ExamBuilder.draftTimer);
         const s = ExamBuilder.s;
         if (!s || !s.dirty || s.saving) return;
-        store.set(draftKey(s.examId), JSON.stringify({ title: s.title, questions: s.questions, t: Date.now() }));
+        store.set(draftKey(s.examId), JSON.stringify({ title: s.title, course: s.course, questions: s.questions, t: Date.now() }));
         const note = ExamBuilder.root && ExamBuilder.root.querySelector('#ebDraftNote');
         if (note) note.textContent = 'Draft saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     },
@@ -167,7 +198,10 @@ export const ExamBuilder = {
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60" id="closeExamBuilderBg"></div>
             <div class="bg-white rounded-none shadow-xl w-full h-full relative z-10 sheet-panel app-page flex flex-col overflow-hidden" id="ebPanel">
                 <div class="flex items-center gap-3 px-4 py-3 border-b app-page-header shrink-0">
-                    <input type="text" id="ebTitle" maxlength="120" value="${esc(s.title)}" placeholder="Exam title (the name shown in Record Scores)" aria-label="Exam title" class="flex-1 min-w-0 text-base sm:text-lg font-bold text-gray-800 border-0 border-b-2 border-gray-300 focus:border-indigo-600 focus:ring-0 outline-none px-1 py-1 bg-transparent">
+                    <div class="flex-1 min-w-0 flex flex-col gap-1">
+                        <input type="text" id="ebTitle" maxlength="120" value="${esc(s.title)}" placeholder="Exam title (the name shown in Record Scores)" aria-label="Exam title" class="w-full min-w-0 text-base sm:text-lg font-bold text-gray-800 border-0 border-b-2 border-gray-300 focus:border-indigo-600 focus:ring-0 outline-none px-1 py-1 bg-transparent">
+                        <select id="ebCourse" aria-label="Course (printed above the title on papers and answer sheets)" class="w-full min-w-0 text-xs sm:text-sm text-gray-600 border-0 border-b border-gray-200 focus:border-indigo-600 focus:ring-0 outline-none px-1 py-0.5 bg-transparent">${ExamBuilder.courseOptions()}</select>
+                    </div>
                     <button type="button" id="ebSaveBtn" aria-label="Save exam" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-bold shadow-sm transition disabled:opacity-50">${SAVE_HTML}</button>
                     <button type="button" id="closeExamBuilderBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
@@ -750,6 +784,7 @@ export const ExamBuilder = {
         if (!s) return;
         const t = e.target;
         if (t.id === 'ebTitle') { s.title = t.value; ExamBuilder.touch(); return; }
+        if (t.id === 'ebCourse') { s.course = t.value; ExamBuilder.touch(); return; }
         if (ExamBuilder.onLinkField(t)) return;
         if (t.tagName === 'SELECT' || t.type === 'checkbox' || t.type === 'radio') return;
         const q = ExamBuilder.qOf(t);
@@ -1159,12 +1194,12 @@ export const ExamBuilder = {
             if (s.examId) {
                 await apiFetch('/api/exams/update', {
                     method: 'POST',
-                    body: JSON.stringify({ examId: s.examId, title: s.title.trim(), examData })
+                    body: JSON.stringify({ examId: s.examId, title: s.title.trim(), course: s.course.trim(), examData })
                 });
             } else {
                 const made = await apiFetch('/api/exams', {
                     method: 'POST',
-                    body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: s.title.trim(), examData })
+                    body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: s.title.trim(), course: s.course.trim(), examData })
                 });
                 savedId = made && made.examId;
             }

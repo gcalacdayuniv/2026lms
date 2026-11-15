@@ -68,7 +68,7 @@ export const askSheetHeader = () => new Promise((resolve) => {
 
 // Prints the bubble answer sheet that matches an exam saved in Manage Exams (its multiple-choice questions only).
 // Returns an error text, or '' when the preview opened.
-export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'letter' } = {}) => {
+export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'letter', copies = 1, course = '' } = {}) => {
     const built = buildScanSets(exam.ExamData, { seed: exam.Exam_ID, count: sets });
     const mixed = built.sets[0] && built.sets[0].items.some(i => i.t !== 'mc');
     const items = scannableItems(exam.ExamData, MAX_CHOICES);
@@ -76,12 +76,10 @@ export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'letter' } 
     if (mixed && !built.cells.length) return 'This exam has no question that an answer sheet can hold.';
     if (mixed && !sheetFits(built.cells, geoFor(sets, built), writtenItems(built))) return 'This exam needs more answer rows than one sheet holds.';
     if (!mixed && items.length > MAX_QUESTIONS) return `The sheet holds up to ${MAX_QUESTIONS} questions; this exam has ${items.length}.`;
-    const header = await askSheetHeader();
-    if (header === null) return '';
-    try { localStorage.setItem('omr_sheet_header', header); } catch (e) { /* storage unavailable */ }
+    const header = String(exam.Title || '').trim();   // the exam title is the header
     const html = buildSheetHtml(mixed
-        ? { title: header, cells: built.cells, paper, sets: sets > 1 ? sets : 0, written: writtenItems(built) }
-        : { title: header, n: items.length, c: Math.max(2, ...items.map(i => i.choices.length)), paper, parts: items.map(i => i.part), sets: sets > 1 ? sets : 0 });
+        ? { title: header, course, copies, cells: built.cells, paper, sets: sets > 1 ? sets : 0, written: writtenItems(built) }
+        : { title: header, course, copies, n: items.length, c: Math.max(2, ...items.map(i => i.choices.length)), paper, parts: items.map(i => i.part), sets: sets > 1 ? sets : 0 });
     showPrintPreview(html.replace(/<script>[\s\S]*?<\/script>/g, ''), `Answer sheet - ${header || exam.Title || ''}`);
     return '';
 };

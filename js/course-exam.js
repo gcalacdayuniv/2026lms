@@ -191,7 +191,7 @@ export const CourseExam = {
 
         if (e.target.closest('.edit-exam-builder-btn')) {
             const btn = e.target.closest('.edit-exam-builder-btn');
-            await ExamBuilder.open({ examId: btn.dataset.examId, title: btn.dataset.title, classLink: CourseExam.classLinkFor(btn.dataset.examId), onSaved: CourseExam.afterBuilderSave });
+            await ExamBuilder.open({ examId: btn.dataset.examId, title: btn.dataset.title, course: btn.dataset.course || '', classLink: CourseExam.classLinkFor(btn.dataset.examId), onSaved: CourseExam.afterBuilderSave });
         }
 
         if (e.target.closest('.export-exam-csv-btn')) {
@@ -699,7 +699,7 @@ export const CourseExam = {
                             <button type="button" class="exam-results-btn bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
                                 <i class="fa-solid fa-chart-column mr-1" aria-hidden="true"></i> Results
                             </button>` : ''}
-                        <button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                        <button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}" data-course="${esc(ex.Course || '')}">
                             <i class="fa-solid fa-pen-to-square mr-1" aria-hidden="true"></i> Edit
                         </button>
                         <button type="button" class="exam-more-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" aria-expanded="false" aria-label="More actions for ${esc(ex.Title)}">
@@ -724,9 +724,9 @@ export const CourseExam = {
                         <button type="button" class="archive-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-archive="${archived ? '0' : '1'}" aria-label="${archived ? 'Restore' : 'Archive'} ${esc(ex.Title)}">
                             <i class="fa-solid ${archived ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i> ${archived ? 'Restore' : 'Archive'}
                         </button>
-                        ${Number(ex.Uses) === 0 ? `<button type="button" class="delete-exam-btn bg-white text-red-600 hover:bg-red-50 border border-red-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Delete ${esc(ex.Title)}">
+                        <button type="button" class="delete-exam-btn bg-white text-red-600 hover:bg-red-50 border border-red-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Delete ${esc(ex.Title)}">
                             <i class="fa-regular fa-trash-can mr-1" aria-hidden="true"></i> Delete
-                        </button>` : ''}
+                        </button>
                         </div>
                     </div>
                 </div>
@@ -1471,6 +1471,8 @@ export const CourseExam = {
                         <button type="button" id="printExamKeysBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-key mr-1" aria-hidden="true"></i>Answer keys</button>
                     </div>
                     <div id="printExamSheetWrap" class="hidden mt-3 pt-3 border-t border-gray-100">
+                        <label for="printExamCopies" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Answer sheets per paper</label>
+                        <select id="printExamCopies" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-2"><option value="1">1 (full page)</option><option value="2">2 (landscape, cut in half)</option></select>
                         <div class="flex items-end gap-2">
                             <button type="button" id="printExamSheetBtn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-table-cells mr-1" aria-hidden="true"></i>Answer sheet (bubbles)</button>
                         </div>
@@ -1511,16 +1513,16 @@ export const CourseExam = {
         const set = Math.min(count - 1, Math.max(0, Number((document.getElementById('printExamSet') || {}).value) || 0));
         const title = String(ex.Title || '');
         CourseExam.closePrintDialog();
-        // First title line = the course name (kept after the first time; the paper still prints without it).
+        // First title line = the course line saved with the exam; exams without one use the name of the class open now.
         const courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
-        if (courseId && CourseExam.courseTitleFor !== courseId) {
+        if (!String(ex.Course || '').trim() && courseId && CourseExam.courseTitleFor !== courseId) {
             try {
                 const d = await apiFetch(`/api/course-details?courseId=${encodeURIComponent(courseId)}&_t=${Date.now()}`);
                 CourseExam.courseTitle = (d.course && d.course.CourseTitle) || '';
                 CourseExam.courseTitleFor = courseId;
             } catch (err) { CourseExam.courseTitle = ''; }
         }
-        const course = courseId && CourseExam.courseTitleFor === courseId ? CourseExam.courseTitle : '';
+        const course = String(ex.Course || '').trim() || (courseId && CourseExam.courseTitleFor === courseId ? CourseExam.courseTitle : '');
         if (CourseExam.printScannable) {
             const built = buildScanSets(ex.ExamData, { seed: ex.Exam_ID, count });
             const label = `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`;
@@ -1535,6 +1537,20 @@ export const CourseExam = {
         showPrintPreview(buildExamPrintHtml({ title, course, questions, withKey, set, sets: count, seed: ex.Exam_ID, paperSize }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
     },
 
+    // Title of the class that is open (used when an exam has no course line of its own).
+    classCourseTitle: async () => {
+        const courseId = window.location.hash.startsWith('#class-') ? window.location.hash.replace('#class-', '') : '';
+        if (!courseId) return '';
+        if (CourseExam.courseTitleFor !== courseId) {
+            try {
+                const d = await apiFetch(`/api/course-details?courseId=${encodeURIComponent(courseId)}&_t=${Date.now()}`);
+                CourseExam.courseTitle = (d.course && d.course.CourseTitle) || '';
+                CourseExam.courseTitleFor = courseId;
+            } catch (err) { return ''; }
+        }
+        return CourseExam.courseTitle || '';
+    },
+
     printSheet: async (examId) => {
         const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
         if (!ex) return;
@@ -1542,7 +1558,8 @@ export const CourseExam = {
         saveSetCount(examId, count);
         const paper = (document.getElementById('printExamPaper') || {}).value || 'letter';
         CourseExam.closePrintDialog();
-        const err = await printExamAnswerSheet(ex, { sets: count, paper });
+        const copies = Number((document.getElementById('printExamCopies') || {}).value) === 2 ? 2 : 1;
+        const err = await printExamAnswerSheet(ex, { sets: count, paper, copies, course: String(ex.Course || '').trim() || await CourseExam.classCourseTitle() });
         if (err) UI.warning(err);
     },
 
@@ -1572,10 +1589,17 @@ export const CourseExam = {
     deleteExam: async (examId) => {
         const ex = CourseExam.exams.find(e => e.Exam_ID === examId);
         if (!ex) return;
-        const ok = await UI.confirm({ title: 'Delete exam', message: `Delete "${ex.Title}" permanently? This exam has no class records. This cannot be undone.`, confirmText: 'Delete', danger: true });
+        const used = Number(ex.Uses) > 0;
+        const ok = await UI.confirm({
+            title: 'Delete exam',
+            message: used
+                ? `Delete "${ex.Title}" permanently? It is used in ${ex.Uses} class record${Number(ex.Uses) === 1 ? '' : 's'}. The exam, its class links and the students' answers are removed, but every student score stays in the class records. This cannot be undone.`
+                : `Delete "${ex.Title}" permanently? This exam has no class records. This cannot be undone.`,
+            confirmText: 'Delete', danger: true
+        });
         if (!ok) return;
         try {
-            await apiFetch('/api/exams/delete', { method: 'POST', body: JSON.stringify({ examId, lecturerId: AppState.user.User_ID }) });
+            await apiFetch('/api/exams/delete', { method: 'POST', body: JSON.stringify({ examId, lecturerId: AppState.user.User_ID, force: used }) });
             UI.success('Exam deleted');
             await CourseExam.loadExams();
         } catch (err) {
@@ -1591,7 +1615,7 @@ export const CourseExam = {
         try {
             await apiFetch('/api/exams', {
                 method: 'POST',
-                body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: `${ex.Title} (copy)`, examData: rows })
+                body: JSON.stringify({ lecturerId: AppState.user.User_ID, title: `${ex.Title} (copy)`, course: ex.Course || '', examData: rows })
             });
             UI.success('Exam duplicated');
             await CourseExam.loadExams();

@@ -287,3 +287,22 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 ## Compact choice guides + mobile delete
 - `js/omr-sheet.js`: smaller A–E / 1–5 / T/F guide letters, tighter bubble row pitch and boxes on compact sheets (mixed or multi-set). Printing, scanner, overlay and review crops share `planSheet`, so they follow automatically. **Reprint** mixed / multi-set sheets. Plain legacy sheets unchanged.
 - `js/exam-builder.js`: delete / restore-draft / close-without-saving now use the in-app `UI.confirm` modal (native `confirm` is blocked on mobile).
+
+## Instructions text, multiple-answer scoring, written answers in review
+- Sheet instruction no longer mentions a blue pen or erasing (`js/omr-sheet.js`).
+- Multiple-answer questions are one number worth their points whole: shading any of the correct choices (and nothing wrong) earns it, no fractions (`js/scan-items.js`, `js/scan-grade.js`, `worker/scan-grade.js`). Sessions saved earlier keep their old numbering; re-create the session to use this.
+- Review (`js/course-scan-review.js`, `js/omr-crop.js`, `js/omr-sheet.js`): written answers (identification, enumeration, essay) are listed in question order with a crop of their lines and check / wrong buttons (check = full points, wrong = 0, tap again to clear; a points box for items worth more than 1). Newly straightened photos keep 10 extra units below the bottom markers so essay lines show; older photos show what they hold.
+
+## Print headers and answer key list
+- Question paper / answer key no longer print the course line (e.g. "NSTP sample"); the header is the exam title (`exam-print.js`, `exam-sets.js`, `scan-paper.js`).
+- The answer key is a list by part in paper order (`1. B`), flowed in two columns like the paper (`print-preview.js` `.q.ak`).
+- Answer sheet header is the exam title; the header prompt is gone (`sheet-print.js`, `course-scanner.js`).
+
+## Course line + 2-up answer sheet
+- Exams now have a **Course line**: a drop-down in the Create Exam header listing the lecturer's classes' Course Titles (a new exam made from a class page starts with that class). Saved in a new `Exams.Course` column (added automatically by the Worker on first use; `worker/worker.js`: create, update, list). It prints above the title on the question paper, answer key and answer sheet. Exams without one use the open class's course title, as before.
+- The course line is back on paper / key headers (`exam-print.js`, `exam-sets.js`, `scan-paper.js`); the key stays a list.
+- Answer sheet: new **Answer sheets per paper** option (print dialog and scanner setup). 2 = landscape paper with two scaled copies side by side and a cut line (`omr-sheet.js` `copies`). The scanner reads each half as usual.
+- `js/course-exam.js` in this zip is the current GitHub version plus these changes (the earlier zip held an outdated copy; do not use it).
+
+## Delete an exam that has records
+- Delete is always shown. For an exam used in class records it asks for confirmation, then removes the exam, its class links and the students' answer records; every score stays (`Assessment_Scores` is untouched, and any exam score not yet copied there is copied first). Scanned sheets are not touched. (`js/course-exam.js`, `worker/worker.js` `/api/exams/delete` with `force`).

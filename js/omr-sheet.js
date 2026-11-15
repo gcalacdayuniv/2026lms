@@ -196,6 +196,14 @@ export const sheetFits = (cells, g = 0) => planSheet(cells, g, true).ok;
 
 // One entry per answer row: where each choice bubble is. answerRows(n, c, g) = n rows of c choices (plain multiple
 // choice); answerRows(cells, g) = the rows of a mixed-type sheet.
+// Where the written answers sit (frame units), for cutting them out of a photo in the review:
+// lines = [{no, part, u0, v}] (one per numbered line), essays = [{no, top, h}] in the bottom band, lineW = length of a short line.
+export const writtenLayout = (cells, g, written) => {
+    const plan = planSheet(cells, g, true);
+    let vE = ESSAY_BOTTOM - bandFor(written);
+    const essays = (written || []).filter(w => w.essay).map(w => { const h = essayHeight(w.lines); const e = { no: w.no, top: vE, h }; vE += h; return e; });
+    return { lines: plan.wrows, essays, lineW: 4 * ANS.kPitch + BUBBLE_D, firstK: ANS.firstK };
+};
 export const answerRows = (n, c, g = 0) => (Array.isArray(n) ? planSheet(n, c, true) : planSheet(plainCells(n, c), g, false)).rows;
 
 // One entry per digit column of the student number (00-0000 = 6 columns, digits 0-9 top to bottom).
@@ -231,7 +239,7 @@ const noteOf = (multi, cells) => {
     return t;
 };
 
-export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null, sets = 0, multi = false, cells: given = null, written = null }) => {
+export const buildSheetHtml = ({ title = '', course = '', copies = 1, n, c, paper = 'letter', parts: qParts = null, sets = 0, multi = false, cells: given = null, written = null }) => {
     const p = PAPERS[paper] || PAPERS.letter;
     const g = { sets, band: given ? bandFor(written) : 0, written: given ? shortWritten(written) : [] };
     const geo = geoOf(g, Boolean(given));
@@ -247,15 +255,16 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
 
     // Header, then ONE line for name / year and section / date, then the instructions. On the compact layout they sit
     // beside and above the top markers (outside the answer area, never scanned).
-    const hv = compact ? { title: -18.5, line: -12.2, note: -8.2 } : { title: 5, line: 14, note: 22 };
+    const hv = compact ? { title: -17.4, line: -12.2, note: -8.2, course: -21.7 } : { title: 5.5, line: 14, note: 22, course: 1 };
+    if (String(course).trim()) parts.push(textHtml(9, hv.course, 162, escapeHtml(String(course).trim().toUpperCase()), 'course'));
     if (String(title).trim()) parts.push(textHtml(9, hv.title, 162, escapeHtml(String(title).trim()), 'title'));
     parts.push(`<div class="hl" style="left:${mm(9)};top:${mm(hv.line)};width:${mm(162)}">` +
         '<span>Name:</span><span class="ul" style="flex:3"></span>' +
         '<span>Year &amp; Section:</span><span class="ul" style="flex:1.3"></span>' +
         '<span>Date:</span><span class="ul" style="flex:1.1"></span></div>');
     parts.push(textHtml(9, hv.note, 162,
-        'Use a black or blue pen, or a dark pencil. Shade the circle completely. ' +
-        'Do not fold or stain this sheet. Erase fully if you change an answer. ' +
+        'Use a black pen or a dark pencil. Shade the circle completely. ' +
+        'Do not fold or stain this sheet. ' +
         noteOf(multi, given), 'note'));
 
     // SET row: one circle per printed exam set, shaded by the student (same letter as on the question paper)
@@ -341,17 +350,33 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
         });
     }
 
+    // Two copies on one paper: the paper turns to landscape and each half holds the whole sheet, scaled to fit.
+    const twoUp = Number(copies) === 2;
+    const one = `<div class="page"><div class="frame">${parts.join('')}</div></div>`;
+    let sheet = one;
+    if (twoUp) {
+        const halfW = p.h / 2, H = p.w;
+        const cTop = Math.max(2, top - 24), cBottom = Math.min(p.h, top + 250), cLeft = left - 8, cW = FRAME.w + 16;
+        const sc = Math.min((halfW - 2) / cW, (H - 6) / (cBottom - cTop));
+        const tx = (halfW - cW * sc) / 2 - cLeft * sc, ty = (H - (cBottom - cTop) * sc) / 2 - cTop * sc;
+        const half = (at) => `<div class="half" style="left:${at}mm"><div class="page" style="transform:translate(${tx.toFixed(2)}mm,${ty.toFixed(2)}mm) scale(${sc.toFixed(4)});transform-origin:0 0"><div class="frame">${parts.join('')}</div></div></div>`;
+        sheet = `<div class="two">${half(0)}${half(halfW)}<div class="cut"></div></div>`;
+    }
     return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Answer Sheet${title ? ' | ' + escapeHtml(title) : ''}</title>
 <style>
-@page { size: ${p.w}mm ${p.h}mm; margin: 0; }
+@page { size: ${twoUp ? p.h : p.w}mm ${twoUp ? p.w : p.h}mm; margin: 0; }
 * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-serif; color: #000; }
-.page { position: relative; width: ${p.w}mm; height: ${p.h}mm; overflow: hidden; }
+.page { position: relative; width: ${p.w}mm; height: ${p.h}mm; overflow: ${twoUp ? 'visible' : 'hidden'}; }
+.two { position: relative; width: ${p.h}mm; height: ${p.w}mm; overflow: hidden; }
+.half { position: absolute; top: 0; width: ${p.h / 2}mm; height: ${p.w}mm; overflow: hidden; }
+.cut { position: absolute; left: ${p.h / 2}mm; top: 0; height: ${p.w}mm; border-left: 0.2mm dashed #999; }
 .frame { position: absolute; left: ${mm(left)}; top: ${mm(top)}; width: ${FRAME.w}mm; height: ${FRAME.h}mm; }
 .mk { position: absolute; background: #000; box-shadow: inset 0 0 0 10mm #000; }
 .b { position: absolute; box-sizing: border-box; border: ${BUBBLE_BORDER}mm solid #000; border-radius: 50%; }
 .t { position: absolute; font-size: 2.9mm; line-height: 3.2mm; }
+.course { font-size: 3.3mm; font-weight: bold; line-height: 4mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .title { font-size: 4.4mm; font-weight: bold; line-height: 5mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hl { position: absolute; display: flex; align-items: flex-end; gap: 1.6mm; font-size: 3.2mm; line-height: 3.6mm; white-space: nowrap; }
 .ul { display: block; height: 3.6mm; border-bottom: 0.3mm solid #000; }
@@ -367,7 +392,7 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-s
 .center { text-align: center; }
 .hyphen { font-size: 4mm; font-weight: bold; }
 </style></head>
-<body><div class="page"><div class="frame">${parts.join('')}</div></div>
+<body>${sheet}
 <script>window.onload = function () { setTimeout(function () { window.print(); }, 400); };<\/script>
 </body></html>`;
 };

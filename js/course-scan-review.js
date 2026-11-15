@@ -7,11 +7,11 @@ import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { PhotoCache, ScanPhotos } from './course-scan-photos.js';
-import { answerRows } from './omr-sheet.js';
+import { answerRows, writtenLayout } from './omr-sheet.js';
 import { gradeScanSet } from './scan-grade.js';
 import { questionPoints } from './grading.js';
-import { cellLabels, cellName, codeText, itemLabel, geoFor, writtenItems } from './scan-items.js';
-import { cropBoxes, drawCrops, setBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
+import { cellLabels, cellName, codeText, itemLabel, geoFor, writtenItems, rowType } from './scan-items.js';
+import { cropBoxes, writtenBoxes, drawCrops, setBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -77,6 +77,7 @@ export const CourseScanReview = {
         const sk0 = (session.Set_Keys || [])[0];
         const nSets = session.Layout && sk0 && sk0.items ? geoFor((session.Set_Keys || []).length, sk0.items) : (session.Set_Keys || []).length;
         CourseScanReview.geo = nSets;
+        CourseScanReview.lay = session.Layout && sk0 && sk0.items ? writtenLayout(session.Layout, nSets, writtenItems(sk0.items)) : null;
         CourseScanReview.rows = session.Layout ? answerRows(session.Layout, nSets) : answerRows(session.Num_Questions, session.Num_Choices, nSets);
         PhotoCache.purge().catch(() => {});
         if (!document.getElementById('scrvExtraStyle')) {
@@ -219,18 +220,65 @@ export const CourseScanReview = {
             <div class="scrv-setl" role="group" aria-label="Set of this sheet">${Array.from({ length: n }, (_, k) => `<span class="scrv-setc${k === cur ? ' is-on' : ''}">${SET_LETTERS[k]}</span>`).join('')}</div></div>`;
     },
 
-    // Questions written on the paper (identification, enumeration, essay): the lecturer types the points.
-    marksHtml: (sheet) => {
+    // A question written on the paper (identification, enumeration, essay) sits in the list in its own number order:
+    // the photo of the lines on the left, check / wrong on the right (points can also be typed when it is worth more than 1).
+    writtenHtml: (sheet, it, i) => {
+        const pts = questionPoints(it.row), m = CourseScanReview.marksOf(sheet)[i];
+        const label = itemLabel(it);
+        const typed = pts > 1 ? `<input type="number" min="0" max="${pts}" step="0.5" inputmode="decimal" class="scrv-mark w-full mt-1 px-2 py-1 border border-gray-300 rounded text-sm bg-white" data-i="${i}" value="${m !== undefined ? m : ''}" placeholder="points / ${fmt(pts)}" aria-label="Points for question ${label}">` : '';
+        return `
+            <div class="scrv-row" data-w="${i}">
+                <div class="scrv-img is-multi">
+                    <span class="scrv-qn">${label}</span>
+                    <canvas data-wcrop="${i}" width="10" height="2" aria-hidden="true"></canvas>
+                    <div class="scrv-ph" data-wph="${i}"></div>
+                </div>
+                <div class="scrv-side">
+                    <div class="scrv-opts" role="group" aria-label="Question ${label} marked by hand">
+                        <button type="button" class="scrv-opt scrv-wm" data-wm="${i}" data-v="ok" aria-label="Question ${label} correct"><i class="fa-solid fa-check" aria-hidden="true"></i></button>
+                        <button type="button" class="scrv-opt scrv-wm" data-wm="${i}" data-v="no" aria-label="Question ${label} wrong"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                    </div>
+                    ${typed}
+                    <div class="scrv-note" data-wnote="${i}"></div>
+                </div>
+            </div>`;
+    },
+
+    // Items marked by hand of the open sheet: [{ it, i }] in question order.
+    manualOf: (sheet) => {
         const { session } = CourseScanReview.detail;
-        if (!session.Layout) return '';
+        if (!session.Layout) return [];
         const sk = keyOfSheet(session, sheet);
-        const items = (sk.set ? sk.set.items : []).map((it, i) => ({ it, i })).filter(x => x.it.t === 'manual');
-        if (!items.length) return '';
-        const marks = CourseScanReview.marksOf(sheet);
-        return `<div class="m-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <div class="text-xs font-bold text-amber-800 mb-2">Marked by hand: check the question paper and type the points</div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${items.map(({ it, i }) => `<label class="text-xs text-gray-700">Q${itemLabel(it)} <span class="text-gray-500">/ ${fmt(questionPoints(it.row))}</span>
-                <input type="number" min="0" max="${questionPoints(it.row)}" step="0.5" inputmode="decimal" class="scrv-mark w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white" data-i="${i}" value="${marks[i] !== undefined ? marks[i] : ''}" aria-label="Points for question ${itemLabel(it)}"></label>`).join('')}</div></div>`;
+        return (sk.set ? sk.set.items : []).map((it, i) => ({ it, i })).filter(x => x.it.t === 'manual');
+    },
+
+    // Scanned rows and hand-marked questions in one list, ordered by question number.
+    listHtml: (sheet) => {
+        const { session } = CourseScanReview.detail;
+        const manual = CourseScanReview.manualOf(sheet).slice();
+        const out = [];
+        CourseScanReview.rows.forEach(r => {
+            const no = session.Layout ? Number(session.Layout[r.q][2]) : 0;
+            while (manual.length && manual[0].it.no < no) { const x = manual.shift(); out.push(CourseScanReview.writtenHtml(sheet, x.it, x.i)); }
+            out.push(CourseScanReview.rowHtml(sheet, r.q));
+        });
+        manual.forEach(x => out.push(CourseScanReview.writtenHtml(sheet, x.it, x.i)));
+        return out.join('');
+    },
+
+    // Sets the marks of a hand-marked question: right = full points, wrong = 0; the same button again clears it.
+    markWritten: (i, v) => {
+        const sheet = CourseScanReview.current();
+        if (!sheet) return;
+        const x = CourseScanReview.manualOf(sheet).find(m => m.i === i);
+        if (!x) return;
+        const pts = questionPoints(x.it.row), marks = { ...CourseScanReview.marksOf(sheet) };
+        const want = v === 'ok' ? pts : 0, cur = marks[i];
+        if (cur !== undefined && Number(cur) === want) delete marks[i]; else marks[i] = want;
+        CourseScanReview.markDrafts[sheet.Sheet_ID] = marks;
+        const inp = document.querySelector(`#scrvBody .scrv-mark[data-i="${i}"]`);
+        if (inp) inp.value = marks[i] !== undefined ? marks[i] : '';
+        CourseScanReview.refresh();
     },
 
     show: async () => {
@@ -245,7 +293,7 @@ export const CourseScanReview = {
         $('scrvPrev').disabled = CourseScanReview.idx === 0;
         $('scrvNext').disabled = CourseScanReview.idx === CourseScanReview.order.length - 1;
 
-        $('scrvBody').innerHTML = `<div class="max-w-4xl mx-auto w-full">${CourseScanReview.setHtml(sheet)}${CourseScanReview.marksHtml(sheet)}${CourseScanReview.rows.map(r => CourseScanReview.rowHtml(sheet, r.q)).join('')}</div>`;
+        $('scrvBody').innerHTML = `<div class="max-w-4xl mx-auto w-full">${CourseScanReview.setHtml(sheet)}${CourseScanReview.listHtml(sheet)}</div>`;
         CourseScanReview.refresh();
 
         const note = $('scrvNote');
@@ -254,7 +302,7 @@ export const CourseScanReview = {
             note.className = html ? `scrv-banner ${cls}` : 'hidden';
             note.innerHTML = html || '';
         };
-        const phs = () => document.querySelectorAll('#scrvBody [data-ph]');
+        const phs = () => document.querySelectorAll('#scrvBody [data-ph], #scrvBody [data-wph]');
 
         if (!sheet.Photo_File_ID && !(sheet.Scan_ID && await ScanPhotos.local(sheet.Scan_ID))) {
             setNote('No photo was saved for this sheet. You can still correct the answers.', 'is-info');
@@ -282,6 +330,11 @@ export const CourseScanReview = {
                 CourseScanReview.rows.forEach(r => {
                     const canvas = document.querySelector(`#scrvBody canvas[data-crop="${r.q}"]`);
                     if (canvas) { drawCrops(canvas, bitmap, cropBoxes(r)); canvas.classList.add('is-ready'); }
+                });
+                CourseScanReview.manualOf(sheet).forEach(({ it, i }) => {
+                    const canvas = document.querySelector(`#scrvBody canvas[data-wcrop="${i}"]`);
+                    const boxes = CourseScanReview.lay ? writtenBoxes(CourseScanReview.lay, { no: it.no, span: it.span ?? it.sp, type: rowType(it.row || []) === 'essay' ? 'essay' : 'id' }) : [];
+                    if (canvas && boxes.length) { drawCrops(canvas, bitmap, boxes); canvas.classList.add('is-ready'); }
                 });
                 const sc = document.querySelector('#scrvBody canvas[data-setcrop]');
                 if (sc) { drawCrop(sc, bitmap, setBox((session.Set_Keys || []).length)); sc.classList.add('is-ready'); }
@@ -345,6 +398,19 @@ export const CourseScanReview = {
                     orig !== cur ? `<span class="text-amber-700 font-bold">scanned: ${cell ? codeText(cell, orig) : label(orig)}</span>` : ''
                 ].filter(Boolean).join(' · ');
             }
+        });
+        const marks = CourseScanReview.marksOf(sheet);
+        CourseScanReview.manualOf(sheet).forEach(({ it, i }) => {
+            const card = document.querySelector(`#scrvBody [data-w="${i}"]`);
+            if (!card) return;
+            const pts = questionPoints(it.row), m = marks[i];
+            const has = m !== undefined && m !== null && m !== '' && Number.isFinite(Number(m));
+            const full = has && Number(m) >= pts, none = has && Number(m) <= 0;
+            card.classList.toggle('is-right', full);
+            card.classList.toggle('is-wrong', has && !full);
+            card.querySelectorAll('.scrv-wm').forEach(b => { const on = b.dataset.v === 'ok' ? full : none; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+            const n = card.querySelector('[data-wnote]');
+            if (n) n.innerHTML = has ? `${fmt(Number(m))} / ${fmt(pts)}${it.b ? ' (bonus)' : ''}` : `<b class="text-amber-700">not marked yet</b> · ${fmt(pts)} pt${pts === 1 ? '' : 's'}`;
         });
         // Keep the picker's mark and score for this student current.
         const opt = $('scrvPick') && $('scrvPick').options[CourseScanReview.idx];
@@ -432,6 +498,8 @@ export const CourseScanReview = {
     onClick: (e) => {
         const t = e.target.closest ? e.target : null;
         if (!t) return;
+        const wm = t.closest('.scrv-wm');
+        if (wm) { CourseScanReview.markWritten(Number(wm.dataset.wm), wm.dataset.v); return; }
         const opt = t.closest('.scrv-opt');
         if (opt) { CourseScanReview.choose(Number(opt.dataset.q), Number(opt.dataset.k)); return; }
         if (t.closest('#scrvPrev')) { CourseScanReview.go(CourseScanReview.idx - 1); return; }
