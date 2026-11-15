@@ -194,8 +194,8 @@ export const ExamBuilder = {
                 <div id="ebBody" class="flex-1 min-h-0 overflow-auto bg-indigo-50/60 p-3 sm:p-4"></div>
                 <div id="ebFabWrap" class="absolute right-4 z-20 flex flex-col items-end gap-3" style="bottom:calc(1rem + env(safe-area-inset-bottom))">
                     <div id="ebFabBackdrop" class="hidden" style="position:fixed;inset:0;z-index:-1;background:rgba(17,24,39,.35)" aria-hidden="true"></div>
-                    <div id="ebFabMenu" role="menu" aria-label="Add question" class="hidden w-64 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 overflow-y-auto p-2" style="max-height:min(36rem,calc(100vh - 8.5rem))">
-                        ${GROUPS.map(g => `<p class="px-2 pt-1.5 pb-0.5 text-[10px] font-black uppercase tracking-wider ${g.scan ? 'text-indigo-600' : 'text-emerald-600'}">${g.scan ? 'Shaded on the sheet' : 'Written by hand'}</p>${M.TYPES.filter(t => isScanType(t.id) === g.scan).map(t => `<button type="button" role="menuitem" data-add="${t.id}" tabindex="-1" class="eb-add w-full flex items-center gap-3 px-2 py-1.5 rounded-xl text-left text-sm font-bold text-gray-800 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none transition"><span class="w-8 h-8 shrink-0 rounded-full flex items-center justify-center ${g.scan ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}"><i class="fa-solid ${t.icon}" aria-hidden="true"></i></span>${ADD_LABEL[t.id] || t.label}</button>`).join('')}`).join('')}
+                    <div id="ebFabMenu" role="menu" aria-label="Add question" class="hidden flex-col items-end gap-2.5 overflow-y-auto overflow-x-hidden pr-0.5" style="max-height:calc(100vh - 8.5rem);max-height:calc(100dvh - 8.5rem)">
+                        ${GROUPS.map(g => `<p class="text-[10px] font-black uppercase tracking-wider text-white/90 mt-1 first:mt-0" style="text-shadow:0 1px 3px rgba(0,0,0,.6)">${g.scan ? 'Shaded on the sheet' : 'Written by hand'}</p>${M.TYPES.filter(t => isScanType(t.id) === g.scan).map(t => `<button type="button" role="menuitem" data-add="${t.id}" tabindex="-1" class="eb-add flex items-center gap-2 group focus:outline-none"><span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">${ADD_LABEL[t.id] || t.label}</span><span class="w-10 h-10 shrink-0 rounded-full ${g.scan ? 'bg-purple-600 hover:bg-purple-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid ${t.icon}" aria-hidden="true"></i></span></button>`).join('')}`).join('')}
                     </div>
                     <button type="button" id="ebFab" aria-label="Add question" aria-haspopup="menu" aria-expanded="false" aria-controls="ebFabMenu" title="Add question" class="w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 flex justify-center items-center focus:outline-none focus-visible:ring-4 ring-purple-300 transition-colors"><i id="ebFabIcon" class="fa-solid fa-plus text-2xl transition-transform duration-200" aria-hidden="true"></i></button>
                 </div>
@@ -228,7 +228,13 @@ export const ExamBuilder = {
         const body = ExamBuilder.root.querySelector('#ebBody');
         ExamBuilder.cancelChunks();
         const first = ExamBuilder.FIRST_CHUNK;
-        body.innerHTML = s.view === 'sheet' ? ExamBuilder.sheetHtml(first) : ExamBuilder.formHtml(first);
+        // Spreadsheet: the table scrolls inside the visible area (its scroll bars always on screen); form: the list scrolls,
+        // with room at the bottom so the + button never covers the last card.
+        const sheetView = s.view === 'sheet';
+        body.classList.toggle('overflow-auto', !sheetView);
+        body.classList.toggle('overflow-hidden', sheetView);
+        body.style.paddingBottom = sheetView ? '4.75rem' : '6rem';
+        body.innerHTML = sheetView ? ExamBuilder.sheetHtml(first) : ExamBuilder.formHtml(first);
         ExamBuilder.startChunks(first);
         ExamBuilder.updateCount();
         if (focusSel) {
@@ -446,7 +452,7 @@ export const ExamBuilder = {
         const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points', ''];
         const widths = ['w-10', 'w-16', 'min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
         return `
-            <div class="bg-white border border-gray-300 rounded-md overflow-auto">
+            <div class="bg-white border border-gray-300 rounded-md overflow-auto h-full">
                 <table class="border-collapse text-xs" id="ebSheet">
                     <thead class="sticky top-0 z-10">
                         <tr>${head.map((h, k) => `<th class="${widths[k]} bg-gray-100 border border-gray-300 px-2 py-1.5 text-left font-bold text-gray-600 whitespace-nowrap">${h}</th>`).join('')}</tr>
@@ -787,6 +793,7 @@ export const ExamBuilder = {
         const m = r && r.querySelector('#ebFabMenu');
         if (!m) return;
         m.classList.toggle('hidden', !open);
+        m.classList.toggle('flex', open);
         r.querySelector('#ebFabBackdrop').classList.toggle('hidden', !open);
         const f = r.querySelector('#ebFab');
         f.setAttribute('aria-expanded', open ? 'true' : 'false');

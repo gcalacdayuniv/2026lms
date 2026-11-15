@@ -265,3 +265,5 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 
 ## Scanner setup "Print answer sheet" fix
 - The print button in the scanner setup now prints the same mixed-type sheet (cells + written lines + essay band) that the scanner reads, instead of a plain multiple-choice sheet.
+
+- Form view has bottom room so the + button never covers the last card's buttons; the + list has no panel (label chip + coloured icon circle, like the class quick-actions); in Spreadsheet mode the table scrolls inside the visible area so the horizontal scroll bar is always on screen.
