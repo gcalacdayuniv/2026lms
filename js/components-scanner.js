@@ -123,6 +123,7 @@ export const ScannerUI = {
                             <select id="scnPaper" class="${FIELD}">
                                 <option value="letter">Letter</option>
                                 <option value="a4">A4</option>
+                                <option value="legal">Legal</option>
                             </select>
                         </div>
                     </div>

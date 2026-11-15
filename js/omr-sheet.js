@@ -47,7 +47,8 @@ const geoOf = (sets) => (sets > 1 ? GEO_SETS : GEO_BASE);
 
 const PAPERS = {
     letter: { w: 215.9, h: 279.4, label: 'Letter' },
-    a4: { w: 210, h: 297, label: 'A4' }
+    a4: { w: 210, h: 297, label: 'A4' },
+    legal: { w: 215.9, h: 355.6, label: 'Legal' }
 };
 
 // Which column and row question i (0-based) goes in; questions fill column 0, then 1, 2, 3.
@@ -134,34 +135,6 @@ export const planSheet = (cells, sets = 0) => {
     return { ok: placed, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, y: yPrev } };
 };
 
-// ---- Written answers ----
-// Items the scanner cannot read (identification, enumeration ...) get a lined portion of the sheet after the last
-// bubble row: one line per question number. labels = the numbers (strings). -> { lines, left: labels that did not fit, heads }
-const WRITE = { pitch: 8.7, head: 5.5, lineLeft: 11, lineRight: 2 };
-export const planWritten = (cells, labels, sets = 0) => {
-    const COLUMNS = geoOf(sets).cols;
-    const plan = planSheet(cells, sets);
-    const out = { lines: [], heads: [], left: [] };
-    if (!plan.ok || !labels || !labels.length) return out;
-    let { ci, y } = plan.end;
-    let v = ci < COLUMNS.length ? COLUMNS[ci].top + (y === null ? -3 : y + ANS.pitch + 0.5) : 0;
-    let first = true;
-    const bottom = (c) => COLUMNS[c].top + COLUMNS[c].rows * ANS.pitch;
-    for (let k = 0; k < labels.length; k++) {
-        if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
-        if (v + WRITE.head * (first ? 1 : 0) + WRITE.pitch > bottom(ci) + 3) {
-            ci++;
-            if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
-            v = COLUMNS[ci].top - 3; first = true;
-        }
-        const u0 = ANS.left + ci * ANS.blockW;
-        if (first) { out.heads.push({ u0, v, cont: out.heads.length > 0 }); v += WRITE.head; first = false; }
-        v += WRITE.pitch;
-        out.lines.push({ u0, v, label: String(labels[k]) });
-    }
-    return out;
-};
-
 // Capacity check used by the scanner setup: number of header + answer rows the cells need.
 export const sheetFits = (cells, sets = 0) => planSheet(cells, sets).ok;
 
@@ -202,6 +175,31 @@ const noteOf = (multi, cells) => {
     let t = (multi || kinds.has('m')) ? 'Shade ONE circle per number, unless the question says to select all that apply: then shade ALL the correct circles.' : 'Shade ONE circle per number.';
     if (kinds.has('x')) t += ' Numbers: shade the sign, the decimal places, then every digit (use leading zeros, e.g. 9.8 = 0098 with 1 decimal).';
     return t;
+};
+
+// Written-answers pages: full-width lines, one numbered line per answer (identification, enumeration), a block of
+// lines per essay. Pages are filled by height so every page keeps its margins. -> html ('' when nothing is written)
+const LINE_MM = 9, ESSAY_MM = 7.6, HEAD_MM = 26;
+const writtenPagesHtml = (written, title, p) => {
+    const room = p.h - 28 - HEAD_MM;
+    const blocks = written.map(w => {
+        const label = w.span > 1 ? `${w.no}-${w.no + w.span - 1}` : String(w.no);
+        if (w.essay) {
+            const lines = Array.from({ length: w.lines }, (_, k) => `<div class="wr" style="height:${ESSAY_MM}mm">${k === 0 ? `<b>${label}.</b>` : '<b></b>'}</div>`).join('');
+            return { h: 5 + w.lines * ESSAY_MM + 3, html: `<div class="wi"><div class="wc">Essay ${label}</div>${lines}</div>` };
+        }
+        const lines = Array.from({ length: w.lines }, (_, k) => `<div class="wr" style="height:${LINE_MM}mm"><b>${w.no + k}.</b></div>`).join('');
+        return { h: w.lines * LINE_MM + 3, html: `<div class="wi">${lines}</div>` };
+    });
+    const pages = [];
+    let cur = [], used = 0;
+    blocks.forEach(b => {
+        if (cur.length && used + b.h > room) { pages.push(cur); cur = []; used = 0; }
+        cur.push(b.html); used += b.h;
+    });
+    if (cur.length) pages.push(cur);
+    return pages.map((list, i) => `<div class="wp"><div class="wh">WRITTEN ANSWERS${title ? ' | ' + escapeHtml(String(title)) : ''}${pages.length > 1 ? ` (${i + 1}/${pages.length})` : ''}</div>
+<div class="wid"><span>Name:</span><span class="l"></span><span>Year &amp; Section:</span><span class="l" style="max-width:40mm"></span><span>Set:</span><span class="l" style="max-width:14mm"></span></div>${list.join('')}</div>`).join('');
 };
 
 export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null, sets = 0, multi = false, cells: given = null, written = null }) => {
@@ -268,16 +266,9 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
     });
     if (!plan.ok) parts.push(textHtml(9, 36, 162, 'This exam has too many answer rows for one sheet.', 'note'));
 
-    // Portion for answers that are written, not shaded (the lecturer marks them by hand)
-    if (written && written.length && plan.ok) {
-        const w = planWritten(cells, written, sets);
-        w.heads.forEach(h => parts.push(textHtml(h.u0 + 1, h.v, ANS.blockW - 2, h.cont ? 'WRITTEN ANSWERS (cont.)' : 'WRITTEN ANSWERS (not shaded)', 'cap small')));
-        w.lines.forEach(l => {
-            parts.push(textHtml(l.u0 - 3, l.v - 3.4, 12, escapeHtml(l.label), 'num right'));
-            parts.push(`<div class="wl" style="left:${mm(l.u0 + WRITE.lineLeft)};top:${mm(l.v)};width:${mm(ANS.blockW - WRITE.lineLeft - WRITE.lineRight)}"></div>`);
-        });
-        if (w.left.length) parts.push(textHtml(9, 233, 162, `Write the answers to ${escapeHtml(w.left.join(', '))} on the question paper.`, 'note'));
-    }
+    // Answers that are written, not shaded, go on the extra page(s) after the bubble sheet.
+    const writtenPages = written && written.length ? writtenPagesHtml(written, title, p) : '';
+    if (writtenPages) parts.push(textHtml(9, 233, 162, 'Written answers (identification, enumeration, essay): use the next page.', 'note'));
 
     return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Answer Sheet${title ? ' | ' + escapeHtml(title) : ''}</title>
@@ -297,14 +288,21 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-s
 .cap { font-size: 2.8mm; font-weight: bold; }
 .small { font-size: 2.2mm; white-space: nowrap; }
 .hd { font-size: 2.3mm; line-height: 2.6mm; }
-.wl { position: absolute; border-top: 0.3mm solid #000; height: 0; }
+.wp { position: relative; width: ${p.w}mm; height: ${p.h}mm; overflow: hidden; break-before: page; page-break-before: always; padding: 14mm 16mm; box-sizing: border-box; }
+.wp .wh { font-size: 4.2mm; font-weight: bold; margin: 0 0 3mm; }
+.wp .wid { display: flex; gap: 3mm; align-items: flex-end; font-size: 3.2mm; margin-bottom: 4mm; white-space: nowrap; }
+.wp .wid span.l { flex: 1; border-bottom: 0.3mm solid #000; height: 3.6mm; }
+.wp .wc { font-size: 3mm; font-weight: bold; margin: 0 0 1mm; }
+.wp .wr { display: flex; align-items: flex-end; gap: 2mm; border-bottom: 0.3mm solid #000; }
+.wp .wr b { font-size: 3.2mm; min-width: 11mm; text-align: right; font-weight: normal; line-height: 3.6mm; padding-bottom: 0.6mm; }
+.wp .wi { margin-bottom: 3mm; }
 .num { font-size: 2.6mm; }
 .part { font-size: 1.9mm; line-height: 2mm; font-weight: bold; white-space: nowrap; }
 .right { text-align: right; }
 .center { text-align: center; }
 .hyphen { font-size: 4mm; font-weight: bold; }
 </style></head>
-<body><div class="page"><div class="frame">${parts.join('')}</div></div>
+<body><div class="page"><div class="frame">${parts.join('')}</div></div>${writtenPages}
 <script>window.onload = function () { setTimeout(function () { window.print(); }, 400); };<\/script>
 </body></html>`;
 };

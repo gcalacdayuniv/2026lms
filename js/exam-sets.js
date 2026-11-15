@@ -3,7 +3,7 @@
 // question papers printed now and the answer keys used when scanning later always agree.
 // Set A is the exam as written. The other sets reorder the questions inside each part and shuffle the choices.
 import { escapeHtml as esc } from './html-utils.js';
-import { PRINT_CSS, PAGINATE_SCRIPT, partTitle } from './print-preview.js';
+import { printCss, PAGINATE_SCRIPT, partTitle } from './print-preview.js';
 import { multiCode, indexesOf, isMulti } from './scan-codes.js';
 
 export const MAX_SETS = 6;
@@ -92,7 +92,7 @@ export const buildSets = (items, { seed = 'exam', count = 4 } = {}) => {
 
 // mode: 'papers' = question paper of ONE set; 'keys' = its answer key (teacher copy).
 // set = index of the set to print (0 = A). Two columns, like a normal paper test.
-export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = 'papers' }) => {
+export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = 'papers', paperSize = 'letter' }) => {
     const sel = sets[Math.min(sets.length - 1, Math.max(0, set))];
     const subtitle = esc(title).toUpperCase() + (sets.length > 1 ? ` - SET ${sel.letter}` : '') + (mode === 'keys' ? ' - ANSWER KEY' : '');
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle}</div></div>`;
@@ -109,5 +109,5 @@ export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = '
         }).join('');
         inner = `<div id="src">${head}${paper}</div>${PAGINATE_SCRIPT}`;
     }
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${PRINT_CSS}</style></head><body>${inner}</body></html>`;
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${printCss(paperSize)}</style></head><body>${inner}</body></html>`;
 };

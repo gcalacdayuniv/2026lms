@@ -1457,6 +1457,8 @@ export const CourseExam = {
                 <div class="relative bg-white rounded-lg shadow-xl w-full max-w-sm p-4">
                     <div class="flex items-center justify-between mb-3"><h4 class="font-bold text-gray-800">Print exam</h4>
                         <button type="button" id="closePrintExamBtn" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button></div>
+                    <label for="printExamPaper" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Paper size (questions, keys, answer sheet)</label>
+                    <select id="printExamPaper" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3"><option value="letter">Letter</option><option value="a4">A4</option><option value="legal">Legal</option></select>
                     <label for="printExamSets" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sets</label>
                     <select id="printExamSets" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3">
                         <option value="1">1 set</option><option value="2">2 sets (A-B)</option><option value="3">3 sets (A-C)</option>
@@ -1464,20 +1466,12 @@ export const CourseExam = {
                     </select>
                     <div id="printExamSetWrap" class="hidden"><label for="printExamSet" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Print set</label>
                     <select id="printExamSet" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3"></select></div>
-                    <div id="printExamScanWrap" class="hidden mb-3 p-2 bg-rose-50 border border-rose-100 rounded-md">
-                        <label class="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
-                            <input type="checkbox" id="printExamScan" class="mt-0.5">
-                            <span><b>For the answer-sheet scanner</b> (every type that can be shaded). The papers and keys then match the scanner exactly.</span>
-                        </label>
-                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <button type="button" id="printExamPapersBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-print mr-1" aria-hidden="true"></i>Questions</button>
                         <button type="button" id="printExamKeysBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-key mr-1" aria-hidden="true"></i>Answer keys</button>
                     </div>
                     <div id="printExamSheetWrap" class="hidden mt-3 pt-3 border-t border-gray-100">
                         <div class="flex items-end gap-2">
-                            <div class="w-24"><label for="printExamPaper" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Paper</label>
-                            <select id="printExamPaper" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white"><option value="letter">Letter</option><option value="a4">A4</option></select></div>
                             <button type="button" id="printExamSheetBtn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-bold"><i class="fa-solid fa-table-cells mr-1" aria-hidden="true"></i>Answer sheet (bubbles)</button>
                         </div>
                         <p class="text-[11px] text-gray-500 mt-2">Students shade this sheet; scan it from Scan Answer Sheets. It shows SET circles when there are 2 or more sets.</p>
@@ -1492,9 +1486,8 @@ export const CourseExam = {
         try { total = JSON.parse((ex && ex.ExamData) || '[]').length; } catch (err) { total = 0; }
         CourseExam.printScannable = items.length > 0;
         document.getElementById('printExamSets').value = String(getSetCount(examId, 4));
-        document.getElementById('printExamScanWrap').classList.toggle('hidden', !items.length);
         document.getElementById('printExamSheetWrap').classList.toggle('hidden', !items.length);
-        document.getElementById('printExamScan').checked = items.length > 0;
+        try { document.getElementById('printExamPaper').value = localStorage.getItem('lms_print_paper') || 'letter'; } catch (err) { /* storage unavailable */ }
         CourseExam.fillPrintSets();
         m.classList.remove('hidden');
     },
@@ -1513,6 +1506,8 @@ export const CourseExam = {
         if (!questions.length) { UI.warning('This exam has no questions to print.'); return; }
         const count = Number((document.getElementById('printExamSets') || {}).value) || 1;
         saveSetCount(examId, count);
+        const paperSize = (document.getElementById('printExamPaper') || {}).value || 'letter';
+        try { localStorage.setItem('lms_print_paper', paperSize); } catch (err) { /* storage unavailable */ }
         const set = Math.min(count - 1, Math.max(0, Number((document.getElementById('printExamSet') || {}).value) || 0));
         const title = String(ex.Title || '');
         CourseExam.closePrintDialog();
@@ -1526,18 +1521,18 @@ export const CourseExam = {
             } catch (err) { CourseExam.courseTitle = ''; }
         }
         const course = courseId && CourseExam.courseTitleFor === courseId ? CourseExam.courseTitle : '';
-        if (CourseExam.printScannable && (document.getElementById('printExamScan') || {}).checked) {
+        if (CourseExam.printScannable) {
             const built = buildScanSets(ex.ExamData, { seed: ex.Exam_ID, count });
             const label = `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`;
             if (built.sets[0] && built.sets[0].items.some(i => i.t !== 'mc')) {
-                showPrintPreview(buildScanPaperHtml({ title, course, built, set: Math.min(built.sets.length - 1, set), mode: withKey ? 'keys' : 'papers' }), label);
+                showPrintPreview(buildScanPaperHtml({ title, course, built, set: Math.min(built.sets.length - 1, set), mode: withKey ? 'keys' : 'papers', paperSize }), label);
                 return;
             }
             const sets = buildSets(scannableItems(ex.ExamData, MAX_CHOICES), { seed: ex.Exam_ID, count });
-            showPrintPreview(buildSetsHtml({ title, course, sets, set: Math.min(sets.length - 1, set), mode: withKey ? 'keys' : 'papers' }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
+            showPrintPreview(buildSetsHtml({ title, course, sets, set: Math.min(sets.length - 1, set), mode: withKey ? 'keys' : 'papers', paperSize }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
             return;
         }
-        showPrintPreview(buildExamPrintHtml({ title, course, questions, withKey, set, sets: count, seed: ex.Exam_ID }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
+        showPrintPreview(buildExamPrintHtml({ title, course, questions, withKey, set, sets: count, seed: ex.Exam_ID, paperSize }), `${title}${count > 1 ? ' - Set ' + 'ABCDEF'[set] : ''}${withKey ? ' (key)' : ''}`);
     },
 
     printSheet: async (examId) => {

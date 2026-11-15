@@ -14,7 +14,11 @@ export const partTitle = (part, types) => {
     return `Part ${part + 1}${kinds.length === 1 && TYPE_LABEL[kinds[0]] ? ': ' + TYPE_LABEL[kinds[0]] : ''}`;
 };
 
-export const PRINT_CSS = `@page{size:letter;margin:12mm}
+const PAGES = { letter: [215.9, 279.4], a4: [210, 297], legal: [215.9, 355.6] };
+// Print style for a paper size (letter, a4 or legal): 12 mm margins, the pages are laid out by PAGINATE_SCRIPT.
+export const printCss = (paper = 'letter') => {
+    const [w, h] = PAGES[paper] || PAGES.letter;
+    return `@page{size:${w}mm ${h}mm;margin:12mm}
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.18;color:#000;margin:0}
 @media screen{body{padding:12mm;background:#fff}}
@@ -29,11 +33,13 @@ body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.18;colo
 .k{margin:0 0 1.6mm}
 .keyg{display:grid;grid-template-columns:repeat(4,1fr);gap:0 6mm}
 #src{column-count:2;column-gap:9mm}
-.page{width:191.9mm;height:254.4mm;overflow:hidden;display:flex;flex-direction:column;break-after:page;page-break-after:always}
+.page{width:${(w - 24).toFixed(1)}mm;height:${(h - 25).toFixed(1)}mm;overflow:hidden;display:flex;flex-direction:column;break-after:page;page-break-after:always}
 .page:last-child{break-after:auto;page-break-after:auto}
 .pcols{flex:1;min-height:0;display:flex;gap:9mm}
 .pcol{flex:1 1 0;min-width:0;height:100%;overflow:hidden}
 @media screen{.page{border-bottom:1px dashed #aaa;margin-bottom:8mm}}`;
+};
+export const PRINT_CSS = printCss('letter');
 
 // Lays the questions out in two columns on fixed-size pages. Done with script instead of CSS columns because
 // iPhone printing ignores CSS columns. Items inside #src: .hd (title), then .part and .q in order.

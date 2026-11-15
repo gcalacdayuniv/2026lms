@@ -173,7 +173,7 @@ export const scanCheck = (row) => {
 };
 
 // Same-shaped items can swap places between sets.
-const shapeOf = (it) => it.t + '#' + it.span + ':' + it.cells.map(c => c[0] + c[1]).join(',');
+const shapeOf = (it) => it.t + '#' + it.span + (it.t === 'manual' ? '/' + it.type + writtenLines(it) : '') + ':' + it.cells.map(c => c[0] + c[1]).join(',');
 
 // Builds every set. rows = saved exam rows (array or JSON text).
 // -> { sets: [{ letter, items, key }], cells: [...], manual: n, scannable: n }
@@ -238,12 +238,19 @@ export const buildScanSets = (examData, { seed = 'exam', count = 4 } = {}) => {
 
 const maskIdx = (code) => { const out = []; for (let k = 0; k < 10; k++) if ((code - 1000) & (1 << k)) out.push(k); return out; };
 
-// Question numbers answered by handwriting on the sheet (identification, enumeration ...). Essays are written on the paper.
-export const writtenLabels = (built) => {
+// Written answers: lines each item needs on the written-answers page. An essay gets room for a paragraph
+// (2 lines per point, 6 to 16); identification one line; enumeration (and any other unshaded item) one line per number.
+export const writtenLines = (it) => {
+    if (it.type === 'essay') {
+        const pts = Number(metaOf(it.row).points) || 5;
+        return Math.max(6, Math.min(16, Math.round(pts * 2)));
+    }
+    return it.span > 1 ? it.span : 1;
+};
+// Everything the scanner cannot read, in question order: [{ no, span, type, lines }].
+export const writtenItems = (built) => {
     const first = built.sets[0] ? built.sets[0].items : [];
-    const out = [];
-    first.forEach(it => { if (it.t === 'manual' && it.type !== 'essay') for (let k = 0; k < it.span; k++) out.push(String(it.no + k)); });
-    return out;
+    return first.filter(it => it.t === 'manual').map(it => ({ no: it.no, span: it.span, type: it.type, lines: writtenLines(it), essay: it.type === 'essay' }));
 };
 
 // What gets stored with a session and sent to the Worker for grading: per set only what grading needs.

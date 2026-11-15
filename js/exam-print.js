@@ -2,7 +2,7 @@
 // Print an exam as a paper test (all question types), with an optional answer key on its own page.
 import { escapeHtml as esc } from './html-utils.js';
 import { pointsOf } from './exam-builder-model.js';
-import { PRINT_CSS, PAGINATE_SCRIPT, partTitle } from './print-preview.js';
+import { printCss, PAGINATE_SCRIPT, partTitle } from './print-preview.js';
 
 export const PRINT_MAX_SETS = 6;
 const SET_LETTERS = 'ABCDEF';
@@ -68,15 +68,17 @@ const body = (q, n) => {
             clean(q.items).map((_, i) => `<div class="ln"><span>${n + i}.</span></div>`).join('');
         case 'order': {
             const items = shuffledBy(clean(q.items), seeded(q.text + 'o' + (q.salt || '')));
-            return '<div class="hint">Write the numbers 1, 2, 3... to put the items in the right order.</div>' +
-                items.map((i, k) => `<div class="c">${n + k}. ____ ${esc(i)}</div>`).join('');
+            return '<div class="hint">Put the items in the right order (1 = first).</div>' +
+                items.map((i, k) => `<div class="c">${n + k}. ${esc(i)}</div>`).join('');
         }
         case 'match': {
             const pairs = q.pairs.filter(p => p.l.trim() && p.r.trim());
             const right = shuffledBy(clean(pairs.map(p => p.r).concat(q.extra || [])), seeded(q.text + 'm' + (q.salt || '')));
-            return '<div class="hint">Write the letter of the matching item.</div><div class="mt"><div>' +
-                pairs.map((p, i) => `<div class="c">${n + i}. ____ ${esc(p.l)}</div>`).join('') + '</div><div>' +
-                right.map((r, k) => `<div class="c">${letter(k)}. ${esc(r)}</div>`).join('') + '</div></div>';
+            // one column, as wide as multiple choice: every numbered item of column 1 first, then column 2 and the extras
+            return '<div class="hint">Give the letter of the matching choice for each number.</div>' +
+                pairs.map((p, i) => `<div class="c">${n + i}. ${esc(p.l)}</div>`).join('') +
+                '<div class="hint" style="margin-top:1.6mm">Choices:</div>' +
+                right.map((r, k) => `<div class="c">${letter(k)}. ${esc(r)}</div>`).join('');
         }
         case 'essay': return lines(4);
         default: return '';
@@ -101,12 +103,12 @@ const keyOf = (q) => {
 
 // set = which set to print (0 = A, 1 = B ...; makeSet makes it from the exam, the same every time).
 // sets = how many sets the exam has (only decides whether the SET letter is shown). course = optional first title line.
-export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey = false, set = 0, sets = 1, seed = 'exam' }) => {
+export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey = false, set = 0, sets = 1, seed = 'exam', paperSize = 'letter' }) => {
     const qs = makeSet(questions, Math.min(PRINT_MAX_SETS - 1, Math.max(0, set)), seed);
     const subtitle = esc(title) + (sets > 1 ? ` - SET ${SET_LETTERS[set]}` : '');
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle.toUpperCase()}${withKey ? ' - ANSWER KEY' : ''}</div></div>`;
     if (withKey) {
-        return doc(title, `${head}<div class="keyg">${(() => { let k = 1; return qs.map(q => { const sp = spanOf(q); const t = `<div class="k">${rangeOf(k, sp)}. ${esc(keyOf(q))}</div>`; k += sp; return t; }).join(''); })()}</div>`);
+        return doc(title, `${head}<div class="keyg">${(() => { let k = 1; return qs.map(q => { const sp = spanOf(q); const t = `<div class="k">${rangeOf(k, sp)}. ${esc(keyOf(q))}</div>`; k += sp; return t; }).join(''); })()}</div>`, false, paperSize);
     }
     const byPart = new Map();
     qs.forEach(q => { if (!byPart.has(q.part)) byPart.set(q.part, []); byPart.get(q.part).push(q); });
@@ -121,7 +123,7 @@ export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey
         }).join('');
         return `<div class="part">${esc(partTitle(p, list.map(q => q.type)))}</div>${items}`;
     }).join('');
-    return doc(title, `<div id="src">${head}${paper}</div>`, true);
+    return doc(title, `<div id="src">${head}${paper}</div>`, true, paperSize);
 };
 
-const doc = (title, inner, paginate = false) => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${PRINT_CSS}</style></head><body>${inner}${paginate ? PAGINATE_SCRIPT : ''}</body></html>`;
+const doc = (title, inner, paginate = false, paper = 'letter') => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${printCss(paper)}</style></head><body>${inner}${paginate ? PAGINATE_SCRIPT : ''}</body></html>`;

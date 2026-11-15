@@ -105,6 +105,7 @@ export const ExamBuilder = {
     close: (force = false) => {
         const s = ExamBuilder.s;
         if (!force && s && s.dirty && !window.confirm('Close without saving? Your changes stay as a draft on this device.')) return;
+        ExamBuilder.cancelChunks();
         ExamBuilder.flushDraft();
         if (ExamBuilder.root) ExamBuilder.root.classList.add('hidden');
         ExamBuilder.s = null;
@@ -117,7 +118,7 @@ export const ExamBuilder = {
         if (!s) return;
         s.dirty = true;
         clearTimeout(ExamBuilder.draftTimer);
-        ExamBuilder.draftTimer = setTimeout(ExamBuilder.flushDraft, 600);
+        ExamBuilder.draftTimer = setTimeout(() => (window.requestIdleCallback ? window.requestIdleCallback(ExamBuilder.flushDraft, { timeout: 3000 }) : ExamBuilder.flushDraft()), 1000);
     },
 
     flushDraft: () => {
@@ -137,6 +138,13 @@ export const ExamBuilder = {
         root.id = ROOT_ID;
         root.className = 'hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0';
         document.body.appendChild(root);
+        if (!document.getElementById('ebPerfStyle')) {
+            const st = document.createElement('style');
+            st.id = 'ebPerfStyle';
+            // Cards that are scrolled out of view are not laid out or painted (big saving on long exams, esp. phones).
+            st.textContent = `#${ROOT_ID} .eb-card{content-visibility:auto;contain-intrinsic-size:auto 300px}#${ROOT_ID} #ebBody{overscroll-behavior:contain}`;
+            document.head.appendChild(st);
+        }
         root.addEventListener('click', ExamBuilder.onClick);
         root.addEventListener('input', ExamBuilder.onInput);
         root.addEventListener('change', ExamBuilder.onChange);
@@ -154,7 +162,7 @@ export const ExamBuilder = {
                 <i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}
             </button>`;
         root.innerHTML = `
-            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeExamBuilderBg"></div>
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60" id="closeExamBuilderBg"></div>
             <div class="bg-white rounded-none shadow-xl w-full h-full relative z-10 sheet-panel app-page flex flex-col overflow-hidden" id="ebPanel">
                 <div class="flex items-center gap-3 px-4 py-3 border-b app-page-header shrink-0">
                     <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate"><i class="fa-solid fa-wand-magic-sparkles text-indigo-600 mr-2" aria-hidden="true"></i>${s.examId ? 'Edit Exam' : 'Create Exam'}</h3>
@@ -203,7 +211,14 @@ export const ExamBuilder = {
             </div>`;
     },
 
+    // Several edits in a row repaint the counter once per frame.
     updateCount: () => {
+        if (ExamBuilder.countFrame) return;
+        const run = () => { ExamBuilder.countFrame = 0; ExamBuilder.paintCount(); };
+        ExamBuilder.countFrame = window.requestAnimationFrame ? window.requestAnimationFrame(run) : setTimeout(run, 16);
+    },
+
+    paintCount: () => {
         const s = ExamBuilder.s;
         const el = ExamBuilder.root && ExamBuilder.root.querySelector('#ebCount');
         if (!s || !el) return;
@@ -213,28 +228,77 @@ export const ExamBuilder = {
         el.textContent = `${regular} question${regular === 1 ? '' : 's'}${points !== regular ? ` (${points} points)` : ''}${bonus ? ` + ${bonus} bonus` : ''}`;
     },
 
+    // The first cards appear at once; the rest are added in small batches so a long exam opens without freezing the device.
+    FIRST_CHUNK: 12,
+    CHUNK: 8,
+
     renderBody: (focusSel) => {
         const s = ExamBuilder.s;
         const body = ExamBuilder.root.querySelector('#ebBody');
-        body.innerHTML = s.view === 'sheet' ? ExamBuilder.sheetHtml() : ExamBuilder.formHtml();
+        ExamBuilder.cancelChunks();
+        const first = ExamBuilder.FIRST_CHUNK;
+        body.innerHTML = s.view === 'sheet' ? ExamBuilder.sheetHtml(first) : ExamBuilder.formHtml(first);
+        ExamBuilder.startChunks(first);
         ExamBuilder.updateCount();
         if (focusSel) {
-            const el = body.querySelector(focusSel);
+            let el = body.querySelector(focusSel);
+            if (!el && ExamBuilder.chunk) { ExamBuilder.finishRender(); el = body.querySelector(focusSel); }
             if (el) {
-                el.focus();
+                el.focus({ preventScroll: true });
                 el.scrollIntoView({ block: 'center', behavior: 'smooth' });
             }
         }
     },
 
+    startChunks: (from) => {
+        const s = ExamBuilder.s;
+        if (!s || from >= s.questions.length) { ExamBuilder.chunk = null; return; }
+        const c = { from, timer: null };
+        ExamBuilder.chunk = c;
+        const step = () => {
+            if (ExamBuilder.chunk !== c || !ExamBuilder.s) return;
+            ExamBuilder.appendChunk(ExamBuilder.CHUNK);
+            if (ExamBuilder.chunk === c) c.timer = setTimeout(step, 24);
+        };
+        c.timer = setTimeout(step, 24);
+    },
+
+    appendChunk: (n) => {
+        const c = ExamBuilder.chunk, s = ExamBuilder.s;
+        if (!c || !s) return;
+        const sheet = s.view === 'sheet';
+        const host = ExamBuilder.root.querySelector(sheet ? '#ebSheet tbody' : '#ebCards');
+        const list = s.questions.slice(c.from, c.from + n);
+        if (host && list.length) {
+            host.insertAdjacentHTML('beforeend', list.map((q, k) => (sheet ? ExamBuilder.rowHtml(q, c.from + k) : ExamBuilder.cardHtml(q, c.from + k))).join(''));
+        }
+        c.from += list.length;
+        if (!host || c.from >= s.questions.length) { clearTimeout(c.timer); ExamBuilder.chunk = null; }
+    },
+
+    // Renders whatever is still waiting (before anything that needs every card: add, delete, move, save).
+    finishRender: () => {
+        while (ExamBuilder.chunk) ExamBuilder.appendChunk(1000);
+    },
+
+    cancelChunks: () => {
+        if (ExamBuilder.chunk) clearTimeout(ExamBuilder.chunk.timer);
+        ExamBuilder.chunk = null;
+    },
+
+    // Q1, Q2 ... after a card was added, removed or moved.
+    numberCards: () => {
+        ExamBuilder.root.querySelectorAll('#ebCards .eb-qn').forEach((el, i) => { el.textContent = `Q${i + 1}`; });
+    },
+
     // ---------- Form view ----------
 
-    formHtml: () => {
+    formHtml: (limit = Infinity) => {
         const s = ExamBuilder.s;
         if (s.questions.length === 0) {
             return '<div class="text-center text-sm text-gray-500 py-10">No questions yet. Tap the + button to add one.</div>';
         }
-        return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards">${s.questions.map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
+        return `<div class="max-w-2xl mx-auto space-y-3" id="ebCards">${s.questions.slice(0, limit).map((q, i) => ExamBuilder.cardHtml(q, i)).join('')}</div>`;
     },
 
     cardHtml: (q, i) => {
@@ -347,7 +411,7 @@ export const ExamBuilder = {
         return `
             <div class="eb-card bg-white rounded-xl border border-gray-200 border-l-4 border-l-transparent focus-within:border-l-indigo-600 shadow-sm p-3 sm:p-4" data-qid="${q.id}">
                 <div class="flex flex-wrap items-center gap-2 mb-2">
-                    <span class="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1">Q${i + 1}</span>
+                    <span class="eb-qn text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-2 py-1">Q${i + 1}</span>
                     <select class="eb-type text-xs font-bold border border-gray-300 rounded-md px-2 py-1.5 bg-white" aria-label="Question type">${typeOptions}</select>
                     <label class="text-[11px] font-bold text-gray-500 flex items-center gap-1">Part
                         <input type="number" min="1" max="99" class="eb-field w-14 border border-gray-300 rounded px-1.5 py-1 text-xs bg-white" data-col="part" value="${q.part + 1}" aria-label="Part number">
@@ -384,7 +448,7 @@ export const ExamBuilder = {
 
     // ---------- Spreadsheet view ----------
 
-    sheetHtml: () => {
+    sheetHtml: (limit = Infinity) => {
         const s = ExamBuilder.s;
         const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points', ''];
         const widths = ['w-10', 'w-16', 'min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
@@ -395,7 +459,7 @@ export const ExamBuilder = {
                     <thead class="sticky top-0 z-10">
                         <tr>${head.map((h, k) => `<th class="${widths[k]} bg-gray-100 border border-gray-300 px-2 py-1.5 text-left font-bold text-gray-600 whitespace-nowrap">${h}</th>`).join('')}</tr>
                     </thead>
-                    <tbody>${s.questions.map((q, i) => ExamBuilder.rowHtml(q, i)).join('')}</tbody>
+                    <tbody>${s.questions.slice(0, limit).map((q, i) => ExamBuilder.rowHtml(q, i)).join('')}</tbody>
                 </table>
             </div>`;
     },
@@ -460,9 +524,19 @@ export const ExamBuilder = {
 
     insertQuestion: (q, index) => {
         const s = ExamBuilder.s;
+        ExamBuilder.finishRender();
+        const host = s.view === 'form' ? ExamBuilder.root.querySelector('#ebCards') : null;
         s.questions.splice(index, 0, q);
         ExamBuilder.touch();
-        ExamBuilder.renderBody(`[data-qid="${q.id}"] [data-col="text"]`);
+        if (!host) { ExamBuilder.renderBody(`[data-qid="${q.id}"] [data-col="text"]`); return; }
+        // card view: only the new card is built, the others stay as they are
+        const tmp = document.createElement('div');
+        tmp.innerHTML = ExamBuilder.cardHtml(q, index);
+        host.insertBefore(tmp.firstElementChild, host.children[index] || null);
+        ExamBuilder.numberCards();
+        ExamBuilder.updateCount();
+        const el = host.querySelector(`[data-qid="${q.id}"] [data-col="text"]`);
+        if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     },
 
     onClick: async (e) => {
@@ -508,9 +582,12 @@ export const ExamBuilder = {
             if (act === 'del') {
                 const hasContent = q.text.trim() || q.answer.trim() || q.options.some(o => o.trim()) || q.items.some(o => o.trim()) || q.pairs.some(p => p.l.trim() || p.r.trim());
                 if (hasContent && !window.confirm(`Delete question ${i + 1}?`)) return;
+                ExamBuilder.finishRender();
                 s.questions.splice(i, 1);
                 ExamBuilder.touch();
-                ExamBuilder.renderBody();
+                const card = s.view === 'form' ? ExamBuilder.root.querySelector(`#ebCards .eb-card[data-qid="${q.id}"]`) : null;
+                if (card && s.questions.length) { card.remove(); ExamBuilder.numberCards(); ExamBuilder.updateCount(); }
+                else ExamBuilder.renderBody();
             } else if (act === 'addsame') {
                 // a blank question of the same type and part, right after this one
                 ExamBuilder.insertQuestion(M.blankQuestion(q.type, q.part), i + 1);
@@ -519,10 +596,19 @@ export const ExamBuilder = {
                 copy.id = M.newId();
                 ExamBuilder.insertQuestion(copy, i + 1);
             } else if ((act === 'up' && i > 0) || (act === 'down' && i < s.questions.length - 1)) {
+                ExamBuilder.finishRender();
                 const j = act === 'up' ? i - 1 : i + 1;
                 [s.questions[i], s.questions[j]] = [s.questions[j], s.questions[i]];
                 ExamBuilder.touch();
-                ExamBuilder.renderBody(`.eb-card[data-qid="${q.id}"] [data-act="${act}"]`);
+                const card = s.view === 'form' ? ExamBuilder.root.querySelector(`#ebCards .eb-card[data-qid="${q.id}"]`) : null;
+                if (card) {
+                    // swap the two cards in place
+                    if (act === 'up') card.parentNode.insertBefore(card, card.previousElementSibling);
+                    else card.parentNode.insertBefore(card.nextElementSibling, card);
+                    ExamBuilder.numberCards();
+                    const btn = card.querySelector(`[data-act="${act}"]`);
+                    if (btn) { btn.focus({ preventScroll: true }); card.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+                } else ExamBuilder.renderBody(`.eb-card[data-qid="${q.id}"] [data-act="${act}"]`);
             }
             return;
         }
@@ -760,6 +846,7 @@ export const ExamBuilder = {
 
     // Pasting rows copied from a spreadsheet: fills cells to the right and rows downward.
     onPaste: (e) => {
+        ExamBuilder.finishRender();
         const s = ExamBuilder.s;
         if (!s || s.view !== 'sheet') return;
         const t = e.target;
@@ -908,6 +995,7 @@ export const ExamBuilder = {
     // ---------- Save ----------
 
     showProblems: (problems) => {
+        ExamBuilder.finishRender();
         const box = ExamBuilder.root.querySelector('#ebAlert');
         if (!problems.length) { box.classList.add('hidden'); box.textContent = ''; return; }
         box.innerHTML = problems.slice(0, 6).map(p => `<div>${esc(p.message)}</div>`).join('') + (problems.length > 6 ? `<div>...and ${problems.length - 6} more.</div>` : '');
