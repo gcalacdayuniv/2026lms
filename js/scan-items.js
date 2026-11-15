@@ -10,7 +10,7 @@
 //   tag = short text for the row label of numeric items
 // Every set has the SAME cells (one printed sheet fits all sets): other sets only swap questions that have the same shape.
 import { multiCode } from './scan-codes.js';
-import { bandFor } from './omr-sheet.js';
+import { bandFor, shortWritten } from './omr-sheet.js';
 
 export const MAX_SETS = 6;
 export const SET_LETTERS = 'ABCDEF';
@@ -253,11 +253,11 @@ export const writtenItems = (src) => {
     const items = Array.isArray(src) ? src : (src.sets[0] ? src.sets[0].items : []);
     return items.filter(it => it.t === 'manual').map(it => {
         const type = it.type || rowType(it.row || []);
-        return { no: it.no, span: Number(it.span ?? it.sp) || 1, type, lines: writtenLines(it), essay: type === 'essay' };
+        return { no: it.no, span: Number(it.span ?? it.sp) || 1, type, lines: writtenLines(it), essay: type === 'essay', part: Number(it.part ?? (it.row || [])[0]) || 0 };
     });
 };
-// What the sheet layout depends on besides the cells: the number of sets and the height of the essay band.
-export const geoFor = (sets, src) => ({ sets: sets > 1 ? sets : 0, band: bandFor(writtenItems(src)) });
+// What the sheet layout depends on besides the cells: the number of sets, the essay band and the written-answer lines.
+export const geoFor = (sets, src) => { const w = writtenItems(src); return { sets: sets > 1 ? sets : 0, band: bandFor(w), written: shortWritten(w) }; };
 
 // What gets stored with a session and sent to the Worker for grading: per set only what grading needs.
 export const gradingSets = (built) => built.sets.map(set => ({

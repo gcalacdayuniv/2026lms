@@ -251,8 +251,8 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - **Bubble sheet**: the choice letters are printed again above the bubbles whenever a new part starts or the kind of question changes (e.g. matching A-E after multiple choice A-E); the label row only lists the letters that exist for that item. Multiple choice / multiple answer with 6-10 choices use the same A-E row, then F-J row layout as matching.
 
 ## Written answers on the bubble page (compact layout)
-- Identification / enumeration: one short line per number, below the last bubble row, same width as the 5-bubble rows.
-- Essay: a full-width band at the bottom of the same page (Short = 3 lines, Long = 6 lines, set per question in the builder). The bubble columns get shorter when an essay is present.
-- Exam name, Name / Year & Section / Date and the instructions now sit above the corner squares (not scanned), giving the bubbles more room.
+- Identification / enumeration: one numbered line per answer (same length as a row of 5 bubbles), placed in the answer columns in exam order, between the bubble rows, with the same numbering and PART labels. No "Written answers" heading.
+- Essay (Short = 3 lines, Long = 6 lines, set in the builder): full-width band at the bottom; it extends below the bottom markers into the page margin, like the header above the top markers. Bubble columns get shorter when an essay is present.
+- Exam name, Name / Year & Section / Date and the instructions sit above the corner squares (not scanned).
 - Plain multiple-choice sheets with at most 1 set keep the old geometry (old printed stock still scans). Mixed or multi-set sheets printed before this version must be reprinted.
-- The scanner derives the essay band from the stored set items (`geoFor`).
+- The scanner/review derive the layout (essay band, written lines) from the stored set items (`geoFor`).

@@ -26,8 +26,9 @@ const bodyOf = (it) => {
             it.shown.map((o, i) => `<div class="c">${it.no + i}. ${esc(o)}</div>`).join('');
         case 'num': return '<div class="hint">Shade the sign, the decimal places and every digit of your answer on the answer sheet.</div>';
         default:
-            // handwritten: the answer goes on the written-answers page of the answer sheet
-            return `<div class="hint">${it.type === 'enum' ? `List ${it.span} item${it.span === 1 ? '' : 's'}. ` : ''}Write your answer${it.span > 1 ? 's' : ''} in the written answers area of the answer sheet, number${it.span > 1 ? 's' : ''} ${itemLabel(it)}.</div>`;
+            // handwritten: id / enum have numbered lines in the answer columns, an essay has lines at the bottom of the sheet
+            if (it.type === 'essay') return `<div class="hint">Write your essay on the lines marked ${it.no} at the bottom of the answer sheet.</div>`;
+            return `<div class="hint">${it.type === 'enum' ? `List ${it.span} item${it.span === 1 ? '' : 's'}. ` : ''}Write your answer${it.span > 1 ? 's' : ''} on the line${it.span > 1 ? 's' : ''} numbered ${itemLabel(it)} on the answer sheet.</div>`;
     }
 };
 

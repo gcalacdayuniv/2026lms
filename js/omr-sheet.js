@@ -29,6 +29,7 @@ const COLUMNS = [
     { top: 41, rows: 32 }
 ];
 const LETTER_GAP = 7;
+const WRITE = { pitch: 8.7 };   // distance to a line for a written answer (identification / enumeration)
 const HDR_A = 4.0, HDR_B = 3.9;   // label row squeezed between two answer rows: distance below the row above / above the row below   // letters A-E are printed this far above the first row of a column
 
 // SET row (which printed exam set the student has): up to 6 circles A-F, printed only for exams with sets.
@@ -42,6 +43,7 @@ const STU = { left: 14, colPitch: 6, gap: 3, top: 38, rowPitch: 4.4 };
 
 // Essays are written on the bubble page, in a band across the bottom: caption, then lines of ESSAY_MM across the page.
 const ESSAY_MM = 8;
+const ESSAY_BOTTOM = 246;   // the essay lines may run below the bottom markers, into the page margin (like the header above the top markers)
 export const essayHeight = (lines) => 4 + lines * ESSAY_MM + 3;
 // written = [{ no, lines, essay }] -> height (mm) the essay band needs
 export const bandFor = (written) => (written || []).filter(w => w.essay).reduce((sum, w) => sum + essayHeight(w.lines), 0);
@@ -50,14 +52,17 @@ export const bandFor = (written) => (written || []).filter(w => w.essay).reduce(
 // changes, so sheets printed before still scan. Mixed-type sheets and sheets with SET circles use the compact layout:
 // the title, name line and instructions sit above the top markers (they are never scanned), so the columns start
 // higher; an essay band at the bottom shortens the columns.
-const normGeo = (g) => (g && typeof g === 'object' ? { sets: Number(g.sets) || 0, band: Number(g.band) || 0 } : { sets: Number(g) || 0, band: 0 });
+// written = [{ no, lines, part }]: identification / enumeration items, which get numbered lines in the answer columns
+// between the bubble rows, in the order of the exam.
+const normGeo = (g) => (g && typeof g === 'object' ? { sets: Number(g.sets) || 0, band: Number(g.band) || 0, written: Array.isArray(g.written) ? g.written : [] } : { sets: Number(g) || 0, band: 0, written: [] });
+export const shortWritten = (written) => (written || []).filter(w => !w.essay).map(w => ({ no: w.no, lines: w.lines, part: Number(w.part) || 0 }));
 const geoOf = (g, mixed = false) => {
-    const { sets, band } = normGeo(g);
-    if (!mixed && sets <= 1) return { compact: false, sets, band: 0, stuTop: STU.top, limit: null, cols: COLUMNS };
+    const { sets, band, written } = normGeo(g);
+    if (!mixed && sets <= 1) return { compact: false, sets, band: 0, written: [], stuTop: STU.top, limit: null, cols: COLUMNS };
     const stuTop = sets > 1 ? 26 : 12;
-    const limit = band > 0 ? 234 - band : 228;       // centre of the lowest answer row
+    const limit = band > 0 ? ESSAY_BOTTOM - 5 - band : 228;       // centre of the lowest answer row
     const cols = [stuTop + 53, 14, 14, 14].map(top => ({ top, rows: Math.max(0, Math.floor((limit - top) / ANS.pitch) + 1) }));
-    return { compact: true, sets, band, stuTop, limit, cols };
+    return { compact: true, sets, band, written, stuTop, limit, cols };
 };
 
 const PAPERS = {
@@ -83,9 +88,10 @@ const famOf = (kind, block) => (kind === 'a' || kind === 'm' ? 'L' + block : kin
 export const planSheet = (cells, g = 0, strict = true) => {
     const geo = geoOf(g, strict);
     const COLUMNS = geo.cols;
-    const slots = [];
+    const groups = [];
     let i = 0;
     while (i < cells.length) {
+        const slots = [];
         let j = i;
         while (j < cells.length && cells[j][2] === cells[i][2]) j++;
         const blocks = Math.max(...cells.slice(i, j).map(c => Math.ceil(c[1] / 5)));
@@ -96,8 +102,18 @@ export const planSheet = (cells, g = 0, strict = true) => {
         } else {
             for (let b = 0; b < blocks; b++) for (let k = i; k < j; k++) if (b === 0 || cells[k][1] > 5 * b) slots.push({ cell: k, block: b });
         }
+        groups.push({ no: cells[i][2], slots });
         i = j;
     }
+    // identification / enumeration lines go between the bubble rows, in the order of the exam
+    const slots = [];
+    const wl = geo.written.slice().sort((a, b) => a.no - b.no);
+    const wslots = (w) => Array.from({ length: w.lines }, (_, k) => ({ w: true, no: w.no + k, part: w.part }));
+    groups.forEach(gr => {
+        while (wl.length && wl[0].no < gr.no) wslots(wl.shift()).forEach(x => slots.push(x));
+        gr.slots.forEach(x => slots.push(x));
+    });
+    wl.forEach(w => wslots(w).forEach(x => slots.push(x)));
     const letterMax = Math.max(0, ...cells.filter(c => c[0] === 'a' || c[0] === 'm').map(c => c[1]));
     const posMax = Math.max(0, ...cells.filter(c => c[0] === 'p').map(c => c[1]));
     const countFor = (fam, cell) => (fam[0] === 'L' || fam[0] === 'P' ? cell[1] : countOf(fam));
@@ -111,27 +127,31 @@ export const planSheet = (cells, g = 0, strict = true) => {
     // a matching item with A-E after a multiple choice item with A-E.
     const sizes = new Map();
     cells.forEach(c => sizes.set(c[2], (sizes.get(c[2]) || 0) + 1));
-    let ci = 0, yPrev = null, last = null, lastSig = '';
+    const wrows = [];
+    let ci = 0, yPrev = null, last = null, lastSig = '', lastW = false, prevPart = null;
     const maxY = (c) => (COLUMNS[c].rows - 1) * ANS.pitch;
     for (const sl of slots) {
-        const cell = cells[sl.cell];
-        const fam = famOf(cell[0], sl.block);
+        const cell = sl.w ? ['w', 0, sl.no, 0, sl.part, ''] : cells[sl.cell];
+        const fam = sl.w ? 'W' : famOf(cell[0], sl.block);
         if (ci >= COLUMNS.length) break;
-        let yHdr = null, y = yPrev === null ? 0 : yPrev + ANS.pitch;
+        let yHdr = null, y = yPrev === null ? 0 : yPrev + (sl.w ? WRITE.pitch : lastW ? 6.6 : ANS.pitch);
         const sig = `${cell[4] || 0}|${cell[0]}${sizes.get(cell[2]) > 1 ? 'G' : 'S'}`;
-        if (yPrev !== null && (fam !== last || (strict && sig !== lastSig))) { yHdr = yPrev + HDR_A; y = yHdr + HDR_B; }
+        if (yPrev !== null && !sl.w && (fam !== last || (strict && sig !== lastSig))) { yHdr = yPrev + (lastW ? 5.2 : HDR_A); y = yHdr + HDR_B; }
         while (ci < COLUMNS.length && y > maxY(ci) + 0.01) { ci++; yPrev = null; last = null; yHdr = null; y = 0; }
         if (ci >= COLUMNS.length) break;
         if (yHdr !== null) {
             headers.push({ u0: ANS.left + ci * ANS.blockW, v: COLUMNS[ci].top + yHdr, labels: labelsOf(fam, countFor(fam, cell)) });
         }
-        if (yPrev === null) columnHeaders[ci] = labelsOf(fam, countFor(fam, cell));
-        last = fam; lastSig = sig;
+        if (yPrev === null) columnHeaders[ci] = sl.w ? [] : labelsOf(fam, countFor(fam, cell));
+        last = fam; lastSig = sig; lastW = Boolean(sl.w);
         const u0 = ANS.left + ci * ANS.blockW;
+        const newPart = (sl.w || sl.block === 0) && (Number(cell[4]) || 0) !== prevPart;
+        if (sl.w || sl.block === 0) prevPart = Number(cell[4]) || 0;
+        if (sl.w) { wrows.push({ no: sl.no, part: sl.part, u0, v: COLUMNS[ci].top + y, partFirst: newPart }); yPrev = y; continue; }
         const v = COLUMNS[ci].top + y;
         const r = rows[sl.cell];
         if (sl.block === 0) {
-            r.u0 = u0; r.v = v; r.placed = true;
+            r.u0 = u0; r.v = v; r.placed = true; r.partFirst = newPart;
             const single = !(cells[sl.cell - 1] && cells[sl.cell - 1][2] === cell[2]) && !(cells[sl.cell + 1] && cells[sl.cell + 1][2] === cell[2]);
             r.text = cell[5] || (single ? String(cell[2]) : `${cell[2]}.${cell[3] + 1}`);
         }
@@ -143,52 +163,14 @@ export const planSheet = (cells, g = 0, strict = true) => {
         }
         yPrev = y;
     }
-    const placed = rows.every(r => r.placed);
-    return { ok: placed, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, y: yPrev }, geo };
+    const placed = rows.every(r => r.placed) && wrows.length === geo.written.reduce((t, w) => t + w.lines, 0);
+    return { ok: placed, wrows, error: placed ? '' : 'The answer sheet is full: this exam has too many answer rows for one sheet.', rows: rows.filter(r => r.placed), headers, columnHeaders, end: { ci, y: yPrev }, geo };
 };
 
 const plainCells = (n, c, parts = null) => Array.from({ length: n }, (_, i) => ['a', c, i + 1, 0, parts ? Number(parts[i]) || 0 : 0, '']);
 
-// ---- Written answers on the bubble page ----
-// Identification and enumeration: one numbered line per answer, as long as one row of 5 bubbles, in the free space
-// after the last bubble row. Essays: a band across the bottom of the page (see bandFor).
-const WRITE = { pitch: 8.7, head: 5.5 };
-// written = [{ no, lines, essay }] -> { lines: [{ u0, v, label }], heads: [{ u0, v, cont }], essays: [{ no, lines, v }], left: [labels that did not fit] }
-export const planWritten = (cells, written, g = 0) => {
-    const geo = geoOf(g, true);
-    const COLUMNS = geo.cols;
-    const plan = planSheet(cells, g, true);
-    const out = { lines: [], heads: [], essays: [], left: [] };
-    let vE = 239 - bandFor(written);
-    (written || []).filter(w => w.essay).forEach(w => { out.essays.push({ no: w.no, lines: w.lines, v: vE }); vE += essayHeight(w.lines); });
-    const labels = [];
-    (written || []).forEach(w => { if (!w.essay) for (let k = 0; k < w.lines; k++) labels.push(String(w.no + k)); });
-    if (!labels.length) return out;
-    if (!plan.ok) { out.left = labels; return out; }
-    let { ci, y } = plan.end;
-    let v = ci < COLUMNS.length ? COLUMNS[ci].top + (y === null ? -3 : y + ANS.pitch + 0.5) : 0;
-    let first = true;
-    const bottom = geo.limit + 2.3;
-    for (let k = 0; k < labels.length; k++) {
-        if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
-        if (v + (first ? WRITE.head : 0) + WRITE.pitch > bottom + 2) {
-            ci++;
-            if (ci >= COLUMNS.length) { out.left = labels.slice(k); break; }
-            v = COLUMNS[ci].top - 3; first = true;
-        }
-        const u0 = ANS.left + ci * ANS.blockW;
-        if (first) { out.heads.push({ u0, v, cont: out.heads.length > 0 }); v += WRITE.head; first = false; }
-        v += WRITE.pitch;
-        out.lines.push({ u0, v, label: labels[k] });
-    }
-    return out;
-};
-
 // Capacity check used by the scanner setup: do the answer rows (and the written answers) fit on one sheet?
-export const sheetFits = (cells, g = 0, written = null) => {
-    if (!planSheet(cells, g, true).ok) return false;
-    return !(written && written.length) || planWritten(cells, written, g).left.length === 0;
-};
+export const sheetFits = (cells, g = 0) => planSheet(cells, g, true).ok;
 
 // One entry per answer row: where each choice bubble is. answerRows(n, c, g) = n rows of c choices (plain multiple
 // choice); answerRows(cells, g) = the rows of a mixed-type sheet.
@@ -229,7 +211,7 @@ const noteOf = (multi, cells) => {
 
 export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qParts = null, sets = 0, multi = false, cells: given = null, written = null }) => {
     const p = PAPERS[paper] || PAPERS.letter;
-    const g = { sets, band: given ? bandFor(written) : 0 };
+    const g = { sets, band: given ? bandFor(written) : 0, written: given ? shortWritten(written) : [] };
     const geo = geoOf(g, Boolean(given));
     const compact = geo.compact;
     const left = (p.w - FRAME.w) / 2;
@@ -284,32 +266,32 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
         labels.forEach((t, k) => parts.push(textHtml(u0 + ANS.firstK + k * ANS.kPitch - 3, COLUMNS[b].top - LETTER_GAP, 6, t, 'cap center')));
     });
     plan.headers.forEach(h => h.labels.forEach((t, k) => parts.push(textHtml(h.u0 + ANS.firstK + k * ANS.kPitch - 3, h.v - 1.3, 6, t, 'cap center hd'))));
-    const showParts = new Set(cells.map(c => c[4])).size > 1;
+    const showParts = new Set([...cells.map(c => Number(c[4]) || 0), ...g.written.map(w => w.part)]).size > 1;
     plan.rows.forEach(r => {
         const c = r.cell;
-        const first = r.q === 0 || cells[r.q - 1][4] !== c[4];
-        if (showParts && first) parts.push(textHtml(r.u0, r.v - 4.3, 10, 'PART ' + (Number(c[4]) + 1), 'part'));
+        if (showParts && r.partFirst) parts.push(textHtml(r.u0 + (r.u0 > ANS.left + 1 ? 2.5 : 0), r.v - 4.3, 10, 'PART ' + (Number(c[4]) + 1), 'part'));
         parts.push(textHtml(r.u0 - 3, r.v - 1.6, 12, r.text, 'num right'));
         r.bubbles.forEach(bb => parts.push(bubbleHtml(bb.u, bb.v)));
     });
     if (!plan.ok) parts.push(textHtml(52, 30, 120, 'This exam has too many answer rows for one sheet.', 'note'));
 
-    // Written answers, on this page: short lines (identification, enumeration) after the bubbles, essays across the bottom
-    if (given && written && written.length && plan.ok) {
-        const w = planWritten(cells, written, g);
+    // Written answers: numbered lines between the bubble rows (same order as the exam), essays in the bottom band
+    if (given && plan.ok) {
         const lineW = 4 * ANS.kPitch + BUBBLE_D;       // as long as one row of 5 bubbles
-        w.heads.forEach(h => parts.push(textHtml(h.u0 + 1, h.v, ANS.blockW - 2, h.cont ? 'WRITTEN ANSWERS (cont.)' : 'WRITTEN ANSWERS', 'cap small')));
-        w.lines.forEach(l => {
-            parts.push(textHtml(l.u0 - 3, l.v - 3.4, 12, escapeHtml(l.label), 'num right'));
-            parts.push(`<div class="wl" style="left:${mm(l.u0 + ANS.firstK - BUBBLE_D / 2)};top:${mm(l.v)};width:${mm(lineW)}"></div>`);
+        plan.wrows.forEach(l => {
+            if (showParts && l.partFirst) parts.push(textHtml(l.u0 + (l.u0 > ANS.left + 1 ? 2.5 : 0), l.v - 4.3, 10, 'PART ' + (l.part + 1), 'part'));
+            parts.push(textHtml(l.u0 - 3, l.v + 2.3 - 3.2, 12, String(l.no), 'num right'));
+            parts.push(`<div class="wl" style="left:${mm(l.u0 + ANS.firstK - BUBBLE_D / 2)};top:${mm(l.v + 2.3)};width:${mm(lineW)}"></div>`);
         });
-        w.essays.forEach(e => {
-            parts.push(textHtml(9, e.v, 100, `ESSAY ${e.no}`, 'cap small'));
-            for (let k = 0; k < e.lines; k++) {
-                const lv = e.v + 4 + (k + 1) * ESSAY_MM;
-                if (k === 0) parts.push(textHtml(9, lv - 3.4, 10, `${e.no}.`, 'num'));
+        let vE = ESSAY_BOTTOM - bandFor(written);
+        (written || []).filter(w => w.essay).forEach(w => {
+            parts.push(textHtml(9, vE, 100, `ESSAY ${w.no}`, 'cap small'));
+            for (let k = 0; k < w.lines; k++) {
+                const lv = vE + 4 + (k + 1) * ESSAY_MM;
+                if (k === 0) parts.push(textHtml(9, lv - 3.4, 10, `${w.no}.`, 'num'));
                 parts.push(`<div class="wl" style="left:${mm(9)};top:${mm(lv)};width:${mm(162)}"></div>`);
             }
+            vE += essayHeight(w.lines);
         });
     }
 
