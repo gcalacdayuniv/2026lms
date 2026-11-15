@@ -89,7 +89,7 @@ export const ExamBuilder = {
         if (saved) {
             try {
                 const d = JSON.parse(saved);
-                if (d && Array.isArray(d.questions) && d.questions.length && window.confirm('You have an unsaved draft of this exam on this device. Restore it?')) {
+                if (d && Array.isArray(d.questions) && d.questions.length && await UI.confirm({ title: 'Restore draft', message: 'You have an unsaved draft of this exam on this device. Restore it?', confirmText: 'Restore' })) {
                     s.title = d.title || s.title;
                     s.questions = d.questions;
                     s.dirty = true;
@@ -104,9 +104,9 @@ export const ExamBuilder = {
         ExamBuilder.renderBody();
     },
 
-    close: (force = false) => {
+    close: async (force = false) => {
         const s = ExamBuilder.s;
-        if (!force && s && s.dirty && !window.confirm('Close without saving? Your changes stay as a draft on this device.')) return;
+        if (!force && s && s.dirty && !(await UI.confirm({ title: 'Close without saving?', message: 'Your changes stay as a draft on this device.', confirmText: 'Close' }))) return;
         ExamBuilder.cancelChunks();
         ExamBuilder.flushDraft();
         if (ExamBuilder.root) ExamBuilder.root.classList.add('hidden');
@@ -645,7 +645,7 @@ export const ExamBuilder = {
             const act = actBtn.dataset.act;
             if (act === 'del') {
                 const hasContent = q.text.trim() || q.answer.trim() || q.options.some(o => o.trim()) || q.items.some(o => o.trim()) || q.pairs.some(p => p.l.trim() || p.r.trim());
-                if (hasContent && !window.confirm(`Delete question ${i + 1}?`)) return;
+                if (hasContent && !(await UI.confirm({ title: 'Delete question', message: `Delete question ${i + 1}?`, confirmText: 'Delete', danger: true }))) return;
                 ExamBuilder.finishRender();
                 s.questions.splice(i, 1);
                 ExamBuilder.touch();

@@ -283,3 +283,7 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 ## Boxed questions on the printed sheet
 - Mixed / multi-set sheets: every question (every number) is drawn in a thin dashed grey box, number on the left, always the width of 5 bubbles; the letters/numbers (A-E, 1-5, T F ...) printed above the first row of a stack of questions are inside the first box. A question with more than 5 choices has one box around all its rows (A-E, F-J, K-O ...); digit grids of numeric answers are boxed row by row and each numeric item is kept together in one column when it fits. Rows and label rows are a little further apart (about 6.8 mm), so a sheet holds slightly fewer rows than before.
 - Plain multiple-choice sheets with at most 1 set keep the old geometry (no boxes) so old printed stock still scans. Reprint mixed / multi-set sheets.
+
+## Compact choice guides + mobile delete
+- `js/omr-sheet.js`: smaller A–E / 1–5 / T/F guide letters, tighter bubble row pitch and boxes on compact sheets (mixed or multi-set). Printing, scanner, overlay and review crops share `planSheet`, so they follow automatically. **Reprint** mixed / multi-set sheets. Plain legacy sheets unchanged.
+- `js/exam-builder.js`: delete / restore-draft / close-without-saving now use the in-app `UI.confirm` modal (native `confirm` is blocked on mobile).

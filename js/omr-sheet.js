@@ -30,7 +30,7 @@ const COLUMNS = [
 ];
 const LETTER_GAP = 7;
 const WRITE = { pitch: 8.7 };   // distance to a line for a written answer (identification / enumeration)
-const CPITCH = 6.8, CHDR_A = 6.0, CHDR_B = 4.8;   // compact sheets: every question sits in a box, so rows and label rows are a little further apart
+const CPITCH = 6.1, CHDR_A = 5.3, CHDR_B = 4.4;   // compact sheets: every question sits in a box, so rows and label rows are a little further apart
 const HDR_A = 4.0, HDR_B = 3.9;   // label row squeezed between two answer rows: distance below the row above / above the row below   // letters A-E are printed this far above the first row of a column
 
 // SET row (which printed exam set the student has): up to 6 circles A-F, printed only for exams with sets.
@@ -147,9 +147,9 @@ export const planSheet = (cells, g = 0, strict = true) => {
         const cell = sl.w ? ['w', 0, sl.no, 0, sl.part, ''] : cells[sl.cell];
         const fam = sl.w ? 'W' : famOf(cell[0], sl.block);
         if (ci >= COLUMNS.length) break;
-        let yHdr = null, y = yPrev === null ? 0 : yPrev + (sl.w ? WRITE.pitch : lastW ? 6.6 : PITCH);
+        let yHdr = null, y = yPrev === null ? 0 : yPrev + (sl.w ? WRITE.pitch : lastW ? 6.0 : PITCH);
         const sig = `${cell[4] || 0}|${cell[0]}${sizes.get(cell[2]) > 1 ? 'G' : 'S'}`;
-        if (yPrev !== null && !sl.w && (fam !== last || (strict && sig !== lastSig))) { yHdr = yPrev + (lastW ? 5.5 : HA); y = yHdr + HB; }
+        if (yPrev !== null && !sl.w && (fam !== last || (strict && sig !== lastSig))) { yHdr = yPrev + (lastW ? 5.0 : HA); y = yHdr + HB; }
         // (compact sheets) the rows of one boxed question stay together in one column
         let need = geo.compact && !sl.w && sl.block === 0 && !['x', 'd'].includes(cell[0]) && cell[1] > 5 ? (Math.ceil(cell[1] / 5) - 1) * (HA + HB) : 0;
         const run = !sl.w && ['s', 'd', 'x'].includes(cell[0]) ? runOf.get(cell[2]) : null;
@@ -169,7 +169,7 @@ export const planSheet = (cells, g = 0, strict = true) => {
         if (sl.w || sl.block === 0) prevPart = Number(cell[4]) || 0;
         if (sl.w) { wrows.push({ no: sl.no, part: sl.part, u0, v: COLUMNS[ci].top + y, partFirst: newPart }); yPrev = y; continue; }
         const v = COLUMNS[ci].top + y;
-        if (yHdr !== null) hdrAt.set(`${u0}|${v.toFixed(2)}`, COLUMNS[ci].top + yHdr - 2.3);
+        if (yHdr !== null) hdrAt.set(`${u0}|${v.toFixed(2)}`, COLUMNS[ci].top + yHdr - 2.0);
         else if (yPrev === null) hdrAt.set(`${u0}|${v.toFixed(2)}`, COLUMNS[ci].top - LETTER_GAP - 1.0);
         const r = rows[sl.cell];
         if (sl.block === 0) {
@@ -287,7 +287,7 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
         const u0 = ANS.left + b * ANS.blockW;
         labels.forEach((t, k) => parts.push(textHtml(u0 + ANS.firstK + k * ANS.kPitch - 3, COLUMNS[b].top - LETTER_GAP, 6, t, 'cap center')));
     });
-    plan.headers.forEach(h => h.labels.forEach((t, k) => parts.push(textHtml(h.u0 + ANS.firstK + k * ANS.kPitch - 3, h.v - 1.3, 6, t, 'cap center hd'))));
+    plan.headers.forEach(h => h.labels.forEach((t, k) => parts.push(textHtml(h.u0 + ANS.firstK + k * ANS.kPitch - 3, h.v - 1.1, 6, t, 'cap center hd'))));
     const showParts = new Set([...cells.map(c => Number(c[4]) || 0), ...g.written.map(w => w.part)]).size > 1;
     plan.rows.forEach(r => {
         const c = r.cell;
@@ -314,7 +314,7 @@ export const buildSheetHtml = ({ title = '', n, c, paper = 'letter', parts: qPar
                 const vmin = Math.min(...vs);
                 const col = Math.floor((Math.min(...us) - ANS.left) / ANS.blockW);
                 const hv = plan.hdrAt.get(`${ANS.left + col * ANS.blockW}|${vmin.toFixed(2)}`);
-                const top = hv !== undefined ? hv : vmin - 3.0, bottom = Math.max(...vs) + 3.0, left = ANS.left + col * ANS.blockW + 7.0, right = ANS.left + col * ANS.blockW + ANS.firstK + 4 * ANS.kPitch + 3.2;   // always the width of 5 bubbles
+                const top = hv !== undefined ? hv : vmin - 2.85, bottom = Math.max(...vs) + 2.85, left = ANS.left + col * ANS.blockW + 7.0, right = ANS.left + col * ANS.blockW + ANS.firstK + 4 * ANS.kPitch + 3.2;   // always the width of 5 bubbles
                 parts.push(`<div class="bx" style="left:${mm(left)};top:${mm(top)};width:${mm(right - left)};height:${mm(bottom - top)}"></div>`);
             });
         }
@@ -356,9 +356,9 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-s
 .hl { position: absolute; display: flex; align-items: flex-end; gap: 1.6mm; font-size: 3.2mm; line-height: 3.6mm; white-space: nowrap; }
 .ul { display: block; height: 3.6mm; border-bottom: 0.3mm solid #000; }
 .note { font-size: 2.5mm; line-height: 3mm; color: #222; }
-.cap { font-size: 2.8mm; font-weight: bold; }
+.cap { font-size: 2.2mm; font-weight: bold; }
 .small { font-size: 2.2mm; white-space: nowrap; }
-.hd { font-size: 2.3mm; line-height: 2.6mm; }
+.hd { font-size: 2.0mm; line-height: 2.2mm; }
 .bx { position: absolute; border: 0.3mm dashed #777; border-radius: 1.2mm; }
 .wl { position: absolute; border-top: 0.3mm solid #000; height: 0; }
 .num { font-size: 2.6mm; }
