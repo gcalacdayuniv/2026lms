@@ -262,3 +262,6 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - Record Scores is a toolbar button (before Import / Export) that opens the class-link panel; it shows "ON" when linked. Template button removed (Export CSV gives the columns).
 - Spreadsheet help text removed.
 - The + button opens a speed-dial list above it (Shaded on the sheet / Written by hand) instead of a modal.
+
+## Scanner setup "Print answer sheet" fix
+- The print button in the scanner setup now prints the same mixed-type sheet (cells + written lines + essay band) that the scanner reads, instead of a plain multiple-choice sheet.

@@ -280,7 +280,7 @@ export const CourseScanner = {
                 cfg = {
                     mode: 'exam', mixed: true, examId: exam.Exam_ID, title: String(exam.Title || '').trim(),
                     n: built.cells.length, c: Math.max(2, ...built.cells.map(c => c[1])), key: gsets[0].key, bonus: gsets[0].bonus,
-                    cells: built.cells, geo: geoFor(setCount0, built), sets: gsets, multiSet: setCount0 > 1, maxRegular, manual: built.manual, skipped: 0
+                    cells: built.cells, geo: geoFor(setCount0, built), written: writtenItems(built), sets: gsets, multiSet: setCount0 > 1, maxRegular, manual: built.manual, skipped: 0
                 };
             }
         }
@@ -432,14 +432,16 @@ export const CourseScanner = {
         if (header === null) return;
         try { localStorage.setItem('omr_sheet_header', header); } catch (e) { /* storage unavailable */ }
 
-        const html = buildSheetHtml({
-            title: header,
-            n: cfg.n,
-            c: cfg.c,
-            paper: val('scnPaper') || 'letter',
-            parts: cfg.parts || null,
-            sets: cfg.sets ? cfg.sets.length : 0
-        });
+        const html = buildSheetHtml(cfg.mixed
+            ? { title: header, cells: cfg.cells, paper: val('scnPaper') || 'letter', sets: cfg.sets && cfg.sets.length > 1 ? cfg.sets.length : 0, written: cfg.written || [] }
+            : {
+                title: header,
+                n: cfg.n,
+                c: cfg.c,
+                paper: val('scnPaper') || 'letter',
+                parts: cfg.parts || null,
+                sets: cfg.sets ? cfg.sets.length : 0
+            });
         showPrintPreview(html.replace(/<script>[\s\S]*?<\/script>/g, ''), `Answer sheet - ${header || cfg.title || ''}`);
     },
 
