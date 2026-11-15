@@ -27,7 +27,7 @@ const bodyOf = (it) => {
         case 'num': return '<div class="hint">Shade the sign, the decimal places and every digit of your answer on the answer sheet.</div>';
         default:
             // handwritten: the answer goes on the written-answers page of the answer sheet
-            return `<div class="hint">${it.type === 'enum' ? `List ${it.span} item${it.span === 1 ? '' : 's'}. ` : ''}Write your answer${it.span > 1 ? 's' : ''} on the written-answers page of the answer sheet, number${it.span > 1 ? 's' : ''} ${itemLabel(it)}.</div>`;
+            return `<div class="hint">${it.type === 'enum' ? `List ${it.span} item${it.span === 1 ? '' : 's'}. ` : ''}Write your answer${it.span > 1 ? 's' : ''} in the written answers area of the answer sheet, number${it.span > 1 ? 's' : ''} ${itemLabel(it)}.</div>`;
     }
 };
 

@@ -12,7 +12,7 @@ import { ScanQueue } from './course-scan-queue.js';
 import { ScanPhotos } from './course-scan-photos.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
 import { scannableItems, buildSets } from './exam-sets.js';
-import { buildScanSets, gradingSets, itemLabel } from './scan-items.js';
+import { buildScanSets, gradingSets, itemLabel, geoFor, writtenItems } from './scan-items.js';
 import { gradeScanSet, setMaxPoints } from './scan-grade.js';
 import { questionPoints } from './grading.js';
 import { sheetFits } from './omr-sheet.js';
@@ -273,14 +273,14 @@ export const CourseScanner = {
             if (built.sets[0] && built.sets[0].items.some(i => i.t !== 'mc')) {
                 // Mixed question types: one sheet layout, per-set items, graded like an online exam.
                 if (!built.cells.length) return { ok: false, error: 'This exam has no question that an answer sheet can hold.' };
-                if (!sheetFits(built.cells, setCount0)) return { ok: false, error: 'This exam needs more answer rows than one sheet holds. Remove some questions or split the exam.' };
+                if (!sheetFits(built.cells, geoFor(setCount0, built), writtenItems(built))) return { ok: false, error: 'This exam needs more answer rows than one sheet holds. Remove some questions or split the exam.' };
                 const gsets = gradingSets(built);
                 const maxRegular = setMaxPoints(gsets[0]);
                 if (!(maxRegular > 0)) return { ok: false, error: 'Every question in this exam is a bonus question.' };
                 cfg = {
                     mode: 'exam', mixed: true, examId: exam.Exam_ID, title: String(exam.Title || '').trim(),
                     n: built.cells.length, c: Math.max(2, ...built.cells.map(c => c[1])), key: gsets[0].key, bonus: gsets[0].bonus,
-                    cells: built.cells, sets: gsets, multiSet: setCount0 > 1, maxRegular, manual: built.manual, skipped: 0
+                    cells: built.cells, geo: geoFor(setCount0, built), sets: gsets, multiSet: setCount0 > 1, maxRegular, manual: built.manual, skipped: 0
                 };
             }
         }
@@ -500,7 +500,7 @@ export const CourseScanner = {
 
     buildRow: async (file) => {
         const cfg = CourseScanner.cfg;
-        const result = await scanImage(file, cfg.cells || cfg.n, cfg.c, cfg.sets ? cfg.sets.length : 0);
+        const result = await scanImage(file, cfg.cells || cfg.n, cfg.c, cfg.geo || (cfg.sets ? cfg.sets.length : 0));
         return CourseScanner.rowFromResult(file.name || 'Photo', result);
     },
 
@@ -825,7 +825,7 @@ export const CourseScanner = {
 
         try {
             const video = $('scnLiveVideo');
-            const result = scanSource(video, video.videoWidth, video.videoHeight, cfg.cells || cfg.n, cfg.c, cfg.sets ? cfg.sets.length : 0);
+            const result = scanSource(video, video.videoWidth, video.videoHeight, cfg.cells || cfg.n, cfg.c, cfg.geo || (cfg.sets ? cfg.sets.length : 0));
             if (!result.ok) {
                 result.canvas.width = 0;
                 live.steady = 0;

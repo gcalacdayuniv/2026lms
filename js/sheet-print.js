@@ -2,7 +2,7 @@
 // Printing helpers shared by Manage Exams (print dialog) and the scanner (typed key): the answer-sheet header
 // question, the number of printed sets remembered per exam, and the bubble answer sheet of an exam.
 import { escapeHtml as esc } from './html-utils.js';
-import { writtenItems } from './scan-items.js';
+import { writtenItems, geoFor } from './scan-items.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES, sheetFits } from './omr-sheet.js';
 import { buildScanSets } from './scan-items.js';
 import { scannableItems } from './exam-sets.js';
@@ -74,7 +74,7 @@ export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'letter' } 
     const items = scannableItems(exam.ExamData, MAX_CHOICES);
     if (!mixed && !items.length) return 'This exam has no question that an answer sheet can hold.';
     if (mixed && !built.cells.length) return 'This exam has no question that an answer sheet can hold.';
-    if (mixed && !sheetFits(built.cells, sets)) return 'This exam needs more answer rows than one sheet holds.';
+    if (mixed && !sheetFits(built.cells, geoFor(sets, built), writtenItems(built))) return 'This exam needs more answer rows than one sheet holds.';
     if (!mixed && items.length > MAX_QUESTIONS) return `The sheet holds up to ${MAX_QUESTIONS} questions; this exam has ${items.length}.`;
     const header = await askSheetHeader();
     if (header === null) return '';

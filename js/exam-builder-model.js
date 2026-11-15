@@ -10,7 +10,8 @@
 //           match = array of [left, right] pairs
 //   ordered: enumeration only. The order of the items matters.
 //   meta (optional object): points (number), mode ('all' = all or nothing, for multi and order),
-//           tol (number, numeric tolerance), extra (array, wrong right-hand choices of a matching question)
+//           tol (number, numeric tolerance), extra (array, wrong right-hand choices of a matching question),
+//           lines (6 = long essay answer space on the answer sheet; otherwise 3)
 //   Several accepted answers of an identification question, or of one enumeration item, are written
 //   "CPU / Central Processing Unit" (space, slash, space).
 //
@@ -74,6 +75,7 @@ export const blankQuestion = (type = 'mc', part = 0) => ({
     pairs: type === 'match' ? [{ l: '', r: '' }, { l: '', r: '' }, { l: '', r: '' }] : [],   // matching
     extra: [],            // matching: wrong choices on the right-hand side
     mode: 'partial',      // multiple answer / ordering: 'partial' credit or 'all' or nothing
+    long: false,          // essay: long answer space on the answer sheet (6 lines instead of 3)
     points: '',           // '' = the default of the type
     expl: '',
     bonus: false
@@ -155,7 +157,7 @@ export const fromRow = (row) => {
         return make('num', { answer: String(rawAnswer ?? ''), tol: meta.tol !== undefined && meta.tol !== null ? String(meta.tol) : '' });
     }
     if (saved === 'essay') {
-        return make('essay', { answer: String(rawAnswer ?? '') });
+        return make('essay', { answer: String(rawAnswer ?? ''), long: Number(meta.lines) >= 6 });
     }
     if (saved === 'enum' || (!saved && Array.isArray(rawAnswer))) {
         const items = (Array.isArray(rawAnswer) ? rawAnswer : String(rawAnswer ?? '').split('|')).map(i => String(i ?? '').trim());
@@ -199,7 +201,10 @@ export const toRow = (q) => {
         const n = parseNumber(q.answer);
         return done([], n === null ? q.answer.trim() : String(n));
     }
-    if (q.type === 'essay') return done([], q.answer.trim());
+    if (q.type === 'essay') {
+        if (q.long) meta.lines = 6;
+        return done([], q.answer.trim());
+    }
     if (q.type === 'order') {
         if (q.mode === 'all') meta.mode = 'all';
         return done([], filled(q.items));

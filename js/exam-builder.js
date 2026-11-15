@@ -400,6 +400,8 @@ export const ExamBuilder = {
                 <div class="mt-3">
                     <p class="text-[11px] font-bold text-gray-500 uppercase">Model answer or rubric <span class="normal-case font-normal">- only you see this. You score essays by hand in Grade Essays.</span></p>
                     <textarea rows="3" class="eb-field w-full border border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none rounded-md px-2 py-2 text-sm bg-gray-50 focus:bg-white mt-1" data-col="answer" placeholder="Key points a good answer should include" aria-label="Model answer or rubric">${esc(q.answer)}</textarea>
+                    <label class="block text-[11px] font-bold text-gray-500 uppercase mt-3" for="ebLong-${q.id}">Writing space on the printed answer sheet</label>
+                    <select id="ebLong-${q.id}" class="eb-long mt-1 w-full sm:w-auto border border-gray-300 rounded-md px-2 py-2 text-sm bg-white"><option value="short" ${q.long ? '' : 'selected'}>Short: 3 lines</option><option value="long" ${q.long ? 'selected' : ''}>Long: 6 lines</option></select>
                 </div>`;
         } else {
             answerArea = `
@@ -740,6 +742,11 @@ export const ExamBuilder = {
             q.corrects = t.checked ? [...new Set([...q.corrects, k])] : q.corrects.filter(c => c !== k);
             ExamBuilder.touch();
             ExamBuilder.refreshCard(q.id);
+            return;
+        }
+        if (t.classList.contains('eb-long')) {
+            q.long = t.value === 'long';
+            ExamBuilder.touch();
             return;
         }
         if (t.classList.contains('eb-mode')) {

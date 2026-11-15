@@ -10,7 +10,7 @@ import { PhotoCache, ScanPhotos } from './course-scan-photos.js';
 import { answerRows } from './omr-sheet.js';
 import { gradeScanSet } from './scan-grade.js';
 import { questionPoints } from './grading.js';
-import { cellLabels, cellName, codeText, itemLabel } from './scan-items.js';
+import { cellLabels, cellName, codeText, itemLabel, geoFor, writtenItems } from './scan-items.js';
 import { cropBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
 const LETTERS = 'ABCDE';
@@ -74,7 +74,8 @@ export const CourseScanReview = {
         CourseScanReview.markDrafts = {};
         CourseScanReview.onChange = onChange || null;
         const { session } = detail;
-        const nSets = (session.Set_Keys || []).length;
+        const sk0 = (session.Set_Keys || [])[0];
+        const nSets = session.Layout && sk0 && sk0.items ? geoFor((session.Set_Keys || []).length, sk0.items) : (session.Set_Keys || []).length;
         CourseScanReview.rows = session.Layout ? answerRows(session.Layout, nSets) : answerRows(session.Num_Questions, session.Num_Choices, nSets);
         PhotoCache.purge().catch(() => {});
 

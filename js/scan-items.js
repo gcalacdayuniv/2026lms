@@ -10,6 +10,7 @@
 //   tag = short text for the row label of numeric items
 // Every set has the SAME cells (one printed sheet fits all sets): other sets only swap questions that have the same shape.
 import { multiCode } from './scan-codes.js';
+import { bandFor } from './omr-sheet.js';
 
 export const MAX_SETS = 6;
 export const SET_LETTERS = 'ABCDEF';
@@ -238,20 +239,25 @@ export const buildScanSets = (examData, { seed = 'exam', count = 4 } = {}) => {
 
 const maskIdx = (code) => { const out = []; for (let k = 0; k < 10; k++) if ((code - 1000) & (1 << k)) out.push(k); return out; };
 
-// Written answers: lines each item needs on the written-answers page. An essay gets room for a paragraph
-// (2 lines per point, 6 to 16); identification one line; enumeration (and any other unshaded item) one line per number.
+// Written answers go on the bubble page: identification / enumeration get one short line per number, an essay a block
+// of full-width lines (short 3, long 6). It reads both the freshly built items and the items stored with a session.
 export const writtenLines = (it) => {
-    if (it.type === 'essay') {
-        const pts = Number(metaOf(it.row).points) || 5;
-        return Math.max(6, Math.min(16, Math.round(pts * 2)));
-    }
-    return it.span > 1 ? it.span : 1;
+    const row = it.row || [];
+    const type = it.type || rowType(row);
+    if (type === 'essay') return Number(metaOf(row).lines) >= 6 ? 6 : 3;
+    const span = Number(it.span ?? it.sp) || 1;
+    return span > 1 ? span : 1;
 };
-// Everything the scanner cannot read, in question order: [{ no, span, type, lines }].
-export const writtenItems = (built) => {
-    const first = built.sets[0] ? built.sets[0].items : [];
-    return first.filter(it => it.t === 'manual').map(it => ({ no: it.no, span: it.span, type: it.type, lines: writtenLines(it), essay: it.type === 'essay' }));
+// Everything the scanner cannot read, in question order: [{ no, span, type, lines, essay }].
+export const writtenItems = (src) => {
+    const items = Array.isArray(src) ? src : (src.sets[0] ? src.sets[0].items : []);
+    return items.filter(it => it.t === 'manual').map(it => {
+        const type = it.type || rowType(it.row || []);
+        return { no: it.no, span: Number(it.span ?? it.sp) || 1, type, lines: writtenLines(it), essay: type === 'essay' };
+    });
 };
+// What the sheet layout depends on besides the cells: the number of sets and the height of the essay band.
+export const geoFor = (sets, src) => ({ sets: sets > 1 ? sets : 0, band: bandFor(writtenItems(src)) });
 
 // What gets stored with a session and sent to the Worker for grading: per set only what grading needs.
 export const gradingSets = (built) => built.sets.map(set => ({
