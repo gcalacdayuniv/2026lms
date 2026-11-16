@@ -142,7 +142,7 @@ export const alignRows = (bitmap, rows) => {
             const results = g.lines.map(l => ({ l, f: found(l, pred - 2.5, pred + 2.5) }));
             const good = results.filter(x => x.f && x.f.r > 0.5).map(x => x.f.s).sort((x, y) => x - y);
             const med = good.length ? good[Math.floor(good.length / 2)] : pred;
-            const dy = Math.abs(med - pred) <= 1 ? pred : med;   // a shift of 1 unit or less is noise: the cut has more room than that
+            const dy = Math.abs(med - pred) <= 0.75 ? pred : med;   // a shift of under 1 unit is noise: the cut has more room than that
             results.forEach(({ l }) => map.set(alignKey(l.v, Math.min(...l.us)), dy));
             prev2 = prev; prev = { v: g.v, dy };
         }
@@ -163,7 +163,7 @@ export const cropBoxes = (row, align = null) => {
     const left = Math.max(0, row.u0 - 0.5);
     return rows.map((r, i) => {
         const dy = align && align.has(alignKey(r.v, r.first)) ? align.get(alignKey(r.v, r.first)) : 0;
-        const top = Math.max(0, r.v + dy - (i === 0 && rows.length === 1 ? 3.1 : 5.6)), bottom = Math.min(FRAME.h + RECT_EXTRA, r.v + dy + 3.1);
+        const top = Math.max(0, r.v + dy - (i === 0 && rows.length === 1 ? 3.1 : 6.0)), bottom = Math.min(FRAME.h + RECT_EXTRA, r.v + dy + (rows.length === 1 ? 3.1 : 3.3));
         return { x: left * RECT_SCALE, y: top * RECT_SCALE, w: (right - left) * RECT_SCALE, h: (bottom - top) * RECT_SCALE };
     });
 };

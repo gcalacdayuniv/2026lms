@@ -353,5 +353,5 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 
 ## Review Crop Alignment
 - The scan review cuts each question out of the straightened photo. When the sheet in the photo is a little stretched or bent, a fixed cut slid onto the neighbouring question (wrong item number, cut circles).
-- `alignRows` (`js/omr-crop.js`) now finds every row of circles in the photo by matching the ring pattern, top to bottom (each row is searched close to where the rows above were found, so drift builds up gradually and never jumps to the next row), and `cropBoxes(row, align)` cuts at the found position. Shifts of 1 unit or less are ignored; if nothing matches, the planned position is used.
+- `alignRows` (`js/omr-crop.js`) now finds every row of circles in the photo by matching the ring pattern, top to bottom (each row is searched close to where the rows above were found, so drift builds up gradually and never jumps to the next row), and `cropBoxes(row, align)` cuts at the found position. Shifts under 1 unit are ignored; questions with 2 or 3 rows of choices (A-J, A-O) are cut per row with a slightly taller margin; if nothing matches, the planned position is used.
 - Used in `js/course-scan-review.js` when a photo is opened. Written-answer and essay crops still use the planned positions.
