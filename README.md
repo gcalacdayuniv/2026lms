@@ -335,3 +335,23 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - **Offline banner:** when offline and work is waiting on the device, the banner shows "N unsaved on this device - tap to view" and opens the Unsaved on Device list (`unsaved-count` event from `UnsavedCenter.updateBadge`).
 - **Tap targets:** on touch screens, small icon buttons (w/h 6-8, page close buttons, check/wrong buttons) get an invisible 44px tap area (`styles.css`, `@media (pointer: coarse)`).
 - **Empty state:** a class with no students shows an icon, a hint and an "Add students" button (`.open-add-student`).
+
+## Attendance, Terms and Year Advance Upgrades
+- **Save All (N):** the button shows how many students differ from what is saved (`CourseAttendance.dirtyCount`).
+- **Undo Mark All Present:** after Mark All Present saves, a toast with an Undo button (7 s) restores the earlier marks and saves them (`CourseAttendance.restoreSnapshot`, `UI.undo`; `UI.toast` accepts an action button).
+- **Per-class view:** each class remembers its sort (`student_sort_<courseId>`) and filter (`roster_filter_<courseId>`) on this device; swipe-to-mark on phones was already in `js/course-swipe.js`.
+- **Course list by term:** a Term select (Current term / All terms / one term) appears once a class has a term; All terms groups the cards under term headings, newest first. Classes without a term count as current. Current term: Aug-Dec = 1st semester, Jan-May = 2nd, Jun-Jul = Summer.
+- **Create Course** opens with the current Academic Year and Semester prefilled.
+- **Copy to another term** (`js/duplicate-course.js`, `POST /api/duplicate-course`, owner only): copies details, schedule, room, target and the exams (switched off, dates cleared). No students, attendance or scores. Next term is suggested (1st -> 2nd, else 1st of next year).
+- **Advance Year Level:** the preview now lists who will advance, who is graduating and who has no year. Optional checkbox marks graduating (Active) students **Graduated** (they cannot sign in; `Graduated` was added to the status lists); Undo restores their status (`Year_Advance_Log.Old_Status/New_Status`).
+
+## Reactivation After Advancing
+- Advance Year Level sets every advanced **Active** student to **Inactive** (other statuses are left alone) and records `Users.Advanced_Term` (the new academic year) and an optional `Users.Reactivation_Until` date (field in the Advance dialog). Only Active accounts can sign in; every other status is refused at login.
+- A student reactivates in one of three ways: a lecturer sets the status to Active (clears the markers); a lecturer enrolls them in a class whose Academic Year is the term they were advanced into, or the current term by date (`POST /api/enroll` returns `reactivated: true`); or the student taps **Request reactivation** on the login screen (password already verified, allowed only until `Reactivation_Until` when set) which stamps `Users.Reactivation_Requested`.
+- Lecturers see a **Reactivation requested** badge on the student's row (class student list and the user list).
+- Undo last advance restores statuses and clears the markers. Columns are added automatically (`ensureReactivationColumns`). `apiFetch` errors now carry the server payload as `err.data`.
+
+## Review Crop Alignment
+- The scan review cuts each question out of the straightened photo. When the sheet in the photo is a little stretched or bent, a fixed cut slid onto the neighbouring question (wrong item number, cut circles).
+- `alignRows` (`js/omr-crop.js`) now finds every row of circles in the photo by matching the ring pattern, top to bottom (each row is searched close to where the rows above were found, so drift builds up gradually and never jumps to the next row), and `cropBoxes(row, align)` cuts at the found position. Shifts of 1 unit or less are ignored; if nothing matches, the planned position is used.
+- Used in `js/course-scan-review.js` when a photo is opened. Written-answer and essay crops still use the planned positions.

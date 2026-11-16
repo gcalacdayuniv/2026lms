@@ -400,6 +400,7 @@ const ClassUI = {
                             <option value="Suspended">Suspended</option>
                             <option value="UD">UD</option>
                             <option value="Dropped">Dropped</option>
+                            <option value="Graduated">Graduated</option>
                         </select>
                     </div>
 
@@ -627,6 +628,7 @@ const ClassUI = {
                             <option value="Suspended">Suspended</option>
                             <option value="UD">UD</option>
                             <option value="Dropped">Dropped</option>
+                            <option value="Graduated">Graduated</option>
                         </select>
                         <select id="enrollSort" aria-label="Sort students" class="w-full sm:w-40 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
                             ${[['', 'Default order'], ['name', 'Sort: Name (A-Z)'], ['number', 'Sort: Student number']].map(([v, l]) => `<option value="${v}"${v === savedStudentSort() ? ' selected' : ''}>${l}</option>`).join('')}
@@ -748,7 +750,8 @@ const ClassUI = {
 };
 
 // The chosen student sort (''=default, 'name', 'number') is remembered on this device.
-const savedStudentSort = () => { try { return localStorage.getItem('student_sort') || ''; } catch (e) { return ''; } };
+// Each class remembers its own sort; a class never sorted yet uses the last one chosen anywhere.
+const savedStudentSort = (courseId) => { try { return localStorage.getItem(`student_sort_${courseId}`) ?? localStorage.getItem('student_sort') ?? ''; } catch (e) { return ''; } };
 
 export const ClassComponents = {
     renderClassScreen: (course, students) => {
@@ -783,7 +786,7 @@ export const ClassComponents = {
         });
 
         // A name / student number order picked in the list header (kept on this device) replaces the default order.
-        const sortMode = savedStudentSort();
+        const sortMode = savedStudentSort(course.Course_ID);
         if (sortMode) {
             const col = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
             const keyOf = (s) => String(sortMode === 'number' ? s.Student_Number : s.Name || '').trim();
@@ -938,7 +941,7 @@ export const ClassComponents = {
                         <button type="button" id="attendanceMoreBtn" aria-label="Sort, filter and select students" aria-expanded="false" aria-controls="attendanceBarTools" class="sm:hidden flex-shrink-0 w-10 h-10 inline-flex items-center justify-center border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                         <div id="attendanceBarTools" class="hidden sm:flex items-center gap-2 w-full sm:w-auto order-last sm:order-none">
                         <select id="rosterSort" aria-label="Sort students" class="min-w-0 flex-1 sm:flex-none px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            ${[['', 'Default order'], ['name', 'Sort: Name (A-Z)'], ['number', 'Sort: Student number']].map(([v, l]) => `<option value="${v}"${v === savedStudentSort() ? ' selected' : ''}>${l}</option>`).join('')}
+                            ${[['', 'Default order'], ['name', 'Sort: Name (A-Z)'], ['number', 'Sort: Student number']].map(([v, l]) => `<option value="${v}"${v === savedStudentSort(course.Course_ID) ? ' selected' : ''}>${l}</option>`).join('')}
                         </select>
                         <select id="rosterFilter" aria-label="Show" class="min-w-0 flex-1 sm:flex-none px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
                             <option value="all">All students</option>

@@ -320,7 +320,8 @@ const lecturerCourseCardHtml = (c) => `
                         <a href="#class-${c.Course_ID}" class="card-action border-x border-gray-100" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
                         <a href="#class-${c.Course_ID}" class="card-action" data-intent="openScoresModalBtn"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Scores</a>
                     </div>
-                    <div class="border-t border-gray-100 px-3 py-1.5 text-right">
+                    <div class="border-t border-gray-100 px-3 py-1.5 flex items-center justify-between gap-3">
+                        <button type="button" class="duplicate-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" aria-label="Copy ${escapeHtml(c.CourseCode)} to another term"><i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Copy to another term</button>
                         <button type="button" class="archive-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-archive="${Number(c.Archived) === 1 ? '0' : '1'}" aria-label="${Number(c.Archived) === 1 ? 'Restore' : 'Archive'} ${escapeHtml(c.CourseCode)}"><i class="fa-solid ${Number(c.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i>${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}</button>
                     </div>
                 </div>
@@ -445,6 +446,37 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
     return assignedExamsSectionHtml;
 };
 
+// Terms: a class has an optional Academic Year + Semester. The lecturer list shows the current term by default.
+const SEM_RANK = { '1st Semester': 1, '2nd Semester': 2, 'Summer': 3 };
+const termKey = (c) => [c.AcademicYear, c.Semester].filter(Boolean).join('|');
+const termLabel = (c) => [c.AcademicYear && `AY ${c.AcademicYear}`, c.Semester].filter(Boolean).join(' · ') || 'No term set';
+// Aug-Dec = 1st semester, Jan-May = 2nd semester, Jun-Jul = summer (of the academic year that started the previous August).
+const currentTerm = () => {
+    const d = new Date(), y = d.getFullYear(), m = d.getMonth() + 1;
+    if (m >= 8) return { ay: `${y}-${y + 1}`, sem: '1st Semester' };
+    return { ay: `${y - 1}-${y}`, sem: m <= 5 ? '2nd Semester' : 'Summer' };
+};
+// Classes without a term count as current, so older classes never disappear.
+const isCurrentTerm = (c) => {
+    if (!c.AcademicYear && !c.Semester) return true;
+    const t = currentTerm();
+    return (!c.AcademicYear || c.AcademicYear === t.ay) && (!c.Semester || c.Semester === t.sem);
+};
+const savedTermFilter = () => { try { return localStorage.getItem('course_term_filter') || ''; } catch (e) { return ''; } };
+// Newest academic year first; inside a year, later semesters first.
+const compareTerms = (a, b) => {
+    const [ay1, s1] = a.split('|'), [ay2, s2] = b.split('|');
+    if ((ay1 || '') !== (ay2 || '')) return (ay2 || '').localeCompare(ay1 || '');
+    return (SEM_RANK[s2] || 0) - (SEM_RANK[s1] || 0);
+};
+
+document.addEventListener('change', (e) => {
+    if (!e.target || e.target.id !== 'courseTermFilter') return;
+    CourseDashboard.termFilter = e.target.value;
+    try { localStorage.setItem('course_term_filter', e.target.value); } catch (err) { /* storage unavailable */ }
+    if (CourseDashboard.repaintLecturer) CourseDashboard.repaintLecturer();
+});
+
 // Archive / restore a class (lecturer). Archived classes leave the main list; nothing is deleted.
 document.addEventListener('click', async (e) => {
     const toggle = e.target.closest && e.target.closest('#toggleArchivedCoursesBtn');
@@ -469,6 +501,7 @@ document.addEventListener('click', async (e) => {
 
 export const CourseDashboard = {
     showArchivedCourses: false,
+    termFilter: '',
     loadGroupMembersForUpload: async (courseId) => {
         const section = document.getElementById('groupUploadSection');
         const list = document.getElementById('groupMembersList');
@@ -743,7 +776,30 @@ export const CourseDashboard = {
             CourseDashboard.repaintLecturer = () => paint(CourseDashboard.lecturerData);
             const archivedCourses = data.courses.filter(c => Number(c.Archived) === 1);
             const activeCourses = data.courses.filter(c => Number(c.Archived) !== 1);
-            let coursesHtml = activeCourses.map(lecturerCourseCardHtml).join('');
+            // Term filter: Current term (default when something is in it) / All terms / one term.
+            const terms = [...new Set(activeCourses.filter(c => c.AcademicYear || c.Semester).map(termKey))].sort(compareTerms);
+            const hasCurrent = activeCourses.some(c => (c.AcademicYear || c.Semester) && isCurrentTerm(c));
+            let filter = CourseDashboard.termFilter || savedTermFilter() || (hasCurrent ? 'current' : 'all');
+            if (filter !== 'current' && filter !== 'all' && !terms.includes(filter)) filter = hasCurrent ? 'current' : 'all';
+            if (!terms.length) filter = 'all';
+            const shownCourses = activeCourses.filter(c => filter === 'all' ? true : filter === 'current' ? isCurrentTerm(c) : termKey(c) === filter);
+            let coursesHtml;
+            if (filter === 'all' && terms.length) {
+                // Headings per term; classes without a term go last.
+                const groups = [...terms, ''].map(k => [k, shownCourses.filter(c => termKey(c) === k)]).filter(([, list]) => list.length);
+                coursesHtml = groups.map(([k, list]) => `<h3 class="col-span-full text-xs font-black uppercase tracking-wider text-gray-500 ${k ? '' : 'mt-2'} -mb-2">${escapeHtml(k ? termLabel(list[0]) : 'No term set')}${k && isCurrentTerm(list[0]) ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-green-100 text-green-700 normal-case tracking-normal">Current</span>' : ''}</h3>${list.map(lecturerCourseCardHtml).join('')}`).join('');
+            } else {
+                coursesHtml = shownCourses.map(lecturerCourseCardHtml).join('');
+            }
+            if (!coursesHtml && activeCourses.length) {
+                coursesHtml = '<div class="col-span-full p-6 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No classes in this term. Choose another term or All terms.</div>';
+            }
+            const termFilterHtml = terms.length ? `<div class="mb-4 flex items-center gap-2"><label for="courseTermFilter" class="text-xs font-bold text-gray-500 uppercase tracking-wider">Term</label>
+                <select id="courseTermFilter" class="px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="current"${filter === 'current' ? ' selected' : ''}>Current term (${escapeHtml(currentTerm().ay)} ${escapeHtml(currentTerm().sem)})</option>
+                    <option value="all"${filter === 'all' ? ' selected' : ''}>All terms</option>
+                    ${terms.map(k => `<option value="${escapeHtml(k)}"${filter === k ? ' selected' : ''}>${escapeHtml(termLabel(activeCourses.find(c => termKey(c) === k)))}</option>`).join('')}
+                </select></div>` : '';
             const archivedHtml = archivedCourses.length ? `
                     <div class="mt-8">
                         <button type="button" id="toggleArchivedCoursesBtn" class="inline-flex items-center text-sm font-bold text-gray-600 hover:text-indigo-700" aria-expanded="${CourseDashboard.showArchivedCourses ? 'true' : 'false'}"><i class="fa-solid fa-box-archive mr-2" aria-hidden="true"></i>${CourseDashboard.showArchivedCourses ? 'Hide' : 'Show'} archived classes (${archivedCourses.length})</button>
@@ -762,6 +818,7 @@ export const CourseDashboard = {
                         <h2 class="text-xl font-bold text-gray-800 flex items-center"><div class="bg-gray-200 p-2 rounded-lg mr-3"><i class="fa-solid fa-chalkboard-user text-gray-600"></i></div>My Created Courses</h2>
                         <button type="button" id="headerNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button>
                     </div>
+                    ${termFilterHtml}
                     ${data.courses.length >= 3 ? searchBarHtml(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) : ''}
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         ${coursesHtml}

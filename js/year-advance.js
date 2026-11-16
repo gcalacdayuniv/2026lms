@@ -25,19 +25,31 @@ const close = () => { const m = $('yaModal'); if (m) m.remove(); };
 
 const values = () => ({
     academicYear: $('yaAY').value.trim(),
-    maxYear: Number($('yaMax').value)
+    maxYear: Number($('yaMax').value),
+    markGraduated: Boolean($('yaGrad') && $('yaGrad').checked),
+    reactivationUntil: $('yaUntil') ? $('yaUntil').value : ''
 });
+
+// A collapsible list (names only, capped by the server at 300).
+const listHtml = (title, items, total) => {
+    if (!items || !items.length) return '';
+    return `<details class="mt-3 border border-gray-200 rounded-md"><summary class="cursor-pointer px-3 py-2 text-xs font-bold text-gray-700">${escapeHtml(title)} (${total})</summary>
+        <ul class="max-h-40 overflow-y-auto px-3 pb-2 text-xs text-gray-700 space-y-0.5">${items.join('')}</ul>${total > items.length ? `<p class="px-3 pb-2 text-[11px] text-gray-500">Showing the first ${items.length}.</p>` : ''}</details>`;
+};
 
 const showSummary = (r) => {
     const box = $('yaResult');
-    const sample = (r.sample || []).map(s => `<li>${escapeHtml(s.name || '')}: ${escapeHtml(s.from || '-')} &rarr; ${escapeHtml(s.to || '-')}</li>`).join('');
+    const adv = (r.advanceList || []).map(s => `<li>${escapeHtml(s.name || '')}: ${escapeHtml(s.from || '-')} &rarr; ${escapeHtml(s.to || '-')}</li>`);
+    const grad = (r.graduatingList || []).map(s => `<li>${escapeHtml(s.name || '')} (year ${escapeHtml(s.year || '-')})</li>`);
+    const none = (r.noYearList || []).map(n => `<li>${escapeHtml(n || '')}</li>`);
     box.innerHTML = `
         <div class="grid grid-cols-3 gap-2 text-center">
-            <div class="rounded-md bg-green-50 border border-green-200 p-2"><div class="text-xl font-bold text-green-700">${r.advance}</div><div class="text-[10px] font-bold uppercase text-green-700">Will advance</div></div>
-            <div class="rounded-md bg-gray-50 border border-gray-200 p-2"><div class="text-xl font-bold text-gray-700">${r.graduating}</div><div class="text-[10px] font-bold uppercase text-gray-600">At year ${r.maxYear} (unchanged)</div></div>
+            <div class="rounded-md bg-green-50 border border-green-200 p-2"><div class="text-xl font-bold text-green-700">${r.advance}</div><div class="text-[10px] font-bold uppercase text-green-700">Will advance</div><div class="text-[10px] text-green-700">${r.deactivate} set Inactive</div></div>
+            <div class="rounded-md bg-gray-50 border border-gray-200 p-2"><div class="text-xl font-bold text-gray-700">${r.graduating}</div><div class="text-[10px] font-bold uppercase text-gray-600">Graduating (year ${r.maxYear})</div></div>
             <div class="rounded-md bg-amber-50 border border-amber-200 p-2"><div class="text-xl font-bold text-amber-700">${r.unrecognized}</div><div class="text-[10px] font-bold uppercase text-amber-700">No year set</div></div>
         </div>
-        ${sample ? `<p class="text-[11px] font-bold text-gray-500 uppercase mt-3 mb-1">Examples</p><ul class="text-xs text-gray-700 space-y-0.5">${sample}</ul>` : ''}
+        ${listHtml('Students who will advance', adv, r.advance)}${listHtml('Graduating students (unchanged)', grad, r.graduating)}${listHtml('Students with no year set (unchanged)', none, r.unrecognized)}
+        ${r.graduating ? `<label class="mt-3 flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" id="yaGrad" class="mt-0.5"><span>Also mark the ${r.graduating} graduating student${r.graduating === 1 ? '' : 's'} as <b>Graduated</b>. They can no longer sign in. Undo restores their status.</span></label>` : ''}
         ${r.alreadyDone ? `<p class="mt-3 text-xs font-bold text-red-600">Year levels were already advanced for ${escapeHtml($('yaAY').value.trim())}.</p>` : ''}`;
     box.classList.remove('hidden');
     $('yaApplyBtn').disabled = !r.advance || r.alreadyDone;
@@ -64,7 +76,8 @@ const open = async () => {
                 <h3 class="min-w-0 flex-1 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-turn-up text-orange-600 mr-2" aria-hidden="true"></i>Advance Year Level</h3>
                 <button id="yaCloseBtn" type="button" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
             </div>
-            <p class="text-xs text-gray-600 mb-4">Moves every registered student up one year level (1 &rarr; 2, 2nd &rarr; 3rd). Students already at the highest level, or with no year, are left unchanged. Classes limited to a target year follow the new level.</p>
+            <p class="text-xs text-gray-600 mb-3">Moves every registered student up one year level (1 &rarr; 2, 2nd &rarr; 3rd). Students already at the highest level, or with no year, are left unchanged. Classes limited to a target year follow the new level.</p>
+            <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2 mb-4"><b>Advanced students are set Inactive</b> and cannot sign in until reactivated: when you set them Active, when you enroll them in a class of the new term, or after they request reactivation at the login screen (you will see "Reactivation requested" on their row). Other statuses (Suspended, UD, Dropped...) still cannot sign in either.</p>
             <div class="space-y-4">
                 <div id="yaError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                 <div class="grid grid-cols-2 gap-4">
@@ -72,6 +85,7 @@ const open = async () => {
                     <div><label class="${LABEL}" for="yaMax">Highest year level</label>
                         <select id="yaMax" class="${FIELD}">${[2, 3, 4, 5, 6].map(n => `<option${n === 4 ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
                 </div>
+                <div><label class="${LABEL}" for="yaUntil">Reactivation requests allowed until (optional)</label><input type="date" id="yaUntil" class="${FIELD}"></div>
                 <button type="button" id="yaPreviewBtn" class="w-full border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 py-2.5 px-4 rounded-md font-bold text-sm">Preview</button>
                 <div id="yaResult" class="hidden"></div>
                 <button type="button" id="yaApplyBtn" disabled class="w-full bg-orange-600 text-white py-2.5 px-4 rounded-md hover:bg-orange-700 shadow-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Advance all students</button>
@@ -95,7 +109,7 @@ const apply = async () => {
     $('yaError').classList.add('hidden');
     const ok = await UI.confirm({
         title: 'Advance all students?',
-        message: `Every student's year level goes up by one for ${v.academicYear}. You can undo the latest run afterwards.`,
+        message: `Every student's year level goes up by one for ${v.academicYear} and they are set Inactive until reactivated${v.markGraduated ? ' and graduating students are marked Graduated' : ''}. You can undo the latest run afterwards.`,
         confirmText: 'Advance', danger: true
     });
     if (!ok) return;
@@ -103,7 +117,7 @@ const apply = async () => {
     b.disabled = true; b.textContent = 'Advancing...';
     try {
         const r = await call({ mode: 'apply', ...v });
-        UI.success(`${r.advance} students advanced`);
+        UI.success(`${r.advance} students advanced${r.graduated ? `, ${r.graduated} marked Graduated` : ''}`);
         b.textContent = 'Advance all students';
         await preview();
         $('yaApplyBtn').disabled = true;

@@ -92,7 +92,9 @@ export const apiFetch = async (endpoint, options = {}) => {
             handleSessionExpired();
         }
         if (!response.ok) {
-            throw new Error((data && data.error) || 'An error occurred during the request.');
+            const failure = new Error((data && data.error) || 'An error occurred during the request.');
+            failure.data = data;   // extra fields from the server (the login screen reads data.reactivation)
+            throw failure;
         }
         if (data === null) {
             throw new Error('The server sent an unexpected response. Please try again.');

@@ -32,7 +32,7 @@ export const UI = {
         return host;
     },
 
-    toast: (message, type = 'info', duration = 3500) => {
+    toast: (message, type = 'info', duration = 3500, action = null) => {
         const host = UI.getHost();
         while (host.children.length >= MAX_TOASTS) host.removeChild(host.firstChild);
 
@@ -57,10 +57,21 @@ export const UI = {
             el.style.opacity = '0';
             setTimeout(() => el.remove(), 200);
         };
+        if (action && action.label) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ml-2 px-2.5 py-1 rounded bg-white bg-opacity-25 hover:bg-opacity-40 text-xs font-black uppercase tracking-wide';
+            btn.textContent = action.label;
+            btn.addEventListener('click', (ev) => { ev.stopPropagation(); dismiss(); if (action.onClick) action.onClick(); });
+            el.appendChild(btn);
+        }
         el.addEventListener('click', dismiss);
         if (duration > 0) timer = setTimeout(dismiss, duration);
         return dismiss;
     },
+
+    // A toast with an Undo button (stays 7 s).
+    undo: (message, onUndo, duration = 7000) => UI.toast(message, 'success', duration, { label: 'Undo', onClick: onUndo }),
 
     success: (message, duration) => UI.toast(message, 'success', duration),
     error: (message, duration = 5000) => UI.toast(message, 'error', duration),

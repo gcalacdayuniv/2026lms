@@ -70,18 +70,100 @@ export const cropBox = (row, c) => {
 
 // A question with more than 5 choices has several rows of bubbles (A-E, F-J ...). One strip per row, so the review
 // shows every choice of the question: [{x,y,w,h}, ...] in pixels of a "rect1" photo.
-export const cropBoxes = (row) => {
+// Where the rows really are in the photo. The review cuts each question out at its planned position; when the sheet in the
+// photo is a little stretched or bent (or was printed by an older version), a fixed cut slips onto the neighbouring question.
+// alignRows finds every row of circles in the photo (it looks for the ring pattern near the planned spot) and returns
+// Map(alignKey -> vertical offset in frame units). cropBoxes then cuts at the found position.
+const AL = 2;   // pixels per frame unit while searching
+export const alignKey = (v, u) => `${Number(v).toFixed(1)}|${Math.round(u)}`;
+const bubbleLines = (rows) => {
+    const out = [];
+    rows.forEach(r => {
+        const byV = new Map();
+        r.bubbles.forEach(b => { const k = b.v.toFixed(2); if (!byV.has(k)) byV.set(k, { v: b.v, us: [] }); byV.get(k).us.push(b.u); });
+        byV.forEach(l => out.push(l));
+    });
+    return out;
+};
+const ringChord = (d) => { const f = (r) => Math.sqrt(Math.max(0, r * r - d * d)); return 2 * (f(2.6) - f(2.0)); };
+export const alignRows = (bitmap, rows) => {
+    const map = new Map();
+    try {
+        const W = Math.round(FRAME.w * AL), H = Math.round((FRAME.h + RECT_EXTRA) * AL);
+        const cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bitmap, 0, 0, W, H);
+        const px = ctx.getImageData(0, 0, W, H).data;
+        const dark = (x, y) => { const i = (y * W + x) * 4; return 1 - (px[i] * 0.3 + px[i + 1] * 0.59 + px[i + 2] * 0.11) / 255; };
+        const D = []; for (let d = -3.4; d <= 3.401; d += 0.25) D.push(Number(d.toFixed(2)));
+        const T = D.map(ringChord);
+        const tMean = T.reduce((a, b) => a + b, 0) / T.length;
+        const T0 = T.map(t => t - tMean);
+        const tSd = Math.sqrt(T0.reduce((a, b) => a + b * b, 0));
+        const lines = bubbleLines(rows);
+        const found = (line, lo, hi) => {
+            const rowDark = (y) => {            // darkness of one pixel row across all circles of the line
+                const yy = Math.round(y * AL);
+                if (yy < 0 || yy >= H) return 0;
+                let sum = 0;
+                for (const u of line.us) {
+                    const x0 = Math.max(0, Math.round((u - 2.7) * AL)), x1 = Math.min(W - 1, Math.round((u + 2.7) * AL));
+                    for (let x = x0; x <= x1; x++) sum += dark(x, yy);
+                }
+                return sum;
+            };
+            let best = null;
+            for (let s = lo; s <= hi + 0.001; s += 0.25) {
+                const P = D.map(d => rowDark(line.v + s + d));
+                const pMean = P.reduce((x, y) => x + y, 0) / P.length;
+                let cov = 0, pv = 0;
+                P.forEach((q, i) => { cov += (q - pMean) * T0[i]; pv += (q - pMean) * (q - pMean); });
+                const r = pv > 0 && tSd > 0 ? cov / (Math.sqrt(pv) * tSd) : 0;
+                const score = r - 0.04 * Math.abs(s - (lo + hi) / 2);   // slight preference for the expected spot
+                if (!best || score > best.score) best = { r, s, score };
+            }
+            return best;
+        };
+        // Top to bottom: a stretched or bent sheet drifts a little more at every row, so each row is searched close to where
+        // the rows above it were found (never as far as the next row, which looks the same).
+        const groups = [];
+        lines.slice().sort((x, y) => x.v - y.v).forEach(l => {
+            const g = groups[groups.length - 1];
+            if (g && Math.abs(g.v - l.v) < 0.3) g.lines.push(l); else groups.push({ v: l.v, lines: [l] });
+        });
+        let prev = null, prev2 = null;
+        for (const g of groups) {
+            let pred = 0;
+            if (prev) {
+                pred = prev.dy;
+                if (prev2 && prev.v > prev2.v) pred += Math.max(-0.12, Math.min(0.12, (prev.dy - prev2.dy) / (prev.v - prev2.v))) * (g.v - prev.v);
+            }
+            const results = g.lines.map(l => ({ l, f: found(l, pred - 2.5, pred + 2.5) }));
+            const good = results.filter(x => x.f && x.f.r > 0.5).map(x => x.f.s).sort((x, y) => x - y);
+            const med = good.length ? good[Math.floor(good.length / 2)] : pred;
+            const dy = Math.abs(med - pred) <= 1 ? pred : med;   // a shift of 1 unit or less is noise: the cut has more room than that
+            results.forEach(({ l }) => map.set(alignKey(l.v, Math.min(...l.us)), dy));
+            prev2 = prev; prev = { v: g.v, dy };
+        }
+    } catch (e) { /* alignment is a refinement; without it the planned positions are used */ }
+    return map;
+};
+
+export const cropBoxes = (row, align = null) => {
     const rows = [];
     row.bubbles.forEach(b => {
         let r = rows.find(x => Math.abs(x.v - b.v) < 0.01);
-        if (!r) { r = { v: b.v, last: b.u }; rows.push(r); }
+        if (!r) { r = { v: b.v, last: b.u, first: b.u }; rows.push(r); }
         r.last = Math.max(r.last, b.u);
+        r.first = Math.min(r.first, b.u);
     });
     rows.sort((a, b) => a.v - b.v);
     const right = Math.min(FRAME.w, Math.max(...rows.map(r => r.last)) + 4.2);
     const left = Math.max(0, row.u0 - 0.5);
     return rows.map((r, i) => {
-        const top = Math.max(0, r.v - (i === 0 && rows.length === 1 ? 3.1 : 5.6)), bottom = Math.min(FRAME.h, r.v + 3.1);
+        const dy = align && align.has(alignKey(r.v, r.first)) ? align.get(alignKey(r.v, r.first)) : 0;
+        const top = Math.max(0, r.v + dy - (i === 0 && rows.length === 1 ? 3.1 : 5.6)), bottom = Math.min(FRAME.h + RECT_EXTRA, r.v + dy + 3.1);
         return { x: left * RECT_SCALE, y: top * RECT_SCALE, w: (right - left) * RECT_SCALE, h: (bottom - top) * RECT_SCALE };
     });
 };

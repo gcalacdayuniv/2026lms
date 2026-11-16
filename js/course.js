@@ -9,6 +9,7 @@ import { getLoadableAvatarSrc } from './components.js';
 import { UI } from './ui-feedback.js';
 import { StudentSummaryUI } from './student-summary-ui.js';
 import './year-advance.js';
+import './duplicate-course.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
 export const CourseModule = {
@@ -731,6 +732,7 @@ export const CourseModule = {
         if (e.target.closest('#recitationPointsPlus')) CourseRecitation.stepPoints(1);
 
         if (e.target.closest('#markAllPresent')) {
+            CourseAttendance.preBulk = CourseAttendance.snapshot();
             const rows = document.querySelectorAll('.student-row');
             rows.forEach(row => {
                 if (row.style.display === 'none') return;   // a search or filter is hiding it

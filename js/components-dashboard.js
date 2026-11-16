@@ -215,6 +215,7 @@ const DashboardUI = {
                         <option value="Suspended">Suspended</option>
                         <option value="UD">UD</option>
                         <option value="Dropped">Dropped</option>
+                        <option value="Graduated">Graduated</option>
                     </select>
                     <p class="text-[11px] text-gray-400 mt-1 sm:hidden"><i class="fa-solid fa-hand-pointer mr-1" aria-hidden="true"></i>Swipe a card right to activate, left for more statuses.</p>
                 </div>

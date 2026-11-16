@@ -93,6 +93,46 @@ export const CourseAttendance = {
         });
     },
 
+    // How many students differ from what is saved (shown on Save All).
+    dirtyCount: () => {
+        if (!CourseAttendance.baselineReady) return 0;
+        return Array.from(document.querySelectorAll('.student-row')).filter(row => {
+            const base = CourseAttendance.baseline[row.dataset.studentId];
+            const cur = CourseAttendance.snapshotRow(row);
+            return !base || base.status !== cur.status || base.points !== cur.points;
+        }).length;
+    },
+
+    // Puts the rows back to a snapshot() taken earlier, then saves each changed row (a cleared row is removed on the server).
+    restoreSnapshot: (snap) => {
+        const colors = { Present: ['bg-green-100', 'text-green-800', 'border-green-400'], Late: ['bg-yellow-100', 'text-yellow-800', 'border-yellow-400'], Absent: ['bg-red-100', 'text-red-800', 'border-red-400'], Excused: ['bg-purple-100', 'text-purple-800', 'border-purple-400'] };
+        const all = ['bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400'];
+        document.querySelectorAll('.student-row').forEach(row => {
+            const want = snap[row.dataset.studentId];
+            if (!want) return;
+            const cur = CourseAttendance.snapshotRow(row);
+            if (cur.status === want.status && cur.points === want.points) return;
+            row.querySelectorAll('.attendance-btn').forEach(b => {
+                b.classList.remove(...all);
+                b.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                b.removeAttribute('data-selected');
+            });
+            if (want.status) {
+                const btn = row.querySelector(`.attendance-btn[data-status="${want.status}"]`);
+                if (btn) {
+                    btn.setAttribute('data-selected', 'true');
+                    btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                    btn.classList.add(...colors[want.status]);
+                }
+            }
+            const pts = row.querySelector('.points-input');
+            if (pts) pts.value = String(want.points || 0);
+            CourseAttendance.queueAutoSave(row.dataset.studentId, 0);
+        });
+        const courseId = getCourseId(), date = getDate();
+        if (courseId && date) CourseAttendance.saveDraft(courseId, date);
+    },
+
     // Shows or hides the "unsaved changes" dot on the sticky bar. Returns the dirty state.
     updateDirty: () => {
         const bar = document.getElementById('attendanceBar');
@@ -128,6 +168,12 @@ export const CourseAttendance = {
         }
         const status = document.getElementById('attendanceDirtyStatus');
         if (status) status.textContent = text;
+        // "Save All (3)": how many students still differ from what is saved.
+        const saveBtn = document.getElementById('saveAttendanceBtn');
+        if (saveBtn && !saveBtn.disabled) {
+            const n = dirty ? CourseAttendance.dirtyCount() : 0;
+            saveBtn.innerHTML = `<i class="fa-solid fa-floppy-disk mr-2"></i> Save All${n ? ` (${n})` : ''}`;
+        }
         return dirty;
     },
 
@@ -295,7 +341,15 @@ export const CourseAttendance = {
             if (getDate() === date) await CourseAttendance.revertDate(courseId, date);
             return;
         }
-        if (ready === 'known') await CourseAttendance.saveAllRows(courseId, date);
+        if (ready === 'known') {
+            const before = CourseAttendance.preBulk;
+            const saved = await CourseAttendance.saveAllRows(courseId, date);
+            // Mark All Present can be taken back for a few seconds.
+            if (saved && before && getDate() === date) {
+                CourseAttendance.preBulk = null;
+                UI.undo('Marked present', () => CourseAttendance.restoreSnapshot(before));
+            }
+        }
     },
 
     // Sends every marked row for the date in one request (replaces that date's records).

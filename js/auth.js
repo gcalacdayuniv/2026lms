@@ -31,7 +31,8 @@ export const AuthModule = {
                     method: 'POST',
                     body: JSON.stringify({
                         identifier: document.getElementById('loginId')?.value.trim() || document.getElementById('loginIdentifier')?.value.trim(),
-                        password: document.getElementById('loginPassword').value
+                        password: document.getElementById('loginPassword').value,
+                        requestReactivation: e.submitter && e.submitter.id === 'requestReactivationBtn' ? true : undefined
                     })
                 });
                 
@@ -41,6 +42,15 @@ export const AuthModule = {
                 window.location.hash = 'dashboard';
             } catch (err) {
                 errorDiv.textContent = err.message;
+                // Moved up a year level: offer to ask for reactivation (the password was already checked).
+                if (err.data && err.data.reactivation && err.data.reactivation.allowed) {
+                    const ask = document.createElement('button');
+                    ask.type = 'submit';
+                    ask.id = 'requestReactivationBtn';
+                    ask.className = 'mt-2 block w-full bg-white text-blue-700 border border-blue-300 hover:bg-blue-50 py-2 rounded-md text-sm font-bold';
+                    ask.textContent = 'Request reactivation';
+                    errorDiv.appendChild(ask);
+                }
                 errorDiv.classList.remove('hidden');
             } finally {
                 btn.disabled = false;
@@ -297,7 +307,7 @@ export const AuthModule = {
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.setAttribute('aria-label', 'Change status');
-        const options = ['Active', 'Inactive', 'Suspended', 'UD', 'Dropped'];
+        const options = ['Active', 'Inactive', 'Suspended', 'UD', 'Dropped', 'Graduated'];
         overlay.innerHTML = `
             <div class="absolute inset-0 bg-gray-900 bg-opacity-50" data-sheet-close></div>
             <div class="relative bg-white w-full max-w-md rounded-t-2xl p-4 sheet-panel" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px))">
@@ -413,6 +423,11 @@ export const AuthModule = {
             document.getElementById('profilePanel').classList.add('translate-x-full');
             document.getElementById('profilePanel').classList.remove('translate-x-0');
             document.getElementById('ccModal').classList.remove('hidden');
+            // Prefill the current term (Aug-Dec 1st sem, Jan-May 2nd sem, Jun-Jul summer) unless already filled in.
+            const ay = document.getElementById('courseAY'), sem = document.getElementById('courseSemester');
+            const now = new Date(), y = now.getFullYear(), mo = now.getMonth() + 1;
+            if (ay && !ay.value) ay.value = mo >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+            if (sem && !sem.value) sem.value = mo >= 8 ? '1st Semester' : (mo <= 5 ? '2nd Semester' : 'Summer');
         }
 
         if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') {
@@ -533,7 +548,7 @@ export const AuthModule = {
         const chipsEl = document.getElementById('muChips');
         if (chipsEl) {
             const searched = AuthModule.usersList.filter(u => u.Name.toLowerCase().includes(search) || (u.Student_Number && u.Student_Number.toLowerCase().includes(search)));
-            const chips = [['', 'All', searched.length], ...['Active', 'Inactive', 'Suspended', 'UD', 'Dropped'].map(st => [st, st, searched.filter(u => u.account_status === st).length])];
+            const chips = [['', 'All', searched.length], ...['Active', 'Inactive', 'Suspended', 'UD', 'Dropped', 'Graduated'].map(st => [st, st, searched.filter(u => u.account_status === st).length])];
             chipsEl.innerHTML = chips.map(([val, label, n]) =>
                 `<button type="button" class="mu-chip flex-shrink-0${val === filter ? ' is-on' : ''}" data-status="${val}" aria-pressed="${val === filter}">${label} ${n}</button>`).join('');
         }
@@ -567,7 +582,7 @@ export const AuthModule = {
                         ${avatarImg}
                     </div>
                     <div class="overflow-hidden min-w-0">
-                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${escapeHtml(u.Name)} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${escapeHtml(u.role)}</span>${disabilityBadge}</div>
+                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${escapeHtml(u.Name)}${u.Reactivation_Requested ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black uppercase" title="Asked to be reactivated at the login screen">Reactivation requested</span>' : ''} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${escapeHtml(u.role)}</span>${disabilityBadge}</div>
                         
                         <div class="text-[11px] sm:text-xs text-gray-600 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span class="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">${escapeHtml(u.Student_Number || 'N/A')}</span>
@@ -593,6 +608,7 @@ export const AuthModule = {
                         <option value="Suspended" ${u.account_status === 'Suspended' ? 'selected' : ''}>Suspended</option>
                         <option value="UD" ${u.account_status === 'UD' ? 'selected' : ''}>UD</option>
                         <option value="Dropped" ${u.account_status === 'Dropped' ? 'selected' : ''}>Dropped</option>
+                        <option value="Graduated" ${u.account_status === 'Graduated' ? 'selected' : ''}>Graduated</option>
                     </select>
                 </div>
             </div>

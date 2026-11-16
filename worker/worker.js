@@ -1241,8 +1241,30 @@ async function ensureYearAdvanceTables(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Year_Advance_Batches (Batch_ID TEXT PRIMARY KEY, Academic_Year TEXT, Max_Year INTEGER, Lecturer_ID TEXT, Advanced INTEGER, Applied_At TEXT, Undone INTEGER DEFAULT 0)").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Year_Advance_Log (Log_ID TEXT PRIMARY KEY, Batch_ID TEXT NOT NULL, User_ID TEXT NOT NULL, Old_Year TEXT, New_Year TEXT, Old_Program_Year TEXT, New_Program_Year TEXT)").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_year_log_batch ON Year_Advance_Log (Batch_ID)").run();
+    for (const col of ["Old_Status TEXT", "New_Status TEXT"]) {
+        try { await env.DB.prepare(`ALTER TABLE Year_Advance_Log ADD COLUMN ${col}`).run(); } catch (e) { /* already there */ }
+    }
     yearAdvanceReady = true;
 }
+// Students moved up by Advance Year Level are set Inactive until reactivated. These Users columns track that:
+//   Advanced_Term: the academic year they were advanced into; Reactivation_Until: last day they may request reactivation (optional);
+//   Reactivation_Requested: when they asked at the login screen. Only "Active" accounts can sign in.
+let reactivationReady = false;
+async function ensureReactivationColumns(env) {
+    if (reactivationReady) return;
+    for (const col of ["Advanced_Term TEXT", "Reactivation_Until TEXT", "Reactivation_Requested TEXT"]) {
+        try { await env.DB.prepare(`ALTER TABLE Users ADD COLUMN ${col}`).run(); } catch (e) { /* already there */ }
+    }
+    reactivationReady = true;
+}
+const CLEAR_REACTIVATION_SQL = "Advanced_Term = NULL, Reactivation_Until = NULL, Reactivation_Requested = NULL";
+// Current term by date (Aug-Dec 1st semester, Jan-May 2nd, Jun-Jul Summer).
+function currentTermNow(now = new Date()) {
+    const y = now.getUTCFullYear(), m = now.getUTCMonth() + 1;
+    if (m >= 8) return { ay: `${y}-${y + 1}`, sem: "1st Semester" };
+    return { ay: `${y - 1}-${y}`, sem: m <= 5 ? "2nd Semester" : "Summer" };
+}
+
 // "1" -> "2", "3rd Year" -> "4th Year". At or above maxYear = graduating; no leading number = unrecognized.
 function nextYearLevel(v, maxYear) {
     const m = /^(\d{1,2})(.*)$/.exec(String(v == null ? "" : v).trim());
@@ -1316,7 +1338,7 @@ export default {
                 return new Response(JSON.stringify({ error: gate.error }), { status: gate.status, headers: corsHeaders });
             }
 
-            if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room" || path === "/api/update-course" || path === "/api/archive-course") {
+            if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room" || path === "/api/update-course" || path === "/api/archive-course" || path === "/api/duplicate-course") {
                 await ensureCourseRoom(env);
             }
 
@@ -2280,6 +2302,27 @@ export default {
                     let errorMessage = "";
                     const statusLower = user.account_status.toLowerCase();
 
+                    // Advanced to a new year level: inactive until reactivated. The student may ask for reactivation here
+                    // (only until the date the lecturer set, if any); the lecturer sees the request and sets the account Active.
+                    if (statusLower === 'inactive') {
+                        await ensureReactivationColumns(env);
+                        const re = await env.DB.prepare("SELECT Advanced_Term, Reactivation_Until, Reactivation_Requested FROM Users WHERE User_ID = ?").bind(user.User_ID).first();
+                        if (re && re.Advanced_Term) {
+                            const today = new Date().toISOString().slice(0, 10);
+                            const open = !re.Reactivation_Until || today <= re.Reactivation_Until;
+                            if (body.requestReactivation && open) {
+                                if (!re.Reactivation_Requested) {
+                                    await env.DB.prepare("UPDATE Users SET Reactivation_Requested = ? WHERE User_ID = ?").bind(new Date().toISOString(), user.User_ID).run();
+                                }
+                                return new Response(JSON.stringify({ error: "Reactivation requested. Your lecturer will review it, then you can sign in.", reactivation: { allowed: false, requested: true } }), { status: 403, headers: corsHeaders });
+                            }
+                            const msg = open
+                                ? `Your account is inactive for the new year level (${re.Advanced_Term}). It is reactivated when a lecturer enrolls you in a class for the current term, or you can request reactivation.`
+                                : `Your account is inactive and the reactivation period ended on ${re.Reactivation_Until}. Please ask your lecturer to reactivate it.`;
+                            return new Response(JSON.stringify({ error: msg, reactivation: { allowed: open && !re.Reactivation_Requested, requested: !!re.Reactivation_Requested, until: re.Reactivation_Until || null } }), { status: 403, headers: corsHeaders });
+                        }
+                    }
+
                     if (statusLower === 'inactive') {
                         errorMessage = "Account is pending approval. Please wait for an admin or lecturer to activate your account.";
                     } else if (statusLower === 'suspended') {
@@ -2414,6 +2457,7 @@ export default {
                 const body = await request.json();
                 const mode = body.mode;
                 await ensureYearAdvanceTables(env);
+                await ensureReactivationColumns(env);
                 const last = await env.DB.prepare("SELECT Batch_ID, Academic_Year, Advanced, Applied_At FROM Year_Advance_Batches WHERE COALESCE(Undone, 0) = 0 ORDER BY Applied_At DESC LIMIT 1").first();
                 const chunks = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };
 
@@ -2423,9 +2467,10 @@ export default {
                     // Only values still equal to what the advance wrote are put back, so later manual edits are kept.
                     for (const part of chunks(rows, 50)) {
                         await env.DB.batch(part.map(r => env.DB.prepare(
-                            "UPDATE Users SET year = CASE WHEN year = ? THEN ? ELSE year END, Program_Year = CASE WHEN Program_Year = ? THEN ? ELSE Program_Year END WHERE User_ID = ?"
-                        ).bind(r.New_Year, r.Old_Year, r.New_Program_Year, r.Old_Program_Year, r.User_ID)));
+                            "UPDATE Users SET year = CASE WHEN year = ? THEN ? ELSE year END, Program_Year = CASE WHEN Program_Year = ? THEN ? ELSE Program_Year END, account_status = CASE WHEN account_status = ? THEN ? ELSE account_status END WHERE User_ID = ?"
+                        ).bind(r.New_Year, r.Old_Year, r.New_Program_Year, r.Old_Program_Year, r.New_Status, r.Old_Status, r.User_ID)));
                     }
+                    await env.DB.prepare(`UPDATE Users SET ${CLEAR_REACTIVATION_SQL} WHERE Advanced_Term = ?`).bind(last.Academic_Year).run();
                     await env.DB.prepare("UPDATE Year_Advance_Batches SET Undone = 1 WHERE Batch_ID = ?").bind(last.Batch_ID).run();
                     return new Response(JSON.stringify({ success: true, restored: rows.length }), { status: 200, headers: corsHeaders });
                 }
@@ -2444,47 +2489,67 @@ export default {
                     return new Response(JSON.stringify({ error: `Year levels were already advanced for ${ay}. Undo that run first if it was a mistake.` }), { status: 409, headers: corsHeaders });
                 }
 
-                const students = (await env.DB.prepare("SELECT User_ID, Name, year, Program_Year FROM Users WHERE role COLLATE NOCASE = 'student'").all()).results;
-                const plan = [];
+                const students = (await env.DB.prepare("SELECT User_ID, Name, year, Program_Year, account_status FROM Users WHERE role COLLATE NOCASE = 'student'").all()).results;
+                const plan = [], grad = [], noYear = [];
                 let graduating = 0, unrecognized = 0;
                 for (const s of students) {
                     const ry = nextYearLevel(s.year, maxYear);
-                    if (ry.skip === "graduating") { graduating++; continue; }
+                    if (ry.skip === "graduating") { graduating++; grad.push({ id: s.User_ID, name: s.Name, year: s.year, status: s.account_status }); continue; }
                     const rp = nextYearLevel(s.Program_Year, maxYear);
-                    if (!ry.value && !rp.value) { unrecognized++; continue; }
+                    if (!ry.value && !rp.value) { unrecognized++; noYear.push(s.Name); continue; }
                     plan.push({
                         id: s.User_ID, name: s.Name, oy: s.year, opy: s.Program_Year,
-                        ny: ry.value || s.year, npy: rp.value || s.Program_Year
+                        ny: ry.value || s.year, npy: rp.value || s.Program_Year,
+                        deactivate: String(s.account_status || "").toLowerCase() === "active"
                     });
                 }
-                const summary = { total: students.length, advance: plan.length, graduating, unrecognized, maxYear };
+                const summary = { total: students.length, advance: plan.length, deactivate: plan.filter(p => p.deactivate).length, graduating, unrecognized, maxYear };
 
                 if (mode === "preview") {
                     return new Response(JSON.stringify({
                         success: true, ...summary, alreadyDone: !!dup,
                         sample: plan.slice(0, 5).map(p => ({ name: p.name, from: p.oy || p.opy, to: p.ny || p.npy })),
+                        advanceList: plan.slice(0, 300).map(p => ({ name: p.name, from: p.oy || p.opy, to: p.ny || p.npy })),
+                        graduatingList: grad.slice(0, 300).map(g => ({ name: g.name, year: g.year })),
+                        noYearList: noYear.slice(0, 300),
                         last: last ? { academicYear: last.Academic_Year, advanced: last.Advanced, appliedAt: last.Applied_At } : null
                     }), { status: 200, headers: corsHeaders });
                 }
 
+                // Optional: students at the highest level become "Graduated" (they can no longer sign in). Undo puts the status back.
+                const gradPlan = body.markGraduated ? grad.filter(g => String(g.status || "").toLowerCase() === "active") : [];
+                const reactivationUntil = /^\d{4}-\d{2}-\d{2}$/.test(String(body.reactivationUntil || "")) ? body.reactivationUntil : null;
                 const batchId = crypto.randomUUID();
                 await env.DB.prepare("INSERT INTO Year_Advance_Batches (Batch_ID, Academic_Year, Max_Year, Lecturer_ID, Advanced, Applied_At) VALUES (?, ?, ?, ?, ?, ?)")
                     .bind(batchId, ay, maxYear, body.lecturerId || null, plan.length, new Date().toISOString()).run();
                 for (const part of chunks(plan, 40)) {
                     const stmts = [];
                     for (const p of part) {
-                        stmts.push(env.DB.prepare("INSERT INTO Year_Advance_Log (Log_ID, Batch_ID, User_ID, Old_Year, New_Year, Old_Program_Year, New_Program_Year) VALUES (?, ?, ?, ?, ?, ?, ?)")
-                            .bind(crypto.randomUUID(), batchId, p.id, p.oy ?? null, p.ny ?? null, p.opy ?? null, p.npy ?? null));
-                        stmts.push(env.DB.prepare("UPDATE Users SET year = ?, Program_Year = ? WHERE User_ID = ?").bind(p.ny ?? null, p.npy ?? null, p.id));
+                        stmts.push(env.DB.prepare("INSERT INTO Year_Advance_Log (Log_ID, Batch_ID, User_ID, Old_Year, New_Year, Old_Program_Year, New_Program_Year, Old_Status, New_Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                            .bind(crypto.randomUUID(), batchId, p.id, p.oy ?? null, p.ny ?? null, p.opy ?? null, p.npy ?? null, p.deactivate ? "Active" : null, p.deactivate ? "Inactive" : null));
+                        // Moved-up students are Inactive until reactivated (they cannot sign in meanwhile).
+                        stmts.push(p.deactivate
+                            ? env.DB.prepare("UPDATE Users SET year = ?, Program_Year = ?, account_status = 'Inactive', Advanced_Term = ?, Reactivation_Until = ?, Reactivation_Requested = NULL WHERE User_ID = ?").bind(p.ny ?? null, p.npy ?? null, ay, reactivationUntil, p.id)
+                            : env.DB.prepare("UPDATE Users SET year = ?, Program_Year = ? WHERE User_ID = ?").bind(p.ny ?? null, p.npy ?? null, p.id));
                     }
                     await env.DB.batch(stmts);
                 }
-                return new Response(JSON.stringify({ success: true, ...summary, batchId }), { status: 200, headers: corsHeaders });
+                for (const part of chunks(gradPlan, 40)) {
+                    const stmts = [];
+                    for (const g of part) {
+                        stmts.push(env.DB.prepare("INSERT INTO Year_Advance_Log (Log_ID, Batch_ID, User_ID, Old_Year, New_Year, Old_Program_Year, New_Program_Year, Old_Status, New_Status) VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, 'Graduated')")
+                            .bind(crypto.randomUUID(), batchId, g.id, g.year ?? null, g.year ?? null, g.status));
+                        stmts.push(env.DB.prepare("UPDATE Users SET account_status = 'Graduated' WHERE User_ID = ?").bind(g.id));
+                    }
+                    await env.DB.batch(stmts);
+                }
+                return new Response(JSON.stringify({ success: true, ...summary, graduated: gradPlan.length, batchId }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "GET" && path === "/api/users") {
+                await ensureReactivationColumns(env);
                 const users = await env.DB.prepare(
-                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, role, registration_timestamp
+                    `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, role, registration_timestamp, Reactivation_Requested
                      FROM Users ORDER BY Name ASC`
                 ).all();
                 return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });
@@ -2495,8 +2560,10 @@ export default {
                 if (!body.studentId || !body.status) {
                     return new Response(JSON.stringify({ error: "Missing required parameters." }), { status: 400, headers: corsHeaders });
                 }
+                await ensureReactivationColumns(env);
+                // Setting a student Active (reactivating) closes the reactivation request.
                 await env.DB.prepare(
-                    `UPDATE Users SET account_status = ? WHERE User_ID = ?`
+                    `UPDATE Users SET account_status = ?${String(body.status).toLowerCase() === "active" ? ", " + CLEAR_REACTIVATION_SQL : ""} WHERE User_ID = ?`
                 ).bind(body.status, body.studentId).run();
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
             }
@@ -2547,6 +2614,42 @@ export default {
                 ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId, targetCourse, targetYear, targetSection, room, term.academicYear, term.semester).run();
 
                 return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
+            }
+
+            // Copies a class into another term: details, schedule, room and target, plus its exams (switched off, dates cleared).
+            // Students, attendance, scores and exam answers are not copied.
+            if (request.method === "POST" && path === "/api/duplicate-course") {
+                const body = await request.json();
+                const src = await env.DB.prepare("SELECT * FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
+                if (!src) return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                if (src.Lecturer_ID !== body.lecturerId) {
+                    return new Response(JSON.stringify({ error: "Only the lecturer of this class can copy it." }), { status: 403, headers: corsHeaders });
+                }
+                const term = cleanTerm(body.academicYear, body.semester);
+                if (term.error) return new Response(JSON.stringify({ error: term.error }), { status: 400, headers: corsHeaders });
+                if (!term.academicYear || !term.semester) {
+                    return new Response(JSON.stringify({ error: "Choose the academic year and semester for the copy." }), { status: 400, headers: corsHeaders });
+                }
+                const newId = crypto.randomUUID();
+                const stmts = [env.DB.prepare(
+                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section, Room, AcademicYear, Semester) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                ).bind(newId, src.CourseCode, src.CourseTitle, src.ScheduleDay, src.TimePeriod, src.Lecturer_ID, src.Target_Course || "", src.Target_Year || "", src.Target_Section || "", src.Room || "", term.academicYear, term.semester)];
+                const links = (await env.DB.prepare(
+                    `SELECT ce.Exam_ID, ce.Term, ce.Category, ce.Time_Limit, a.Title, a.Max_Score
+                     FROM Class_Exams ce LEFT JOIN Assessments a ON a.Assessment_ID = ce.Assessment_ID WHERE ce.Course_ID = ?`
+                ).bind(src.Course_ID).all()).results || [];
+                const today = new Date().toISOString().slice(0, 10);
+                for (const l of links) {
+                    const aId = crypto.randomUUID();
+                    stmts.push(env.DB.prepare(
+                        `INSERT INTO Assessments (Assessment_ID, Course_ID, Term, Category, Title, Max_Score, Date) VALUES (?, ?, ?, ?, ?, ?, ?)`
+                    ).bind(aId, newId, l.Term || "MidTerm", l.Category || "MajorExam", l.Title || "Exam", l.Max_Score || 0, today));
+                    stmts.push(env.DB.prepare(
+                        `INSERT INTO Class_Exams (Class_Exam_ID, Course_ID, Exam_ID, Assessment_ID, Term, Category, Is_Active, From_Date, To_Date, Time_Limit) VALUES (?, ?, ?, ?, ?, ?, 0, NULL, NULL, ?)`
+                    ).bind(crypto.randomUUID(), newId, l.Exam_ID, aId, l.Term || "MidTerm", l.Category || "MajorExam", l.Time_Limit || null));
+                }
+                for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
+                return new Response(JSON.stringify({ success: true, courseId: newId, exams: links.length }), { status: 201, headers: corsHeaders });
             }
 
             if (request.method === "POST" && path === "/api/update-course-room") {
@@ -2682,7 +2785,25 @@ export default {
                     `INSERT INTO Enrollments (Enrollment_ID, Course_ID, Student_ID) VALUES (?, ?, ?)`
                 ).bind(enrollId, body.courseId, body.studentId).run();
 
-                return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+                // A student set Inactive by Advance Year Level is reactivated when enrolled in a class of the term they were
+                // advanced into, or of the current term.
+                let reactivated = false;
+                try {
+                    await ensureReactivationColumns(env);
+                    const stu = await env.DB.prepare("SELECT account_status, Advanced_Term FROM Users WHERE User_ID = ?").bind(body.studentId).first();
+                    if (stu && stu.Advanced_Term && String(stu.account_status || "").toLowerCase() === "inactive") {
+                        const crs = await env.DB.prepare("SELECT AcademicYear, Semester FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
+                        const now = currentTermNow();
+                        const thisYear = crs && crs.AcademicYear && crs.AcademicYear === stu.Advanced_Term;
+                        const thisTerm = crs && crs.AcademicYear === now.ay && (!crs.Semester || crs.Semester === now.sem);
+                        if (thisYear || thisTerm) {
+                            await env.DB.prepare(`UPDATE Users SET account_status = 'Active', ${CLEAR_REACTIVATION_SQL} WHERE User_ID = ?`).bind(body.studentId).run();
+                            reactivated = true;
+                        }
+                    }
+                } catch (e) { /* enrollment is saved; reactivation can be done by hand */ }
+
+                return new Response(JSON.stringify({ success: true, reactivated }), { status: 201, headers: corsHeaders });
             }
 
             if (request.method === "POST" && path === "/api/unenroll") {
@@ -2752,6 +2873,7 @@ export default {
             }
 
             if (request.method === "GET" && path === "/api/course-details") {
+                await ensureReactivationColumns(env);
                 const courseId = url.searchParams.get("courseId");
                 if (!courseId) {
                     return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
@@ -2763,7 +2885,7 @@ export default {
                 }
 
                 const students = await env.DB.prepare(
-                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, e.Seat_Number, e.Group_Name, e.Assigned_Topic
+                    `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, u.Reactivation_Requested, e.Seat_Number, e.Group_Name, e.Assigned_Topic
                      FROM Enrollments e
                      JOIN Users u ON e.Student_ID = u.User_ID
                      WHERE e.Course_ID = ?`

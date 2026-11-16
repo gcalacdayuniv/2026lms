@@ -2,6 +2,7 @@
 import { apiFetch, AppState } from './globals.js';
 import { Components, getLoadableAvatarSrc } from './components.js';
 import { CourseAttendance } from './course-attendance.js';
+import { RosterTools } from './course-roster-tools.js';
 import { CoursePending } from './course-pending.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
@@ -405,7 +406,7 @@ export const CourseClass = {
                     s.account_status === 'Suspended' ? 'text-orange-500 border-orange-200 bg-orange-50' :
                     s.account_status === 'UD' ? 'text-red-500 border-red-200 bg-red-50' :
                     s.account_status === 'Dropped' ? 'text-red-700 border-red-300 bg-red-100' : 'text-gray-500 border-gray-200 bg-gray-50'
-                }">${s.account_status || 'Inactive'}</span>`;
+                }">${s.account_status || 'Inactive'}</span>${s.Reactivation_Requested ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black uppercase" title="Asked to be reactivated at the login screen">Reactivation requested</span>' : ''}`;
 
                 return `
                     <div class="student-enroll-item flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md shadow-sm hover:border-blue-300 transition">
@@ -464,6 +465,7 @@ export const CourseClass = {
         if (cached) {
             CourseClass.currentStudents = cached.students;
             root.innerHTML = Components.renderClassScreen(cached.course, cached.students);
+            RosterTools.apply();
             const d = document.getElementById('attendanceDate');
             if (d) earlyAttendance = CourseAttendance.loadAttendanceData(courseId, d.value);
         } else if (!skipSpinner) {
@@ -487,6 +489,7 @@ export const CourseClass = {
             if (redrawn) {
                 CourseClass.currentStudents = data.students;
                 root.innerHTML = Components.renderClassScreen(data.course, data.students);
+                RosterTools.apply();
             }
 
             const dateInput = document.getElementById('attendanceDate');

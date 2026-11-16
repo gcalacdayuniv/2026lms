@@ -57,8 +57,23 @@ export const RosterTools = {
         if (bar && bulk) bulk.style.top = `${64 + bar.offsetHeight + 2}px`;
     },
 
+    classId: () => window.location.hash.replace('#class-', ''),
+
+    // The first time a class screen is shown, put back the filter this class was last left on.
+    restoreView: () => {
+        const tools = $('rosterTools');
+        if (!tools || tools.dataset.viewRestored) return;
+        tools.dataset.viewRestored = '1';
+        try {
+            const f = localStorage.getItem(`roster_filter_${RosterTools.classId()}`);
+            const sel = $('rosterFilter');
+            if (f && sel && [...sel.options].some(o => o.value === f)) sel.value = f;
+        } catch (err) { /* storage unavailable */ }
+    },
+
     apply: () => {
         if (!$('rosterTools')) return;
+        RosterTools.restoreView();
         RosterTools.syncBulkTop();
         RosterTools.sortRows();
         const query = ($('rosterSearch').value || '').trim().toLowerCase();
@@ -182,9 +197,15 @@ export const RosterTools = {
     },
 
     onChange: (e) => {
-        if (e.target.id === 'rosterFilter') RosterTools.apply();
+        if (e.target.id === 'rosterFilter') {
+            try { localStorage.setItem(`roster_filter_${RosterTools.classId()}`, e.target.value); } catch (err) { /* storage unavailable */ }
+            RosterTools.apply();
+        }
         else if (e.target.id === 'rosterSort') {
-            try { localStorage.setItem('student_sort', e.target.value); } catch (err) { /* storage unavailable */ }
+            try {
+                localStorage.setItem('student_sort', e.target.value);
+                localStorage.setItem(`student_sort_${RosterTools.classId()}`, e.target.value);
+            } catch (err) { /* storage unavailable */ }
             RosterTools.apply();
         }
         else if (e.target.classList && e.target.classList.contains('roster-check')) RosterTools.updateSelection();

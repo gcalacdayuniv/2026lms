@@ -11,7 +11,7 @@ import { answerRows, writtenLayout } from './omr-sheet.js';
 import { gradeScanSet } from './scan-grade.js';
 import { questionPoints } from './grading.js';
 import { cellLabels, cellName, codeText, itemLabel, geoFor, writtenItems, rowType } from './scan-items.js';
-import { cropBoxes, writtenBoxes, drawCrops, setBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
+import { cropBoxes, alignRows, writtenBoxes, drawCrops, setBox, drawCrop, straightenLegacy, RECT_LAYOUT } from './omr-crop.js';
 
 const LETTERS = 'ABCDE';
 const BLANK = -1;
@@ -327,9 +327,10 @@ export const CourseScanReview = {
             if (mine !== CourseScanReview.token) { bitmap.close(); return; }
             CourseScanReview.bitmap = bitmap;
             if (layout === RECT_LAYOUT) {
+                const align = alignRows(bitmap, CourseScanReview.rows);   // cut where the rows really are in this photo
                 CourseScanReview.rows.forEach(r => {
                     const canvas = document.querySelector(`#scrvBody canvas[data-crop="${r.q}"]`);
-                    if (canvas) { drawCrops(canvas, bitmap, cropBoxes(r)); canvas.classList.add('is-ready'); }
+                    if (canvas) { drawCrops(canvas, bitmap, cropBoxes(r, align)); canvas.classList.add('is-ready'); }
                 });
                 CourseScanReview.manualOf(sheet).forEach(({ it, i }) => {
                     const canvas = document.querySelector(`#scrvBody canvas[data-wcrop="${i}"]`);
