@@ -76,6 +76,22 @@ export const StudentSummaryUI = {
         btn.focus();
     },
 
+    // A long group name or topic slides back and forth inside its box so it can be read in full.
+    marquee: (id) => {
+        const span = $(id);
+        const box = span && span.parentElement;
+        if (!box) return;
+        box.classList.remove('is-scrolling');
+        requestAnimationFrame(() => {
+            const over = span.scrollWidth - box.clientWidth;
+            if (over > 2) {
+                box.style.setProperty('--ss-shift', `-${over + 6}px`);
+                box.style.setProperty('--ss-dur', `${Math.max(5, Math.round(over / 22) + 3)}s`);
+                box.classList.add('is-scrolling');
+            }
+        });
+    },
+
     init: () => {
         const modal = $('studentSummaryModal');
         if (!modal || modal.dataset.ssInit) return;
@@ -103,7 +119,6 @@ export const StudentSummaryUI = {
         new MutationObserver(() => { if (modal.classList.contains('hidden')) $('ssActionBar')?.classList.add('hidden'); })
             .observe(modal, { attributes: true, attributeFilter: ['class'] });
 
-        $('ssTopicChip')?.addEventListener('click', () => StudentSummaryUI.callout('Topic', $('ssTopic')?.textContent || ''));
         $('ssTermTabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest && e.target.closest('.ss-term-tab');
             if (btn) { $('detailsModal')?.classList.add('hidden'); StudentSummaryUI.show(btn.dataset.term); modal.scrollTo?.({ top: 0 }); }

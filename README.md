@@ -84,7 +84,7 @@ The database uses Universally Unique Identifiers (UUIDs) for all primary keys, g
 **Note: Ensure the following tables are created and updated for the system to function correctly:**
 * **`Programs`:** Program_ID (UUID), ProgramCode (e.g., BSCS, BSIT).
 * **`Users`:** User_ID (UUID), Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section (lecturer-assigned program details, separate from the class `course`/`year`/`section`; added by `migrations/001_program_fields.sql`), eye_condition (`No Eye Condition`, `Near Sighted`, `Far Sighted`, `Legally Blind`), role (Default: 'Student'), registration_timestamp (DATETIME).
-* **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section, Midterm_Start, Midterm_End, Final_Start, Final_End.
+* **`Courses`:** Course_ID (UUID), CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID (FK mapped to Users.User_ID), Target_Course, Target_Year, Target_Section, Room, Archived, AcademicYear (e.g. `2026-2027`), Semester (`1st Semester`, `2nd Semester`, `Summer`), Midterm_Start, Midterm_End, Final_Start, Final_End.
 * **`Enrollments`:** Enrollment_ID (UUID), Course_ID (FK), Student_ID (FK), Seat_Number, Group_Name, Assigned_Topic.
 * **`Course_Sessions`:** Session_ID (UUID), Course_ID (FK), Date (TEXT), Is_No_Class (INTEGER).
 * **`Attendance`:** Attendance_ID (UUID), Course_ID (FK mapped to Courses.Course_ID), Student_ID (FK mapped to Users.User_ID), Date, Status (Present, Late, Absent, Excused), Performance_Points (Integer).
@@ -118,6 +118,7 @@ We use the following environment variables strictly within the API (`worker/wran
 * **`GAS_WEBHOOK_URL`**: The proxy endpoint used to transmit base64 payloads to Google Apps Script.
 
 ## Recent Feature & Security Updates
+* **Student course summary header:** the small heading is the course code (instead of "My Course Summary") with the title under it. Seat, Group and Topic sit on one line, each label above its value; a long group name or topic slides back and forth so it can be read in full (the topic pop-up is gone; the group still opens its members list). Submission History is a full-screen page on phones like Submit Document (`js/components-dashboard.js`, `js/course.js`, `js/student-summary-ui.js`, `styles.css`).
 * **Class screen header:** the "Class Roster & Attendance" heading is gone; the schedule day and time, room, target audience badge and the edit (pencil) button now sit at the right of the blue header bar (`js/components-class.js`; the button keeps id `editRoomBtn`).
 * **Student list sorting:** the class roster (attendance tab) and the Add Student list have a sort drop-down: Default order (as before), Name (A-Z) or Student number (numbers compared as numbers, blanks last). The choice is kept on the device (`localStorage` key `student_sort`). Sorting only moves rows; saving and filtering are unaffected (`js/course-roster-tools.js`, `js/components-class.js`, `js/course-class.js`, `js/course.js`).
 * **Attendance unsaved indicator:** the orange dot on Save All and the "Unsaved changes" label are hidden unless the date on screen has unsaved changes or this device keeps a draft for another date; they used to show all the time (`js/course-attendance.js`, `js/components-class.js`).
@@ -309,3 +310,21 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 
 ## Delete an exam that has records
 - Delete is always shown. For an exam used in class records it asks for confirmation, then removes the exam, its class links and the students' answer records; every score stays (`Assessment_Scores` is untouched, and any exam score not yet copied there is copied first). Scanned sheets are not touched. (`js/course-exam.js`, `worker/worker.js` `/api/exams/delete` with `force`).
+
+## Attendance Bar Tools
+- Sort, Filter and Select moved from the roster header into the sticky attendance bar (next to the date and Save All).
+- On mobile they collapse behind a three-dot button (`#attendanceMoreBtn`) that expands the row (`#attendanceBarTools`); the bulk-action bar offset follows the bar height (`RosterTools.syncBulkTop`).
+- Files: `js/components-class.js`, `js/course-roster-tools.js`, `styles.css` (`.att-tools-open`).
+
+## Academic Year and Semester
+- Courses have two optional columns, `AcademicYear` and `Semester`, added automatically by `ensureCourseRoom` in `worker/worker.js` (no manual migration).
+- Create Course and Edit Class Details have an Academic Year field (`YYYY-YYYY`, second year = first + 1, validated by `cleanTerm` in the worker) and a Semester select.
+- Shown under the course title in the class header and on the lecturer course cards ("AY 2026-2027 · 1st Semester").
+
+## Advance Year Level
+- Dashboard menu > Manage > **Advance Year Level** (`js/year-advance.js`, endpoint `POST /api/advance-year-level`, lecturer only).
+- Choose the new academic year and the highest year level (default 4), press **Preview** (counts: will advance / at highest level / no year set), then **Advance all students**.
+- Both `Users.year` (drives which classes a student can see and join) and `Users.Program_Year` go up by one; `1` becomes `2`, `3rd Year` becomes `4th Year`. Students at the highest level or without a year are left unchanged.
+- A run for an academic year can only be applied once (409 otherwise). Each run is logged in `Year_Advance_Batches` and `Year_Advance_Log` (created automatically); **Undo last advance** restores the old values, keeping any year edited manually since.
+- Students enrolled in existing classes stay enrolled; classes with a Target Year should be edited or recreated for the new term.
+- Modes of the endpoint: `preview`, `apply`, `undo`.

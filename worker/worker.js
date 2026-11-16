@@ -1233,12 +1233,50 @@ function upsertAttendance(env, courseId, studentId, date, status, points) {
     ];
 }
 
+// Year-level advance: moves every student up one year level (Users.year, which drives class targeting, and
+// Program_Year). Each run is logged per student so the latest run can be undone.
+let yearAdvanceReady = false;
+async function ensureYearAdvanceTables(env) {
+    if (yearAdvanceReady) return;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Year_Advance_Batches (Batch_ID TEXT PRIMARY KEY, Academic_Year TEXT, Max_Year INTEGER, Lecturer_ID TEXT, Advanced INTEGER, Applied_At TEXT, Undone INTEGER DEFAULT 0)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Year_Advance_Log (Log_ID TEXT PRIMARY KEY, Batch_ID TEXT NOT NULL, User_ID TEXT NOT NULL, Old_Year TEXT, New_Year TEXT, Old_Program_Year TEXT, New_Program_Year TEXT)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_year_log_batch ON Year_Advance_Log (Batch_ID)").run();
+    yearAdvanceReady = true;
+}
+// "1" -> "2", "3rd Year" -> "4th Year". At or above maxYear = graduating; no leading number = unrecognized.
+function nextYearLevel(v, maxYear) {
+    const m = /^(\d{1,2})(.*)$/.exec(String(v == null ? "" : v).trim());
+    if (!m || Number(m[1]) < 1) return { skip: "unrecognized" };
+    const n = Number(m[1]);
+    if (n >= maxYear) return { skip: "graduating" };
+    const nn = n + 1;
+    let rest = m[2];
+    if (/^(st|nd|rd|th)(?![a-z])/i.test(rest)) {
+        const suf = nn % 100 >= 11 && nn % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[nn % 10] || "th");
+        rest = suf + rest.replace(/^(st|nd|rd|th)/i, "");
+    }
+    return { value: String(nn) + rest };
+}
+
+// Academic year ("2026-2027", second year = first + 1) and semester are both optional.
+const SEMESTERS = ["1st Semester", "2nd Semester", "Summer"];
+function cleanTerm(ay, sem) {
+    const a = ay === undefined || ay === null ? "" : String(ay).trim().replace(/\s+/g, "");
+    const s = sem === undefined || sem === null ? "" : String(sem).trim();
+    if (a) {
+        const m = /^(\d{4})-(\d{4})$/.exec(a);
+        if (!m || Number(m[2]) !== Number(m[1]) + 1) return { error: "Academic year must look like 2026-2027." };
+    }
+    if (s && !SEMESTERS.includes(s)) return { error: "Choose a valid semester." };
+    return { academicYear: a, semester: s };
+}
+
 // Room = the classroom the class meets in. Added to an existing Courses table the first time it is needed.
 let courseRoomReady = false;
 async function ensureCourseRoom(env) {
     if (courseRoomReady) return;
     // Archived = 1: the lecturer put the class away (hidden from the main list, nothing deleted).
-    for (const col of ["Room TEXT", "Archived INTEGER"]) {
+    for (const col of ["Room TEXT", "Archived INTEGER", "AcademicYear TEXT", "Semester TEXT"]) {
         try {
             await env.DB.prepare(`ALTER TABLE Courses ADD COLUMN ${col}`).run();
         } catch (err) {
@@ -2372,6 +2410,78 @@ export default {
                 return new Response(JSON.stringify({ success: true, message: "Password reset successfully", tempPassword }), { status: 200, headers: corsHeaders });
             }
 
+            if (request.method === "POST" && path === "/api/advance-year-level") {
+                const body = await request.json();
+                const mode = body.mode;
+                await ensureYearAdvanceTables(env);
+                const last = await env.DB.prepare("SELECT Batch_ID, Academic_Year, Advanced, Applied_At FROM Year_Advance_Batches WHERE COALESCE(Undone, 0) = 0 ORDER BY Applied_At DESC LIMIT 1").first();
+                const chunks = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };
+
+                if (mode === "undo") {
+                    if (!last) return new Response(JSON.stringify({ error: "There is no advance to undo." }), { status: 404, headers: corsHeaders });
+                    const rows = (await env.DB.prepare("SELECT * FROM Year_Advance_Log WHERE Batch_ID = ?").bind(last.Batch_ID).all()).results;
+                    // Only values still equal to what the advance wrote are put back, so later manual edits are kept.
+                    for (const part of chunks(rows, 50)) {
+                        await env.DB.batch(part.map(r => env.DB.prepare(
+                            "UPDATE Users SET year = CASE WHEN year = ? THEN ? ELSE year END, Program_Year = CASE WHEN Program_Year = ? THEN ? ELSE Program_Year END WHERE User_ID = ?"
+                        ).bind(r.New_Year, r.Old_Year, r.New_Program_Year, r.Old_Program_Year, r.User_ID)));
+                    }
+                    await env.DB.prepare("UPDATE Year_Advance_Batches SET Undone = 1 WHERE Batch_ID = ?").bind(last.Batch_ID).run();
+                    return new Response(JSON.stringify({ success: true, restored: rows.length }), { status: 200, headers: corsHeaders });
+                }
+
+                if (mode !== "preview" && mode !== "apply") {
+                    return new Response(JSON.stringify({ error: "Unknown mode." }), { status: 400, headers: corsHeaders });
+                }
+                const maxYear = Math.min(10, Math.max(1, parseInt(body.maxYear, 10) || 4));
+                const ay = body.academicYear ? String(body.academicYear).trim() : "";
+                const m = /^(\d{4})-(\d{4})$/.exec(ay);
+                if (mode === "apply" && (!m || Number(m[2]) !== Number(m[1]) + 1)) {
+                    return new Response(JSON.stringify({ error: "Enter the academic year the students are moving into, like 2027-2028." }), { status: 400, headers: corsHeaders });
+                }
+                const dup = ay ? await env.DB.prepare("SELECT Batch_ID FROM Year_Advance_Batches WHERE Academic_Year = ? AND COALESCE(Undone, 0) = 0").bind(ay).first() : null;
+                if (mode === "apply" && dup) {
+                    return new Response(JSON.stringify({ error: `Year levels were already advanced for ${ay}. Undo that run first if it was a mistake.` }), { status: 409, headers: corsHeaders });
+                }
+
+                const students = (await env.DB.prepare("SELECT User_ID, Name, year, Program_Year FROM Users WHERE role COLLATE NOCASE = 'student'").all()).results;
+                const plan = [];
+                let graduating = 0, unrecognized = 0;
+                for (const s of students) {
+                    const ry = nextYearLevel(s.year, maxYear);
+                    if (ry.skip === "graduating") { graduating++; continue; }
+                    const rp = nextYearLevel(s.Program_Year, maxYear);
+                    if (!ry.value && !rp.value) { unrecognized++; continue; }
+                    plan.push({
+                        id: s.User_ID, name: s.Name, oy: s.year, opy: s.Program_Year,
+                        ny: ry.value || s.year, npy: rp.value || s.Program_Year
+                    });
+                }
+                const summary = { total: students.length, advance: plan.length, graduating, unrecognized, maxYear };
+
+                if (mode === "preview") {
+                    return new Response(JSON.stringify({
+                        success: true, ...summary, alreadyDone: !!dup,
+                        sample: plan.slice(0, 5).map(p => ({ name: p.name, from: p.oy || p.opy, to: p.ny || p.npy })),
+                        last: last ? { academicYear: last.Academic_Year, advanced: last.Advanced, appliedAt: last.Applied_At } : null
+                    }), { status: 200, headers: corsHeaders });
+                }
+
+                const batchId = crypto.randomUUID();
+                await env.DB.prepare("INSERT INTO Year_Advance_Batches (Batch_ID, Academic_Year, Max_Year, Lecturer_ID, Advanced, Applied_At) VALUES (?, ?, ?, ?, ?, ?)")
+                    .bind(batchId, ay, maxYear, body.lecturerId || null, plan.length, new Date().toISOString()).run();
+                for (const part of chunks(plan, 40)) {
+                    const stmts = [];
+                    for (const p of part) {
+                        stmts.push(env.DB.prepare("INSERT INTO Year_Advance_Log (Log_ID, Batch_ID, User_ID, Old_Year, New_Year, Old_Program_Year, New_Program_Year) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                            .bind(crypto.randomUUID(), batchId, p.id, p.oy ?? null, p.ny ?? null, p.opy ?? null, p.npy ?? null));
+                        stmts.push(env.DB.prepare("UPDATE Users SET year = ?, Program_Year = ? WHERE User_ID = ?").bind(p.ny ?? null, p.npy ?? null, p.id));
+                    }
+                    await env.DB.batch(stmts);
+                }
+                return new Response(JSON.stringify({ success: true, ...summary, batchId }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "GET" && path === "/api/users") {
                 const users = await env.DB.prepare(
                     `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, role, registration_timestamp
@@ -2427,10 +2537,14 @@ export default {
                 const targetYear = body.targetYear ? body.targetYear.trim() : "";
                 const targetSection = body.targetSection ? body.targetSection.trim() : "";
                 const room = body.room ? String(body.room).trim().slice(0, 60) : "";
+                const term = cleanTerm(body.academicYear, body.semester);
+                if (term.error) {
+                    return new Response(JSON.stringify({ error: term.error }), { status: 400, headers: corsHeaders });
+                }
 
                 await env.DB.prepare(
-                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section, Room) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-                ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId, targetCourse, targetYear, targetSection, room).run();
+                    `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section, Room, AcademicYear, Semester) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId, targetCourse, targetYear, targetSection, room, term.academicYear, term.semester).run();
 
                 return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
             }
@@ -2472,13 +2586,18 @@ export default {
                 if (!days.includes(d.day)) {
                     return new Response(JSON.stringify({ error: "Choose a valid schedule day." }), { status: 400, headers: corsHeaders });
                 }
+                const term = cleanTerm(body.academicYear, body.semester);
+                if (term.error) {
+                    return new Response(JSON.stringify({ error: term.error }), { status: 400, headers: corsHeaders });
+                }
                 await env.DB.prepare(
                     `UPDATE Courses SET CourseCode = ?, CourseTitle = ?, ScheduleDay = ?, TimePeriod = ?, Room = ?,
-                        Target_Course = ?, Target_Year = ?, Target_Section = ? WHERE Course_ID = ?`
-                ).bind(d.code, d.title, d.day, d.time, d.room, d.tc, d.ty, d.ts, body.courseId).run();
+                        Target_Course = ?, Target_Year = ?, Target_Section = ?, AcademicYear = ?, Semester = ? WHERE Course_ID = ?`
+                ).bind(d.code, d.title, d.day, d.time, d.room, d.tc, d.ty, d.ts, term.academicYear, term.semester, body.courseId).run();
                 return new Response(JSON.stringify({ success: true, course: {
                     CourseCode: d.code, CourseTitle: d.title, ScheduleDay: d.day, TimePeriod: d.time, Room: d.room,
-                    Target_Course: d.tc, Target_Year: d.ty, Target_Section: d.ts
+                    Target_Course: d.tc, Target_Year: d.ty, Target_Section: d.ts,
+                    AcademicYear: term.academicYear, Semester: term.semester
                 } }), { status: 200, headers: corsHeaders });
             }
 

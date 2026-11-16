@@ -128,6 +128,10 @@ const DashboardUI = {
                             <span class="menu-tile-icon bg-purple-100 text-purple-700"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Registration List</span>
                         </button>
+                        <button type="button" id="openYaModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-orange-100 text-orange-700"><i class="fa-solid fa-turn-up" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Advance Year Level</span>
+                        </button>
                         <button type="button" id="openMuModalBtn" class="menu-tile">
                             <span class="menu-tile-icon bg-green-100 text-green-700"><i class="fa-solid fa-users-gear" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Manage Users</span>
@@ -383,6 +387,19 @@ const DashboardUI = {
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider" for="courseAY">Academic Year</label>
+                            <input type="text" id="courseAY" maxlength="9" inputmode="numeric" pattern="\\d{4}-\\d{4}" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="2026-2027">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider" for="courseSemester">Semester</label>
+                            <select id="courseSemester" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                                <option value="">Not set</option><option>1st Semester</option><option>2nd Semester</option><option>Summer</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Schedule Day</label>
                             <select id="scheduleDay" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
                                 <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
@@ -526,14 +543,14 @@ const DashboardUI = {
     `,
 
     renderSubmissionHistoryModal: () => `
-        <div id="submissionHistoryModal" class="hidden fixed inset-0 z-[100] flex items-end sm:items-center justify-center fade-in p-0 sm:p-4">
+        <div id="submissionHistoryModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmissionHistoryModalBg"></div>
-            <div class="bg-white rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-md p-4 sm:p-6 relative z-10 sheet-panel max-h-[85vh] flex flex-col">
-                <div class="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" aria-hidden="true"></div>
-                <div class="flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-clock-rotate-left text-green-600 mr-2"></i>Submission History</h3>
-                    <button id="closeSubmissionHistoryModalBtn" class="text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
-                        <i class="fa-solid fa-xmark text-xl"></i>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-clock-rotate-left text-green-600 mr-2"></i>Submission History</h3>
+                    <button id="closeSubmissionHistoryModalBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden"></i>
+                        <i class="fa-solid fa-xmark text-xl hidden sm:inline"></i>
                     </button>
                 </div>
                 <div id="historySubmissionsList" class="flex-1 overflow-y-auto space-y-2 p-1">
@@ -568,18 +585,14 @@ const DashboardUI = {
                         <i class="fa-solid fa-arrow-left text-xl"></i>
                     </button>
                     <div class="min-w-0 flex-1">
-                        <div class="text-[11px] font-bold uppercase tracking-wider text-blue-100">My Course Summary</div>
+                        <div id="ssCourseCode" class="text-[11px] font-bold uppercase tracking-wider text-blue-100 truncate">Course</div>
                         <div id="ssCourseTitle" class="font-black text-white text-lg leading-tight truncate"></div>
                     </div>
                 </div>
-                <div id="ssEnrollmentInfo" class="hidden max-w-4xl mx-auto px-4 sm:px-6 pb-3 flex flex-wrap gap-2">
-                    <span class="ss-chip"><i class="fa-solid fa-chair" aria-hidden="true"></i> Seat <b id="ssSeat">-</b></span>
-                    <span class="ss-chip"><i class="fa-solid fa-user-group" aria-hidden="true"></i> Group <b id="ssGroup">-</b></span>
-                    <button type="button" id="ssTopicChip" class="ss-chip ss-chip-topic" aria-haspopup="dialog" aria-label="Show full topic">
-                        <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
-                        <span class="ss-topic-text">Topic <b id="ssTopic">-</b></span>
-                        <i class="fa-solid fa-circle-info ss-info" aria-hidden="true"></i>
-                    </button>
+                <div id="ssEnrollmentInfo" class="hidden ss-info-grid max-w-4xl mx-auto px-4 sm:px-6 pb-3">
+                    <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-chair" aria-hidden="true"></i> Seat</div><div class="ss-info-val"><span id="ssSeat">-</span></div></div>
+                    <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-user-group" aria-hidden="true"></i> Group</div><div class="ss-info-val ss-marq"><span id="ssGroup">-</span></div></div>
+                    <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Topic</div><div class="ss-info-val ss-marq"><span id="ssTopic">-</span></div></div>
                 </div>
                 <div id="ssTermTabs" class="ss-tabs max-w-4xl mx-auto" role="tablist" aria-label="Term">
                     <button type="button" role="tab" class="ss-term-tab is-active" data-term="midterm" aria-selected="true">Mid Term</button>

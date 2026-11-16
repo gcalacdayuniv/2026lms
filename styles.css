@@ -341,3 +341,17 @@ html[data-theme="dark"] .scrv-banner.is-info { background: #172554; color: #bfdb
 html[data-theme="dark"] .scrv-banner.is-warn { background: #3a2a10; color: #fcd34d; }
 @media (prefers-reduced-motion: reduce) { .scrv-ph.is-loading { animation: none; } }
 #detailsModal[style*="top:"] .details-top { padding-top: 0; }
+
+/* Student summary: seat / group / topic in one line, label above value; long values slide so they can be read */
+.ss-info-grid { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.4fr); gap: .35rem .9rem; }
+.ss-info-cell { min-width: 0; color: #fff; }
+.ss-info-label { font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #c7d2fe; white-space: nowrap; }
+.ss-info-label i { margin-right: .2rem; }
+.ss-info-val { font-size: .85rem; font-weight: 800; line-height: 1.25; min-width: 0; white-space: nowrap; overflow: hidden; }
+.ss-info-val > span { display: inline-block; }
+.ss-marq.is-scrolling > span { animation: ssMarq var(--ss-dur, 8s) ease-in-out 1s infinite alternate; }
+@keyframes ssMarq { from { transform: translateX(0); } to { transform: translateX(var(--ss-shift, 0)); } }
+@media (prefers-reduced-motion: reduce) { .ss-marq { overflow-x: auto; } .ss-marq.is-scrolling > span { animation: none; } }
+
+/* Class screen (phones): the sort / filter / select row opens from the three-dot button */
+.att-tools-open { display: flex !important; }

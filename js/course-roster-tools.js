@@ -20,6 +20,7 @@ export const RosterTools = {
         document.addEventListener('input', RosterTools.onInput);
         document.addEventListener('change', RosterTools.onChange);
         document.addEventListener('click', RosterTools.onClick);
+        window.addEventListener('resize', () => RosterTools.syncBulkTop());
     },
 
     matches: (row, query, filter) => {
@@ -50,8 +51,15 @@ export const RosterTools = {
         sorted.forEach(row => parent.appendChild(row));
     },
 
+    // The selection bar sticks just under the attendance bar, whatever height the bar has (the phone menu makes it taller).
+    syncBulkTop: () => {
+        const bar = $('attendanceBar'), bulk = $('rosterBulkBar');
+        if (bar && bulk) bulk.style.top = `${64 + bar.offsetHeight + 2}px`;
+    },
+
     apply: () => {
         if (!$('rosterTools')) return;
+        RosterTools.syncBulkTop();
         RosterTools.sortRows();
         const query = ($('rosterSearch').value || '').trim().toLowerCase();
         const filter = $('rosterFilter').value || 'all';
@@ -85,6 +93,7 @@ export const RosterTools = {
 
     setSelecting: (on) => {
         RosterTools.selecting = on;
+        RosterTools.syncBulkTop();
         rows().forEach(row => {
             const box = row.querySelector('.roster-check');
             if (!box) return;
@@ -184,6 +193,12 @@ export const RosterTools = {
 
     onClick: (e) => {
         const t = e.target;
+        if (t.closest('#attendanceMoreBtn')) {
+            const open = $('attendanceBarTools').classList.toggle('att-tools-open');
+            $('attendanceMoreBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+            RosterTools.syncBulkTop();
+            return;
+        }
         if (t.closest('#rosterSelectToggle')) { RosterTools.setSelecting(!RosterTools.selecting); return; }
         if (t.closest('#rosterSelectShown')) {
             rows().filter(isShown).forEach(r => { const b = r.querySelector('.roster-check'); if (b) b.checked = true; });

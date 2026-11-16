@@ -586,6 +586,11 @@ const openEditClass = async (btn) => {
                 <div><label class="${LABEL}" for="ecCode">Course Code</label><input type="text" id="ecCode" required maxlength="40" class="${FIELD}" value="${escapeHtml(d.code)}"></div>
                 <div><label class="${LABEL}" for="ecTitle">Course Title</label><input type="text" id="ecTitle" required maxlength="200" class="${FIELD}" value="${escapeHtml(d.title)}"></div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="${LABEL}" for="ecAY">Academic Year</label><input type="text" id="ecAY" maxlength="9" inputmode="numeric" pattern="\\d{4}-\\d{4}" class="${FIELD}" value="${escapeHtml(d.academicYear || '')}" placeholder="2026-2027"></div>
+                    <div><label class="${LABEL}" for="ecSemester">Semester</label>
+                        <select id="ecSemester" class="${FIELD}"><option value="">Not set</option>${['1st Semester', '2nd Semester', 'Summer'].map(x => `<option${x === d.semester ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><label class="${LABEL}" for="ecDay">Schedule Day</label>
                         <select id="ecDay" class="${FIELD}">${days.map(x => `<option${x === d.day ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
                     <div><label class="${LABEL}" for="ecTime">Time Period</label><input type="text" id="ecTime" required maxlength="60" class="${FIELD}" value="${escapeHtml(d.time)}" placeholder="9:00 AM - 12:00 PM"></div>
@@ -634,7 +639,8 @@ const saveEditClass = async (form) => {
             body: JSON.stringify({
                 courseId, lecturerId: AppState.user.User_ID,
                 courseCode: v('ecCode'), courseTitle: v('ecTitle'), scheduleDay: document.getElementById('ecDay').value, timePeriod: v('ecTime'),
-                room: v('ecRoom'), targetCourse: v('ecTargetCourse'), targetYear: v('ecTargetYear'), targetSection: v('ecTargetSection')
+                room: v('ecRoom'), targetCourse: v('ecTargetCourse'), targetYear: v('ecTargetYear'), targetSection: v('ecTargetSection'),
+                academicYear: v('ecAY'), semester: document.getElementById('ecSemester').value
             })
         });
         try { localStorage.removeItem(classCacheKey(courseId)); } catch (e) { /* storage blocked */ }

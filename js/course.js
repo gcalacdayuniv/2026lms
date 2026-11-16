@@ -7,6 +7,8 @@ import { CourseRecitation } from './course-recitation.js';
 import { CourseExam } from './course-exam.js';
 import { getLoadableAvatarSrc } from './components.js';
 import { UI } from './ui-feedback.js';
+import { StudentSummaryUI } from './student-summary-ui.js';
+import './year-advance.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
 export const CourseModule = {
@@ -300,7 +302,10 @@ export const CourseModule = {
             const courseId = card.dataset.courseId;
             const courseTitle = card.dataset.courseTitle;
 
-            document.getElementById('ssCourseTitle').textContent = courseTitle;
+            // the card holds "CODE | Title": the code is the small heading, the title sits under it
+            const sep = String(courseTitle || '').indexOf(' | ');
+            document.getElementById('ssCourseCode').textContent = sep > -1 ? courseTitle.slice(0, sep) : 'Course';
+            document.getElementById('ssCourseTitle').textContent = sep > -1 ? courseTitle.slice(sep + 3) : courseTitle;
             document.getElementById('ssEnrollmentInfo').classList.add('hidden');
 
             document.getElementById('studentSummaryModal').classList.remove('hidden');
@@ -338,6 +343,8 @@ export const CourseModule = {
 
                     document.getElementById('ssTopic').textContent = data.enrollment.Assigned_Topic || 'N/A';
                     document.getElementById('ssEnrollmentInfo').classList.remove('hidden');
+                    StudentSummaryUI.marquee('ssGroup');
+                    StudentSummaryUI.marquee('ssTopic');
                 }
 
                 const submitBtn = document.getElementById('openSubmitDocModalBtn');

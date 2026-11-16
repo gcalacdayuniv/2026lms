@@ -312,6 +312,7 @@ const lecturerCourseCardHtml = (c) => `
                         <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
                             <i class="fa-regular fa-calendar mr-1"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(c.TimePeriod)}${c.Room ? ` &nbsp;|&nbsp; <i class="fa-solid fa-door-open mr-1"></i> ${escapeHtml(c.Room)}` : ''}
                         </div>
+                        ${(c.AcademicYear || c.Semester) ? `<div class="mt-2 text-[11px] font-bold text-gray-500"><i class="fa-solid fa-graduation-cap mr-1" aria-hidden="true"></i>${escapeHtml([c.AcademicYear && 'AY ' + c.AcademicYear, c.Semester].filter(Boolean).join(' · '))}</div>` : ''}
                         ${courseChipsHtml(c)}
                     </a>
                     <div class="grid grid-cols-3 border-t border-gray-100 text-xs font-bold text-gray-600">
@@ -697,6 +698,8 @@ export const CourseDashboard = {
             scheduleDay: document.getElementById('scheduleDay').value,
             timePeriod: document.getElementById('timePeriod').value.trim(),
             room: document.getElementById('courseRoom').value.trim(),
+            academicYear: document.getElementById('courseAY').value.trim(),
+            semester: document.getElementById('courseSemester').value,
             targetCourse: document.getElementById('targetCourse').value.trim(),
             targetYear: document.getElementById('targetYear').value.trim(),
             targetSection: document.getElementById('targetSection').value.trim(),
