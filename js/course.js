@@ -615,7 +615,7 @@ export const CourseModule = {
             }
         }
 
-        if (e.target.closest('#openAddStudentModalBtn')) {
+        if (e.target.closest('#openAddStudentModalBtn, .open-add-student')) {
             document.getElementById('courseMenuModal').classList.add('hidden');
             document.getElementById('addStudentModal').classList.remove('hidden');
 

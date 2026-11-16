@@ -328,3 +328,10 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - A run for an academic year can only be applied once (409 otherwise). Each run is logged in `Year_Advance_Batches` and `Year_Advance_Log` (created automatically); **Undo last advance** restores the old values, keeping any year edited manually since.
 - Students enrolled in existing classes stay enrolled; classes with a Target Year should be edited or recreated for the new term.
 - Modes of the endpoint: `preview`, `apply`, `undo`.
+
+## UX Polish (scanner, exam builder, general)
+- **Scanner:** a progress bar "N of M students scanned" (M = enrolled students) above the sheet list; sheets with no student, a duplicate student, no set, hand-marking or double-shaded answers get a **Needs review** badge, and the "N need review - jump" button scrolls to the next one (`CourseScanner.needsReview`, `updateTally`, `jumpToReview`).
+- **Exam builder:** the status next to the question count shows Unsaved changes (amber), Draft kept on this device + time (green) and Saving... (blue) (`ExamBuilder.setNote`).
+- **Offline banner:** when offline and work is waiting on the device, the banner shows "N unsaved on this device - tap to view" and opens the Unsaved on Device list (`unsaved-count` event from `UnsavedCenter.updateBadge`).
+- **Tap targets:** on touch screens, small icon buttons (w/h 6-8, page close buttons, check/wrong buttons) get an invisible 44px tap area (`styles.css`, `@media (pointer: coarse)`).
+- **Empty state:** a class with no students shows an icon, a hint and an "Add students" button (`.open-add-student`).

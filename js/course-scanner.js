@@ -897,10 +897,18 @@ export const CourseScanner = {
             `<div class="text-[10px] text-gray-500">${s.raw} ${s.points ? 'pts' : 'correct'}${s.bonus ? ` + ${s.bonus} bonus` : ''}</div>`;
     },
 
+    // A sheet the lecturer should look at before trusting its score.
+    needsReview: (row, dups) => {
+        if (!row.ok || !CourseScanner.cfg) return false;
+        const s = CourseScanner.scoreRow(row, CourseScanner.cfg.cap);
+        return !row.studentId || dups.has(row.studentId) || CourseScanner.needsSet(row) || s.pending > 0 || s.multi > 0;
+    },
+
     flagsHtml: (row, dups) => {
         const s = CourseScanner.scoreRow(row, CourseScanner.cfg.cap);
         const badge = (cls, text) => `<span class="text-[10px] font-bold px-2 py-0.5 rounded border ${cls}">${text}</span>`;
         const out = [];
+        if (CourseScanner.needsReview(row, dups)) out.push(badge('bg-amber-500 text-white border-amber-600', '<i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>Needs review'));
         if (!row.studentId) out.push(badge('bg-amber-50 text-amber-800 border-amber-300', 'No student matched - pick one'));
         else if (dups.has(row.studentId)) out.push(badge('bg-red-50 text-red-700 border-red-300', 'Duplicate - another sheet has this student'));
         if (CourseScanner.needsSet(row)) out.push(badge('bg-amber-50 text-amber-800 border-amber-300', 'Set not shaded - pick the set'));
@@ -1017,7 +1025,7 @@ export const CourseScanner = {
 
         const answers = row.answers.map((_, q) => CourseScanner.answerSelectHtml(row, q)).join('');
 
-        return `<div class="bg-white border ${CourseScanner.rowBorder(row, dups)} rounded-lg p-3" data-card="${row.id}">
+        return `<div class="bg-white border ${CourseScanner.rowBorder(row, dups)} rounded-lg p-3" data-card="${row.id}"${CourseScanner.needsReview(row, dups) ? ' data-review="1"' : ''}>
             ${head}
             <div class="mt-2 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                 <div class="sm:col-span-3">
@@ -1066,9 +1074,39 @@ export const CourseScanner = {
                 card.querySelector('[data-role="score"]').innerHTML = CourseScanner.scoreHtml(row);
                 card.querySelector('[data-role="flags"]').innerHTML = CourseScanner.flagsHtml(row, dups);
                 card.className = `bg-white border ${CourseScanner.rowBorder(row, dups)} rounded-lg p-3`;
+                if (CourseScanner.needsReview(row, dups)) card.dataset.review = '1'; else delete card.dataset.review;
             });
         });
         CourseScanner.updateSaveInfo();
+    },
+
+    // "18 of 40 students scanned" bar plus a jump to the next sheet that needs review.
+    updateTally: (okRows, dups) => {
+        const box = $('scnTally');
+        if (!box) return;
+        const total = CourseScanner.students.length;
+        if (!okRows.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        const scanned = new Set(okRows.map(r => r.studentId).filter(Boolean)).size;
+        const review = okRows.filter(r => CourseScanner.needsReview(r, dups)).length;
+        const pct = total ? Math.min(100, Math.round(scanned / total * 100)) : 0;
+        box.innerHTML = `<div class="flex items-center justify-between gap-2 text-xs font-bold text-gray-700">
+                <span>${scanned}${total ? ` of ${total}` : ''} student${total || scanned !== 1 ? 's' : ''} scanned</span>
+                ${review ? `<button type="button" id="scnNextReviewBtn" class="px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>${review} need${review === 1 ? 's' : ''} review - jump</button>` : '<span class="text-green-700"><i class="fa-solid fa-circle-check mr-1" aria-hidden="true"></i>Nothing to review</span>'}
+            </div>
+            ${total ? `<div class="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${scanned}" aria-label="Students scanned"><div class="h-full bg-blue-600 transition-all" style="width:${pct}%"></div></div>` : ''}`;
+        box.classList.remove('hidden');
+    },
+
+    // Scrolls to the next flagged sheet after the one last jumped to (wraps around).
+    jumpToReview: () => {
+        const cards = [...document.querySelectorAll('#scnRows [data-review="1"]')];
+        if (!cards.length) return;
+        const i = cards.findIndex(c => c.dataset.card === CourseScanner.lastReviewJump);
+        const card = cards[(i + 1) % cards.length];
+        CourseScanner.lastReviewJump = card.dataset.card;
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.add('ring-2', 'ring-amber-400');
+        setTimeout(() => card.classList.remove('ring-2', 'ring-amber-400'), 1600);
     },
 
     updateSaveInfo: () => {
@@ -1084,6 +1122,7 @@ export const CourseScanner = {
         const noStudent = count(r => !r.studentId);
         const noSet = count(r => CourseScanner.needsSet(r));
         const dupRows = count(r => r.studentId && dups.has(r.studentId));
+        CourseScanner.updateTally(okRows, dups);
         const parts = [`${saved} saved to the database`];
         if (waiting) parts.push(`${waiting} waiting to upload`);
         if (conflicts) parts.push(`${conflicts} already saved earlier - choose`);
@@ -1457,6 +1496,7 @@ export const CourseScanner = {
         if (e.target.closest('#scnLiveCaptureBtn')) await CourseScanner.liveCapture(CourseScanner.live.prev);
         if (e.target.closest('#scnCameraBtn')) $('scnCameraInput').click();
         if (e.target.closest('#scnUploadBtn')) $('scnFileInput').click();
+        if (e.target.closest('#scnNextReviewBtn')) CourseScanner.jumpToReview();
         if (e.target.closest('#scnSaveBtn')) await CourseScanner.save();
         if (e.target.closest('#scnRegradeBtn')) await CourseScanner.allowRegrade();
         if (e.target.closest('#scnOrphanReplaceBtn')) await CourseScanner.resolveOrphans(true);

@@ -895,7 +895,12 @@ export const ClassComponents = {
             `;
         }).join('');
 
-        const emptyState = `<div class="p-8 text-center text-gray-500 bg-white rounded-b-xl border-dashed border-gray-300">No students enrolled yet.</div>`;
+        const emptyState = `<div class="p-8 text-center text-gray-500 bg-white rounded-b-xl">
+            <div class="mx-auto mb-3 w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-user-plus" aria-hidden="true"></i></div>
+            <p class="font-bold text-gray-700">No students enrolled yet</p>
+            <p class="text-sm mt-1 mb-4">Add students to start taking attendance, scanning and grading.</p>
+            <button type="button" class="open-add-student bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-md shadow-sm">Add students</button>
+        </div>`;
 
         const targetDisplay = [course.Target_Course, course.Target_Year, course.Target_Section].filter(Boolean).join(' ');
         const audienceBadge = targetDisplay

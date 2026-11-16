@@ -67,6 +67,7 @@ export const UnsavedCenter = {
     // Count on the "Unsaved on this device" button of the profile panel.
     updateBadge: () => {
         const n = UnsavedCenter.count();
+        window.dispatchEvent(new CustomEvent('unsaved-count', { detail: n }));
         document.querySelectorAll('.unsaved-badge').forEach(badge => {
             badge.textContent = String(n);
             badge.classList.toggle('hidden', n === 0);

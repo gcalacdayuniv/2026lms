@@ -150,6 +150,7 @@ export const ExamBuilder = {
         const s = ExamBuilder.s;
         if (!s) return;
         s.dirty = true;
+        ExamBuilder.setNote('unsaved');
         clearTimeout(ExamBuilder.draftTimer);
         ExamBuilder.draftTimer = setTimeout(() => (window.requestIdleCallback ? window.requestIdleCallback(ExamBuilder.flushDraft, { timeout: 3000 }) : ExamBuilder.flushDraft()), 1000);
     },
@@ -159,8 +160,21 @@ export const ExamBuilder = {
         const s = ExamBuilder.s;
         if (!s || !s.dirty || s.saving) return;
         store.set(draftKey(s.examId), JSON.stringify({ title: s.title, course: s.course, questions: s.questions, t: Date.now() }));
+        ExamBuilder.setNote('draft');
+    },
+
+    // Status next to the question count: unsaved (amber), draft kept on this device (green), saving (blue).
+    setNote: (state) => {
         const note = ExamBuilder.root && ExamBuilder.root.querySelector('#ebDraftNote');
-        if (note) note.textContent = 'Draft saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (!note) return;
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const look = {
+            unsaved: ['text-amber-600', '<i class="fa-solid fa-circle text-[6px] mr-1 align-middle" aria-hidden="true"></i>Unsaved changes'],
+            draft: ['text-green-600', `<i class="fa-solid fa-check mr-1" aria-hidden="true"></i>Draft kept on this device ${time}`],
+            saving: ['text-blue-600', '<i class="fa-solid fa-spinner fa-spin mr-1" aria-hidden="true"></i>Saving...']
+        }[state];
+        note.className = `text-[11px] font-bold ${look[0]}`;
+        note.innerHTML = look[1];
     },
 
     // ---------- Shell ----------
@@ -1186,6 +1200,7 @@ export const ExamBuilder = {
 
         const btn = ExamBuilder.root.querySelector('#ebSaveBtn');
         s.saving = true;
+        ExamBuilder.setNote('saving');
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span class="hidden sm:inline ml-1.5">Saving...</span>';
         try {

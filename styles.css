@@ -355,3 +355,14 @@ html[data-theme="dark"] .scrv-banner.is-warn { background: #3a2a10; color: #fcd3
 
 /* Class screen (phones): the sort / filter / select row opens from the three-dot button */
 .att-tools-open { display: flex !important; }
+
+/* Tappable offline banner (shows the unsaved count). */
+.offline-banner.is-tappable { pointer-events: auto; cursor: pointer; }
+
+/* Touch screens: small icon buttons keep their look but get a 44px tap area. */
+@media (pointer: coarse) {
+    button:is(.w-6, .w-7, .w-8, .h-6, .h-7, .h-8, .app-page-close, .scrv-wm):not(.absolute):not(.fixed):not(.sticky) { position: relative; }
+    button:is(.w-6, .w-7, .w-8, .h-6, .h-7, .h-8, .app-page-close, .scrv-wm):not(.absolute):not(.fixed):not(.sticky)::after {
+        content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+    }
+}

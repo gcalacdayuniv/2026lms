@@ -8,6 +8,7 @@ const FIELD_HOSTS = '.app-page, .sheet-panel, .auth-screen';
 const isPhone = () => window.matchMedia('(max-width: 639px)').matches;
 let inited = false;
 let bannerTimer = 0;
+let unsavedN = 0;
 
 // Slim status pill at the top: shown while offline, and briefly when the connection returns.
 const showBanner = (online) => {
@@ -23,9 +24,13 @@ const showBanner = (online) => {
     }
     clearTimeout(bannerTimer);
     el.classList.toggle('is-online', online);
+    // Offline with work waiting on this phone: say how much, and tap to see it (the .open-unsaved handler opens the list).
+    const queued = !online && unsavedN > 0;
+    el.classList.toggle('open-unsaved', queued);
+    el.classList.toggle('is-tappable', queued);
     el.innerHTML = online
         ? '<i class="fa-solid fa-wifi" aria-hidden="true"></i> Back online'
-        : '<i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i> You are offline. Showing saved data.';
+        : `<i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i> You are offline. Showing saved data.${queued ? ` <span class="underline">${unsavedN} unsaved on this device - tap to view</span>` : ''}`;
     requestAnimationFrame(() => el.classList.add('is-shown'));
     if (online) bannerTimer = setTimeout(() => el.classList.remove('is-shown'), 2200);
 };
@@ -45,6 +50,11 @@ export const AppFeel = {
 
         window.addEventListener('offline', () => showBanner(false));
         window.addEventListener('online', () => showBanner(true));
+        window.addEventListener('unsaved-count', (e) => {
+            unsavedN = Number(e.detail) || 0;
+            const el = document.getElementById('offlineBanner');
+            if (el && navigator.onLine === false) showBanner(false);
+        });
         if (navigator.onLine === false) showBanner(false);
 
         // Touch only, so a mouse click on a laptop never buzzes (and navigator.vibrate is absent on iOS anyway).
