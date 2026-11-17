@@ -217,10 +217,11 @@ export const AuthModule = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
             
             try {
-                await apiFetch('/api/change-password', {
+                const changed = await apiFetch('/api/change-password', {
                     method: 'POST',
                     body: JSON.stringify({ userId: AppState.user.User_ID, currentPassword: current, newPassword: newPw })
                 });
+                if (changed && changed.token) AppState.setToken(changed.token);   // other devices are signed out; this one stays in
                 UI.success('Password updated');
                 successDiv.textContent = "Password updated securely.";
                 successDiv.classList.remove('hidden');

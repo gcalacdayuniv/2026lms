@@ -1,5 +1,5 @@
 // worker/worker.js
-import { authorize, signToken, authEnabled } from './auth.js';
+import { authorize, signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { gradeScanSet } from './scan-grade.js';
 import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
@@ -2418,7 +2418,14 @@ export default {
                 const newHash = await hashPassword(newPassword, env);
                 await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, userId).run();
 
-                return new Response(JSON.stringify({ success: true, message: "Password updated successfully" }), { status: 200, headers: corsHeaders });
+                // Other devices are signed out; this device gets a fresh token and stays signed in.
+                let token;
+                if (authEnabled(env)) {
+                    await markPasswordChanged(env, userId);
+                    token = await signToken(env, userId);
+                }
+
+                return new Response(JSON.stringify({ success: true, message: "Password updated successfully", token }), { status: 200, headers: corsHeaders });
             }
 
             if (request.method === "POST" && path === "/api/update-details") {
@@ -2510,6 +2517,7 @@ export default {
                 const tempPassword = Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
                 const newHash = await hashPassword(tempPassword, env);
                 await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, studentId).run();
+                if (authEnabled(env)) await markPasswordChanged(env, studentId);
 
                 return new Response(JSON.stringify({ success: true, message: "Password reset successfully", tempPassword }), { status: 200, headers: corsHeaders });
             }

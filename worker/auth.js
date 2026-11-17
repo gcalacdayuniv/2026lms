@@ -35,8 +35,8 @@ export async function signToken(env, userId, now = Date.now()) {
     return `${body}.${b64url(new Uint8Array(sig))}`;
 }
 
-// Returns the User_ID, or null when the token is missing, forged or expired.
-export async function verifyToken(env, token, now = Date.now()) {
+// Returns { id, iat } (iat = seconds when the token was issued), or null when the token is missing, forged or expired.
+export async function verifyTokenInfo(env, token, now = Date.now()) {
     if (!token || typeof token !== 'string') return null;
     const parts = token.split('.');
     if (parts.length !== 2) return null;
@@ -45,10 +45,34 @@ export async function verifyToken(env, token, now = Date.now()) {
         if (!ok) return null;
         const payload = JSON.parse(new TextDecoder().decode(fromB64url(parts[0])));
         if (!payload || !payload.sub || typeof payload.exp !== 'number' || payload.exp * 1000 < now) return null;
-        return String(payload.sub);
+        return { id: String(payload.sub), iat: payload.exp - TOKEN_DAYS * 86400 };
     } catch (e) {
         return null;
     }
+}
+
+// Returns the User_ID, or null when the token is missing, forged or expired.
+export async function verifyToken(env, token, now = Date.now()) {
+    const info = await verifyTokenInfo(env, token, now);
+    return info ? info.id : null;
+}
+
+// A password change or reset signs the account out everywhere: tokens issued before Users.Password_Changed_At stop working.
+// The column is added automatically the first time it is needed.
+let passwordColumnReady = false;
+async function ensurePasswordColumn(env) {
+    if (passwordColumnReady) return;
+    try {
+        await env.DB.prepare('ALTER TABLE Users ADD COLUMN Password_Changed_At INTEGER').run();
+    } catch (e) {
+        if (!/duplicate column/i.test(String(e && e.message))) throw e;
+    }
+    passwordColumnReady = true;
+}
+
+export async function markPasswordChanged(env, userId) {
+    await ensurePasswordColumn(env);
+    await env.DB.prepare('UPDATE Users SET Password_Changed_At = ? WHERE User_ID = ?').bind(Math.floor(Date.now() / 1000), userId).run();
 }
 
 // ---------- Rules ----------
@@ -156,11 +180,14 @@ export async function authorize(request, env, path, url) {
     const rule = RULES[`${request.method} ${path}`] || LECTURER;
     if (rule.who === 'public') return { ok: true, user: null };
 
-    const userId = await verifyToken(env, bearer(request));
-    if (!userId) return deny(401, 'Your session has expired. Please sign in again.');
+    const info = await verifyTokenInfo(env, bearer(request));
+    if (!info) return deny(401, 'Your session has expired. Please sign in again.');
+    const userId = info.id;
 
-    const row = await env.DB.prepare('SELECT User_ID, role, account_status FROM Users WHERE User_ID = ?').bind(userId).first();
+    await ensurePasswordColumn(env);
+    const row = await env.DB.prepare('SELECT User_ID, role, account_status, Password_Changed_At FROM Users WHERE User_ID = ?').bind(userId).first();
     if (!row) return deny(401, 'Your session has expired. Please sign in again.');
+    if (row.Password_Changed_At && info.iat < row.Password_Changed_At) return deny(401, 'Your password was changed. Please sign in again.');
     if (String(row.account_status || '').toLowerCase() !== 'active') return deny(403, 'This account is not active.');
 
     const role = String(row.role || '').toLowerCase() === 'lecturer' ? 'lecturer' : 'student';
