@@ -1,3 +1,32 @@
+# Working Agreement (read this first)
+
+This section is the standing instruction for every task. Keep it current when a new rule is agreed.
+
+**How to work**
+1. Plan briefly, then work in batches that stay within the token limit. Give the output of each batch so progress is not lost.
+2. Do not change GitHub directly. Work on copies; the owner uploads the files.
+3. Test before delivering: worker changes against a local SQLite D1 test, UI changes in a browser (Playwright). Say what was tested and what was not.
+
+**Delivery (every task)**
+- Give full replacement files, never snippets.
+- Zip only the changed files, named for what changed, and send it as a downloadable file.
+- Update this README in the same zip so it matches the current setup (add or remove only what changed), including the "Setup & Deploy" notes: required secrets and vars, tables created automatically vs. anything to run manually, deploy steps for the worker and the front end, and any one-time action after an update.
+
+**Code rules**
+- Keep existing element IDs. Escape all user text (`escapeHtml` / `safeUrl` in `js/html-utils.js`).
+- `SESSION_SECRET` is a Worker secret; `ALLOWED_ORIGIN` is in vars.
+- Routes not listed in `auth.js` RULES are lecturer-only, and `courseId` must belong to the signed-in lecturer.
+- New D1 tables and columns are created by the worker (`ensure…` functions); no manual database step.
+- Mobile first: usable at phone width, tap targets of at least 44px.
+
+**Privacy and data rules**
+- See "Lecturer's Notes: Privacy Rules" and "Exams Tied to a Course Title" below.
+
+**Reply style**
+- Brief and direct, no recap of steps. End with: what changed, what was tested, what to deploy (worker and/or front end), and one next step if there is one.
+
+---
+
 # Online Portal - System Architecture & Developer Guidelines
 
 ## Role & Persona
