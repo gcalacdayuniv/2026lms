@@ -360,3 +360,16 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - The Record Scores grid now remembers the scores it loaded and saves only the ones the lecturer changed (`partial` save on `POST /api/assessment-scores`, with `clear` for emptied boxes). Scores corrected elsewhere, such as in Scan Review, are no longer overwritten by an older open grid.
 - After saving, the grid reloads from the database. A save without `partial` still replaces every score (older behaviour).
 - Scan Review corrections are stored only when the per-student **Save** is pressed; "•" in the picker marks unsaved ones.
+
+## Lecturer's Notes (private, per student per class)
+- In a class, open a student's **Performance Summary**; the **Lecturer's Notes** panel at the bottom lets the lecturer add, edit and delete dated notes (behaviour, participation, other written observations). Max 4000 characters each.
+- Stored in the `Lecturer_Notes` D1 table (created automatically): `Note_ID, Course_ID, Student_ID, Lecturer_ID, Body, Created_At, Updated_At`. Notes belong to one student in one class.
+- API `/api/lecturer-notes` (GET list for a student, GET with only `courseId` for per-student counts, POST add/edit, DELETE). It is not in the student rules in `auth.js`, so it is lecturer-only and `courseId` must be one of the lecturer's own classes. No student-facing route returns notes, and the student's own summary page has no notes panel.
+- Code: `js/lecturer-notes.js`; hooks in `js/course.js` (opens it with the summary) and `js/components-class.js` (`#lnPanel`).
+
+### Lecturer's Notes: Privacy Rules (must hold for every future change)
+- Notes are visible and editable **only by the lecturer who owns that specific course class**. Never by students, other lecturers, or in another class of the same lecturer.
+- Every notes query must filter by both `Course_ID` and `Student_ID`, and the `courseId` must be checked against the signed-in lecturer's own classes (`auth.js` ownership check; keep `/api/lecturer-notes` out of the student rules in `RULES`).
+- Never add notes to student-facing responses (`/api/student-summary`, `/api/my-courses`, exports, reports, copied or duplicated classes, year advance, roster caches in `localStorage`) or to the student's own summary page.
+- Do not copy notes when a class is duplicated to another term. Keep notes out of any shared or student-visible export.
+- After any change to these routes, re-test as a student and as a different lecturer: both must be refused.

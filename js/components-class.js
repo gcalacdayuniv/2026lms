@@ -556,6 +556,7 @@ const ClassUI = {
                             <i class="fa-solid fa-file-lines mr-2"></i> View Submission History
                         </button>
                     </div>
+                    <div id="lnPanel" class="mt-4"></div>
                 </div>
             </div>
         </div>

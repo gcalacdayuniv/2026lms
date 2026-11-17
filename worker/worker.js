@@ -1246,6 +1246,14 @@ async function ensureYearAdvanceTables(env) {
     }
     yearAdvanceReady = true;
 }
+// Lecturer's private notes per student per class. Never returned by any student-facing route.
+let lecturerNotesReady = false;
+async function ensureLecturerNotes(env) {
+    if (lecturerNotesReady) return;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Lecturer_Notes (Note_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Student_ID TEXT NOT NULL, Lecturer_ID TEXT, Body TEXT NOT NULL, Created_At TEXT DEFAULT CURRENT_TIMESTAMP, Updated_At TEXT DEFAULT CURRENT_TIMESTAMP)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_lnotes_course_student ON Lecturer_Notes (Course_ID, Student_ID)").run();
+    lecturerNotesReady = true;
+}
 // Students moved up by Advance Year Level are set Inactive until reactivated. These Users columns track that:
 //   Advanced_Term: the academic year they were advanced into; Reactivation_Until: last day they may request reactivation (optional);
 //   Reactivation_Requested: when they asked at the login screen. Only "Active" accounts can sign in.
@@ -3285,6 +3293,46 @@ export default {
                 if (statements.length) await env.DB.batch(statements);
 
                 return new Response(JSON.stringify({ success: true, saved: scores.length }), { status: 200, headers: corsHeaders });
+            }
+
+            if (path === "/api/lecturer-notes") {
+                // Lecturer-only (not listed in auth RULES) and courseId is checked against the lecturer's own classes.
+                await ensureLecturerNotes(env);
+                const out = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: corsHeaders });
+                if (request.method === "GET") {
+                    const courseId = url.searchParams.get("courseId");
+                    const studentId = url.searchParams.get("studentId");
+                    if (!courseId) return out({ error: "Missing courseId" }, 400);
+                    if (!studentId) {
+                        const counts = await env.DB.prepare("SELECT Student_ID, COUNT(*) AS Total FROM Lecturer_Notes WHERE Course_ID = ? GROUP BY Student_ID").bind(courseId).all();
+                        return out({ success: true, counts: counts.results });
+                    }
+                    const notes = await env.DB.prepare("SELECT Note_ID, Body, Created_At, Updated_At FROM Lecturer_Notes WHERE Course_ID = ? AND Student_ID = ? ORDER BY Created_At DESC, rowid DESC").bind(courseId, studentId).all();
+                    return out({ success: true, notes: notes.results });
+                }
+                if (request.method === "POST" || request.method === "DELETE") {
+                    const b = await request.json().catch(() => ({}));
+                    const { courseId, studentId, noteId } = b;
+                    if (!courseId) return out({ error: "Missing courseId" }, 400);
+                    if (request.method === "DELETE") {
+                        if (!noteId) return out({ error: "Missing noteId" }, 400);
+                        await env.DB.prepare("DELETE FROM Lecturer_Notes WHERE Note_ID = ? AND Course_ID = ?").bind(noteId, courseId).run();
+                        return out({ success: true });
+                    }
+                    const text = String(b.body || '').trim().slice(0, 4000);
+                    if (!text) return out({ error: "Write something first." }, 400);
+                    if (noteId) {
+                        await env.DB.prepare("UPDATE Lecturer_Notes SET Body = ?, Updated_At = CURRENT_TIMESTAMP WHERE Note_ID = ? AND Course_ID = ?").bind(text, noteId, courseId).run();
+                        return out({ success: true, noteId });
+                    }
+                    if (!studentId) return out({ error: "Missing studentId" }, 400);
+                    const enrolled = await env.DB.prepare("SELECT 1 AS ok FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?").bind(courseId, studentId).first();
+                    if (!enrolled) return out({ error: "That student is not in this class." }, 400);
+                    const course = await env.DB.prepare("SELECT Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                    const id = crypto.randomUUID();
+                    await env.DB.prepare("INSERT INTO Lecturer_Notes (Note_ID, Course_ID, Student_ID, Lecturer_ID, Body) VALUES (?, ?, ?, ?, ?)").bind(id, courseId, studentId, course ? course.Lecturer_ID : null, text).run();
+                    return out({ success: true, noteId: id }, 201);
+                }
             }
 
             if (request.method === "GET" && path === "/api/student-summary") {
