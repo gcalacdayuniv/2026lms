@@ -196,7 +196,7 @@ export const CourseScanner = {
             const ts = new Date().getTime();
             const [details, examRes, assessRes, classExamRes] = await Promise.all([
                 apiFetch(`/api/course-details?courseId=${CourseScanner.courseId}&_t=${ts}`),
-                apiFetch(`/api/exams?lecturerId=${AppState.user.User_ID}&_t=${ts}`),
+                apiFetch(`/api/exams?lecturerId=${AppState.user.User_ID}&courseId=${encodeURIComponent(CourseScanner.courseId)}&_t=${ts}`),
                 apiFetch(`/api/assessments?courseId=${CourseScanner.courseId}&_t=${ts}`),
                 apiFetch(`/api/class-exams?courseId=${CourseScanner.courseId}&_t=${ts}`)
             ]);

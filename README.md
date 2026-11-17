@@ -373,3 +373,12 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - Never add notes to student-facing responses (`/api/student-summary`, `/api/my-courses`, exports, reports, copied or duplicated classes, year advance, roster caches in `localStorage`) or to the student's own summary page.
 - Do not copy notes when a class is duplicated to another term. Keep notes out of any shared or student-visible export.
 - After any change to these routes, re-test as a student and as a different lecturer: both must be refused.
+
+## Exams Tied to a Course Title
+- An exam's **Course** line (`Exams.Course`, set in the exam builder) ties it to a course title. Such an exam can only be shown and used by classes whose Course Title is the same (ignoring capital letters and extra spaces). An exam with "No course line" can be used by any class.
+- Worker: `EXAM_FITS_CLASS_SQL` / `examFitsTitle` in `worker/worker.js`.
+  - `POST /api/class-exams` refuses a class with a different course title (400).
+  - `GET /api/exams?lecturerId=…&courseId=…` returns only the exams that fit that class. Without `courseId` (the exam library) it returns all of the lecturer's exams.
+  - `GET /api/class-exams`, the student's exam list, loading, starting and submitting an exam all skip an exam whose course title does not match the class.
+- The class Exam tab and the Scanner (`js/course-exam.js`, `js/course-scanner.js`) request exams for their class only.
+- If a class's Course Title is changed so it no longer matches an exam already assigned, that exam is hidden from the class and its students until the titles match again. Its scores stay recorded.

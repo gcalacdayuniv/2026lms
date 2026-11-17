@@ -597,7 +597,7 @@ export const CourseExam = {
 
         try {
             const ts = new Date().getTime();
-            const requests = [apiFetch(`/api/exams?lecturerId=${lecturerId}&_t=${ts}`)];
+            const requests = [apiFetch(`/api/exams?lecturerId=${lecturerId}${courseId ? `&courseId=${encodeURIComponent(courseId)}` : ''}&_t=${ts}`)];
             if (courseId) {
                 requests.push(apiFetch(`/api/class-exams?courseId=${courseId}&_t=${ts}`));
             }

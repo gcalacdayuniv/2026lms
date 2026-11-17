@@ -1026,7 +1026,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
          JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
          JOIN Exams e ON ce.Exam_ID = e.Exam_ID
          JOIN Courses c ON ce.Course_ID = c.Course_ID
-         WHERE ea.Student_ID = ? AND ea.Is_Enabled = 1 AND ce.Is_Active = 1
+         WHERE ea.Student_ID = ? AND ea.Is_Enabled = 1 AND ce.Is_Active = 1 AND ${EXAM_FITS_CLASS_SQL}
          ORDER BY ce.Created_At DESC`
     ).bind(studentId).all();
 
@@ -1246,6 +1246,14 @@ async function ensureYearAdvanceTables(env) {
     }
     yearAdvanceReady = true;
 }
+// An exam tied to a course title (Exams.Course) may only be shown and used by classes with that same Course Title (ignoring case and spaces).
+// An exam with no course line can be used by any class. Aliases: e = Exams, ce = Class_Exams.
+const EXAM_FITS_CLASS_SQL = "(TRIM(COALESCE(e.Course, '')) = '' OR LOWER(TRIM(e.Course)) = LOWER(TRIM(COALESCE((SELECT CourseTitle FROM Courses WHERE Course_ID = ce.Course_ID), ''))))";
+const examFitsTitle = (examCourse, courseTitle) => {
+    const a = String(examCourse || '').trim().toLowerCase();
+    return !a || a === String(courseTitle || '').trim().toLowerCase();
+};
+
 // Lecturer's private notes per student per class. Never returned by any student-facing route.
 let lecturerNotesReady = false;
 async function ensureLecturerNotes(env) {
@@ -1352,14 +1360,17 @@ export default {
 
             if (request.method === "GET" && path === "/api/exams") {
                 const lecturerId = url.searchParams.get("lecturerId");
+                const forCourseId = url.searchParams.get("courseId");
                 await ensureAccessibleExamTables(env);
                 // Uses = how many times the exam was assigned to a class. An exam that was never assigned can be deleted.
                 await ensureManualMarksColumn(env);
                 const exams = await env.DB.prepare(
                     `SELECT e.Exam_ID, e.Title, e.Course, e.ExamData, e.Created_At, COALESCE(e.Archived, 0) AS Archived,
                             (SELECT COUNT(*) FROM Class_Exams ce WHERE ce.Exam_ID = e.Exam_ID) AS Uses
-                     FROM Exams e WHERE e.Lecturer_ID = ? ORDER BY e.Created_At DESC`
-                ).bind(lecturerId).all();
+                     FROM Exams e WHERE e.Lecturer_ID = ?
+                       ${forCourseId ? "AND (TRIM(COALESCE(e.Course, '')) = '' OR LOWER(TRIM(e.Course)) = LOWER(TRIM(COALESCE((SELECT CourseTitle FROM Courses WHERE Course_ID = ?), ''))))" : ""}
+                     ORDER BY e.Created_At DESC`
+                ).bind(...(forCourseId ? [lecturerId, forCourseId] : [lecturerId])).all();
                 return new Response(JSON.stringify({ success: true, exams: exams.results }), { status: 200, headers: corsHeaders });
             }
 
@@ -1449,14 +1460,15 @@ export default {
                      FROM Class_Exams ce
                      JOIN Exams e ON ce.Exam_ID = e.Exam_ID
                      LEFT JOIN Assessments a ON ce.Assessment_ID = a.Assessment_ID
-                     WHERE ce.Course_ID = ?`
+                     WHERE ce.Course_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
                 ).bind(courseId).all();
 
                 const assignments = await env.DB.prepare(
                     `SELECT ea.*
                      FROM Exam_Assignments ea
                      JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
-                     WHERE ce.Course_ID = ?`
+                     JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+                     WHERE ce.Course_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
                 ).bind(courseId).all();
 
                 return new Response(JSON.stringify({
@@ -1490,6 +1502,10 @@ export default {
                 const exam = await env.DB.prepare("SELECT * FROM Exams WHERE Exam_ID = ?").bind(examId).first();
                 if (!exam) {
                     return new Response(JSON.stringify({ error: "Exam not found." }), { status: 404, headers: corsHeaders });
+                }
+                const targetClass = await env.DB.prepare("SELECT CourseTitle FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!examFitsTitle(exam.Course, targetClass && targetClass.CourseTitle)) {
+                    return new Response(JSON.stringify({ error: `This exam is for the course "${String(exam.Course).trim()}" and can only be used by classes with that course title.` }), { status: 400, headers: corsHeaders });
                 }
 
                 let parsedQuestions = [];
@@ -1683,8 +1699,8 @@ export default {
 
                 const record = await env.DB.prepare(
                     `SELECT ea.Assignment_ID, ea.Status, ea.Is_Enabled, ea.Started_At, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit
-                     FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
-                     WHERE ea.Assignment_ID = ? AND ea.Student_ID = ?`
+                     FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID JOIN Exams e ON ce.Exam_ID = e.Exam_ID
+                     WHERE ea.Assignment_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
                 ).bind(assignmentId, studentId).first();
                 if (!record) {
                     return new Response(JSON.stringify({ error: "Exam assignment not found." }), { status: 404, headers: corsHeaders });
@@ -1720,7 +1736,7 @@ export default {
 
                 const ce = await env.DB.prepare(
                     `SELECT ce.Class_Exam_ID, ce.Time_Limit, ce.Adjustments, ce.Release, e.Title as Exam_Title, e.ExamData
-                     FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID WHERE ce.Class_Exam_ID = ?`
+                     FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID WHERE ce.Class_Exam_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
                 ).bind(classExamId).first();
                 if (!ce) {
                     return new Response(JSON.stringify({ error: "Class exam not found." }), { status: 404, headers: corsHeaders });
@@ -1934,7 +1950,7 @@ export default {
                      FROM Exam_Assignments ea
                      JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
                      JOIN Exams e ON ce.Exam_ID = e.Exam_ID
-                     WHERE ea.Class_Exam_ID = ? AND ea.Student_ID = ?`
+                     WHERE ea.Class_Exam_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
                 ).bind(classExamId, studentId).first();
                 if (!record) {
                     return new Response(JSON.stringify({ error: "Exam record not found." }), { status: 404, headers: corsHeaders });
@@ -2003,7 +2019,7 @@ export default {
                      FROM Exam_Assignments ea
                      JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
                      JOIN Exams e ON ce.Exam_ID = e.Exam_ID
-                     WHERE ea.Assignment_ID = ? AND ea.Student_ID = ?`
+                     WHERE ea.Assignment_ID = ? AND ea.Student_ID =  AND ${EXAM_FITS_CLASS_SQL}`
                 ).bind(assignmentId, studentId).first();
 
                 if (!record) {
