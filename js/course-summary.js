@@ -107,23 +107,38 @@ export const CourseSummary = {
             CourseSummary.course = details.course;
             const students = CourseSummary.sortStudents(details.students || []);
 
-            const results = new Array(students.length);
-            let next = 0;
-            let done = 0;
+            let results = new Array(students.length);
+            let bulk = null;
+            try {
+                // One request for the whole class. An older Worker without it falls back to one request per student.
+                bulk = await apiFetch(`/api/class-summary?courseId=${courseId}&_t=${ts}`);
+            } catch (err) {
+                bulk = null;
+            }
 
-            const worker = async () => {
-                while (next < students.length) {
-                    const i = next++;
-                    try {
-                        results[i] = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${students[i].User_ID}&_t=${ts}`);
-                    } catch (err) {
-                        results[i] = { error: err.message, records: [] };
+            if (bulk && bulk.students) {
+                results = students.map(s => {
+                    const one = bulk.students[s.User_ID] || { records: [], assessments: [] };
+                    return { sessions: bulk.sessions, course: bulk.course, records: one.records, assessments: one.assessments };
+                });
+            } else {
+                let next = 0;
+                let done = 0;
+
+                const worker = async () => {
+                    while (next < students.length) {
+                        const i = next++;
+                        try {
+                            results[i] = await apiFetch(`/api/student-summary?courseId=${courseId}&studentId=${students[i].User_ID}&_t=${ts}`);
+                        } catch (err) {
+                            results[i] = { error: err.message, records: [] };
+                        }
+                        done++;
+                        loadingText.textContent = `Loading performance data... ${done} / ${students.length}`;
                     }
-                    done++;
-                    loadingText.textContent = `Loading performance data... ${done} / ${students.length}`;
-                }
-            };
-            await Promise.all(Array.from({ length: Math.min(6, students.length) }, worker));
+                };
+                await Promise.all(Array.from({ length: Math.min(6, students.length) }, worker));
+            }
 
             const firstOk = results.find(r => r && !r.error);
             CourseSummary.sessions = firstOk ? (firstOk.sessions || []) : [];

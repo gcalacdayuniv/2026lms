@@ -3,6 +3,9 @@ name = '2026-api'
 main = "worker.js"
 compatibility_date = "2024-01-01"
 
+# Keep variables and secrets that exist only in the Cloudflare dashboard (such as SESSION_SECRET) when this file is deployed.
+keep_vars = true
+
 [vars]
 ALLOWED_ORIGIN = "https://plv.workers.dev" 
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzsHLilW-Cf6271-psjtck20A0rABnoywXCPvsSeL5rSypDxKC3v6HA_HPZ8YOg1Tns/exec"

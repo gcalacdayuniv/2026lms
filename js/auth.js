@@ -38,7 +38,6 @@ export const AuthModule = {
                 
                 AppState.setUser(data.user);
                 AppState.setToken(data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
                 window.location.hash = 'dashboard';
             } catch (err) {
                 errorDiv.textContent = err.message;
@@ -176,7 +175,6 @@ export const AuthModule = {
                     if (progEl) progEl.textContent = [payload.programCourse, payload.programYear, payload.programSection].filter(Boolean).join(' ') || 'Not assigned';
                 }
                 
-                localStorage.setItem('user', JSON.stringify(AppState.user));
                 localStorage.setItem('portal_user', JSON.stringify(AppState.user));
                 
                 UI.success('Details updated');

@@ -1001,20 +1001,32 @@ const cleanLimit = (v) => {
     return Number.isFinite(n) && n >= 1 ? Math.min(n, 600) : null;
 };
 
-function isWithinScheduleWindow(fromDate, toDate) {
+// A date-only window (YYYY-MM-DD, what the app saves) is compared with today's date in the visitor's
+// timezone (Asia/Manila by default), so "from" opens at local midnight and "to" closes at the end of that local day.
+function isWithinScheduleWindow(fromDate, toDate, request) {
+    const today = getRequestDate(request);
     const now = new Date();
+    const dateOnly = (v) => typeof v === 'string' && DATE_RE.test(v);
     if (fromDate) {
-        const start = new Date(fromDate.length === 10 ? `${fromDate}T00:00:00` : fromDate);
-        if (!isNaN(start.getTime()) && now < start) return false;
+        if (dateOnly(fromDate)) {
+            if (today < fromDate) return false;
+        } else {
+            const start = new Date(fromDate);
+            if (!isNaN(start.getTime()) && now < start) return false;
+        }
     }
     if (toDate) {
-        const end = new Date(toDate.length === 10 ? `${toDate}T23:59:59` : toDate);
-        if (!isNaN(end.getTime()) && now > end) return false;
+        if (dateOnly(toDate)) {
+            if (today > toDate) return false;
+        } else {
+            const end = new Date(toDate);
+            if (!isNaN(end.getTime()) && now > end) return false;
+        }
     }
     return true;
 }
 
-async function getStudentAccessibleExamsList(env, studentId) {
+async function getStudentAccessibleExamsList(env, studentId, request) {
     await ensureAccessibleExamTables(env);
 
     const rows = await env.DB.prepare(
@@ -1033,7 +1045,7 @@ async function getStudentAccessibleExamsList(env, studentId) {
     const availableExams = [];
 
     for (const r of (rows.results || [])) {
-        if (!isWithinScheduleWindow(r.From_Date, r.To_Date)) {
+        if (!isWithinScheduleWindow(r.From_Date, r.To_Date, request)) {
             continue;
         }
 
@@ -1310,6 +1322,29 @@ function cleanTerm(ay, sem) {
 }
 
 // Room = the classroom the class meets in. Added to an existing Courses table the first time it is needed.
+// Indexes for the tables every class screen reads. Created once per Worker start; a table that does not exist yet
+// (some are created on first use) is skipped and tried again on the next start. Plain indexes only, so existing data is never rejected.
+let coreIndexesReady = false;
+async function ensureCoreIndexes(env) {
+    if (coreIndexesReady) return;
+    const list = [
+        "CREATE INDEX IF NOT EXISTS idx_att_course_student_date ON Attendance (Course_ID, Student_ID, Date)",
+        "CREATE INDEX IF NOT EXISTS idx_att_course_date ON Attendance (Course_ID, Date)",
+        "CREATE INDEX IF NOT EXISTS idx_enr_course ON Enrollments (Course_ID, Student_ID)",
+        "CREATE INDEX IF NOT EXISTS idx_enr_student ON Enrollments (Student_ID)",
+        "CREATE INDEX IF NOT EXISTS idx_assess_course ON Assessments (Course_ID, Date)",
+        "CREATE INDEX IF NOT EXISTS idx_ascore_assess ON Assessment_Scores (Assessment_ID, Student_ID)",
+        "CREATE INDEX IF NOT EXISTS idx_sub_course_student ON Submissions (Course_ID, Student_ID)",
+        "CREATE INDEX IF NOT EXISTS idx_sess_course ON Course_Sessions (Course_ID, Date)",
+        "CREATE INDEX IF NOT EXISTS idx_courses_lecturer ON Courses (Lecturer_ID)"
+    ];
+    let all = true;
+    for (const sql of list) {
+        try { await env.DB.prepare(sql).run(); } catch (e) { all = false; }
+    }
+    coreIndexesReady = all;
+}
+
 let courseRoomReady = false;
 async function ensureCourseRoom(env) {
     if (courseRoomReady) return;
@@ -1348,6 +1383,8 @@ export default {
         }
 
         try {
+            ctx.waitUntil(ensureCoreIndexes(env).catch(() => {}));
+
             // Who is calling, and may they do this? (Off until the SESSION_SECRET secret is set.)
             const gate = await authorize(request, env, path, url);
             if (!gate.ok) {
@@ -1645,7 +1682,7 @@ export default {
                     return new Response(JSON.stringify({ error: "Student not found." }), { status: 404, headers: corsHeaders });
                 }
 
-                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID);
+                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID, request);
 
                 return new Response(JSON.stringify({
                     success: true,
@@ -1679,7 +1716,7 @@ export default {
                     return new Response(JSON.stringify({ error: `Account is ${user.account_status}.` }), { status: 403, headers: corsHeaders });
                 }
 
-                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID);
+                const availableExams = await getStudentAccessibleExamsList(env, user.User_ID, request);
 
                 return new Response(JSON.stringify({
                     success: true,
@@ -1705,7 +1742,7 @@ export default {
                 if (!record) {
                     return new Response(JSON.stringify({ error: "Exam assignment not found." }), { status: 404, headers: corsHeaders });
                 }
-                if (!record.Is_Enabled || !record.Is_Active || record.Status === "Completed" || !isWithinScheduleWindow(record.From_Date, record.To_Date)) {
+                if (!record.Is_Enabled || !record.Is_Active || record.Status === "Completed" || !isWithinScheduleWindow(record.From_Date, record.To_Date, request)) {
                     return new Response(JSON.stringify({ error: "This exam is not open." }), { status: 403, headers: corsHeaders });
                 }
 
@@ -2034,7 +2071,7 @@ export default {
                     return new Response(JSON.stringify({ error: "You have already submitted this exam." }), { status: 400, headers: corsHeaders });
                 }
 
-                if (!isWithinScheduleWindow(record.From_Date, record.To_Date)) {
+                if (!isWithinScheduleWindow(record.From_Date, record.To_Date, request)) {
                     return new Response(JSON.stringify({ error: "This exam is outside the scheduled date window and is closed." }), { status: 403, headers: corsHeaders });
                 }
 
@@ -3160,16 +3197,16 @@ export default {
                     return new Response(JSON.stringify({ error: "Missing required parameters" }), { status: 400, headers: corsHeaders });
                 }
 
-                const existing = await env.DB.prepare(
-                    "SELECT Status, Performance_Points FROM Attendance WHERE Course_ID = ? AND Student_ID = ? AND Date = ?"
-                ).bind(courseId, studentId, date).first();
+                if (!Number.isFinite(points)) {
+                    return new Response(JSON.stringify({ error: "Invalid points" }), { status: 400, headers: corsHeaders });
+                }
 
-                if (existing) {
-                    const newTotal = (parseInt(existing.Performance_Points) || 0) + points;
-                    await env.DB.prepare(
-                        "UPDATE Attendance SET Performance_Points = ? WHERE Course_ID = ? AND Student_ID = ? AND Date = ?"
-                    ).bind(newTotal, courseId, studentId, date).run();
-                } else {
+                // Add in one statement so two quick taps cannot overwrite each other.
+                const updated = await env.DB.prepare(
+                    "UPDATE Attendance SET Performance_Points = COALESCE(Performance_Points, 0) + ? WHERE Course_ID = ? AND Student_ID = ? AND Date = ?"
+                ).bind(points, courseId, studentId, date).run();
+
+                if (!(updated.meta && updated.meta.changes > 0)) {
                     const attId = crypto.randomUUID();
                     await env.DB.prepare(
                         "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, 'Present', ?)"
@@ -3421,6 +3458,55 @@ export default {
                 }), { status: 200, headers: corsHeaders });
             }
 
+            // One call for the whole class (lecturer only): replaces one /api/student-summary call per student.
+            if (request.method === "GET" && path === "/api/class-summary") {
+                const courseId = url.searchParams.get("courseId");
+                if (!courseId) {
+                    return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+                }
+
+                const course = await env.DB.prepare("SELECT Midterm_Start, Midterm_End, Final_Start, Final_End, ScheduleDay FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+                if (!course) {
+                    return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+                }
+
+                const sessions = await env.DB.prepare("SELECT Date, Is_No_Class FROM Course_Sessions WHERE Course_ID = ?").bind(courseId).all();
+                const enrolled = await env.DB.prepare("SELECT Student_ID FROM Enrollments WHERE Course_ID = ?").bind(courseId).all();
+                const attendance = await env.DB.prepare(
+                    "SELECT Student_ID, Date, Status, Performance_Points FROM Attendance WHERE Course_ID = ? ORDER BY Date ASC"
+                ).bind(courseId).all();
+                const assessmentRows = await env.DB.prepare(
+                    "SELECT Assessment_ID, Term, Category, Title, Max_Score, Date FROM Assessments WHERE Course_ID = ? ORDER BY Date ASC, Created_At ASC"
+                ).bind(courseId).all();
+                const scoreRows = await env.DB.prepare(
+                    `SELECT s.Assessment_ID, s.Student_ID, s.Score
+                     FROM Assessment_Scores s JOIN Assessments a ON a.Assessment_ID = s.Assessment_ID
+                     WHERE a.Course_ID = ?`
+                ).bind(courseId).all();
+
+                const scoreOf = new Map();
+                for (const s of (scoreRows.results || [])) scoreOf.set(`${s.Assessment_ID}|${s.Student_ID}`, s.Score);
+
+                const recordsOf = new Map();
+                for (const r of (attendance.results || [])) {
+                    if (!recordsOf.has(r.Student_ID)) recordsOf.set(r.Student_ID, []);
+                    recordsOf.get(r.Student_ID).push({ Date: r.Date, Status: r.Status, Performance_Points: r.Performance_Points });
+                }
+
+                const students = {};
+                for (const e of (enrolled.results || [])) {
+                    students[e.Student_ID] = {
+                        records: recordsOf.get(e.Student_ID) || [],
+                        assessments: (assessmentRows.results || []).map(a => ({
+                            ...a,
+                            Score: scoreOf.has(`${a.Assessment_ID}|${e.Student_ID}`) ? scoreOf.get(`${a.Assessment_ID}|${e.Student_ID}`) : null
+                        }))
+                    };
+                }
+
+                return new Response(JSON.stringify({ success: true, course, sessions: sessions.results, students }), { status: 200, headers: corsHeaders });
+            }
+
             if (request.method === "GET" && path === "/api/recitation-pool") {
                 const courseId = url.searchParams.get("courseId");
                 if (!courseId) {
@@ -3496,4 +3582,3 @@ export default {
         }
     }
 };
-// This is a sample comment
