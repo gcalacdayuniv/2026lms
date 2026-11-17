@@ -3246,7 +3246,7 @@ export default {
 
             if (request.method === "POST" && path === "/api/assessment-scores") {
                 const body = await request.json();
-                const { assessmentId, scores } = body;
+                const { assessmentId, scores, clear, partial } = body;
 
                 if (!assessmentId || !Array.isArray(scores)) {
                     return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: corsHeaders });
@@ -3259,15 +3259,22 @@ export default {
                     return new Response(JSON.stringify({ error: "Assessment not found." }), { status: 404, headers: corsHeaders });
                 }
 
-                const statements = [
+                // partial: only the listed students change; everyone else (e.g. scan corrections) is kept.
+                const statements = partial ? [] : [
                     env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ?").bind(assessmentId)
                 ];
+                if (partial) {
+                    for (const sid of (Array.isArray(clear) ? clear : [])) {
+                        statements.push(env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?").bind(assessmentId, sid));
+                    }
+                }
 
                 for (const entry of scores) {
                     const value = parseFloat(entry.score);
                     if (!entry.studentId || isNaN(value) || value < 0 || value > assessment.Max_Score) {
                         return new Response(JSON.stringify({ error: `Invalid score. Scores must be between 0 and ${assessment.Max_Score}.` }), { status: 400, headers: corsHeaders });
                     }
+                    if (partial) statements.push(env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?").bind(assessmentId, entry.studentId));
                     statements.push(
                         env.DB.prepare(
                             "INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)"
@@ -3275,7 +3282,7 @@ export default {
                     );
                 }
 
-                await env.DB.batch(statements);
+                if (statements.length) await env.DB.batch(statements);
 
                 return new Response(JSON.stringify({ success: true, saved: scores.length }), { status: 200, headers: corsHeaders });
             }

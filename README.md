@@ -355,3 +355,8 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - The scan review cuts each question out of the straightened photo. When the sheet in the photo is a little stretched or bent, a fixed cut slid onto the neighbouring question (wrong item number, cut circles).
 - `alignRows` (`js/omr-crop.js`) now finds every row of circles in the photo by matching the ring pattern, top to bottom (each row is searched close to where the rows above were found, so drift builds up gradually and never jumps to the next row), and `cropBoxes(row, align)` cuts at the found position. Shifts under 1 unit are ignored; questions with 2 or 3 rows of choices (A-J, A-O) are cut per row with a slightly taller margin; if nothing matches, the planned position is used.
 - Used in `js/course-scan-review.js` when a photo is opened. Written-answer and essay crops still use the planned positions.
+
+## Record Scores: Corrected Scores Are Kept
+- The Record Scores grid now remembers the scores it loaded and saves only the ones the lecturer changed (`partial` save on `POST /api/assessment-scores`, with `clear` for emptied boxes). Scores corrected elsewhere, such as in Scan Review, are no longer overwritten by an older open grid.
+- After saving, the grid reloads from the database. A save without `partial` still replaces every score (older behaviour).
+- Scan Review corrections are stored only when the per-student **Save** is pressed; "•" in the picker marks unsaved ones.

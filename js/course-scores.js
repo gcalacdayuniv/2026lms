@@ -234,8 +234,10 @@ export const CourseScores = {
             const data = await apiFetch(`/api/assessment-scores?assessmentId=${id}&_t=${ts}`);
             const map = {};
             (data.scores || []).forEach(s => { map[s.Student_ID] = s.Score; });
+            CourseScores.baseline = { ...map };   // what the database held when this grid was opened
             CourseScores.renderGrid(map);
         } catch (err) {
+            CourseScores.baseline = null;
             CourseScores.renderGrid({});
             CourseScores.setAlert(err.message || 'Failed to load scores.', false);
         }
@@ -281,17 +283,25 @@ export const CourseScores = {
         if (!(max > 0)) return CourseScores.setAlert('Maximum score must be greater than 0.', false);
 
         const scores = [];
+        const clear = [];
+        const base = CourseScores.currentId ? CourseScores.baseline : null;
+        const same = (a, b) => Number(a) === Number(b);
         const inputs = Array.from(document.querySelectorAll('.score-input'));
         inputs.forEach(i => i.classList.remove('border-red-500'));
 
         for (const input of inputs) {
-            if (input.value.trim() === '') continue;
+            if (input.value.trim() === '') {
+                if (base && base[input.dataset.studentId] !== undefined) clear.push(input.dataset.studentId);
+                continue;
+            }
             const value = parseFloat(input.value);
             if (isNaN(value) || value < 0 || value > max) {
                 input.classList.add('border-red-500');
                 input.focus();
                 return CourseScores.setAlert(`Score for ${input.dataset.name} must be between 0 and ${fmt(max)}.`, false);
             }
+            // Only scores the lecturer changed are sent, so a score corrected elsewhere (scan review) is never overwritten by an older grid.
+            if (base && base[input.dataset.studentId] !== undefined && same(base[input.dataset.studentId], value)) continue;
             scores.push({ studentId: input.dataset.studentId, score: value });
         }
 
@@ -315,7 +325,7 @@ export const CourseScores = {
 
             await apiFetch('/api/assessment-scores', {
                 method: 'POST',
-                body: JSON.stringify({ assessmentId: id, scores })
+                body: JSON.stringify({ assessmentId: id, scores, clear, partial: !!base })
             });
 
             const ts = new Date().getTime();
@@ -325,6 +335,7 @@ export const CourseScores = {
             CourseScores.renderSelect();
             document.getElementById('scDeleteBtn').classList.remove('hidden');
 
+            await CourseScores.selectAssessment(id).catch(() => {});   // reload so the grid shows what is really stored
             CourseScores.setAlert(`Saved "${title}" with ${scores.length} score(s).`, true);
             UI.success(`Saved "${title}" (${scores.length} score${scores.length === 1 ? '' : 's'}).`);
         } catch (err) {
