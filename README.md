@@ -199,7 +199,7 @@ We use the following environment variables strictly within the API (`worker/wran
 ## Forms and Sign-in on Phones
 - Create Course, Registration List (`apModal`), Update Details and Change Password open as full-screen pages on phones (`sheet-panel app-page`, back arrow, sticky `.form-save` button above the keyboard). From 640 px up they stay centered dialogs. IDs and close buttons are unchanged.
 - Login and Register are full-screen on phones (`.auth-screen`), with `autocomplete`, `inputmode` and `enterkeyhint` set so password managers and keyboards behave.
-- Inputs inside pages, sheets and sign-in screens are 16 px on phones, because iOS Safari zooms the page into any smaller field.
+- Every text field (input, select, textarea) is 16 px on touch devices (`@media (hover: none) and (pointer: coarse)` in `styles.css`), because iOS Safari zooms the page into any smaller field. The viewport is not locked (no `maximum-scale`), so users can still pinch-zoom. `sw.js` cache version is now `portal-shell-v3` so the new `styles.css` is picked up.
 - `js/app-feel.js`: a light vibration on primary controls (touch only; iOS has no vibration API) and scrolling the focused field into view when the keyboard opens. Buttons get a small press animation (zero-specificity rule in `styles.css`).
 
 ## Speed and Connection
@@ -210,7 +210,7 @@ We use the following environment variables strictly within the API (`worker/wran
 ## Manage Users, Dark Mode and Install
 - **Manage Users (phones):** full-screen page with a search box, status chips with counts (the hidden `#muFilterStatus` select is still the single source of truth) and card swipes (`js/mu-swipe.js`): swipe right sets Active, swipe left opens a status sheet. `AuthModule.setUserStatus` saves the change (optimistic, reverted with an error toast on failure) and is shared by the dropdown, the swipe and the sheet.
 - **Dark mode:** `dark.css` remaps the Tailwind utility classes the app uses (surfaces, text, borders, pastel tints, gradients) when `<html data-theme="dark">`. `index.html` sets the attribute before first paint and `js/theme.js` keeps it in sync. Choice (Auto, Light, Dark) is in the profile panel and stored under `localStorage.theme`. New screens that use colors outside `styles.css` should use classes already mapped in `dark.css`, or add a rule there. Solid colored buttons and dark panels are deliberately left as they are.
-- **Install:** the profile panel has an "Install app" button (hidden once installed). On iPhone, `pwa.js` also generates a launch image for the current screen size; Safari reads it when the app is added to the Home Screen. `sw.js` cache version is `portal-shell-v2` and `dark.css` is part of the shell.
+- **Install:** the profile panel has an "Install app" button (hidden once installed). On iPhone, `pwa.js` also generates a launch image for the current screen size; Safari reads it when the app is added to the Home Screen. `sw.js` cache version is `portal-shell-v3` and `dark.css` is part of the shell.
 
 ## Development Directives
 When asked to add features, debug, or refactor, you must strictly adhere to the following rules:
