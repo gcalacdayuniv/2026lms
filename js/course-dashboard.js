@@ -4,6 +4,7 @@ import { CourseExam } from './course-exam.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 import { escapeHtml } from './html-utils.js';
+import { formatSchedule } from './schedule-time.js';
 import { getLocalDateString } from './date-utils.js';
 
 // Maximum size of an uploaded submission file.
@@ -396,7 +397,7 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
                                 <div>
                                     <div class="flex justify-between items-start gap-2">
                                         <span class="px-2.5 py-0.5 bg-yellow-400 text-gray-950 font-black text-[10px] rounded uppercase tracking-wider">${escapeHtml(ex.courseCode)} &bull; ${escapeHtml(ex.term)}</span>
-                                        ${ex.toDate ? `<span class="text-[10px] text-indigo-200 font-mono">Open until: ${ex.toDate}</span>` : ''}
+                                        ${ex.toDate ? `<span class="text-[10px] text-indigo-200 font-mono">Open until: ${escapeHtml(formatSchedule(ex.toDate, true))} (GMT+8)</span>` : ''}
                                     </div>
                                     <h3 class="text-lg sm:text-xl font-black text-white mt-2">${escapeHtml(ex.examTitle)}</h3>
                                     <p class="text-xs text-indigo-200 font-medium mt-0.5">${escapeHtml(ex.courseTitle)}</p>

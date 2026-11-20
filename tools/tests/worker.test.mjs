@@ -207,6 +207,15 @@ ok('owner cannot delete an exam another lecturer is using', shDel.s === 409 && !
 await call('POST', '/api/exams/share', { token: l1.j.token, body: { examId: exId, lecturerId: 'L1', lecturerIds: [] } });
 ok('after unsharing L3 loses access', (await call('GET', `/api/exam-data?examId=${exId}`, { token: l3.j.token })).s === 403);
 
+// ---- exam open/close times are GMT+8 ----
+import { scheduleMs } from '../../worker/exams.js';
+ok('open time "2026-11-20T08:30" is 00:30 UTC', scheduleMs('2026-11-20T08:30', false) === Date.UTC(2026, 10, 20, 0, 30));
+ok('date-only opening is midnight Manila', scheduleMs('2026-11-20', false) === Date.UTC(2026, 10, 19, 16, 0));
+ok('date-only closing is 11:59:59 PM Manila', scheduleMs('2026-11-20', true) === Date.UTC(2026, 10, 20, 15, 59, 59, 999));
+ok('blank time means no limit', scheduleMs('', false) === null && scheduleMs(null, true) === null);
+ok('closing before opening is rejected', (await call('POST', '/api/class-exams', { token: l1.j.token, body: { courseId: 'C1', examId: exId, fromDate: '2026-11-20T18:00', toDate: '2026-11-20T09:00', assignments: [] } })).s === 400);
+ok('garbage time is rejected', (await call('POST', '/api/class-exams', { token: l1.j.token, body: { courseId: 'C1', examId: exId, fromDate: 'tomorrow', assignments: [] } })).s === 400);
+
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----
 import { readFileSync, readdirSync } from 'node:fs';
 const workerDir = new URL('../../worker/', import.meta.url);

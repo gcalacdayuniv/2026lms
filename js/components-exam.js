@@ -72,12 +72,12 @@ export const ExamUI = {
                             </select>
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-indigo-700 uppercase mb-1">From Date (Open)</label>
-                            <input type="date" id="ecaFromDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white">
+                            <label class="block text-[10px] font-bold text-indigo-700 uppercase mb-1" for="ecaFromDate">Opens (date &amp; time, GMT+8)</label>
+                            <input type="datetime-local" id="ecaFromDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-indigo-700 uppercase mb-1">To Date (Auto-Close)</label>
-                            <input type="date" id="ecaToDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white">
+                            <label class="block text-[10px] font-bold text-indigo-700 uppercase mb-1" for="ecaToDate">Closes (date &amp; time, GMT+8)</label>
+                            <input type="datetime-local" id="ecaToDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white">
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-indigo-700 uppercase mb-1" for="ecaTimeLimit">Time limit (minutes)</label>

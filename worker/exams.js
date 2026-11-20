@@ -22,28 +22,27 @@ const cleanLimit = (v) => {
     return Number.isFinite(n) && n >= 1 ? Math.min(n, 600) : null;
 };
 
-// A date-only window (YYYY-MM-DD, what the app saves) is compared with today's date in the visitor's
-// timezone (Asia/Manila by default), so "from" opens at local midnight and "to" closes at the end of that local day.
-function isWithinScheduleWindow(fromDate, toDate, request) {
-    const today = getRequestDate(request);
-    const now = new Date();
-    const dateOnly = (v) => typeof v === 'string' && DATE_RE.test(v);
-    if (fromDate) {
-        if (dateOnly(fromDate)) {
-            if (today < fromDate) return false;
-        } else {
-            const start = new Date(fromDate);
-            if (!isNaN(start.getTime()) && now < start) return false;
-        }
-    }
-    if (toDate) {
-        if (dateOnly(toDate)) {
-            if (today > toDate) return false;
-        } else {
-            const end = new Date(toDate);
-            if (!isNaN(end.getTime()) && now > end) return false;
-        }
-    }
+// Exam open and close times are Philippine time (GMT+8, no daylight saving), whatever the visitor's timezone.
+// Saved as "YYYY-MM-DDTHH:mm" (or just "YYYY-MM-DD" on older exams: opens 12:00 AM, closes 11:59:59 PM that day).
+const SCHEDULE_OFFSET = "+08:00";
+const SCHEDULE_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/;
+
+export function scheduleMs(value, isEnd) {
+    if (value === null || value === undefined || value === "") return null;
+    const t = String(value).trim();
+    let ms;
+    if (DATE_RE.test(t)) ms = Date.parse(`${t}T${isEnd ? "23:59:59.999" : "00:00:00"}${SCHEDULE_OFFSET}`);
+    else if (SCHEDULE_DATETIME_RE.test(t)) ms = Date.parse(`${t.replace(" ", "T")}${t.length === 16 ? ":00" : ""}${SCHEDULE_OFFSET}`);
+    else ms = Date.parse(t);   // a value that carries its own timezone
+    return Number.isFinite(ms) ? ms : null;
+}
+
+function isWithinScheduleWindow(fromDate, toDate) {
+    const now = Date.now();
+    const start = scheduleMs(fromDate, false);
+    if (start !== null && now < start) return false;
+    const end = scheduleMs(toDate, true);
+    if (end !== null && now > end) return false;
     return true;
 }
 
@@ -66,7 +65,7 @@ async function getStudentAccessibleExamsList(env, studentId, request) {
     const availableExams = [];
 
     for (const r of (rows.results || [])) {
-        if (!isWithinScheduleWindow(r.From_Date, r.To_Date, request)) {
+        if (!isWithinScheduleWindow(r.From_Date, r.To_Date)) {
             continue;
         }
 
@@ -327,6 +326,14 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         if (!courseId || !examId) {
             return new Response(JSON.stringify({ error: "Course and Exam are required." }), { status: 400, headers: corsHeaders });
         }
+        const badTime = (x) => x && !DATE_RE.test(String(x)) && !SCHEDULE_DATETIME_RE.test(String(x));
+        if (badTime(fromDate) || badTime(toDate)) {
+            return new Response(JSON.stringify({ error: "The opening or closing time is not valid." }), { status: 400, headers: corsHeaders });
+        }
+        const openMs = scheduleMs(fromDate, false), closeMs = scheduleMs(toDate, true);
+        if (openMs !== null && closeMs !== null && openMs > closeMs) {
+            return new Response(JSON.stringify({ error: "The opening time must be before the closing time." }), { status: 400, headers: corsHeaders });
+        }
 
         await ensureAccessibleExamTables(env);
 
@@ -536,7 +543,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         if (!record) {
             return new Response(JSON.stringify({ error: "Exam assignment not found." }), { status: 404, headers: corsHeaders });
         }
-        if (!record.Is_Enabled || !record.Is_Active || record.Status === "Completed" || !isWithinScheduleWindow(record.From_Date, record.To_Date, request)) {
+        if (!record.Is_Enabled || !record.Is_Active || record.Status === "Completed" || !isWithinScheduleWindow(record.From_Date, record.To_Date)) {
             return new Response(JSON.stringify({ error: "This exam is not open." }), { status: 403, headers: corsHeaders });
         }
 
@@ -865,7 +872,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: "You have already submitted this exam." }), { status: 400, headers: corsHeaders });
         }
 
-        if (!isWithinScheduleWindow(record.From_Date, record.To_Date, request)) {
+        if (!isWithinScheduleWindow(record.From_Date, record.To_Date)) {
             return new Response(JSON.stringify({ error: "This exam is outside the scheduled date window and is closed." }), { status: 403, headers: corsHeaders });
         }
 

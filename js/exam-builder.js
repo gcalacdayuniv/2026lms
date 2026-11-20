@@ -1325,8 +1325,8 @@ export const ExamBuilder = {
                     <div><label class="${lab}" for="ebLinkWho">Who can take it</label>
                         <select id="ebLinkWho" class="${inp}">${l.linked ? opt('keep', 'Keep current students', l.audience) : ''}${opt('blind', 'Legally Blind students only', l.audience)}${opt('all', 'All students', l.audience)}</select></div>
                     <div><label class="${lab}" for="ebLinkTime">Time limit (minutes)</label><input type="number" id="ebLinkTime" min="1" max="600" step="1" placeholder="No limit" class="${inp}" value="${esc(l.timeLimit ?? '')}"></div>
-                    <div><label class="${lab}" for="ebLinkFrom">Available from</label><input type="date" id="ebLinkFrom" class="${inp}" value="${esc(l.fromDate || '')}"></div>
-                    <div><label class="${lab}" for="ebLinkTo">Available until</label><input type="date" id="ebLinkTo" class="${inp}" value="${esc(l.toDate || '')}"></div>
+                    <div><label class="${lab}" for="ebLinkFrom">Opens (date &amp; time, GMT+8)</label><input type="datetime-local" id="ebLinkFrom" class="${inp}" value="${esc(l.fromDate || '')}"></div>
+                    <div><label class="${lab}" for="ebLinkTo">Closes (date &amp; time, GMT+8)</label><input type="datetime-local" id="ebLinkTo" class="${inp}" value="${esc(l.toDate || '')}"></div>
                     <p class="sm:col-span-2 lg:col-span-3 text-[11px] text-indigo-800">The exam title above is the name shown in Record Scores. You can pick individual students later with Link &amp; Assign Students.</p>
                 </div>
             </div>`;

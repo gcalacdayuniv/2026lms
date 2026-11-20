@@ -4,6 +4,7 @@ import { CourseClass } from './course-class.js';
 import { UI } from './ui-feedback.js';
 import { ExamBuilder } from './exam-builder.js';
 import { ExamShare } from './exam-share.js';
+import { toInputValue, formatSchedule } from './schedule-time.js';
 import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
 import { buildExamPrintHtml } from './exam-print.js';
 import { ExamReview } from './exam-review.js';
@@ -678,7 +679,7 @@ export const CourseExam = {
             }
 
             const linkBadge = linked && linked.Is_Active
-                ? `<span class="text-[10px] bg-green-100 text-green-800 border border-green-300 font-bold px-2 py-0.5 rounded">Linked (${enabledStudentsCount} student${enabledStudentsCount === 1 ? '' : 's'}) | ${esc(linked.From_Date || 'Any')} to ${esc(linked.To_Date || 'Any')}</span>`
+                ? `<span class="text-[10px] bg-green-100 text-green-800 border border-green-300 font-bold px-2 py-0.5 rounded">Linked (${enabledStudentsCount} student${enabledStudentsCount === 1 ? '' : 's'}) | ${esc(formatSchedule(linked.From_Date, false))} to ${esc(formatSchedule(linked.To_Date, true))}</span>`
                 : `<span class="text-[10px] bg-gray-100 text-gray-600 border border-gray-200 font-medium px-2 py-0.5 rounded">Not linked to this class</span>`;
 
             return `
@@ -761,8 +762,8 @@ export const CourseExam = {
         document.getElementById('ecaIsActive').checked = linked ? Boolean(linked.Is_Active) : true;
         document.getElementById('ecaTerm').value = linked?.Term || 'MidTerm';
         document.getElementById('ecaCategory').value = linked?.Category || 'MajorExam';
-        document.getElementById('ecaFromDate').value = linked?.From_Date || '';
-        document.getElementById('ecaToDate').value = linked?.To_Date || '';
+        document.getElementById('ecaFromDate').value = toInputValue(linked?.From_Date, false);
+        document.getElementById('ecaToDate').value = toInputValue(linked?.To_Date, true);
         document.getElementById('ecaTimeLimit').value = linked?.Time_Limit || '';
 
         const listEl = document.getElementById('ecaStudentList');
@@ -838,8 +839,8 @@ export const CourseExam = {
             enabled: linked ? Boolean(linked.Is_Active) : false,
             term: linked?.Term || 'MidTerm',
             category: linked?.Category || 'MajorExam',
-            fromDate: linked?.From_Date || '',
-            toDate: linked?.To_Date || '',
+            fromDate: toInputValue(linked?.From_Date, false),
+            toDate: toInputValue(linked?.To_Date, true),
             timeLimit: linked?.Time_Limit || '',
             audience: linked ? 'keep' : 'blind'
         };
@@ -905,7 +906,7 @@ export const CourseExam = {
         const timeLimit = parseInt(document.getElementById('ecaTimeLimit').value, 10) || null;
 
         if (fromDate && toDate && fromDate > toDate) {
-            alertBox.textContent = "From Date cannot be later than To Date.";
+            alertBox.textContent = "The opening time must be before the closing time.";
             alertBox.className = "mb-3 p-2 rounded text-xs font-bold bg-red-100 text-red-700 block";
             return;
         }
