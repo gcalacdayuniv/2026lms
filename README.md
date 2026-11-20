@@ -252,6 +252,9 @@ We use the following environment variables strictly within the API (`worker/wran
 - **Form view:** the open question has a labeled "Minimize" button; opening another question also folds the previous one.
 - **Scan Answer Sheets:** the Date field no longer overflows into the Paper field (min-w-0 grid children, fixed date height). `sw.js` cache is now `portal-shell-v7`.
 
+## Icons are hosted with the app
+- Font Awesome 6.4.0 (free) now lives in `vendor/fontawesome/` (CSS plus the solid, regular and brands `.woff2` fonts) instead of loading from the CDN, so icons no longer vanish on a weak connection or after a service-worker cache reset. `sw.js` pre-caches the CSS and the two fonts the app uses (`portal-shell-v8`). ExcelJS and SheetJS still load from cdnjs when needed. If you upgrade Font Awesome, replace the files in that folder together (the CSS paths expect `../webfonts/`).
+
 ## Manage Users, Dark Mode and Install
 - **Manage Users (phones):** full-screen page with a search box, status chips with counts (the hidden `#muFilterStatus` select is still the single source of truth) and card swipes (`js/mu-swipe.js`): swipe right sets Active, swipe left opens a status sheet. `AuthModule.setUserStatus` saves the change (optimistic, reverted with an error toast on failure) and is shared by the dropdown, the swipe and the sheet.
 - **Dark mode:** `dark.css` remaps the Tailwind utility classes the app uses (surfaces, text, borders, pastel tints, gradients) when `<html data-theme="dark">`. `index.html` sets the attribute before first paint and `js/theme.js` keeps it in sync. Choice (Auto, Light, Dark) is in the profile panel and stored under `localStorage.theme`. New screens that use colors outside `styles.css` should use classes already mapped in `dark.css`, or add a rule there. Solid colored buttons and dark panels are deliberately left as they are.

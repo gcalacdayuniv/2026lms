@@ -36,7 +36,7 @@ const UTILITY = /^((sm|md|lg|xl|hover|focus|dark|disabled|group-hover|active):)*
         const u = r.request().url();
         if (u.startsWith('http://localhost:' + PORT)) return r.continue();
         if (u.includes('workers.dev')) return r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(api(u)) });
-        if (u.includes('font-awesome')) return r.fulfill({ contentType: 'text/css', body: '' });   // icons are not what is tested here
+        if (u.includes('fontawesome')) return r.fulfill({ contentType: 'text/css', body: '' });   // icons are not what is tested here
         return r.abort();
     });
     const seen = new Set(), overflow = [];
