@@ -4,12 +4,7 @@ import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { CourseAttendance } from './course-attendance.js';
 import { getWeekdayName, matchesScheduleDay } from './date-utils.js';
-
-const esc = (v) => String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+import { escapeHtml as esc } from './html-utils.js';
 
 const getCourseId = () => window.location.hash.replace('#class-', '');
 const getScheduleDay = () => document.getElementById('attendanceDate')?.dataset.scheduleDay || '';

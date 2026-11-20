@@ -3,12 +3,8 @@ import { apiFetch } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
 import { parseLocalDate, getLocalDateString } from './date-utils.js';
-
-const esc = (v) => String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+import { escapeHtml as esc } from './html-utils.js';
+import { csvCell, downloadCsv } from './download-utils.js';
 
 const STATUS_BADGE = {
     'Active': 'text-green-600 border-green-200 bg-green-50',
@@ -47,6 +43,10 @@ export const CourseSummary = {
 
         if (e.target.closest('#csExportCsvBtn')) {
             CourseSummary.exportCsv();
+        }
+
+        if (e.target.closest('#csExportGradeBtn')) {
+            CourseSummary.exportGrade();
         }
     },
 
@@ -99,6 +99,7 @@ export const CourseSummary = {
         errorDiv.classList.add('hidden');
         content.classList.add('hidden');
         exportBtn.disabled = true;
+        document.getElementById('csExportGradeBtn').disabled = true;
         loadingText.textContent = 'Loading class list...';
 
         try {
@@ -157,6 +158,7 @@ export const CourseSummary = {
             loading.classList.add('hidden');
             content.classList.remove('hidden');
             exportBtn.disabled = false;
+            document.getElementById('csExportGradeBtn').disabled = false;
             CourseSummary.render();
         } catch (err) {
             loading.classList.add('hidden');
@@ -358,10 +360,34 @@ export const CourseSummary = {
         }).join('');
     },
 
-    csvCell: (value) => {
-        let str = String(value ?? '');
-        if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
-        return `"${str.replace(/"/g, '""')}"`;
+    // Downloads the CLASS GRADE workbook (midterm, final term and summary blocks) for every student in the class.
+    exportGrade: async () => {
+        const btn = document.getElementById('csExportGradeBtn');
+        const label = document.getElementById('csExportGradeLabel');
+        if (!btn || btn.disabled || !CourseSummary.rows.length) return;
+        btn.disabled = true;
+        label.textContent = 'Preparing...';
+        try {
+            const { exportClassGrade } = await import('./class-grade-export.js');   // loaded only when used
+            // Attendance and participation per term: attendance = present + half of late + excused, out of the term's class days
+            // (excused days count as attended so they never lower a student's rating).
+            const rows = CourseSummary.rows.map(row => {
+                const attendance = {};
+                [['MidTerm', 'midterm'], ['FinalTerm', 'finalterm']].forEach(([term, key]) => {
+                    const s = CourseSummary.computeTerm(row.records || [], key);
+                    attendance[term] = { score: s.present + s.late * 0.5 + s.excused, max: s.classDays + s.excused, points: s.points };
+                });
+                return { ...row, attendance };
+            });
+            const { warnings } = await exportClassGrade(CourseSummary.course, rows);
+            UI.success('Class grade downloaded');
+            warnings.forEach(w => UI.warning(w, 8000));
+        } catch (err) {
+            UI.error(err.message || 'Could not create the class grade file.');
+        } finally {
+            label.textContent = 'Class Grade (.xlsx)';
+            btn.disabled = false;
+        }
     },
 
     exportCsv: () => {
@@ -383,7 +409,7 @@ export const CourseSummary = {
             'Attendance & Participation Log', 'Assessment Scores'
         ];
 
-        const lines = [header.map(CourseSummary.csvCell).join(',')];
+        const lines = [header.map(csvCell).join(',')];
 
         rows.forEach(r => {
             const s = r.student;
@@ -401,20 +427,11 @@ export const CourseSummary = {
                 ...blank(sc.Written), ...blank(sc.Narrative), ...blank(sc.Individual),
                 ...blank(sc.Report), ...blank(sc.Performance), ...blank(sc.MajorExam),
                 log, scoreLog
-            ].map(CourseSummary.csvCell).join(','));
+            ].map(csvCell).join(','));
         });
 
-        const csv = '\uFEFF' + lines.join('\r\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
         const safeCode = (course.CourseCode || 'class').replace(/[^a-zA-Z0-9_-]/g, '_');
         const safeTerm = term === 'all' ? 'all-terms' : term;
-        a.href = url;
-        a.download = `${safeCode}_summary_${safeTerm}_${getLocalDateString()}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadCsv(`${safeCode}_summary_${safeTerm}_${getLocalDateString()}.csv`, lines.join('\r\n'));
     }
 };

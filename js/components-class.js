@@ -198,13 +198,16 @@ const ClassUI = {
 
                 <div class="mb-3 flex flex-col md:flex-row gap-2">
                     <input type="text" id="csSearchInput" placeholder="Search name, student no., email, contact, group, topic, status..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-gray-50">
-                    <select id="csTermSelect" class="w-full md:w-44 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
+                    <select id="csTermSelect" aria-label="Term" class="w-full md:w-44 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50 font-medium">
                         <option value="midterm">Mid Term</option>
                         <option value="finalterm">Final Term</option>
                         <option value="all">Mid + Final Term</option>
                     </select>
-                    <button type="button" id="csExportCsvBtn" disabled class="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                    <button type="button" id="csExportCsvBtn" disabled class="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-file-csv mr-2"></i> Export CSV
+                    </button>
+                    <button type="button" id="csExportGradeBtn" disabled class="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center min-h-[44px]">
+                        <i class="fa-solid fa-file-excel mr-2" aria-hidden="true"></i> <span id="csExportGradeLabel">Class Grade (.xlsx)</span>
                     </button>
                 </div>
 
@@ -304,7 +307,7 @@ const ClassUI = {
                     <button type="button" id="scDeleteBtn" class="hidden px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-md text-sm font-bold transition">
                         <i class="fa-solid fa-trash"></i>
                     </button>
-                    <button type="button" id="scSaveBtn" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                    <button type="button" id="scSaveBtn" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                         <i class="fa-solid fa-floppy-disk mr-2"></i> Save Assessment & Scores
                     </button>
                 </div>
@@ -351,15 +354,15 @@ const ClassUI = {
                 <div class="space-y-4">
                     <div class="grid grid-cols-3 gap-2">
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Seat</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Seat</label>
                             <input type="text" id="manageSeatInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Group</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Group</label>
                             <input type="text" id="manageGroupInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Topic</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Topic</label>
                             <input type="text" id="manageTopicInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="Assigned">
                         </div>
                     </div>
@@ -368,22 +371,22 @@ const ClassUI = {
                         <div class="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1"><i class="fa-solid fa-graduation-cap mr-1"></i>Program (assigned by lecturer)</div>
                         <div class="grid grid-cols-3 gap-2">
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Course</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Course</label>
                             <input type="text" id="manageProgramCourseInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="e.g. BSCS">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Year</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Year</label>
                             <input type="text" id="manageProgramYearInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="e.g. 2">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Section</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Section</label>
                             <input type="text" id="manageProgramSectionInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="e.g. A">
                         </div>
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Eye Condition / Disability Tag</label>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Eye Condition / Disability Tag</label>
                         <select id="manageEyeConditionSelect" class="w-full px-3 py-2 text-sm border border-gray-300 rounded outline-none font-bold bg-gray-50 cursor-pointer transition focus:ring-2 focus:ring-blue-500">
                             <option value="No Eye Condition">No Eye Condition</option>
                             <option value="Near Sighted">Near Sighted</option>
@@ -393,7 +396,7 @@ const ClassUI = {
                     </div>
 
                     <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Account Status</label>
                         <select id="manageStatusSelect" class="w-full px-3 py-2 text-sm border rounded outline-none font-medium cursor-pointer transition">
                             <option value="Active">Active</option>
                             <option value="Inactive">Inactive</option>
@@ -408,34 +411,34 @@ const ClassUI = {
                         <summary class="text-xs font-bold text-gray-700 cursor-pointer select-none"><i class="fa-solid fa-id-card text-blue-600 mr-1"></i>Edit Student Details</summary>
                         <div class="space-y-3 mt-3">
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Full Name</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
                             <input type="text" id="manageNameInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Student Number</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Student Number</label>
                             <input type="text" id="manageStudentNumberInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="00-0000">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Email</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
                             <input type="text" id="manageEmailInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Contact Number</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Number</label>
                             <input type="text" id="manageContactInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
                         </div>
 
-                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Class Course / Year / Section</div>
+                            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Class Course / Year / Section</div>
                             <div class="grid grid-cols-3 gap-2">
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Course</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Course</label>
                             <input type="text" id="manageClassCourseInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Year</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Year</label>
                             <input type="text" id="manageClassYearInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Section</label>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Section</label>
                             <input type="text" id="manageClassSectionInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
                         </div>
                             </div>
@@ -482,23 +485,23 @@ const ClassUI = {
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermWrittenScore">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Narrative" title="Click to view narrative grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Narrative</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermNarrativeScore">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Individual" title="Click to view individual grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Individual</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermIndividualScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-500 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermWrittenScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Narrative" title="Click to view narrative grades"><div class="text-gray-500 text-[9px] uppercase font-bold">Narrative</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermNarrativeScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Individual" title="Click to view individual grades"><div class="text-gray-500 text-[9px] uppercase font-bold">Individual</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermIndividualScore">...</span></div>
                                 </div>
                             </div>
 
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Report" title="Click to view report grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Report</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermReportScore">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermPerformanceTaskScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Report" title="Click to view report grades"><div class="text-gray-500 text-[9px] uppercase font-bold">Report</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermReportScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-blue-400 transition" data-term="midterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-500 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-blue-600 text-base block mt-0.5" id="midtermPerformanceTaskScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="participation" title="Click to view participation details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
+                                        <div class="text-gray-500 text-[9px] uppercase font-bold">Participation</div>
                                         <span class="font-black text-blue-600 text-base block mt-0.5" id="midtermParticipationScore">...</span>
                                     </div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-blue-400 transition" data-term="midterm" data-metric="attendance" title="Click to view attendance details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
+                                        <div class="text-gray-500 text-[9px] uppercase font-bold">Attendance</div>
                                         <span class="font-black text-blue-600 text-base block mt-0.5"><span id="midtermAttendancePct">...</span>%</span>
                                         <div class="text-[8px] text-gray-500 mt-0.5"><span id="midtermPresent">0</span>P, <span id="midtermLate">0</span>L, <span id="midtermExcused">0</span>E, <span id="midtermAbsent">0</span>A</div>
                                         <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="midtermTotalDays">0</span></div>
@@ -520,23 +523,23 @@ const ClassUI = {
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Written Output</span>
                                 <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermWrittenScore">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Narrative" title="Click to view narrative grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Narrative</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermNarrativeScore">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Individual" title="Click to view individual grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Individual</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermIndividualScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Written" title="Click to view quizzes/long exam scores"><div class="text-gray-500 text-[9px] uppercase font-bold">Quizzes/Long</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermWrittenScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Narrative" title="Click to view narrative grades"><div class="text-gray-500 text-[9px] uppercase font-bold">Narrative</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermNarrativeScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Individual" title="Click to view individual grades"><div class="text-gray-500 text-[9px] uppercase font-bold">Individual</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermIndividualScore">...</span></div>
                                 </div>
                             </div>
 
                             <div>
                                 <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Performance Output</span>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1 text-xs">
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Report" title="Click to view report grades"><div class="text-gray-400 text-[9px] uppercase font-bold">Report</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermReportScore">...</span></div>
-                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-400 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermPerformanceTaskScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Report" title="Click to view report grades"><div class="text-gray-500 text-[9px] uppercase font-bold">Report</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermReportScore">...</span></div>
+                                    <div class="bg-white p-2 border rounded text-center cursor-pointer view-scores-trigger hover:border-yellow-400 transition" data-term="finalterm" data-category="Performance" title="Click to view performance task scores"><div class="text-gray-500 text-[9px] uppercase font-bold">Tasks</div><span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermPerformanceTaskScore">...</span></div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="participation" title="Click to view participation details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Participation</div>
+                                        <div class="text-gray-500 text-[9px] uppercase font-bold">Participation</div>
                                         <span class="font-black text-yellow-600 text-base block mt-0.5" id="finaltermParticipationScore">...</span>
                                     </div>
                                     <div class="bg-white p-2 border rounded text-center cursor-pointer view-details-trigger hover:border-yellow-400 transition" data-term="finalterm" data-metric="attendance" title="Click to view attendance details">
-                                        <div class="text-gray-400 text-[9px] uppercase font-bold">Attendance</div>
+                                        <div class="text-gray-500 text-[9px] uppercase font-bold">Attendance</div>
                                         <span class="font-black text-yellow-600 text-base block mt-0.5"><span id="finaltermAttendancePct">...</span>%</span>
                                         <div class="text-[8px] text-gray-500 mt-0.5"><span id="finaltermPresent">0</span>P, <span id="finaltermLate">0</span>L, <span id="finaltermExcused">0</span>E, <span id="finaltermAbsent">0</span>A</div>
                                         <div class="text-[8px] text-gray-400 mt-0.5 font-bold">Class days: <span id="finaltermTotalDays">0</span></div>
@@ -835,7 +838,7 @@ export const ClassComponents = {
                                     <span class="font-medium text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayCourse || 'N/A')} ${eyeConditionBadge}
                                 </div>
                                 ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${escapeHtml(displayProgram)}</div>` : ''}
-                                <div class="text-[10px] font-bold text-gray-400 mt-1 uppercase">
+                                <div class="text-[10px] font-bold text-gray-500 mt-1 uppercase">
                                     Seat: <span class="text-gray-800">${escapeHtml(s.Seat_Number || '')}</span>
                                     &nbsp;|&nbsp; Group: ${groupDisplay}
                                     &nbsp;|&nbsp; Topic: <span class="text-gray-800">${escapeHtml(s.Assigned_Topic || '')}</span>
@@ -844,7 +847,7 @@ export const ClassComponents = {
                         </div>
 
                         <div class="lg:hidden">
-                            <button type="button" class="manage-student-btn px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm"
+                            <button type="button" aria-label="Manage ${escapeHtml(s.Name)}" class="manage-student-btn min-w-[44px] min-h-[40px] px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm"
                                 data-student-id="${s.User_ID}"
                                 data-name="${escapeHtml(s.Name)}"
                                 data-seat="${escapeHtml(s.Seat_Number || '')}"
@@ -858,7 +861,7 @@ export const ClassComponents = {
                     </div>
 
                     <div class="hidden lg:flex items-center justify-center w-auto px-2">
-                        <button type="button" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm"
+                        <button type="button" aria-label="Manage ${escapeHtml(s.Name)}" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm"
                             data-student-id="${s.User_ID}"
                             data-name="${escapeHtml(s.Name)}"
                             data-seat="${escapeHtml(s.Seat_Number || '')}"
@@ -870,9 +873,9 @@ export const ClassComponents = {
                         </button>
                     </div>
 
-                    <div class="row-points-area flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto">
+                    <div class="row-points-area flex items-end justify-between lg:justify-end w-full lg:w-auto space-x-2 border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 mt-1 lg:mt-0 overflow-x-auto lg:overflow-visible lg:flex-shrink-0">
                         <div class="flex items-center lg:items-start lg:flex-col gap-2 lg:gap-0">
-                            <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-wider lg:mb-0.5 text-center">Pts</label>
+                            <label class="block text-[9px] font-bold text-gray-500 uppercase tracking-wider lg:mb-0.5 text-center">Pts</label>
                             <div class="flex items-center gap-1">
                                 <button type="button" class="pts-step w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-gray-300 text-gray-700 text-lg font-black leading-none hover:bg-gray-100 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-step="-1" aria-label="Subtract 1 participation point for ${escapeHtml(s.Name)}">&minus;</button>
                                 <input type="number" min="0" max="999" placeholder="0" aria-label="Participation points for ${escapeHtml(s.Name)}" class="points-input w-12 px-1 py-1.5 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 outline-none text-center bg-gray-50 focus:bg-white transition font-mono font-bold" value="0">
@@ -938,7 +941,7 @@ export const ClassComponents = {
             <main class="pt-20 pb-36 sm:pb-28 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in relative">
                 <div id="attendanceBar" data-dirty="false" class="sticky top-16 z-30 mb-4 px-2 sm:px-3 py-2 bg-gray-50/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
                     <div class="flex flex-wrap items-center gap-2">
-                        <input type="date" id="attendanceDate" data-schedule-day="${escapeHtml(course.ScheduleDay || '')}" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
+                        <input type="date" id="attendanceDate" aria-label="Attendance date" data-schedule-day="${escapeHtml(course.ScheduleDay || '')}" class="flex-1 sm:flex-none min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
                         <button type="button" id="attendanceMoreBtn" aria-label="Sort, filter and select students" aria-expanded="false" aria-controls="attendanceBarTools" class="sm:hidden flex-shrink-0 w-10 h-10 inline-flex items-center justify-center border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                         <div id="attendanceBarTools" class="hidden sm:flex items-center gap-2 w-full sm:w-auto order-last sm:order-none">
                         <select id="rosterSort" aria-label="Sort students" class="min-w-0 flex-1 sm:flex-none px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
@@ -979,10 +982,10 @@ export const ClassComponents = {
                             ${students.length} Enrolled Students
                         </span>
                         <div class="space-x-2">
-                            <button type="button" id="toggleStatusButtons" aria-controls="rosterListContainer" aria-expanded="${isStatusCollapsed() ? 'false' : 'true'}" class="text-[10px] sm:text-xs font-bold text-gray-600 hover:text-gray-900 underline">
+                            <button type="button" id="toggleStatusButtons" aria-controls="rosterListContainer" aria-expanded="${isStatusCollapsed() ? 'false' : 'true'}" class="text-[10px] sm:text-xs font-bold text-gray-600 hover:text-gray-900 underline py-3 sm:py-1">
                                 <i class="fa-solid ${isStatusCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'} mr-1" aria-hidden="true"></i><span>${isStatusCollapsed() ? 'Expand Status' : 'Collapse Status'}</span>
                             </button>
-                            <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-600 hover:text-green-800 underline">Mark All Present</button>
+                            <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-700 hover:text-green-900 underline py-3 sm:py-1">Mark All Present</button>
                         </div>
                     </div>
                     ${students.length > 1 ? `

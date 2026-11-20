@@ -6,14 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Online Portal</title>
     <link rel="icon" type="image/x-icon" href="https://drive.google.com/thumbnail?id=1eekXPNHZZfcTTUqDbipQbu-a-cuQfB77&sz=w64">
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="dark.css">
-    <script>
-        // Apply the saved appearance before the first paint (see js/theme.js).
-        try { var t = localStorage.getItem("theme"); if (t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.setAttribute("data-theme", "dark"); } catch (e) {}
-    </script>
+    <!-- Built by tools/build-css.sh (it replaces the Tailwind CDN). Last in the head, where the CDN used to add its styles, so the cascade is unchanged. -->
+    <link rel="stylesheet" href="tailwind.css">
+    <script src="js/theme-boot.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans antialiased overflow-x-hidden">
     <div id="app-root" class="w-full min-h-screen">

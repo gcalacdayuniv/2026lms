@@ -19,6 +19,8 @@
 //   Part | Type | Question | Choice A ... Choice J | Answer | Explanation | Bonus | Points
 //   Part is shown and written from 1 (Part 1 is stored as 0 in the exam row). A file written with Choice A-H still imports.
 
+import { csvCell } from './download-utils.js';
+
 export const MAX_OPTIONS = 10;
 export const MIN_OPTIONS = 2;
 export const MAX_ITEMS = 30;
@@ -460,13 +462,6 @@ export const detectDelimiter = (text) => {
     const count = (d) => first.split(d).length - 1;
     const best = [',', ';', '\t'].map(d => [d, count(d)]).sort((a, b) => b[1] - a[1])[0];
     return best[1] > 0 ? best[0] : ',';
-};
-
-// A cell that starts with = + - @ would run as a formula in Excel. A leading ' keeps it text.
-const csvCell = (v) => {
-    let s = String(v ?? '');
-    if (/^[=+@]/.test(s) || (/^-/.test(s) && !/^-?\d+([.,]\d+)?$/.test(s))) s = `'${s}`;
-    return `"${s.replace(/"/g, '""')}"`;
 };
 
 // Questions -> CSV text in the spreadsheet layout.

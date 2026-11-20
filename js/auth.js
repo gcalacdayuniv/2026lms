@@ -6,6 +6,29 @@ import { UI } from './ui-feedback.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
 export const AuthModule = {
+    // Shrinks a profile photo to at most 1024 px on the long side (JPEG) so a phone photo of several MB becomes about 150 KB.
+    // If the browser cannot decode or draw it, the original file is sent.
+    photoToBase64: async (file) => {
+        const readAsBase64 = (blob) => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
+            reader.readAsDataURL(blob);
+        });
+        try {
+            const bitmap = await createImageBitmap(file);
+            const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            if (bitmap.close) bitmap.close();
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+            if (blob && blob.size > 0 && blob.size < file.size) return await readAsBase64(blob);
+        } catch (err) { /* fall back to the original file */ }
+        return readAsBase64(file);
+    },
+
     usersList: [],
     currentImageGallery: [],
     currentImageIndex: 0,
@@ -94,12 +117,7 @@ export const AuthModule = {
                 if (cameraInput && cameraInput.files.length > 0) activeFile = cameraInput.files[0];
 
                 if (activeFile) {
-                    payload.avatarBase64 = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result.split(',')[1]);
-                        reader.onerror = error => reject(error);
-                        reader.readAsDataURL(activeFile);
-                    });
+                    payload.avatarBase64 = await AuthModule.photoToBase64(activeFile);
                 } else {
                      throw new Error("Profile photo is required.");
                 }
@@ -250,12 +268,14 @@ export const AuthModule = {
         }
         
         if (e.target.id === 'muSearchInput') {
+            AuthModule.muLimit = AuthModule.MU_PAGE;
             AuthModule.renderManageUsers();
         }
     },
 
     handleChanges: async (e) => {
         if (e.target.id === 'muFilterStatus') {
+            AuthModule.muLimit = AuthModule.MU_PAGE;
             AuthModule.renderManageUsers();
         }
 
@@ -364,6 +384,10 @@ export const AuthModule = {
                 input.type = 'password';
                 icon.classList.replace('fa-eye-slash', 'fa-eye');
             }
+            const shown = input.type === 'text';
+            const tbtn = e.target.closest('#toggleLoginPassword');
+            tbtn.setAttribute('aria-pressed', String(shown));
+            tbtn.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
         }
         
         if (e.target.closest('#btnCamera')) {
@@ -391,7 +415,13 @@ export const AuthModule = {
         const muChip = e.target.closest('.mu-chip');
         if (muChip) {
             const sel = document.getElementById('muFilterStatus');
-            if (sel) { sel.value = muChip.dataset.status; AuthModule.renderManageUsers(); }
+            if (sel) { sel.value = muChip.dataset.status; AuthModule.muLimit = AuthModule.MU_PAGE; AuthModule.renderManageUsers(); }
+            return;
+        }
+
+        if (e.target.closest('#muShowMore')) {
+            AuthModule.muLimit = (AuthModule.muLimit || AuthModule.MU_PAGE) + AuthModule.MU_PAGE;
+            AuthModule.renderManageUsers();
             return;
         }
 
@@ -523,6 +553,10 @@ export const AuthModule = {
         }
     },
 
+    // Manage Users draws 40 cards at a time ("Show more" adds 40), so a long list does not make a phone draw hundreds of cards and avatars at once.
+    MU_PAGE: 40,
+    muLimit: 40,
+
     loadManageUsers: async () => {
         const list = document.getElementById('manageUsersList');
         if (!list) return;
@@ -531,6 +565,7 @@ export const AuthModule = {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/users?_t=${ts}`);
             AuthModule.usersList = data.users;
+            AuthModule.muLimit = AuthModule.MU_PAGE;
             AuthModule.renderManageUsers();
         } catch(err) {
             list.innerHTML = `<div class="text-red-500 p-4 text-center font-bold bg-red-50 border border-red-200 rounded">${escapeHtml(err.message)}</div>`;
@@ -563,7 +598,9 @@ export const AuthModule = {
             return;
         }
         
-        list.innerHTML = filtered.map(u => {
+        const limit = AuthModule.muLimit || AuthModule.MU_PAGE;
+        const more = filtered.length - limit;
+        list.innerHTML = filtered.slice(0, limit).map(u => {
             const avatarSrc = u.Avatar ? getLoadableAvatarSrc(u.Avatar) : null;
             const avatarImg = avatarSrc 
                 ? `<img src="${safeUrl(avatarSrc)}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition shadow-sm" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(u.Name)}" data-info="${escapeHtml(u.course || '')} ${escapeHtml(u.year || '')} ${escapeHtml(u.section || '')}">` 
@@ -612,7 +649,7 @@ export const AuthModule = {
                 </div>
             </div>
             `;
-        }).join('');
+        }).join('') + (more > 0 ? `<div class="text-center py-3"><button type="button" id="muShowMore" class="px-5 min-h-[44px] rounded-lg border border-blue-200 bg-blue-50 text-blue-700 font-bold text-sm">Show more (${more} left)</button></div>` : '');
         list.scrollTop = keepScroll;
     }
 };

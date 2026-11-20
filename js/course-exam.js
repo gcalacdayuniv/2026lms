@@ -7,17 +7,13 @@ import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js'
 import { buildExamPrintHtml } from './exam-print.js';
 import { ExamReview } from './exam-review.js';
 import { showPrintPreview } from './print-preview.js';
+import { escapeHtml as esc } from './html-utils.js';
+import { csvCell, downloadCsv } from './download-utils.js';
 import { scannableItems, buildSets, buildSetsHtml } from './exam-sets.js';
 import { buildScanSets } from './scan-items.js';
 import { buildScanPaperHtml } from './scan-paper.js';
 import { getSetCount, saveSetCount, printExamAnswerSheet } from './sheet-print.js';
 import { MAX_CHOICES } from './omr-sheet.js';
-
-const esc = (v) => String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 
 export const CourseExam = {
     exams: [],
@@ -1155,22 +1151,11 @@ export const CourseExam = {
     exportResultsCsv: () => {
         const d = CourseExam.resultsData;
         if (!d) return;
-        const cell = (v) => {
-            let t = String(v ?? '');
-            if (/^[=+@]/.test(t) || (/^-/.test(t) && !/^-?\d+(\.\d+)?$/.test(t))) t = "'" + t;
-            return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
-        };
+        const cell = csvCell;
         const lines = [['Student', 'Student number', 'Status', 'Score', 'Max', 'Percent', 'Minutes'].join(',')]
             .concat(d.students.map(s => [s.name, s.studentNumber, s.status, s.score ?? '', s.max ?? '', s.percent ?? '', s.minutes ?? ''].map(cell).join(',')));
         const name = (d.title || 'exam').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'exam';
-        const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${name}_results.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        downloadCsv(`${name}_results.csv`, lines.join('\r\n'));
     },
 
     // ---------- Grade Essays ----------

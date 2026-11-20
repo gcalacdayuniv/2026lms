@@ -305,7 +305,7 @@ const lecturerCourseCardHtml = (c) => `
                                 `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
                                     ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
                                 </span>` :
-                                `<span class="bg-blue-50 text-blue-500 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
+                                `<span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
                             }
                         </div>
                         <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
@@ -321,8 +321,8 @@ const lecturerCourseCardHtml = (c) => `
                         <a href="#class-${c.Course_ID}" class="card-action" data-intent="openScoresModalBtn"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Scores</a>
                     </div>
                     <div class="border-t border-gray-100 px-3 py-1.5 flex items-center justify-between gap-3">
-                        <button type="button" class="duplicate-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" aria-label="Copy ${escapeHtml(c.CourseCode)} to another term"><i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Copy to another term</button>
-                        <button type="button" class="archive-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-archive="${Number(c.Archived) === 1 ? '0' : '1'}" aria-label="${Number(c.Archived) === 1 ? 'Restore' : 'Archive'} ${escapeHtml(c.CourseCode)}"><i class="fa-solid ${Number(c.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i>${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}</button>
+                        <button type="button" class="duplicate-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" aria-label="Copy to another term: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Copy to another term</button>
+                        <button type="button" class="archive-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-archive="${Number(c.Archived) === 1 ? '0' : '1'}" aria-label="${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}: ${escapeHtml(c.CourseCode)}"><i class="fa-solid ${Number(c.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i>${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}</button>
                     </div>
                 </div>
             `;

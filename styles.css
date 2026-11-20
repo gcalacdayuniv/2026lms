@@ -374,4 +374,30 @@ html[data-theme="dark"] .scrv-banner.is-warn { background: #3a2a10; color: #fcd3
     button:is(.w-6, .w-7, .w-8, .h-6, .h-7, .h-8, .app-page-close, .scrv-wm):not(.absolute):not(.fixed):not(.sticky)::after {
         content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
     }
+    /* Text links in the course card footer (were 17 px tall): real padding, so the tap areas do not overlap the row above. */
+    .duplicate-course-btn, .archive-course-btn { min-height: 44px; padding: 0 .25rem; display: inline-flex; align-items: center; }
+    #udEditBtn { min-height: 40px; padding-left: 1rem; padding-right: 1rem; }
+    /* Modal buttons found at 15-34 px tall in the phone audit. */
+    .assign-class-exam-btn, .edit-exam-builder-btn, .exam-more-btn { min-height: 44px; }
+    #closeSubmissionHistoryModalBtn, #closeRecitationModalBtn { min-width: 44px; min-height: 44px; }
+    #adMergeBtn { min-height: 40px; }
+    .eb-view-btn, #ebImportBtn, #ebExportBtn { min-height: 40px; }
+}
+
+/* Rows open a quick-action sheet on long press: no text selection or iOS callout while holding. */
+@media (hover: none) and (pointer: coarse) {
+    .student-row { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}
+
+/* Phone held sideways: the accessible exam header, progress bar and footer took most of the 390 px height and hid the answers. */
+@media (orientation: landscape) and (max-height: 520px) {
+    #accessibleExamOverlay > header { padding-top: .25rem; padding-bottom: .25rem; }
+    #accessibleExamOverlay #accExamHeaderTitle { font-size: 1rem; margin-top: 0; }
+    #accessibleExamOverlay > .h-3 { height: .375rem; }
+    #accessibleExamOverlay > footer { padding-top: .375rem; padding-bottom: .375rem; }
+    #accessibleExamOverlay > footer button { padding-top: .5rem; padding-bottom: .5rem; font-size: 1rem; }
+    #accExamBody { padding-top: .5rem; padding-bottom: .5rem; }
+    #accExamQuestionCounter { font-size: 1.125rem; }
+    #accExamQuestionText { font-size: 1.25rem; padding: .75rem; margin-bottom: .75rem; }
+    #accExamLiveFeedback { padding: .375rem; font-size: .875rem; margin-bottom: 0; }
 }

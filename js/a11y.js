@@ -56,6 +56,26 @@ export const A11y = {
     swipe: null,
     settleTimer: 0,
 
+    // Many screens put a <label> directly above a field without a `for`, so a screen reader announces
+    // the field with no name. Pair each such label with the control that follows it.
+    linkLabels: (root) => {
+        let n = 0;
+        root.querySelectorAll('label:not([for])').forEach((label) => {
+            if (label.querySelector('input, select, textarea')) return;
+            const el = label.nextElementSibling;
+            if (!el) return;
+            const ctl = el.matches('input, select, textarea') ? el : el.querySelector('input:not([type="hidden"]), select, textarea');
+            if (!ctl) return;
+            if (!ctl.id) ctl.id = `a11y-field-${++A11y.fieldSeq}`;
+            if (document.querySelector(`label[for="${ctl.id}"]`)) return;
+            label.setAttribute('for', ctl.id);
+            n++;
+        });
+        return n;
+    },
+    fieldSeq: 0,
+    labelTimer: 0,
+
     init: () => {
         if (A11y.observer) return;
         A11y.lastHash = window.location.hash;
@@ -67,6 +87,12 @@ export const A11y = {
         document.addEventListener('touchmove', A11y.swipeMove, { passive: true });
         document.addEventListener('touchend', A11y.swipeEnd, { passive: true });
         document.addEventListener('touchcancel', A11y.swipeEnd, { passive: true });
+        A11y.linkLabels(document);
+        A11y.labelObserver = new MutationObserver(() => {
+            clearTimeout(A11y.labelTimer);
+            A11y.labelTimer = setTimeout(() => A11y.linkLabels(document), 60);
+        });
+        A11y.labelObserver.observe(document.body, { childList: true, subtree: true });
         A11y.observer = new MutationObserver(A11y.handleMutations);
         A11y.observer.observe(document.body, {
             childList: true,

@@ -4,12 +4,7 @@ import { apiFetch } from './globals.js';
 import { CourseSummary } from './course-summary.js';
 import { UI } from './ui-feedback.js';
 import { getLocalDateString } from './date-utils.js';
-
-const esc = (v) => String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+import { escapeHtml as esc } from './html-utils.js';
 
 const fmt = (n) => Number(Number(n).toFixed(2));
 

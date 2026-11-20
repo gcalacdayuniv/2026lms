@@ -4,15 +4,11 @@
 import { apiFetch, AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
 import * as M from './exam-builder-model.js';
+import { escapeHtml as esc } from './html-utils.js';
+import { downloadCsv } from './download-utils.js';
 
 const ROOT_ID = 'examBuilderModal';
 const VIEW_KEY = 'exam_builder_view';
-
-const esc = (v) => String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 
 const store = {
     get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -557,15 +553,18 @@ export const ExamBuilder = {
     sheetHtml: (limit = Infinity) => {
         const s = ExamBuilder.s;
         const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points', ''];
-        const widths = ['w-10', 'w-16', 'min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
+        const widths = ['w-10', 'w-16', 'min-w-[160px] sm:min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
         return `
-            <div class="bg-white border border-gray-300 rounded-md overflow-auto h-full">
+            <div class="flex flex-col h-full">
+            <p class="sm:hidden text-[11px] font-semibold text-gray-500 px-1 pb-1"><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i> Swipe sideways to see all columns</p>
+            <div class="bg-white border border-gray-300 rounded-md overflow-auto flex-1 min-h-0">
                 <table class="border-collapse text-xs" id="ebSheet">
                     <thead class="sticky top-0 z-10">
                         <tr>${head.map((h, k) => `<th class="${widths[k]} bg-gray-100 border border-gray-300 px-2 py-1.5 text-left font-bold text-gray-600 whitespace-nowrap">${h}</th>`).join('')}</tr>
                     </thead>
                     <tbody>${s.questions.slice(0, limit).map((q, i) => ExamBuilder.rowHtml(q, i)).join('')}</tbody>
                 </table>
+            </div>
             </div>`;
     },
 
@@ -1104,17 +1103,7 @@ export const ExamBuilder = {
         ExamBuilder.download('exam_template.csv', M.toCsv([mc, tf, id, alt, en, eo, multi, num, order, match, essay, bonus]));
     },
 
-    download: (filename, text) => {
-        const blob = new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    },
+    download: (filename, text) => downloadCsv(filename, text),
 
     // ---------- Save ----------
 

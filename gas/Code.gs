@@ -18,6 +18,13 @@ function doPost(e) {
       throw new Error("No payload received from the Cloudflare Worker.");
     }
 
+    // The Worker adds ?key=<secret>. When a SECRET script property is set, any request without it is refused,
+    // so the web app address alone cannot be used to read or write the Drive folder.
+    var secret = PropertiesService.getScriptProperties().getProperty("SECRET");
+    if (secret && (!e.parameter || e.parameter.key !== secret)) {
+      return jsonOut({ success: false, error: "Not allowed." });
+    }
+
     var payload = JSON.parse(e.postData.contents);
 
     if (payload.action === "chunk") return jsonOut(handleChunk(payload));

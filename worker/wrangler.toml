@@ -10,6 +10,11 @@ keep_vars = true
 ALLOWED_ORIGIN = "https://plv.workers.dev" 
 GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzsHLilW-Cf6271-psjtck20A0rABnoywXCPvsSeL5rSypDxKC3v6HA_HPZ8YOg1Tns/exec"
 
+# Secrets set in the Cloudflare dashboard (Worker > Settings > Variables and Secrets), never in this file:
+#   SESSION_SECRET  signs login tokens (16+ random characters)
+#   GAS_SECRET      the same value as the SECRET script property in the Apps Script project; without it the
+#                   Apps Script web address above works for anyone who knows it
+
 [[d1_databases]]
 binding = "DB"
 database_name = "online-portal-db"

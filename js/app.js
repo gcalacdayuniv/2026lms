@@ -11,6 +11,7 @@ import { CourseScanner } from './course-scanner.js';
 import { CourseScanRecords } from './course-scan-records.js';
 import { CourseFab } from './course-fab.js';
 import { CourseSwipe } from './course-swipe.js';
+import { CourseQuick } from './course-quick.js';
 import { RosterTools } from './course-roster-tools.js';
 import { CoursePull } from './course-pull.js';
 import { PWA } from './pwa.js';
@@ -38,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseScanRecords.init();
     CourseFab.init();
     CourseSwipe.init();
+    CourseQuick.init();
     RosterTools.init();
     CoursePull.init();
     PWA.init();

@@ -2,15 +2,15 @@
 
 export const AuthUI = {
     renderLogin: () => `
-        <div class="flex flex-col justify-center items-center min-h-screen p-0 sm:p-4 auth-screen">
+        <main id="mainContent" class="flex flex-col justify-center items-center min-h-screen p-0 sm:p-4 auth-screen">
             <div class="w-full max-w-md bg-white rounded-none sm:rounded-lg shadow-none sm:shadow-md p-6 sm:p-8 fade-in min-h-screen sm:min-h-0 flex flex-col justify-center">
                 <div class="text-center mb-8">
-                    <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-4"></i>
-                    <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
+                    <i class="fa-solid fa-graduation-cap text-4xl text-blue-600 mb-4" aria-hidden="true"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Welcome Back</h1>
                     <p class="text-gray-500 text-sm">Please sign in to your account</p>
                 </div>
                 <form id="loginForm" class="space-y-4">
-                    <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
+                    <div id="loginError" role="alert" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Username, Email, Contact, or Student No.</label>
                         <input type="text" id="loginIdentifier" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -19,8 +19,8 @@ export const AuthUI = {
                         <label class="block text-sm font-medium text-gray-700">Password</label>
                         <div class="relative">
                             <input type="password" id="loginPassword" autocomplete="current-password" enterkeyhint="go" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10">
-                            <button type="button" id="toggleLoginPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600 mt-1 focus:outline-none">
-                                <i class="fa-solid fa-eye" id="loginPasswordEye"></i>
+                            <button type="button" id="toggleLoginPassword" aria-label="Show password" aria-pressed="false" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600 mt-1 focus:outline-none">
+                                <i class="fa-solid fa-eye" id="loginPasswordEye" aria-hidden="true"></i>
                             </button>
                         </div>
                     </div>
@@ -32,20 +32,20 @@ export const AuthUI = {
                     <p class="text-sm text-gray-600">Don't have an account? <a href="#register" class="text-blue-600 font-medium hover:text-blue-500">Register here</a></p>
                 </div>
             </div>
-        </div>
+        </main>
     `,
 
     renderRegister: () => `
-        <div class="flex flex-col justify-center items-center min-h-screen p-0 sm:p-4 auth-screen">
+        <main id="mainContent" class="flex flex-col justify-center items-center min-h-screen p-0 sm:p-4 auth-screen">
             <div class="w-full max-w-lg bg-white rounded-none sm:rounded-lg shadow-none sm:shadow-md p-6 sm:p-8 fade-in sm:my-8 min-h-screen sm:min-h-0">
                 <div class="text-center mb-8">
-                    <i class="fa-solid fa-user-plus text-4xl text-green-600 mb-4"></i>
-                    <h2 class="text-2xl font-bold text-gray-800">Create Account</h2>
+                    <i class="fa-solid fa-user-plus text-4xl text-green-600 mb-4" aria-hidden="true"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Create Account</h1>
                     <p class="text-gray-500 text-sm">Fill in your details to register</p>
                 </div>
                 <form id="registerForm" class="space-y-4">
-                    <div id="registerError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
-                    <div id="registerSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm">Registration successful! Redirecting to login...</div>
+                    <div id="registerError" role="alert" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm"></div>
+                    <div id="registerSuccess" role="status" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm">Registration successful! Redirecting to login...</div>
                     
                     <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-3">Profile Photo (Required)</label>
@@ -147,14 +147,14 @@ export const AuthUI = {
                         </div>
                     </div>
                     
-                    <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
+                    <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
                         Create Account
                     </button>
                 </form>
                 <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-600">Already have an account? <a href="#login" class="text-green-600 font-medium hover:text-green-500">Sign in here</a></p>
+                    <p class="text-sm text-gray-600">Already have an account? <a href="#login" class="text-green-700 font-medium hover:text-green-800">Sign in here</a></p>
                 </div>
             </div>
-        </div>
+        </main>
     `
 };
