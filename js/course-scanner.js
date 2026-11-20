@@ -386,6 +386,9 @@ export const CourseScanner = {
         $('scnExamPanel')?.classList.toggle('hidden', !isExam);
         $('scnTypedPanel')?.classList.toggle('hidden', isExam);
         $('scnPrintBtn')?.classList.toggle('hidden', isExam);   // exam sheets are printed from Manage Exams
+        // Paper size and sheets per paper only shape the printed blank sheet; scanning does not use them.
+        $('scnPaperWrap')?.classList.toggle('hidden', isExam);
+        $('scnCopiesWrap')?.classList.toggle('hidden', isExam);
 
         const info = $('scnExamInfo');
         if (info) {

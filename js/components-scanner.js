@@ -118,7 +118,7 @@ export const ScannerUI = {
                             <label class="${LABEL}" for="scnDate">Date</label>
                             <input type="date" id="scnDate" class="${FIELD} min-w-0 max-w-full appearance-none h-[42px] text-left">
                         </div>
-                        <div>
+                        <div id="scnPaperWrap">
                             <label class="${LABEL}" for="scnPaper">Paper</label>
                             <select id="scnPaper" class="${FIELD}">
                                 <option value="letter">Letter</option>
@@ -126,7 +126,7 @@ export const ScannerUI = {
                                 <option value="legal">Legal</option>
                             </select>
                         </div>
-                        <div>
+                        <div id="scnCopiesWrap">
                             <label class="${LABEL}" for="scnCopies">Sheets per paper</label>
                             <select id="scnCopies" class="${FIELD}">
                                 <option value="1">1 (full page)</option>
