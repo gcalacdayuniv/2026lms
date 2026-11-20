@@ -308,6 +308,47 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         return new Response(JSON.stringify({ success: true, message: "Details updated successfully" }), { status: 200, headers: corsHeaders });
     }
 
+    // A lecturer corrects a student's details (including the eye condition tag) from Manage Users.
+    if (request.method === "POST" && path === "/api/admin-update-student") {
+        const body = await request.json();
+        const stu = await env.DB.prepare("SELECT User_ID, role FROM Users WHERE User_ID = ?").bind(body.studentId || "").first();
+        if (!stu || String(stu.role).toLowerCase() !== "student") {
+            return new Response(JSON.stringify({ error: "Student not found." }), { status: 404, headers: corsHeaders });
+        }
+        const clean = (v, max) => { const t = v == null ? "" : String(v).trim(); return t.length > max ? undefined : (t || null); };
+        const f = {
+            Name: clean(body.name, 120), Email: clean(body.email, 120), Contact_Number: clean(body.contact, 30), Student_Number: clean(body.studentNumber, 20),
+            course: clean(body.course, 80), year: clean(body.year, 40), section: clean(body.section, 40),
+            Program_Course: clean(body.programCourse, 80), Program_Year: clean(body.programYear, 40), Program_Section: clean(body.programSection, 40)
+        };
+        if (Object.values(f).includes(undefined)) {
+            return new Response(JSON.stringify({ error: "Some details are too long." }), { status: 400, headers: corsHeaders });
+        }
+        if (!f.Name) return new Response(JSON.stringify({ error: "Name is required." }), { status: 400, headers: corsHeaders });
+        if (!/^\d{2}-\d{4}$/.test(f.Student_Number || "")) {
+            return new Response(JSON.stringify({ error: "Invalid Student Number. Format must be 00-0000" }), { status: 400, headers: corsHeaders });
+        }
+        const EYE = ["No Eye Condition", "Near Sighted", "Far Sighted", "Legally Blind"];
+        const eye = body.eyeCondition === undefined || body.eyeCondition === null || body.eyeCondition === "" ? "No Eye Condition" : String(body.eyeCondition);
+        if (!EYE.includes(eye)) {
+            return new Response(JSON.stringify({ error: "Unknown eye condition." }), { status: 400, headers: corsHeaders });
+        }
+        const clash = await env.DB.prepare(
+            `SELECT Student_Number, Email, Contact_Number FROM Users WHERE User_ID != ? AND (Student_Number COLLATE NOCASE = ? OR (? IS NOT NULL AND Email COLLATE NOCASE = ?) OR (? IS NOT NULL AND Contact_Number = ?))`
+        ).bind(stu.User_ID, f.Student_Number, f.Email, f.Email, f.Contact_Number, f.Contact_Number).first();
+        if (clash) {
+            const c = [];
+            if (clash.Student_Number && clash.Student_Number.toLowerCase() === f.Student_Number.toLowerCase()) c.push("Student Number");
+            if (f.Email && clash.Email && clash.Email.toLowerCase() === f.Email.toLowerCase()) c.push("Email");
+            if (f.Contact_Number && clash.Contact_Number === f.Contact_Number) c.push("Contact Number");
+            return new Response(JSON.stringify({ error: `Already used by another account: ${c.join(", ")}.` }), { status: 400, headers: corsHeaders });
+        }
+        await env.DB.prepare(
+            `UPDATE Users SET Name = ?, Email = ?, Contact_Number = ?, Student_Number = ?, course = ?, year = ?, section = ?, Program_Course = ?, Program_Year = ?, Program_Section = ?, eye_condition = ? WHERE User_ID = ?`
+        ).bind(f.Name, f.Email, f.Contact_Number, f.Student_Number, f.course, f.year, f.section, f.Program_Course, f.Program_Year, f.Program_Section, eye, stu.User_ID).run();
+        return new Response(JSON.stringify({ success: true, student: { User_ID: stu.User_ID, ...f, eye_condition: eye } }), { status: 200, headers: corsHeaders });
+    }
+
     if (request.method === "POST" && path === "/api/reset-student-password") {
         const body = await request.json();
         const { studentId } = body;

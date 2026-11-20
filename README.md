@@ -437,6 +437,11 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - Until one is set, the term follows the calendar in **GMT+8** (Aug-Dec 1st, Jan-May 2nd, Jun-Jul Summer): `calendarTerm` in `worker/shared.js` and `js/current-term.js`. The worker's `getCurrentTerm(env)` replaces the old device-date `currentTermNow`.
 - Used by: the class list "Current term" filter, the create-class prefill, copy-to-another-term, Advance Year Level default, and student re-activation on enrol. The front end caches it (`current_term_cache`) and repaints the class list when it changes (`term-changed` event).
 
+## Edit Student Details (Manage Users)
+- Dashboard menu > Manage > **Manage Users** > **Edit details** on a student card (`js/edit-student.js`, endpoint `POST /api/admin-update-student`, lecturer only, students only).
+- Editable: name, student number (00-0000, must be unique), contact, email (unique), class course/year/section, program course/year/section, and the **eye condition tag** (No Eye Condition, Near Sighted, Far Sighted, Legally Blind). Legally Blind turns on the accessible read-aloud exam for that student.
+- Username and password are not edited here (use Reset password for that).
+
 ## Advance Year Level
 - Dashboard menu > Manage > **Advance Year Level** (`js/year-advance.js`, endpoint `POST /api/advance-year-level`, lecturer only).
 - Choose the new academic year and the highest year level (default 4), press **Preview** (counts: will advance / at highest level / no year set), then **Advance all students**.

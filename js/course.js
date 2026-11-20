@@ -11,6 +11,7 @@ import { StudentSummaryUI } from './student-summary-ui.js';
 import { LecturerNotes } from './lecturer-notes.js';
 import './year-advance.js';
 import './current-term.js';
+import './edit-student.js';
 import './duplicate-course.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 

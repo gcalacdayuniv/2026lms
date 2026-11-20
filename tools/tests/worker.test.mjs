@@ -256,6 +256,19 @@ ok('apply uses the program limit', ap.s === 200 && sql.prepare("select year y fr
 ok('program limit is remembered when none is sent', (await adv('preview', {})).j.programs.find(p => p.name === 'BSArch').maxYear === 5);
 ok('student cannot use it', (await call('POST', '/api/advance-year-level', { token: s2b.j.token, body: { mode: 'preview' } })).s === 403);
 
+// ---- lecturer edits a student's details and eye condition ----
+const ed = (who, body) => call('POST', '/api/admin-update-student', { token: who, body });
+const base = { studentId: 'S1', name: 'Student One', studentNumber: '24-0001', contact: '0917', email: 'one@x.com', course: 'BSCS', year: '2', section: 'A', eyeCondition: 'Legally Blind' };
+const e1 = await ed(l1.j.token, base);
+ok('lecturer edits student details + eye condition', e1.s === 200 && sql.prepare("select eye_condition e, Name n, year y from Users where User_ID='S1'").get().e === 'Legally Blind', JSON.stringify(e1.j));
+ok('student cannot edit', (await ed(s2b.j.token, base)).s === 403);
+ok('bad student number rejected', (await ed(l1.j.token, { ...base, studentNumber: '1234' })).s === 400);
+ok('unknown eye condition rejected', (await ed(l1.j.token, { ...base, eyeCondition: 'x' })).s === 400);
+ok('cannot edit a lecturer account', (await ed(l1.j.token, { ...base, studentId: 'L2' })).s === 404);
+await ed(l1.j.token, { ...base, studentId: 'S2', name: 'Student Two', studentNumber: '24-0002', contact: '0918', email: 'two@x.com', eyeCondition: 'No Eye Condition' });
+ok('duplicate student number rejected', (await ed(l1.j.token, { ...base, studentId: 'S2', name: 'Student Two', studentNumber: '24-0001', contact: '0918', email: 'two@x.com' })).s === 400);
+ok('clearing eye condition resets it', (await ed(l1.j.token, { ...base, eyeCondition: 'No Eye Condition' })).s === 200 && sql.prepare("select eye_condition e from Users where User_ID='S1'").get().e === 'No Eye Condition');
+
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----
 import { readFileSync, readdirSync } from 'node:fs';
 const workerDir = new URL('../../worker/', import.meta.url);
