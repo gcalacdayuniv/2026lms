@@ -1001,9 +1001,10 @@ export const ExamBuilder = {
                 <div class="flex items-center gap-1 px-2 py-2 border-b border-gray-200 min-w-0">
                     <button type="button" id="closeEbCellEditor" aria-label="Close" class="shrink-0 w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
                     <select id="ebCellQ" aria-label="Go to question" class="shrink-0 h-10 w-[4.5rem] px-1 rounded-md border border-gray-300 bg-gray-50 text-sm font-black text-indigo-700"></select>
-                    <h3 id="ebCellTitle" class="flex-1 min-w-0 truncate text-sm font-bold text-gray-800 px-1"></h3>
-                    <button type="button" id="ebCellPrev" aria-label="Previous field" class="shrink-0 w-9 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
-                    <button type="button" id="ebCellNext" aria-label="Next field" class="shrink-0 w-9 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                    <select id="ebCellCol" aria-label="Go to field" class="flex-1 min-w-0 h-10 px-1 rounded-md border border-gray-300 bg-gray-50 text-sm font-bold text-gray-800 truncate"></select>
+                    <h3 id="ebCellTitle" class="sr-only"></h3>
+                    <button type="button" id="ebCellPrev" aria-label="Previous field" class="shrink-0 w-8 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button type="button" id="ebCellNext" aria-label="Next field" class="shrink-0 w-8 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
                     <button type="button" id="ebCellDone" aria-label="Done" class="shrink-0 w-11 h-10 rounded-md bg-indigo-600 text-white"><i class="fa-solid fa-check" aria-hidden="true"></i></button>
                 </div>
                 <div id="ebCellExtras" class="px-3 py-2 border-b border-gray-200 space-y-2 bg-gray-50"></div>
@@ -1016,6 +1017,13 @@ export const ExamBuilder = {
             });
             ed.addEventListener('click', (ev) => ExamBuilder.onEditorPick(ev));
             ed.querySelector('#ebCellQ').addEventListener('change', (ev) => ExamBuilder.gotoQuestion(parseInt(ev.target.value, 10)));
+            ed.querySelector('#ebCellCol').addEventListener('change', (ev) => {
+                const cur = ExamBuilder.cellTarget;
+                const next = cur && ExamBuilder.rowFields(cur)[parseInt(ev.target.value, 10)];
+                if (!next) return;
+                ExamBuilder.onChange({ target: cur });
+                ExamBuilder.openCellEditor(next);
+            });
             ed.querySelector('#ebCellText').addEventListener('input', (ev) => {
                 const c = ExamBuilder.cellTarget;
                 if (!c) return;
@@ -1031,6 +1039,7 @@ export const ExamBuilder = {
         const here = rows.indexOf(cell.closest('tr'));
         ed.querySelector('#ebCellQ').innerHTML = rows.map((_, i) => `<option value="${i}" ${i === here ? 'selected' : ''}>Q${i + 1}</option>`).join('');
         ExamBuilder.renderEditorExtras();
+        ed.querySelector('#ebCellCol').innerHTML = ExamBuilder.rowFields(cell).map((f, i) => `<option value="${i}" ${f === cell ? 'selected' : ''}>${esc(ExamBuilder.cellLabel(f))}</option>`).join('');
         const ta = ed.querySelector('#ebCellText');
         ta.value = cell.value;
         ta.placeholder = cell.placeholder || '';
@@ -1113,12 +1122,14 @@ export const ExamBuilder = {
         }
     },
 
+    // The text fields of a row that can be typed into (Question, Choice A.., Explanation), left to right.
+    rowFields: (cell) => [...cell.closest('tr').querySelectorAll('input[type="text"][data-col]:not([disabled]), textarea[data-col]:not([disabled])')].filter(c => c.dataset.col !== 'points'),
+
     // Previous / next text field in the same row (Question, Choice A, B, ... Explanation).
     stepCell: (dir) => {
         const cur = ExamBuilder.cellTarget;
         if (!cur) return;
-        const row = cur.closest('tr');
-        const cells = [...row.querySelectorAll('input[type="text"][data-col]:not([disabled]), textarea[data-col]:not([disabled])')].filter(c => c.dataset.col !== 'points');
+        const cells = ExamBuilder.rowFields(cur);
         const next = cells[cells.indexOf(cur) + dir];
         if (!next) return;
         ExamBuilder.onChange({ target: cur });
