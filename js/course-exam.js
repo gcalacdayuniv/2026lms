@@ -3,6 +3,7 @@ import { apiFetch, AppState } from './globals.js';
 import { CourseClass } from './course-class.js';
 import { UI } from './ui-feedback.js';
 import { ExamBuilder } from './exam-builder.js';
+import { ExamShare } from './exam-share.js';
 import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
 import { buildExamPrintHtml } from './exam-print.js';
 import { ExamReview } from './exam-review.js';
@@ -214,6 +215,12 @@ export const CourseExam = {
         }
         if (e.target.closest('.delete-exam-btn')) {
             await CourseExam.deleteExam(e.target.closest('.delete-exam-btn').dataset.examId);
+            return;
+        }
+
+        if (e.target.closest('.share-exam-btn')) {
+            const b = e.target.closest('.share-exam-btn');
+            await ExamShare.open(b.dataset.examId, b.dataset.title, () => CourseExam.loadExams());
             return;
         }
 
@@ -634,6 +641,7 @@ export const CourseExam = {
 
         container.innerHTML = archiveBar + emptyNote + shown.map(ex => {
             const archived = Number(ex.Archived) === 1;
+            const shared = Number(ex.Shared) === 1;   // another lecturer's exam, shared with me (read-only)
             let parsed = [];
             try { parsed = JSON.parse(ex.ExamData || '[]'); } catch (e) { parsed = []; }
             const rows = fromExamData(parsed);
@@ -676,7 +684,7 @@ export const CourseExam = {
             return `
                 <div class="bg-white p-3 border border-gray-200 rounded-xl shadow-sm hover:border-indigo-300 transition">
                     <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                        <div class="font-black text-gray-800 text-sm min-w-0 break-words">${esc(ex.Title)}${archived ? ' <span class="ml-1 text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded align-middle">Archived</span>' : ''}</div>
+                        <div class="font-black text-gray-800 text-sm min-w-0 break-words">${esc(ex.Title)}${archived ? ' <span class="ml-1 text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded align-middle">Archived</span>' : ''}${shared ? ` <span class="ml-1 text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-1.5 py-0.5 rounded align-middle">Shared by ${esc(ex.OwnerName || 'another lecturer')}</span>` : ''}</div>
                         <div class="text-[11px] font-bold text-gray-500 whitespace-nowrap">${regCount} question${regCount === 1 ? '' : 's'}${points !== regCount ? ` &bull; ${points} points` : ''}${bonusCount > 0 ? ` &bull; ${bonusCount} bonus` : ''}</div>
                     </div>
                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${typeChips}</div>
@@ -695,9 +703,9 @@ export const CourseExam = {
                             <button type="button" class="exam-results-btn bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 px-3 py-2 rounded-md text-xs font-bold transition" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-title="${esc(ex.Title)}">
                                 <i class="fa-solid fa-chart-column mr-1" aria-hidden="true"></i> Results
                             </button>` : ''}
-                        <button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}" data-course="${esc(ex.Course || '')}">
+                        ${shared ? '' : `<button type="button" class="edit-exam-builder-btn bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}" data-course="${esc(ex.Course || '')}">
                             <i class="fa-solid fa-pen-to-square mr-1" aria-hidden="true"></i> Edit
-                        </button>
+                        </button>`}
                         <button type="button" class="exam-more-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" aria-expanded="false" aria-label="More actions for ${esc(ex.Title)}">
                             <i class="fa-solid fa-ellipsis mr-1" aria-hidden="true"></i> More <i class="fa-solid fa-chevron-down text-[9px] ml-1 transition-transform" aria-hidden="true"></i>
                         </button>
@@ -705,24 +713,27 @@ export const CourseExam = {
                         <button type="button" class="present-exam-btn bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
                             <i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Present
                         </button>
-                        <button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
+                        ${shared ? '' : `<button type="button" class="manage-bonus-exam-btn bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}">
                             <i class="fa-solid fa-star mr-1" aria-hidden="true"></i> Bonus Qs
-                        </button>
+                        </button>`}
                         <button type="button" class="print-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Print ${esc(ex.Title)}">
                             <i class="fa-solid fa-print mr-1" aria-hidden="true"></i> Print
                         </button>
                         <button type="button" class="export-exam-csv-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Export ${esc(ex.Title)} as CSV">
                             <i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i> CSV
                         </button>
+                        ${shared ? '' : `<button type="button" class="share-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-title="${esc(ex.Title)}" aria-label="Share ${esc(ex.Title)} with other lecturers">
+                            <i class="fa-solid fa-user-group mr-1" aria-hidden="true"></i> Share${Number(ex.ShareCount) ? ` (${Number(ex.ShareCount)})` : ''}
+                        </button>`}
                         <button type="button" class="duplicate-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Duplicate ${esc(ex.Title)}">
                             <i class="fa-regular fa-copy mr-1" aria-hidden="true"></i> Copy
                         </button>
-                        <button type="button" class="archive-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-archive="${archived ? '0' : '1'}" aria-label="${archived ? 'Restore' : 'Archive'} ${esc(ex.Title)}">
+                        ${shared ? '' : `<button type="button" class="archive-exam-btn bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" data-archive="${archived ? '0' : '1'}" aria-label="${archived ? 'Restore' : 'Archive'} ${esc(ex.Title)}">
                             <i class="fa-solid ${archived ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i> ${archived ? 'Restore' : 'Archive'}
-                        </button>
-                        <button type="button" class="delete-exam-btn bg-white text-red-600 hover:bg-red-50 border border-red-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Delete ${esc(ex.Title)}">
+                        </button>`}
+                        ${shared ? '' : `<button type="button" class="delete-exam-btn bg-white text-red-600 hover:bg-red-50 border border-red-200 px-3 py-2 rounded-md text-xs font-bold transition" data-exam-id="${esc(ex.Exam_ID)}" aria-label="Delete ${esc(ex.Title)}">
                             <i class="fa-regular fa-trash-can mr-1" aria-hidden="true"></i> Delete
-                        </button>
+                        </button>`}
                         </div>
                     </div>
                 </div>

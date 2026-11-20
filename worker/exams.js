@@ -3,7 +3,7 @@
 // worker.js calls handleExams() after the permission check; it returns a Response for its own paths and null otherwise.
 
 import { safeJson, getRequestDate, findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, runInChunks } from './shared.js';
-import { ensureAccessibleExamTables, ensureManualMarksColumn } from './schema.js';
+import { ensureAccessibleExamTables, ensureManualMarksColumn, ensureExamShares } from './schema.js';
 import { ASSESSMENT_TERMS, ASSESSMENT_CATEGORIES } from './constants.js';
 import { DATE_RE } from './attendance.js';
 import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
@@ -120,6 +120,27 @@ const examFitsTitle = (examCourse, courseTitle) => {
     return !a || a === String(courseTitle || '').trim().toLowerCase();
 };
 
+// Active lecturers (other than the owner) who teach a class with the same course code as one of the owner's classes
+// for this exam's course. If the exam has no course set, any of the owner's course codes counts.
+async function eligibleLecturers(env, exam) {
+    const title = String(exam.Course || '').trim();
+    const codes = await env.DB.prepare(
+        `SELECT DISTINCT UPPER(TRIM(CourseCode)) AS code FROM Courses
+         WHERE Lecturer_ID = ? AND TRIM(COALESCE(CourseCode, '')) <> '' ${title ? "AND LOWER(TRIM(CourseTitle)) = LOWER(?)" : ""}`
+    ).bind(...(title ? [exam.Lecturer_ID, title] : [exam.Lecturer_ID])).all();
+    const list = codes.results.map(r => r.code);
+    if (!list.length) return [];
+    const marks = list.map(() => '?').join(',');
+    const rows = await env.DB.prepare(
+        `SELECT u.User_ID AS id, u.Name AS name, GROUP_CONCAT(DISTINCT c.CourseCode) AS courses
+         FROM Users u JOIN Courses c ON c.Lecturer_ID = u.User_ID
+         WHERE u.User_ID <> ? AND LOWER(COALESCE(u.role, '')) = 'lecturer' AND LOWER(COALESCE(u.account_status, '')) = 'active'
+           AND UPPER(TRIM(c.CourseCode)) IN (${marks})
+         GROUP BY u.User_ID, u.Name ORDER BY u.Name`
+    ).bind(exam.Lecturer_ID, ...list).all();
+    return rows.results;
+}
+
 export async function handleExams(request, env, path, url, corsHeaders) {
     if (request.method === "GET" && path === "/api/exams") {
         const lecturerId = url.searchParams.get("lecturerId");
@@ -127,13 +148,22 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         await ensureAccessibleExamTables(env);
         // Uses = how many times the exam was assigned to a class. An exam that was never assigned can be deleted.
         await ensureManualMarksColumn(env);
+        await ensureExamShares(env);
+        const courseClause = forCourseId ? "AND (TRIM(COALESCE(e.Course, '')) = '' OR LOWER(TRIM(e.Course)) = LOWER(TRIM(COALESCE((SELECT CourseTitle FROM Courses WHERE Course_ID = ?), ''))))" : "";
+        const cols = `e.Exam_ID, e.Title, e.Course, e.ExamData, e.Created_At, COALESCE(e.Archived, 0) AS Archived,
+                    (SELECT COUNT(*) FROM Class_Exams ce WHERE ce.Exam_ID = e.Exam_ID) AS Uses`;
+        // Own exams, then exams other lecturers shared with this lecturer (Shared = 1, read-only for them).
         const exams = await env.DB.prepare(
-            `SELECT e.Exam_ID, e.Title, e.Course, e.ExamData, e.Created_At, COALESCE(e.Archived, 0) AS Archived,
-                    (SELECT COUNT(*) FROM Class_Exams ce WHERE ce.Exam_ID = e.Exam_ID) AS Uses
-             FROM Exams e WHERE e.Lecturer_ID = ?
-               ${forCourseId ? "AND (TRIM(COALESCE(e.Course, '')) = '' OR LOWER(TRIM(e.Course)) = LOWER(TRIM(COALESCE((SELECT CourseTitle FROM Courses WHERE Course_ID = ?), ''))))" : ""}
-             ORDER BY e.Created_At DESC`
-        ).bind(...(forCourseId ? [lecturerId, forCourseId] : [lecturerId])).all();
+            `SELECT ${cols}, 0 AS Shared, NULL AS OwnerName,
+                    (SELECT COUNT(*) FROM Exam_Shares s WHERE s.Exam_ID = e.Exam_ID) AS ShareCount
+             FROM Exams e WHERE e.Lecturer_ID = ? ${courseClause}
+             UNION ALL
+             SELECT ${cols}, 1 AS Shared, u.Name AS OwnerName, 0 AS ShareCount
+             FROM Exams e JOIN Exam_Shares sh ON sh.Exam_ID = e.Exam_ID AND sh.Lecturer_ID = ?
+             LEFT JOIN Users u ON u.User_ID = e.Lecturer_ID
+             WHERE 1 = 1 ${courseClause}
+             ORDER BY Created_At DESC`
+        ).bind(...(forCourseId ? [lecturerId, forCourseId, lecturerId, forCourseId] : [lecturerId, lecturerId])).all();
         return new Response(JSON.stringify({ success: true, exams: exams.results }), { status: 200, headers: corsHeaders });
     }
 
@@ -150,6 +180,12 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         if (path === "/api/exams/archive") {
             await env.DB.prepare("UPDATE Exams SET Archived = ? WHERE Exam_ID = ?").bind(body.archived ? 1 : 0, body.examId).run();
             return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+        }
+        // Another lecturer may have linked this shared exam to their class: deleting it would wipe their students' records.
+        await ensureExamShares(env);
+        const others = await env.DB.prepare("SELECT COUNT(*) AS n FROM Class_Exams ce JOIN Courses c ON c.Course_ID = ce.Course_ID WHERE ce.Exam_ID = ? AND c.Lecturer_ID <> ?").bind(body.examId, exam.Lecturer_ID).first();
+        if (others && others.n > 0) {
+            return new Response(JSON.stringify({ error: "Another lecturer is using this shared exam in their class, so it cannot be deleted. Archive it instead." }), { status: 409, headers: corsHeaders });
         }
         const used = await env.DB.prepare("SELECT COUNT(*) AS n FROM Class_Exams WHERE Exam_ID = ?").bind(body.examId).first();
         if (used && used.n > 0) {
@@ -170,8 +206,40 @@ export async function handleExams(request, env, path, url, corsHeaders) {
                 env.DB.prepare("DELETE FROM Class_Exams WHERE Exam_ID = ?").bind(body.examId)
             ]);
         }
+        await env.DB.prepare("DELETE FROM Exam_Shares WHERE Exam_ID = ?").bind(body.examId).run();
         await env.DB.prepare("DELETE FROM Exams WHERE Exam_ID = ?").bind(body.examId).run();
         return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+    }
+
+    // ---- Sharing an exam with other lecturers who teach the same course code ----
+
+    if (path === "/api/exams/shares" && request.method === "GET") {
+        const examId = url.searchParams.get("examId");
+        const lecturerId = url.searchParams.get("lecturerId");
+        await ensureExamShares(env);
+        const exam = await env.DB.prepare("SELECT Exam_ID, Lecturer_ID, Course FROM Exams WHERE Exam_ID = ?").bind(examId).first();
+        if (!exam) return new Response(JSON.stringify({ error: "Exam not found." }), { status: 404, headers: corsHeaders });
+        if (exam.Lecturer_ID !== lecturerId) return new Response(JSON.stringify({ error: "Only the lecturer who owns this exam can share it." }), { status: 403, headers: corsHeaders });
+        const eligible = await eligibleLecturers(env, exam);
+        const shared = await env.DB.prepare("SELECT Lecturer_ID FROM Exam_Shares WHERE Exam_ID = ?").bind(examId).all();
+        return new Response(JSON.stringify({ success: true, eligible, shared: shared.results.map(r => r.Lecturer_ID) }), { status: 200, headers: corsHeaders });
+    }
+
+    if (path === "/api/exams/share" && request.method === "POST") {
+        const body = await request.json();
+        await ensureExamShares(env);
+        const exam = await env.DB.prepare("SELECT Exam_ID, Lecturer_ID, Course FROM Exams WHERE Exam_ID = ?").bind(body.examId).first();
+        if (!exam) return new Response(JSON.stringify({ error: "Exam not found." }), { status: 404, headers: corsHeaders });
+        if (exam.Lecturer_ID !== body.lecturerId) return new Response(JSON.stringify({ error: "Only the lecturer who owns this exam can share it." }), { status: 403, headers: corsHeaders });
+        const wanted = [...new Set((Array.isArray(body.lecturerIds) ? body.lecturerIds : []).map(String))].slice(0, 100);
+        const allowed = new Set((await eligibleLecturers(env, exam)).map(l => l.id));
+        if (wanted.some(id => !allowed.has(id))) {
+            return new Response(JSON.stringify({ error: "You can only share with lecturers who teach the same course code." }), { status: 400, headers: corsHeaders });
+        }
+        const stmts = [env.DB.prepare("DELETE FROM Exam_Shares WHERE Exam_ID = ?").bind(exam.Exam_ID)];
+        wanted.forEach(id => stmts.push(env.DB.prepare("INSERT OR IGNORE INTO Exam_Shares (Exam_ID, Lecturer_ID) VALUES (?, ?)").bind(exam.Exam_ID, id)));
+        await env.DB.batch(stmts);
+        return new Response(JSON.stringify({ success: true, shared: wanted }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "GET" && path === "/api/exam-data") {

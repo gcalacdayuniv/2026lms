@@ -7,6 +7,8 @@
 //    request, so a suspended account or a changed role takes effect at once.
 //  - Routes are listed in RULES. A route that is not listed is lecturer-only.
 
+import { ensureExamShares } from './schema.js';
+
 const TOKEN_DAYS = 7;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;   // larger bodies (photos) are checked by role and query only
 
@@ -110,6 +112,8 @@ export const RULES = {
     'POST /api/finish-chunked-upload': { who: 'any' },
 
     'GET /api/exams': { who: 'lecturer', mine: ['lecturerId'] },
+    'GET /api/exam-data': { who: 'lecturer', sharedOk: true },        // a lecturer an exam was shared with may open it
+    'POST /api/class-exams': { who: 'lecturer', sharedOk: true },     // ... and assign it to their own class
     'POST /api/exams': { who: 'lecturer', mine: ['lecturerId'] },
     'POST /api/courses': { who: 'lecturer', mine: ['lecturerId'] },
     'POST /api/update-course-room': { who: 'lecturer', mine: ['lecturerId'] },
@@ -173,6 +177,14 @@ async function readFields(request, url) {
 }
 
 // Returns { ok: true, user } or { ok: false, status, error }. user is null for public routes or when the gate is off.
+async function isSharedWith(env, examId, lecturerId) {
+    try {
+        await ensureExamShares(env);
+        const r = await env.DB.prepare('SELECT 1 AS ok FROM Exam_Shares WHERE Exam_ID = ? AND Lecturer_ID = ?').bind(examId, lecturerId).first();
+        return !!r;
+    } catch (e) { return false; }
+}
+
 export async function authorize(request, env, path, url) {
     if (!path.startsWith('/api')) return { ok: true, user: null };
     if (!authEnabled(env)) return { ok: true, user: null };
@@ -214,7 +226,11 @@ export async function authorize(request, env, path, url) {
         for (const key of Object.keys(OWNER_SQL)) {
             if (!fields[key]) continue;
             const owner = await ownerOf(env, key, fields[key]);
-            if (owner !== null && owner !== user.id) return deny(403, 'This belongs to another lecturer.');
+            if (owner !== null && owner !== user.id) {
+                // Some exam routes are open to a lecturer the owner shared the exam with.
+                if (key === 'examId' && rule.sharedOk && await isSharedWith(env, fields[key], user.id)) continue;
+                return deny(403, 'This belongs to another lecturer.');
+            }
         }
     }
     return { ok: true, user };

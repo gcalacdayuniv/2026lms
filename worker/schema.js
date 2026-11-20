@@ -92,6 +92,11 @@ export async function ensureLoginTable(env) {
     loginTableReady = true;
 }
 
+// An exam its owner shares with other lecturers (they can see, print, copy and assign it, but not change it).
+export async function ensureExamShares(env) {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Exam_Shares (Exam_ID TEXT NOT NULL, Lecturer_ID TEXT NOT NULL, Shared_At DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (Exam_ID, Lecturer_ID))").run();
+}
+
 export async function ensureAccessibleExamTables(env) {
     await env.DB.batch([
         env.DB.prepare(`

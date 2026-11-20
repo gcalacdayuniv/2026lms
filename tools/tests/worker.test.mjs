@@ -179,6 +179,34 @@ const purged = await purgeOldAttempts(env);
 const left = sql.prepare('select Attempt_Key k from Login_Attempts').all().map(r => r.k);
 ok('purge removes day-old attempts and keeps recent ones', purged === 1 && left.length === 1 && left[0] === 'u:fresh', JSON.stringify({ purged, left }));
 
+// ---- exam sharing between lecturers with the same course code ----
+U('L3', 'lec3', 'lecturer');
+sql.exec(`insert into Courses(Course_ID,CourseCode,CourseTitle,Lecturer_ID) values('C3','C1','Course One','L3'),('C2','OTHER','Other','L2')`);
+const l3 = await login('lec3');
+const made = await call('POST', '/api/exams', { token: l1.j.token, body: { lecturerId: 'L1', title: 'Shared quiz', course: 'Course One', examData: [] } });
+const exId = made.j.examId;
+const info = await call('GET', `/api/exams/shares?examId=${exId}&lecturerId=L1`, { token: l1.j.token });
+ok('eligible = lecturers with the same course code only', info.s === 200 && info.j.eligible.length === 1 && info.j.eligible[0].id === 'L3', JSON.stringify(info));
+ok('cannot share with a lecturer of another course code', (await call('POST', '/api/exams/share', { token: l1.j.token, body: { examId: exId, lecturerId: 'L1', lecturerIds: ['L2'] } })).s === 400);
+ok('another lecturer cannot manage the shares', (await call('GET', `/api/exams/shares?examId=${exId}&lecturerId=L3`, { token: l3.j.token })).s === 403);
+ok('before sharing L3 cannot open the exam', (await call('GET', `/api/exam-data?examId=${exId}`, { token: l3.j.token })).s === 403);
+ok('owner shares with L3', (await call('POST', '/api/exams/share', { token: l1.j.token, body: { examId: exId, lecturerId: 'L1', lecturerIds: ['L3'] } })).s === 200);
+const l3list = await call('GET', '/api/exams?lecturerId=L3', { token: l3.j.token });
+ok('L3 sees the exam marked shared with the owner name', l3list.j.exams.length === 1 && l3list.j.exams[0].Shared === 1 && l3list.j.exams[0].OwnerName === 'lec1', JSON.stringify(l3list));
+ok('L2 does not see it', (await call('GET', '/api/exams?lecturerId=L2', { token: l2.j.token })).j.exams.length === 0);
+ok('L3 can open the shared exam', (await call('GET', `/api/exam-data?examId=${exId}`, { token: l3.j.token })).s === 200);
+ok('L3 cannot edit it', (await call('POST', '/api/exams/update', { token: l3.j.token, body: { examId: exId, examData: [] } })).s === 403);
+ok('L3 cannot archive it', (await call('POST', '/api/exams/archive', { token: l3.j.token, body: { examId: exId, lecturerId: 'L3', archived: true } })).s === 403);
+ok('L3 cannot delete it', (await call('POST', '/api/exams/delete', { token: l3.j.token, body: { examId: exId, lecturerId: 'L3' } })).s === 403);
+ok('L3 cannot re-share it', (await call('POST', '/api/exams/share', { token: l3.j.token, body: { examId: exId, lecturerId: 'L3', lecturerIds: [] } })).s === 403);
+const assign = await call('POST', '/api/class-exams', { token: l3.j.token, body: { courseId: 'C3', examId: exId, term: 'MidTerm', category: 'MajorExam', isActive: true, assignments: [] } });
+ok('L3 can assign it to their own class', assign.s === 200 || assign.s === 201, JSON.stringify(assign));
+ok('L3 cannot assign it to another lecturer\'s class', (await call('POST', '/api/class-exams', { token: l3.j.token, body: { courseId: 'C1', examId: exId, assignments: [] } })).s === 403);
+const shDel = await call('POST', '/api/exams/delete', { token: l1.j.token, body: { examId: exId, lecturerId: 'L1', force: true } });
+ok('owner cannot delete an exam another lecturer is using', shDel.s === 409 && !shDel.j.needsConfirm, JSON.stringify(shDel));
+await call('POST', '/api/exams/share', { token: l1.j.token, body: { examId: exId, lecturerId: 'L1', lecturerIds: [] } });
+ok('after unsharing L3 loses access', (await call('GET', `/api/exam-data?examId=${exId}`, { token: l3.j.token })).s === 403);
+
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----
 import { readFileSync, readdirSync } from 'node:fs';
 const workerDir = new URL('../../worker/', import.meta.url);
