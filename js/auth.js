@@ -106,6 +106,9 @@ export const AuthModule = {
                     course: document.getElementById('regCourse').value,
                     year: document.getElementById('regYear').value,
                     section: document.getElementById('regSection').value.trim().toUpperCase(),
+                    program_course: document.getElementById('regPCourse').value,
+                    program_year: document.getElementById('regPYear').value,
+                    program_section: document.getElementById('regPSection').value.trim().toUpperCase(),
                     eye_condition: document.getElementById('regEyeCondition').value,
                     avatarBase64: null
                 };
@@ -535,21 +538,22 @@ export const AuthModule = {
     },
 
     loadPrograms: async () => {
-        const courseSelect = document.getElementById('regCourse');
-        if (!courseSelect) return;
-        
+        const selects = ['regPCourse', 'regCourse'].map(id => document.getElementById(id)).filter(Boolean);
+        if (!selects.length) return;
+        const fill = (html) => selects.forEach(s => { s.innerHTML = html; });
+
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/programs?_t=${ts}`);
-            
+
             if (data.programs && data.programs.length > 0) {
-                courseSelect.innerHTML = '<option value="" disabled selected>Select Course</option>' + 
-                    data.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
+                fill('<option value="" disabled selected>Select Course</option>' +
+                    data.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join(''));
             } else {
-                courseSelect.innerHTML = '<option value="" disabled selected>No courses available</option>';
+                fill('<option value="" disabled selected>No courses available</option>');
             }
         } catch (err) {
-            courseSelect.innerHTML = '<option value="" disabled selected>Error loading courses</option>';
+            fill('<option value="" disabled selected>Error loading courses</option>');
             console.error('Failed to load programs:', err);
         }
     },

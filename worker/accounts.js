@@ -40,11 +40,17 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const tooLong = (v, max) => v != null && String(v).length > max;
         if (!body || typeof body.password !== 'string' || body.password.length < 6 || body.password.length > 200
             || tooLong(body.username, 60) || tooLong(body.name, 120) || tooLong(body.email, 120) || tooLong(body.contact_number, 30)
-            || tooLong(body.course, 80) || tooLong(body.year, 40) || tooLong(body.section, 40) || tooLong(body.eye_condition, 120)) {
+            || tooLong(body.course, 80) || tooLong(body.year, 40) || tooLong(body.section, 40) || tooLong(body.eye_condition, 120)
+            || tooLong(body.program_course, 80) || tooLong(body.program_year, 40) || tooLong(body.program_section, 40)) {
             return new Response(JSON.stringify({ error: "Some details are missing or too long. Passwords need 6 to 200 characters." }), { status: 400, headers: corsHeaders });
         }
         if (body.avatarBase64 != null && (typeof body.avatarBase64 !== 'string' || body.avatarBase64.length > MAX_AVATAR_B64)) {
             return new Response(JSON.stringify({ error: "The profile photo is too large. Choose a smaller photo." }), { status: 400, headers: corsHeaders });
+        }
+
+        // The student's own program is required; the class course/year/section below is for enrolling in classes.
+        if (![body.program_course, body.program_year, body.program_section].every(v => typeof v === 'string' && v.trim())) {
+            return new Response(JSON.stringify({ error: "Choose your program course, year and section." }), { status: 400, headers: corsHeaders });
         }
 
         const studentNoFormat = /^\d{2}-\d{4}$/;
@@ -124,12 +130,13 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const hashedPassword = await hashPassword(body.password, env);
 
         await env.DB.prepare(
-            `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, registration_timestamp)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+            `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, Program_Course, Program_Year, Program_Section, registration_timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
         ).bind(
             userId, body.username, hashedPassword, body.name, finalAvatarUrl,
             body.email, body.contact_number, body.student_number,
-            'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, body.eye_condition ? body.eye_condition.trim() : null, 'Student'
+            'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, body.eye_condition ? body.eye_condition.trim() : null, 'Student',
+            body.program_course.trim(), body.program_year.trim(), body.program_section.trim()
         ).run();
 
         return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });

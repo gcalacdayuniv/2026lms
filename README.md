@@ -437,6 +437,11 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - Until one is set, the term follows the calendar in **GMT+8** (Aug-Dec 1st, Jan-May 2nd, Jun-Jul Summer): `calendarTerm` in `worker/shared.js` and `js/current-term.js`. The worker's `getCurrentTerm(env)` replaces the old device-date `currentTermNow`.
 - Used by: the class list "Current term" filter, the create-class prefill, copy-to-another-term, Advance Year Level default, and student re-activation on enrol. The front end caches it (`current_term_cache`) and repaints the class list when it changes (`term-changed` event).
 
+## Registration: program vs class fields
+- Sign-up requires the student's **program** (Program course, year, section: `Users.Program_Course/Program_Year/Program_Section`). The server rejects a registration without them (400).
+- The **class** course, year and section (`Users.course/year/section`) are for enrolling in classes: they decide which classes a student can see and join.
+- Both groups are editable by a lecturer in Manage Users > Edit details. Advance Year Level groups students by Program course (falls back to the class course for older accounts with no program).
+
 ## Edit Student Details (Manage Users)
 - Dashboard menu > Manage > **Manage Users** > **Edit details** on a student card (`js/edit-student.js`, endpoint `POST /api/admin-update-student`, lecturer only, students only).
 - Editable: name, student number (00-0000, must be unique), contact, email (unique), class course/year/section, program course/year/section, and the **eye condition tag** (No Eye Condition, Near Sighted, Far Sighted, Legally Blind). Legally Blind turns on the accessible read-aloud exam for that student.

@@ -107,15 +107,43 @@ export const AuthUI = {
                         <input type="password" id="regPassword" autocomplete="new-password" enterkeyhint="done" required minlength="6" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                     </div>
 
+                    <fieldset class="mt-5 border border-gray-200 rounded-md p-3">
+                        <legend class="px-1 text-sm font-bold text-gray-800">Your program</legend>
+                        <p class="text-xs text-gray-500 mb-2">The program you are enrolled in at school.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label for="regPCourse" class="block text-sm font-medium text-gray-700">Program course</label>
+                                <select id="regPCourse" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                    <option value="" disabled selected>Loading courses...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="regPYear" class="block text-sm font-medium text-gray-700">Program year</label>
+                                <select id="regPYear" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                    <option value="" disabled selected>Select Year</option>
+                                    ${[1, 2, 3, 4, 5].map(n => `<option value="${n}">${n}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="regPSection" class="block text-sm font-medium text-gray-700">Program section</label>
+                                <select id="regPSection" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                    <option value="" disabled selected>Select Section</option>
+                                    ${Array.from({length: 30}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <p class="mt-5 text-sm font-bold text-gray-800">Class you are enrolling in</p>
+                    <p class="text-xs text-gray-500">The course, year and section of the classes you will join (this decides which classes you can see).</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Course</label>
+                            <label for="regCourse" class="block text-sm font-medium text-gray-700">Class course</label>
                             <select id="regCourse" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                                 <option value="" disabled selected>Loading courses...</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Year</label>
+                            <label for="regYear" class="block text-sm font-medium text-gray-700">Class year</label>
                             <select id="regYear" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                                 <option value="" disabled selected>Select Year</option>
                                 <option value="1">1</option>
@@ -129,7 +157,7 @@ export const AuthUI = {
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Section</label>
+                            <label for="regSection" class="block text-sm font-medium text-gray-700">Class section</label>
                             <select id="regSection" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                                 <option value="" disabled selected>Select Section</option>
                                 ${Array.from({length: 30}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('')}
