@@ -3,15 +3,14 @@
 import { apiFetch, AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
+import { getTerm } from './current-term.js';
 
 const FIELD = 'w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm';
 const LABEL = 'block text-xs font-bold text-gray-500 uppercase tracking-wider';
 
-// The academic year that starts next: from April on it is this year-next year, before that it is last year-this year.
+// The academic year after the current term's (the term is set in Admin tools).
 const defaultAY = () => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const start = d.getMonth() >= 3 ? y + 1 : y;
+    const start = Number(getTerm().ay.slice(0, 4)) + 1;
     return `${start}-${start + 1}`;
 };
 

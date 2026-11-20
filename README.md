@@ -430,6 +430,13 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - Create Course and Edit Class Details have an Academic Year field (`YYYY-YYYY`, second year = first + 1, validated by `cleanTerm` in the worker) and a Semester select.
 - Shown under the course title in the class header and on the lecturer course cards ("AY 2026-2027 · 1st Semester").
 
+## Current Academic Term (set by an admin)
+- Dashboard menu > Manage > **Academic Term** (`js/current-term.js`). Every lecturer has the Admin tools, so any lecturer can set it; there is no separate admin role.
+- Endpoints: `GET /api/current-term` (anyone signed in) and `POST /api/current-term` (lecturer only; `{ay, sem}` or `{reset: true}`). Stored in `App_Settings` (key `current_term`, created automatically by `ensureAppSettings`).
+- Academic year must be like `2026-2027` (second year = first + 1); semester is 1st Semester, 2nd Semester or Summer.
+- Until one is set, the term follows the calendar in **GMT+8** (Aug-Dec 1st, Jan-May 2nd, Jun-Jul Summer): `calendarTerm` in `worker/shared.js` and `js/current-term.js`. The worker's `getCurrentTerm(env)` replaces the old device-date `currentTermNow`.
+- Used by: the class list "Current term" filter, the create-class prefill, copy-to-another-term, Advance Year Level default, and student re-activation on enrol. The front end caches it (`current_term_cache`) and repaints the class list when it changes (`term-changed` event).
+
 ## Advance Year Level
 - Dashboard menu > Manage > **Advance Year Level** (`js/year-advance.js`, endpoint `POST /api/advance-year-level`, lecturer only).
 - Choose the new academic year and the highest year level (default 4), press **Preview** (counts: will advance / at highest level / no year set), then **Advance all students**.

@@ -4,6 +4,7 @@ import { apiFetch, AppState } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
+import { getTerm } from './current-term.js';
 
 export const AuthModule = {
     // Shrinks a profile photo to at most 1024 px on the long side (JPEG) so a phone photo of several MB becomes about 150 KB.
@@ -452,11 +453,11 @@ export const AuthModule = {
             document.getElementById('profilePanel').classList.add('translate-x-full');
             document.getElementById('profilePanel').classList.remove('translate-x-0');
             document.getElementById('ccModal').classList.remove('hidden');
-            // Prefill the current term (Aug-Dec 1st sem, Jan-May 2nd sem, Jun-Jul summer) unless already filled in.
+            // Prefill the current term (set by an admin in Admin tools) unless already filled in.
             const ay = document.getElementById('courseAY'), sem = document.getElementById('courseSemester');
-            const now = new Date(), y = now.getFullYear(), mo = now.getMonth() + 1;
-            if (ay && !ay.value) ay.value = mo >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
-            if (sem && !sem.value) sem.value = mo >= 8 ? '1st Semester' : (mo <= 5 ? '2nd Semester' : 'Summer');
+            const term = getTerm();
+            if (ay && !ay.value) ay.value = term.ay;
+            if (sem && !sem.value) sem.value = term.sem;
         }
 
         if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') {

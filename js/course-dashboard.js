@@ -6,6 +6,7 @@ import { Skeleton } from './skeletons.js';
 import { escapeHtml } from './html-utils.js';
 import { formatSchedule } from './schedule-time.js';
 import { getLocalDateString } from './date-utils.js';
+import { getTerm, loadTerm } from './current-term.js';
 
 // Maximum size of an uploaded submission file.
 const DASH_CACHE_PREFIX = 'dash_cache:';
@@ -451,12 +452,9 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
 const SEM_RANK = { '1st Semester': 1, '2nd Semester': 2, 'Summer': 3 };
 const termKey = (c) => [c.AcademicYear, c.Semester].filter(Boolean).join('|');
 const termLabel = (c) => [c.AcademicYear && `AY ${c.AcademicYear}`, c.Semester].filter(Boolean).join(' · ') || 'No term set';
-// Aug-Dec = 1st semester, Jan-May = 2nd semester, Jun-Jul = summer (of the academic year that started the previous August).
-const currentTerm = () => {
-    const d = new Date(), y = d.getFullYear(), m = d.getMonth() + 1;
-    if (m >= 8) return { ay: `${y}-${y + 1}`, sem: '1st Semester' };
-    return { ay: `${y - 1}-${y}`, sem: m <= 5 ? '2nd Semester' : 'Summer' };
-};
+// The current term is set by an admin (Admin tools); until then it follows the calendar in GMT+8.
+const currentTerm = () => getTerm();
+document.addEventListener('term-changed', () => { if (CourseDashboard.repaintLecturer && CourseDashboard.lecturerData) CourseDashboard.repaintLecturer(); });
 // Classes without a term count as current, so older classes never disappear.
 const isCurrentTerm = (c) => {
     if (!c.AcademicYear && !c.Semester) return true;
@@ -925,6 +923,9 @@ export const CourseDashboard = {
         if (mode === 'fresh' || (mode === 'open' && !readSaved(key))) {
             container.innerHTML = Skeleton.dashboard(AppState.user.role);
         }
+
+        // Refresh the shared current term in the background; the list repaints if it changed.
+        if (isLecturer) loadTerm();
 
         return isLecturer
             ? CourseDashboard.renderLecturerDashboard(container, mode)

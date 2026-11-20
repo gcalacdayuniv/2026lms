@@ -2,7 +2,7 @@
 // Helpers used by more than one route file: the visitor's local date, safe JSON parsing, sign-in checks and lockout, and batching.
 
 import { hashPassword, verifyPassword } from './password.js';
-import { ensureLoginTable } from './schema.js';
+import { ensureLoginTable, ensureAppSettings } from './schema.js';
 
 export const SCAN_BATCH_SIZE = 90;
 export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -127,9 +127,30 @@ export async function runInChunks(env, statements) {
 }
 
 export const CLEAR_REACTIVATION_SQL = "Advanced_Term = NULL, Reactivation_Until = NULL, Reactivation_Requested = NULL";
-// Current term by date (Aug-Dec 1st semester, Jan-May 2nd, Jun-Jul Summer).
-export function currentTermNow(now = new Date()) {
-    const y = now.getUTCFullYear(), m = now.getUTCMonth() + 1;
+export const SEMESTERS = ["1st Semester", "2nd Semester", "Summer"];
+
+// Fallback term by calendar in GMT+8 (Aug-Dec 1st semester, Jan-May 2nd, Jun-Jul Summer).
+export function calendarTerm(now = new Date()) {
+    const d = new Date(now.getTime() + 8 * 3600 * 1000);
+    const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1;
     if (m >= 8) return { ay: `${y}-${y + 1}`, sem: "1st Semester" };
     return { ay: `${y - 1}-${y}`, sem: m <= 5 ? "2nd Semester" : "Summer" };
+}
+
+export function validTerm(ay, sem) {
+    const m = /^(\d{4})-(\d{4})$/.exec(String(ay || ""));
+    return !!m && Number(m[2]) === Number(m[1]) + 1 && SEMESTERS.includes(sem);
+}
+
+// The term an admin set, else the calendar term. source says which one it is.
+export async function getCurrentTerm(env, now = new Date()) {
+    try {
+        await ensureAppSettings(env);
+        const row = await env.DB.prepare("SELECT Value, Updated_By, Updated_At FROM App_Settings WHERE Key = 'current_term'").first();
+        if (row && row.Value) {
+            const t = JSON.parse(row.Value);
+            if (validTerm(t.ay, t.sem)) return { ay: t.ay, sem: t.sem, source: "set", updatedBy: row.Updated_By || null, updatedAt: row.Updated_At || null };
+        }
+    } catch (e) { /* fall back to the calendar */ }
+    return { ...calendarTerm(now), source: "calendar" };
 }

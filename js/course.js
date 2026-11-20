@@ -10,6 +10,7 @@ import { UI } from './ui-feedback.js';
 import { StudentSummaryUI } from './student-summary-ui.js';
 import { LecturerNotes } from './lecturer-notes.js';
 import './year-advance.js';
+import './current-term.js';
 import './duplicate-course.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 

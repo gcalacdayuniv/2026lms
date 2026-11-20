@@ -3,17 +3,18 @@ import { apiFetch, AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
 import { CourseDashboard } from './course-dashboard.js';
+import { getTerm } from './current-term.js';
 
 const FIELD = 'w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm';
 const LABEL = 'block text-xs font-bold text-gray-500 uppercase tracking-wider';
 const SEMS = ['1st Semester', '2nd Semester', 'Summer'];
 
 // The term after the one given: 1st -> 2nd (same year), 2nd or Summer -> 1st of the next year. No term = the current one.
-export const nextTerm = (ay, sem, now = new Date()) => {
+export const nextTerm = (ay, sem) => {
     const m = /^(\d{4})-(\d{4})$/.exec(ay || '');
     if (!m) {
-        const y = now.getFullYear(), mo = now.getMonth() + 1;
-        return { ay: mo >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`, sem: mo >= 8 ? '1st Semester' : (mo <= 5 ? '2nd Semester' : 'Summer') };
+        const t = getTerm();
+        return { ay: t.ay, sem: t.sem };
     }
     if (sem === '1st Semester') return { ay, sem: '2nd Semester' };
     const a = Number(m[1]) + 1;

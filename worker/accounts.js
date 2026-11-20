@@ -3,8 +3,8 @@
 
 import { signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
-import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL } from './shared.js';
-import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs } from './schema.js';
+import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL, getCurrentTerm, validTerm } from './shared.js';
+import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings } from './schema.js';
 import { gasUrl } from './gas.js';
 
 const MAX_AVATAR_B64 = 8000000;   // about 6 MB of photo; the app shrinks pictures to about 150 KB before sending
@@ -238,6 +238,25 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         await ensureUserPrefs(env);
         await env.DB.prepare("INSERT INTO User_Prefs (User_ID, Paper, Updated_At) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(User_ID) DO UPDATE SET Paper = excluded.Paper, Updated_At = CURRENT_TIMESTAMP").bind(body.userId, paper).run();
         return new Response(JSON.stringify({ success: true, paper }), { status: 200, headers: corsHeaders });
+    }
+
+    // Current academic term: set by hand by an admin lecturer, else the GMT+8 calendar.
+    if (path === "/api/current-term" && request.method === "GET") {
+        return new Response(JSON.stringify({ success: true, ...(await getCurrentTerm(env)) }), { status: 200, headers: corsHeaders });
+    }
+
+    if (path === "/api/current-term" && request.method === "POST") {
+        const body = await request.json();
+        await ensureAppSettings(env);
+        if (body.reset) {
+            await env.DB.prepare("DELETE FROM App_Settings WHERE Key = 'current_term'").run();
+        } else {
+            if (!validTerm(body.ay, body.sem)) {
+                return new Response(JSON.stringify({ error: "Use an academic year like 2026-2027 and pick a semester." }), { status: 400, headers: corsHeaders });
+            }
+            await env.DB.prepare("INSERT INTO App_Settings (Key, Value, Updated_By, Updated_At) VALUES ('current_term', ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value, Updated_By = excluded.Updated_By, Updated_At = CURRENT_TIMESTAMP").bind(JSON.stringify({ ay: body.ay, sem: body.sem }), String(body.userId || "")).run();
+        }
+        return new Response(JSON.stringify({ success: true, ...(await getCurrentTerm(env)) }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/update-details") {

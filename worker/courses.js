@@ -2,7 +2,7 @@
 // Programs, classes (create, copy, edit, archive), enrollment, rosters, student details, lecturer notes and groups.
 
 import { ensureLecturerNotes, ensureReactivationColumns } from './schema.js';
-import { CLEAR_REACTIVATION_SQL, currentTermNow } from './shared.js';
+import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
 
 // Academic year ("2026-2027", second year = first + 1) and semester are both optional.
 const SEMESTERS = ["1st Semester", "2nd Semester", "Summer"];
@@ -244,7 +244,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             const stu = await env.DB.prepare("SELECT account_status, Advanced_Term FROM Users WHERE User_ID = ?").bind(body.studentId).first();
             if (stu && stu.Advanced_Term && String(stu.account_status || "").toLowerCase() === "inactive") {
                 const crs = await env.DB.prepare("SELECT AcademicYear, Semester FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
-                const now = currentTermNow();
+                const now = await getCurrentTerm(env);
                 const thisYear = crs && crs.AcademicYear && crs.AcademicYear === stu.Advanced_Term;
                 const thisTerm = crs && crs.AcademicYear === now.ay && (!crs.Semester || crs.Semester === now.sem);
                 if (thisYear || thisTerm) {

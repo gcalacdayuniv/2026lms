@@ -226,6 +226,22 @@ ok('unknown paper size rejected', (await call('POST', '/api/my-prefs', { token: 
 ok('cannot change another lecturer\'s paper size', (await call('POST', '/api/my-prefs', { token: l2.j.token, body: { userId: 'L1', paper: 'a4' } })).s === 403);
 ok('each lecturer has their own', (await call('GET', '/api/my-prefs?userId=L2', { token: l2.j.token })).j.paper === null);
 
+// ---- current academic term, set by an admin lecturer ----
+import { calendarTerm } from '../../worker/shared.js';
+ok('calendar term uses GMT+8 (Jul 31 17:00 UTC is already Aug 1 in Manila)', calendarTerm(new Date('2026-07-31T17:00:00Z')).sem === '1st Semester' && calendarTerm(new Date('2026-07-31T15:00:00Z')).sem === 'Summer');
+ok('calendar term Jan is 2nd semester of the year before', JSON.stringify(calendarTerm(new Date('2027-01-15T00:00:00Z'))) === JSON.stringify({ ay: '2026-2027', sem: '2nd Semester' }));
+const s2t = s2b.j.token;
+const t0 = (await call('GET', '/api/current-term', { token: s2t })).j;
+ok('student can read the term, calendar fallback when none set', t0.source === 'calendar' && /^\d{4}-\d{4}$/.test(t0.ay));
+ok('student cannot set the term', (await call('POST', '/api/current-term', { token: s2t, body: { userId: 'S2', ay: '2026-2027', sem: '1st Semester' } })).s === 403);
+ok('bad year pair rejected', (await call('POST', '/api/current-term', { token: l1.j.token, body: { userId: 'L1', ay: '2026-2028', sem: '1st Semester' } })).s === 400);
+ok('bad semester rejected', (await call('POST', '/api/current-term', { token: l1.j.token, body: { userId: 'L1', ay: '2026-2027', sem: 'Fall' } })).s === 400);
+ok('a lecturer sets the term', (await call('POST', '/api/current-term', { token: l1.j.token, body: { userId: 'L1', ay: '2026-2027', sem: '2nd Semester' } })).s === 200);
+const t1 = (await call('GET', '/api/current-term', { token: s2t })).j;
+ok('everyone sees the set term', t1.source === 'set' && t1.ay === '2026-2027' && t1.sem === '2nd Semester' && t1.updatedBy === 'L1');
+ok('another lecturer can change it', (await call('POST', '/api/current-term', { token: l2.j.token, body: { userId: 'L2', ay: '2026-2027', sem: 'Summer' } })).j.sem === 'Summer');
+ok('reset goes back to the calendar', (await call('POST', '/api/current-term', { token: l1.j.token, body: { userId: 'L1', reset: true } })).j.source === 'calendar');
+
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----
 import { readFileSync, readdirSync } from 'node:fs';
 const workerDir = new URL('../../worker/', import.meta.url);

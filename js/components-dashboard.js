@@ -128,6 +128,10 @@ const DashboardUI = {
                             <span class="menu-tile-icon bg-purple-100 text-purple-700"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Registration List</span>
                         </button>
+                        <button type="button" id="openCtModalBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-blue-100 text-blue-700"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Academic Term</span>
+                        </button>
                         <button type="button" id="openYaModalBtn" class="menu-tile">
                             <span class="menu-tile-icon bg-orange-100 text-orange-700"><i class="fa-solid fa-turn-up" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Advance Year Level</span>

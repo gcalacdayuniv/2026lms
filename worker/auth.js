@@ -96,6 +96,8 @@ export const RULES = {
     'POST /api/update-details': { who: 'any', mine: ['userId'] },
     'GET /api/my-prefs': { who: 'any', mine: ['userId'] },
     'POST /api/my-prefs': { who: 'any', mine: ['userId'] },
+    'GET /api/current-term': { who: 'any' },
+    'POST /api/current-term': { who: 'lecturer', mine: ['userId'] },
     'GET /api/courses': { who: 'any', self: ['studentId'] },
     'GET /api/my-courses': { who: 'any', mine: ['userId'], roleParam: 'role' },
     'POST /api/enroll': { who: 'any', self: ['studentId'] },
