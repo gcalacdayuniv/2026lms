@@ -441,6 +441,7 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - Dashboard menu > Manage > **Advance Year Level** (`js/year-advance.js`, endpoint `POST /api/advance-year-level`, lecturer only).
 - Choose the new academic year and the highest year level (default 4), press **Preview** (counts: will advance / at highest level / no year set), then **Advance all students**.
 - Both `Users.year` (drives which classes a student can see and join) and `Users.Program_Year` go up by one; `1` becomes `2`, `3rd Year` becomes `4th Year`. Students at the highest level or without a year are left unchanged.
+- **Highest year per program:** after **Preview**, a list of programs (student's Program Course, else Course) appears, each with its own highest year (default follows the box above, so a 5-year program is set to 5). The choices are remembered in `App_Settings` (`program_max_year`) and used next time; changing any limit disables Apply until you Preview again.
 - A run for an academic year can only be applied once (409 otherwise). Each run is logged in `Year_Advance_Batches` and `Year_Advance_Log` (created automatically); **Undo last advance** restores the old values, keeping any year edited manually since.
 - Students enrolled in existing classes stay enrolled; classes with a Target Year should be edited or recreated for the new term.
 - Modes of the endpoint: `preview`, `apply`, `undo`.

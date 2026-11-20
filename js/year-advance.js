@@ -22,9 +22,20 @@ const call = (body) => apiFetch('/api/advance-year-level', {
 const $ = (id) => document.getElementById(id);
 const close = () => { const m = $('yaModal'); if (m) m.remove(); };
 
+// Programs whose highest year differs from the default (rows appear after Preview).
+const programMaxValues = () => {
+    const rows = document.querySelectorAll('#yaPrograms select[data-program]');
+    if (!rows.length) return undefined;   // not shown yet: the server uses the remembered ones
+    const out = {};
+    const def = $('yaMax') ? $('yaMax').value : '';
+    rows.forEach(sel => { if (sel.value !== def) out[sel.dataset.program] = Number(sel.value); });
+    return out;
+};
+
 const values = () => ({
     academicYear: $('yaAY').value.trim(),
     maxYear: Number($('yaMax').value),
+    programMax: programMaxValues(),
     markGraduated: Boolean($('yaGrad') && $('yaGrad').checked),
     reactivationUntil: $('yaUntil') ? $('yaUntil').value : ''
 });
@@ -34,6 +45,19 @@ const listHtml = (title, items, total) => {
     if (!items || !items.length) return '';
     return `<details class="mt-3 border border-gray-200 rounded-md"><summary class="cursor-pointer px-3 py-2 text-xs font-bold text-gray-700">${escapeHtml(title)} (${total})</summary>
         <ul class="max-h-40 overflow-y-auto px-3 pb-2 text-xs text-gray-700 space-y-0.5">${items.join('')}</ul>${total > items.length ? `<p class="px-3 pb-2 text-[11px] text-gray-500">Showing the first ${items.length}.</p>` : ''}</details>`;
+};
+
+// One row per program with its own "highest year" (default follows the box above).
+const programsHtml = (r) => {
+    const list = r.programs || [];
+    if (!list.length) return '';
+    const opts = (cur) => [1, 2, 3, 4, 5, 6, 7].map(n => `<option${n === cur ? ' selected' : ''}>${n}</option>`).join('');
+    return `<div id="yaPrograms" class="mt-3 border border-gray-200 rounded-md p-3">
+        <p class="text-xs font-bold text-gray-700 mb-1">Highest year per program</p>
+        <p class="text-[11px] text-gray-500 mb-2">Set 5 for programs that run five years. Preview again after changing. Remembered for next time.</p>
+        <div class="space-y-1.5 max-h-48 overflow-y-auto">${list.map((p, i) => `<div class="flex items-center gap-2">
+            <label for="yaPg${i}" class="min-w-0 flex-1 text-xs text-gray-700 truncate" title="${escapeHtml(p.name)}">${escapeHtml(p.name)} <span class="text-gray-400">(${p.count})</span></label>
+            <select id="yaPg${i}" data-program="${escapeHtml(p.name)}" class="w-16 border border-gray-300 rounded-md p-1.5 text-base">${opts(p.maxYear)}</select></div>`).join('')}</div></div>`;
 };
 
 const showSummary = (r) => {
@@ -47,6 +71,7 @@ const showSummary = (r) => {
             <div class="rounded-md bg-gray-50 border border-gray-200 p-2"><div class="text-xl font-bold text-gray-700">${r.graduating}</div><div class="text-[10px] font-bold uppercase text-gray-600">Graduating (year ${r.maxYear})</div></div>
             <div class="rounded-md bg-amber-50 border border-amber-200 p-2"><div class="text-xl font-bold text-amber-700">${r.unrecognized}</div><div class="text-[10px] font-bold uppercase text-amber-700">No year set</div></div>
         </div>
+        ${programsHtml(r)}
         ${listHtml('Students who will advance', adv, r.advance)}${listHtml('Graduating students (unchanged)', grad, r.graduating)}${listHtml('Students with no year set (unchanged)', none, r.unrecognized)}
         ${r.graduating ? `<label class="mt-3 flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" id="yaGrad" class="mt-0.5"><span>Also mark the ${r.graduating} graduating student${r.graduating === 1 ? '' : 's'} as <b>Graduated</b>. They can no longer sign in. Undo restores their status.</span></label>` : ''}
         ${r.alreadyDone ? `<p class="mt-3 text-xs font-bold text-red-600">Year levels were already advanced for ${escapeHtml($('yaAY').value.trim())}.</p>` : ''}`;
@@ -135,6 +160,10 @@ document.addEventListener('click', (e) => {
     if (e.target.closest('#yaPreviewBtn')) { preview(); return; }
     if (e.target.closest('#yaApplyBtn')) { apply(); return; }
     if (e.target.closest('#yaUndoBtn')) undo();
+});
+document.addEventListener('change', (e) => {
+    // Any change to the limits needs a fresh Preview before applying.
+    if (e.target.id === 'yaMax' || e.target.closest('#yaPrograms') || e.target.id === 'yaAY') { const b = $('yaApplyBtn'); if (b) b.disabled = true; }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('yaModal')) close(); });
 

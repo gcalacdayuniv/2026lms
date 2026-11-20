@@ -368,13 +368,31 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: `Year levels were already advanced for ${ay}. Undo that run first if it was a mistake.` }), { status: 409, headers: corsHeaders });
         }
 
-        const students = (await env.DB.prepare("SELECT User_ID, Name, year, Program_Year, account_status FROM Users WHERE role COLLATE NOCASE = 'student'").all()).results;
+        // Programs can have their own highest year (for example a 5-year program). Remembered between runs.
+        await ensureAppSettings(env);
+        const savedRow = await env.DB.prepare("SELECT Value FROM App_Settings WHERE Key = 'program_max_year'").first();
+        let savedMax = {};
+        try { savedMax = savedRow && savedRow.Value ? JSON.parse(savedRow.Value) : {}; } catch (e) { savedMax = {}; }
+        const progKey = (v) => String(v || "").trim().toLowerCase();
+        const programMax = {};
+        const given = body.programMax && typeof body.programMax === "object" ? body.programMax : savedMax;
+        for (const [k, v] of Object.entries(given)) {
+            const n = parseInt(v, 10);
+            if (progKey(k) && n >= 1 && n <= 10 && n !== maxYear) programMax[progKey(k)] = n;
+        }
+
+        const students = (await env.DB.prepare("SELECT User_ID, Name, year, Program_Year, Program_Course, course, account_status FROM Users WHERE role COLLATE NOCASE = 'student'").all()).results;
         const plan = [], grad = [], noYear = [];
+        const programs = new Map();
         let graduating = 0, unrecognized = 0;
         for (const s of students) {
-            const ry = nextYearLevel(s.year, maxYear);
+            const pname = String(s.Program_Course || s.course || "").trim();
+            const pk = progKey(pname);
+            if (pk) { const e = programs.get(pk) || { name: pname, count: 0 }; e.count++; programs.set(pk, e); }
+            const myMax = programMax[pk] || maxYear;
+            const ry = nextYearLevel(s.year, myMax);
             if (ry.skip === "graduating") { graduating++; grad.push({ id: s.User_ID, name: s.Name, year: s.year, status: s.account_status }); continue; }
-            const rp = nextYearLevel(s.Program_Year, maxYear);
+            const rp = nextYearLevel(s.Program_Year, myMax);
             if (!ry.value && !rp.value) { unrecognized++; noYear.push(s.Name); continue; }
             plan.push({
                 id: s.User_ID, name: s.Name, oy: s.year, opy: s.Program_Year,
@@ -382,11 +400,12 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
                 deactivate: String(s.account_status || "").toLowerCase() === "active"
             });
         }
+        const programList = [...programs.entries()].map(([k, e]) => ({ name: e.name, count: e.count, maxYear: programMax[k] || maxYear })).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 200);
         const summary = { total: students.length, advance: plan.length, deactivate: plan.filter(p => p.deactivate).length, graduating, unrecognized, maxYear };
 
         if (mode === "preview") {
             return new Response(JSON.stringify({
-                success: true, ...summary, alreadyDone: !!dup,
+                success: true, ...summary, alreadyDone: !!dup, programs: programList,
                 sample: plan.slice(0, 5).map(p => ({ name: p.name, from: p.oy || p.opy, to: p.ny || p.npy })),
                 advanceList: plan.slice(0, 300).map(p => ({ name: p.name, from: p.oy || p.opy, to: p.ny || p.npy })),
                 graduatingList: grad.slice(0, 300).map(g => ({ name: g.name, year: g.year })),
@@ -396,6 +415,9 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         }
 
         // Optional: students at the highest level become "Graduated" (they can no longer sign in). Undo puts the status back.
+        if (body.programMax && typeof body.programMax === "object") {
+            await env.DB.prepare("INSERT INTO App_Settings (Key, Value, Updated_By, Updated_At) VALUES ('program_max_year', ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value, Updated_By = excluded.Updated_By, Updated_At = CURRENT_TIMESTAMP").bind(JSON.stringify(programMax), String(body.lecturerId || "")).run();
+        }
         const gradPlan = body.markGraduated ? grad.filter(g => String(g.status || "").toLowerCase() === "active") : [];
         const reactivationUntil = /^\d{4}-\d{2}-\d{2}$/.test(String(body.reactivationUntil || "")) ? body.reactivationUntil : null;
         const batchId = crypto.randomUUID();

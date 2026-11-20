@@ -242,6 +242,20 @@ ok('everyone sees the set term', t1.source === 'set' && t1.ay === '2026-2027' &&
 ok('another lecturer can change it', (await call('POST', '/api/current-term', { token: l2.j.token, body: { userId: 'L2', ay: '2026-2027', sem: 'Summer' } })).j.sem === 'Summer');
 ok('reset goes back to the calendar', (await call('POST', '/api/current-term', { token: l1.j.token, body: { userId: 'L1', reset: true } })).j.source === 'calendar');
 
+// ---- advance year level: highest year per program ----
+sql.exec("delete from Users where User_ID like 'Y%'");
+const addY = (id, prog, yr) => sql.prepare("insert into Users(User_ID, Username, Name, role, account_status, Program_Course, year, Program_Year) values(?,?,?,?,?,?,?,?)").run(id, id, id, 'student', 'Active', prog, yr, yr);
+addY('Y1', 'BSCS', '4'); addY('Y2', 'BSArch', '4'); addY('Y3', 'BSArch', '5'); addY('Y4', 'BSArch', '3');
+const adv = (mode, extra) => call('POST', '/api/advance-year-level', { token: l1.j.token, body: { mode, lecturerId: 'L1', academicYear: '2027-2028', maxYear: 4, ...extra } });
+const pv1 = (await adv('preview', { programMax: {} })).j;
+ok('default highest year 4: both 4th-years graduate', pv1.graduating >= 2 && pv1.programs.some(p => p.name === 'BSArch' && p.count === 3 && p.maxYear === 4), JSON.stringify(pv1.programs));
+const pv2 = (await adv('preview', { programMax: { bsarch: 5 } })).j;
+ok('program with highest year 5: its 4th-year advances, 5th graduates', pv2.graduating === pv1.graduating - 1 && pv2.programs.find(p => p.name === 'BSArch').maxYear === 5);
+const ap = await adv('apply', { programMax: { BSArch: 5 } });
+ok('apply uses the program limit', ap.s === 200 && sql.prepare("select year y from Users where User_ID='Y2'").get().y === '5' && sql.prepare("select year y from Users where User_ID='Y1'").get().y === '4' && sql.prepare("select year y from Users where User_ID='Y3'").get().y === '5');
+ok('program limit is remembered when none is sent', (await adv('preview', {})).j.programs.find(p => p.name === 'BSArch').maxYear === 5);
+ok('student cannot use it', (await call('POST', '/api/advance-year-level', { token: s2b.j.token, body: { mode: 'preview' } })).s === 403);
+
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----
 import { readFileSync, readdirSync } from 'node:fs';
 const workerDir = new URL('../../worker/', import.meta.url);
