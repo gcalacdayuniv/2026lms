@@ -187,7 +187,7 @@ export const ExamBuilder = {
             const st = document.createElement('style');
             st.id = 'ebPerfStyle';
             // Cards that are scrolled out of view are not laid out or painted (big saving on long exams, esp. phones).
-            st.textContent = `#${ROOT_ID} .eb-card{content-visibility:auto;contain-intrinsic-size:auto 300px}#${ROOT_ID} .eb-sum{contain-intrinsic-size:auto 64px}#${ROOT_ID} #ebBody{overscroll-behavior:contain}`;
+            st.textContent = `#${ROOT_ID} .eb-sum{content-visibility:auto;contain-intrinsic-size:auto 64px}#${ROOT_ID} #ebBody{overscroll-behavior:contain}`;
             document.head.appendChild(st);
         }
         root.addEventListener('click', ExamBuilder.onClick);
@@ -985,9 +985,7 @@ export const ExamBuilder = {
     },
 
     cellLabel: (cell) => {
-        const row = cell.closest('tr');
-        const n = row ? row.querySelector('.eb-rownum')?.textContent : '';
-        return `Q${n} \u00b7 ${cell.getAttribute('aria-label') || cell.dataset.col}`;
+        return cell.getAttribute('aria-label') || cell.dataset.col;
     },
 
     openCellEditor: (cell) => {
@@ -1002,11 +1000,13 @@ export const ExamBuilder = {
             ed.innerHTML = `
                 <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-200">
                     <button type="button" id="closeEbCellEditor" aria-label="Close" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+                    <select id="ebCellQ" aria-label="Go to question" class="shrink-0 h-10 px-2 rounded-md border border-gray-300 bg-gray-50 text-sm font-black text-indigo-700"></select>
                     <h3 id="ebCellTitle" class="flex-1 min-w-0 truncate text-sm font-bold text-gray-800"></h3>
                     <button type="button" id="ebCellPrev" aria-label="Previous field" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
                     <button type="button" id="ebCellNext" aria-label="Next field" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
                     <button type="button" id="ebCellDone" class="px-4 h-10 rounded-md bg-indigo-600 text-white text-sm font-bold">Done</button>
                 </div>
+                <div id="ebCellExtras" class="px-3 py-2 border-b border-gray-200 space-y-2 bg-gray-50"></div>
                 <textarea id="ebCellText" class="flex-1 w-full p-4 text-base outline-none resize-none" aria-labelledby="ebCellTitle"></textarea>`;
             root.appendChild(ed);
             ed.addEventListener('click', (ev) => {
@@ -1014,6 +1014,8 @@ export const ExamBuilder = {
                 else if (ev.target.closest('#ebCellPrev')) ExamBuilder.stepCell(-1);
                 else if (ev.target.closest('#ebCellNext')) ExamBuilder.stepCell(1);
             });
+            ed.addEventListener('click', (ev) => ExamBuilder.onEditorPick(ev));
+            ed.querySelector('#ebCellQ').addEventListener('change', (ev) => ExamBuilder.gotoQuestion(parseInt(ev.target.value, 10)));
             ed.querySelector('#ebCellText').addEventListener('input', (ev) => {
                 const c = ExamBuilder.cellTarget;
                 if (!c) return;
@@ -1025,11 +1027,77 @@ export const ExamBuilder = {
         cell.blur();
         ed.classList.remove('hidden');
         ed.querySelector('#ebCellTitle').textContent = ExamBuilder.cellLabel(cell);
+        const rows = [...root.querySelectorAll('#ebSheet tbody tr')];
+        const here = rows.indexOf(cell.closest('tr'));
+        ed.querySelector('#ebCellQ').innerHTML = rows.map((_, i) => `<option value="${i}" ${i === here ? 'selected' : ''}>Q${i + 1}</option>`).join('');
+        ExamBuilder.renderEditorExtras();
         const ta = ed.querySelector('#ebCellText');
         ta.value = cell.value;
         ta.placeholder = cell.placeholder || '';
         ta.focus();
         ta.setSelectionRange(ta.value.length, ta.value.length);
+    },
+
+    // Jump to another question (same field when it can be edited there, otherwise the Question text).
+    gotoQuestion: (idx) => {
+        const cur = ExamBuilder.cellTarget;
+        if (!cur) return;
+        const rows = [...ExamBuilder.root.querySelectorAll('#ebSheet tbody tr')];
+        const row = rows[idx];
+        if (!row) return;
+        ExamBuilder.onChange({ target: cur });
+        const col = cur.dataset.col;
+        const pick = row.querySelector(`input[type="text"][data-col="${col}"]:not([disabled]), textarea[data-col="${col}"]:not([disabled])`) || row.querySelector('textarea[data-col="text"]');
+        if (pick) ExamBuilder.openCellEditor(pick);
+    },
+
+    // Answer picker and Bonus Yes/No for the question being edited.
+    renderEditorExtras: () => {
+        const box = ExamBuilder.root.querySelector('#ebCellExtras');
+        const cell = ExamBuilder.cellTarget;
+        const q = cell && ExamBuilder.qOf(cell);
+        if (!box || !q) return;
+        const btn = (attrs, on, label) => `<button type="button" ${attrs} aria-pressed="${on}" class="min-h-[40px] px-3 rounded-md border text-sm font-bold ${on ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300 text-gray-700'}">${label}</button>`;
+        let answer = '';
+        if (q.type === 'mc' || q.type === 'multi') {
+            const chosen = q.type === 'mc' ? (q.correct >= 0 ? [q.correct] : []) : q.corrects;
+            const chips = q.options.map((o, k) => (o.trim() ? btn(`data-pick="${k}"`, chosen.includes(k), `${M.letter(k)}<span class="font-normal"> ${esc(o.trim().slice(0, 14))}</span>`) : '')).join('');
+            answer = `<div><p class="text-[11px] font-bold text-gray-500 uppercase">Correct answer${q.type === 'multi' ? ' (tick all)' : ''}</p><div class="flex flex-wrap gap-2 mt-1">${chips || '<span class="text-xs text-gray-500">Type the choices first.</span>'}</div></div>`;
+        } else if (q.type === 'tf') {
+            answer = `<div><p class="text-[11px] font-bold text-gray-500 uppercase">Correct answer</p><div class="flex gap-2 mt-1">${btn('data-tf="True"', q.tf === 'True', 'True')}${btn('data-tf="False"', q.tf === 'False', 'False')}</div></div>`;
+        }
+        const bonus = `<div class="flex items-center gap-2"><span class="text-[11px] font-bold text-gray-500 uppercase">Bonus</span>${btn('data-bonus="yes"', !!q.bonus, 'Yes')}${btn('data-bonus="no"', !q.bonus, 'No')}</div>`;
+        box.innerHTML = answer + bonus;
+    },
+
+    onEditorPick: (ev) => {
+        const cell = ExamBuilder.cellTarget;
+        const q = cell && ExamBuilder.qOf(cell);
+        const b = ev.target.closest && ev.target.closest('[data-pick], [data-tf], [data-bonus]');
+        if (!q || !b) return;
+        const row = cell.closest('tr');
+        if (b.dataset.bonus) {
+            q.bonus = b.dataset.bonus === 'yes';
+            const cb = row.querySelector('.eb-bonus');
+            if (cb) cb.checked = q.bonus;
+            ExamBuilder.updateCount();
+        } else if (b.dataset.tf) {
+            M.setCell(q, 'answer', b.dataset.tf);
+        } else {
+            const k = parseInt(b.dataset.pick, 10);
+            if (q.type === 'mc') q.correct = q.correct === k ? -1 : k;
+            else q.corrects = q.corrects.includes(k) ? q.corrects.filter(i => i !== k) : [...q.corrects, k];
+        }
+        ExamBuilder.touch();
+        // keep the sheet's own Answer cell in step
+        const ans = row.querySelector('[data-col="answer"]');
+        if (ans) {
+            if (ans.tagName === 'SELECT') {
+                if (q.type === 'mc') ans.innerHTML = '<option value="">- pick -</option>' + q.options.map((o, i) => (o.trim() ? `<option value="${M.letter(i)}" ${q.correct === i ? 'selected' : ''}>${M.letter(i)}: ${esc(o.trim().slice(0, 18))}</option>` : '')).join('');
+                else ans.value = q.tf;
+            } else ans.value = M.cellText(q, 'answer');
+        }
+        ExamBuilder.renderEditorExtras();
     },
 
     closeCellEditor: () => {
