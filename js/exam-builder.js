@@ -136,6 +136,8 @@ export const ExamBuilder = {
         if (!force && s && s.dirty && !(await UI.confirm({ title: 'Close without saving?', message: 'Your changes stay as a draft on this device.', confirmText: 'Close' }))) return;
         ExamBuilder.cancelChunks();
         ExamBuilder.flushDraft();
+        ExamBuilder.cellTarget = null;
+        ExamBuilder.root?.querySelector('#ebCellEditor')?.classList.add('hidden');
         if (ExamBuilder.root) ExamBuilder.root.classList.add('hidden');
         ExamBuilder.s = null;
     },
@@ -193,6 +195,7 @@ export const ExamBuilder = {
         root.addEventListener('change', ExamBuilder.onChange);
         root.addEventListener('paste', ExamBuilder.onPaste);
         root.addEventListener('keydown', ExamBuilder.onKeydown);
+        root.addEventListener('focusin', ExamBuilder.onCellFocus);
         ExamBuilder.root = root;
         return root;
     },
@@ -523,7 +526,7 @@ export const ExamBuilder = {
                     <label class="ml-auto text-[11px] font-bold ${q.bonus ? 'text-amber-800' : 'text-gray-500'} flex items-center gap-1 cursor-pointer">
                         <input type="checkbox" class="eb-bonus rounded text-amber-600 focus:ring-amber-500" ${q.bonus ? 'checked' : ''}> Bonus
                     </label>
-                    <button type="button" class="eb-fold w-8 h-8 rounded text-gray-500 hover:bg-gray-100" aria-label="Fold question ${i + 1}" title="Fold"><i class="fa-solid fa-chevron-up" aria-hidden="true"></i></button>
+                    <button type="button" class="eb-fold h-8 px-2 rounded text-[11px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 flex items-center gap-1" aria-label="Minimize question ${i + 1}" title="Minimize"><i class="fa-solid fa-chevron-up" aria-hidden="true"></i>Minimize</button>
                 </div>
                 <textarea rows="2" class="eb-field w-full border border-gray-200 focus:border-indigo-500 focus:ring-0 outline-none rounded-md px-2 py-2 text-sm bg-gray-50 focus:bg-white" data-col="text" placeholder="Question" aria-label="Question">${esc(q.text)}</textarea>
                 ${answerArea}
@@ -553,14 +556,14 @@ export const ExamBuilder = {
     sheetHtml: (limit = Infinity) => {
         const s = ExamBuilder.s;
         const head = ['#', 'Part', 'Type', 'Question', ...Array.from({ length: M.MAX_OPTIONS }, (_, k) => `Choice ${M.letter(k)}`), 'Answer', 'Explanation', 'Bonus', 'Points', ''];
-        const widths = ['w-10', 'w-16', 'min-w-[160px] sm:min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
+        const widths = ['w-10 min-w-[2.5rem]', 'w-16', 'min-w-[160px] sm:min-w-[230px]', 'min-w-[260px]', ...Array(M.MAX_OPTIONS).fill('min-w-[130px]'), 'min-w-[200px]', 'min-w-[180px]', 'w-14', 'w-16', 'w-20'];
         return `
             <div class="flex flex-col h-full">
             <p class="sm:hidden text-[11px] font-semibold text-gray-500 px-1 pb-1"><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i> Swipe sideways to see all columns</p>
             <div class="bg-white border border-gray-300 rounded-md overflow-auto flex-1 min-h-0">
                 <table class="border-collapse text-xs" id="ebSheet">
                     <thead class="sticky top-0 z-10">
-                        <tr>${head.map((h, k) => `<th class="${widths[k]} bg-gray-100 border border-gray-300 px-2 py-1.5 text-left font-bold text-gray-600 whitespace-nowrap">${h}</th>`).join('')}</tr>
+                        <tr>${head.map((h, k) => `<th class="${widths[k]} ${k === 0 ? 'sticky left-0 z-20 shadow-[1px_0_0_#d1d5db]' : ''} bg-gray-100 border border-gray-300 px-2 py-1.5 text-left font-bold text-gray-600 whitespace-nowrap">${h}</th>`).join('')}</tr>
                     </thead>
                     <tbody>${s.questions.slice(0, limit).map((q, i) => ExamBuilder.rowHtml(q, i)).join('')}</tbody>
                 </table>
@@ -591,7 +594,7 @@ export const ExamBuilder = {
         }
         return `
             <tr data-qid="${q.id}" class="eb-row">
-                <td class="border border-gray-200 bg-gray-50 text-center font-bold text-gray-500 px-1">${i + 1}</td>
+                <td class="eb-rownum sticky left-0 z-[5] shadow-[1px_0_0_#d1d5db] border border-gray-200 bg-gray-50 text-center font-bold text-gray-500 px-1">${i + 1}</td>
                 <td class="border border-gray-200 p-0"><input type="number" min="1" max="99" class="${CELL}" data-col="part" value="${q.part + 1}" aria-label="Part"></td>
                 <td class="border border-gray-200 p-0"><select class="${CELL} eb-type" data-col="type" aria-label="Type">${typeOptions}</select></td>
                 <td class="border border-gray-200 p-0"><textarea rows="1" class="${CELL} resize-none" data-col="text" aria-label="Question">${esc(q.text)}</textarea></td>
@@ -965,6 +968,92 @@ export const ExamBuilder = {
         const next = row && row.nextElementSibling;
         const cell = next && next.querySelector(`[data-col="${col}"]:not([disabled])`);
         if (cell) cell.focus();
+    },
+
+    // ---------- Full-screen cell editor (touch screens, spreadsheet view) ----------
+    // The cells are small, so on a phone the keyboard covers what you are typing. Tapping a text cell opens
+    // a full-screen box with the same text; every keystroke is copied back into the cell.
+
+    cellTarget: null,
+    editorSkip: 0,
+
+    onCellFocus: (e) => {
+        const s = ExamBuilder.s, t = e.target;
+        if (!s || s.view !== 'sheet' || !t.matches || !t.matches('#ebSheet input[type="text"][data-col], #ebSheet textarea[data-col]')) return;
+        if (t.disabled || Date.now() < ExamBuilder.editorSkip || !window.matchMedia('(pointer: coarse)').matches) return;
+        ExamBuilder.openCellEditor(t);
+    },
+
+    cellLabel: (cell) => {
+        const row = cell.closest('tr');
+        const n = row ? row.querySelector('.eb-rownum')?.textContent : '';
+        return `Q${n} \u00b7 ${cell.getAttribute('aria-label') || cell.dataset.col}`;
+    },
+
+    openCellEditor: (cell) => {
+        const root = ExamBuilder.root;
+        let ed = root.querySelector('#ebCellEditor');
+        if (!ed) {
+            ed = document.createElement('div');
+            ed.id = 'ebCellEditor';
+            ed.className = 'fixed inset-0 z-[90] bg-white flex flex-col';
+            ed.setAttribute('role', 'dialog');
+            ed.setAttribute('aria-modal', 'true');
+            ed.innerHTML = `
+                <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-200">
+                    <button type="button" id="closeEbCellEditor" aria-label="Close" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+                    <h3 id="ebCellTitle" class="flex-1 min-w-0 truncate text-sm font-bold text-gray-800"></h3>
+                    <button type="button" id="ebCellPrev" aria-label="Previous field" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button type="button" id="ebCellNext" aria-label="Next field" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                    <button type="button" id="ebCellDone" class="px-4 h-10 rounded-md bg-indigo-600 text-white text-sm font-bold">Done</button>
+                </div>
+                <textarea id="ebCellText" class="flex-1 w-full p-4 text-base outline-none resize-none" aria-labelledby="ebCellTitle"></textarea>`;
+            root.appendChild(ed);
+            ed.addEventListener('click', (ev) => {
+                if (ev.target.closest('#closeEbCellEditor') || ev.target.closest('#ebCellDone')) ExamBuilder.closeCellEditor();
+                else if (ev.target.closest('#ebCellPrev')) ExamBuilder.stepCell(-1);
+                else if (ev.target.closest('#ebCellNext')) ExamBuilder.stepCell(1);
+            });
+            ed.querySelector('#ebCellText').addEventListener('input', (ev) => {
+                const c = ExamBuilder.cellTarget;
+                if (!c) return;
+                c.value = ev.target.value;
+                c.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        }
+        ExamBuilder.cellTarget = cell;
+        cell.blur();
+        ed.classList.remove('hidden');
+        ed.querySelector('#ebCellTitle').textContent = ExamBuilder.cellLabel(cell);
+        const ta = ed.querySelector('#ebCellText');
+        ta.value = cell.value;
+        ta.placeholder = cell.placeholder || '';
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+    },
+
+    closeCellEditor: () => {
+        const ed = ExamBuilder.root && ExamBuilder.root.querySelector('#ebCellEditor');
+        const cell = ExamBuilder.cellTarget;
+        ExamBuilder.cellTarget = null;
+        if (ed) ed.classList.add('hidden');
+        if (cell && cell.isConnected) {
+            ExamBuilder.editorSkip = Date.now() + 400;      // focusing the cell again must not reopen the editor
+            ExamBuilder.onChange({ target: cell });
+            cell.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    },
+
+    // Previous / next text field in the same row (Question, Choice A, B, ... Explanation).
+    stepCell: (dir) => {
+        const cur = ExamBuilder.cellTarget;
+        if (!cur) return;
+        const row = cur.closest('tr');
+        const cells = [...row.querySelectorAll('input[type="text"][data-col]:not([disabled]), textarea[data-col]:not([disabled])')].filter(c => c.dataset.col !== 'points');
+        const next = cells[cells.indexOf(cur) + dir];
+        if (!next) return;
+        ExamBuilder.onChange({ target: cur });
+        ExamBuilder.openCellEditor(next);
     },
 
     // Pasting rows copied from a spreadsheet: fills cells to the right and rows downward.

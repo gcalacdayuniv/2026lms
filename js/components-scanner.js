@@ -95,7 +95,7 @@ export const ScannerUI = {
                         <div id="scnKeyGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 border border-gray-200 rounded-lg p-2 bg-gray-50 max-h-72 overflow-y-auto"></div>
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 [&>div]:min-w-0">
                         <div>
                             <label class="${LABEL}" for="scnTerm">Term</label>
                             <select id="scnTerm" class="${FIELD}">
@@ -116,7 +116,7 @@ export const ScannerUI = {
                         </div>
                         <div>
                             <label class="${LABEL}" for="scnDate">Date</label>
-                            <input type="date" id="scnDate" class="${FIELD}">
+                            <input type="date" id="scnDate" class="${FIELD} min-w-0 max-w-full appearance-none h-[42px] text-left">
                         </div>
                         <div>
                             <label class="${LABEL}" for="scnPaper">Paper</label>
