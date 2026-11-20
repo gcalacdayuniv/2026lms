@@ -994,17 +994,17 @@ export const ExamBuilder = {
         if (!ed) {
             ed = document.createElement('div');
             ed.id = 'ebCellEditor';
-            ed.className = 'fixed inset-0 z-[90] bg-white flex flex-col';
+            ed.className = 'fixed inset-0 z-[90] bg-white flex flex-col w-full max-w-full overflow-hidden';
             ed.setAttribute('role', 'dialog');
             ed.setAttribute('aria-modal', 'true');
             ed.innerHTML = `
-                <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-200">
-                    <button type="button" id="closeEbCellEditor" aria-label="Close" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
-                    <select id="ebCellQ" aria-label="Go to question" class="shrink-0 h-10 px-2 rounded-md border border-gray-300 bg-gray-50 text-sm font-black text-indigo-700"></select>
-                    <h3 id="ebCellTitle" class="flex-1 min-w-0 truncate text-sm font-bold text-gray-800"></h3>
-                    <button type="button" id="ebCellPrev" aria-label="Previous field" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
-                    <button type="button" id="ebCellNext" aria-label="Next field" class="w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
-                    <button type="button" id="ebCellDone" class="px-4 h-10 rounded-md bg-indigo-600 text-white text-sm font-bold">Done</button>
+                <div class="flex items-center gap-1 px-2 py-2 border-b border-gray-200 min-w-0">
+                    <button type="button" id="closeEbCellEditor" aria-label="Close" class="shrink-0 w-10 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+                    <select id="ebCellQ" aria-label="Go to question" class="shrink-0 h-10 w-[4.5rem] px-1 rounded-md border border-gray-300 bg-gray-50 text-sm font-black text-indigo-700"></select>
+                    <h3 id="ebCellTitle" class="flex-1 min-w-0 truncate text-sm font-bold text-gray-800 px-1"></h3>
+                    <button type="button" id="ebCellPrev" aria-label="Previous field" class="shrink-0 w-9 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    <button type="button" id="ebCellNext" aria-label="Next field" class="shrink-0 w-9 h-10 rounded text-gray-600 hover:bg-gray-100"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                    <button type="button" id="ebCellDone" aria-label="Done" class="shrink-0 w-11 h-10 rounded-md bg-indigo-600 text-white"><i class="fa-solid fa-check" aria-hidden="true"></i></button>
                 </div>
                 <div id="ebCellExtras" class="px-3 py-2 border-b border-gray-200 space-y-2 bg-gray-50"></div>
                 <textarea id="ebCellText" class="flex-1 w-full p-4 text-base outline-none resize-none" aria-labelledby="ebCellTitle"></textarea>`;
@@ -1034,8 +1034,9 @@ export const ExamBuilder = {
         const ta = ed.querySelector('#ebCellText');
         ta.value = cell.value;
         ta.placeholder = cell.placeholder || '';
-        ta.focus();
+        ta.focus({ preventScroll: true });
         ta.setSelectionRange(ta.value.length, ta.value.length);
+        window.scrollTo(0, 0);
     },
 
     // Jump to another question (same field when it can be edited there, otherwise the Question text).
