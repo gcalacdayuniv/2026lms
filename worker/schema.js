@@ -92,6 +92,11 @@ export async function ensureLoginTable(env) {
     loginTableReady = true;
 }
 
+// Per-user settings that follow the person to any device (for now: the preferred paper size).
+export async function ensureUserPrefs(env) {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS User_Prefs (User_ID TEXT PRIMARY KEY, Paper TEXT, Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP)").run();
+}
+
 // An exam its owner shares with other lecturers (they can see, print, copy and assign it, but not change it).
 export async function ensureExamShares(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Exam_Shares (Exam_ID TEXT NOT NULL, Lecturer_ID TEXT NOT NULL, Shared_At DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (Exam_ID, Lecturer_ID))").run();

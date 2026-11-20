@@ -239,8 +239,8 @@ const noteOf = (multi, cells) => {
     return t;
 };
 
-export const buildSheetHtml = ({ title = '', course = '', copies = 1, n, c, paper = 'letter', parts: qParts = null, sets = 0, multi = false, cells: given = null, written = null }) => {
-    const p = PAPERS[paper] || PAPERS.letter;
+export const buildSheetHtml = ({ title = '', course = '', copies = 1, n, c, paper = 'a4', parts: qParts = null, sets = 0, multi = false, cells: given = null, written = null }) => {
+    const p = PAPERS[paper] || PAPERS.a4;
     const g = { sets, band: given ? bandFor(written) : 0, written: given ? shortWritten(written) : [] };
     const geo = geoOf(g, Boolean(given));
     const compact = geo.compact;

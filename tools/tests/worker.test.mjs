@@ -216,6 +216,16 @@ ok('blank time means no limit', scheduleMs('', false) === null && scheduleMs(nul
 ok('closing before opening is rejected', (await call('POST', '/api/class-exams', { token: l1.j.token, body: { courseId: 'C1', examId: exId, fromDate: '2026-11-20T18:00', toDate: '2026-11-20T09:00', assignments: [] } })).s === 400);
 ok('garbage time is rejected', (await call('POST', '/api/class-exams', { token: l1.j.token, body: { courseId: 'C1', examId: exId, fromDate: 'tomorrow', assignments: [] } })).s === 400);
 
+// ---- preferred paper size follows the lecturer ----
+ok('no paper saved yet', (await call('GET', '/api/my-prefs?userId=L1', { token: l1.j.token })).j.paper === null);
+ok('save paper size', (await call('POST', '/api/my-prefs', { token: l1.j.token, body: { userId: 'L1', paper: 'letter' } })).s === 200);
+ok('paper size comes back (another device)', (await call('GET', '/api/my-prefs?userId=L1', { token: l1.j.token })).j.paper === 'letter');
+(await call('POST', '/api/my-prefs', { token: l1.j.token, body: { userId: 'L1', paper: 'legal' } }));
+ok('paper size can be changed', (await call('GET', '/api/my-prefs?userId=L1', { token: l1.j.token })).j.paper === 'legal');
+ok('unknown paper size rejected', (await call('POST', '/api/my-prefs', { token: l1.j.token, body: { userId: 'L1', paper: 'tabloid' } })).s === 400);
+ok('cannot change another lecturer\'s paper size', (await call('POST', '/api/my-prefs', { token: l2.j.token, body: { userId: 'L1', paper: 'a4' } })).s === 403);
+ok('each lecturer has their own', (await call('GET', '/api/my-prefs?userId=L2', { token: l2.j.token })).j.paper === null);
+
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----
 import { readFileSync, readdirSync } from 'node:fs';
 const workerDir = new URL('../../worker/', import.meta.url);

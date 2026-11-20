@@ -94,6 +94,8 @@ export const RULES = {
 
     'POST /api/change-password': { who: 'any', mine: ['userId'] },
     'POST /api/update-details': { who: 'any', mine: ['userId'] },
+    'GET /api/my-prefs': { who: 'any', mine: ['userId'] },
+    'POST /api/my-prefs': { who: 'any', mine: ['userId'] },
     'GET /api/courses': { who: 'any', self: ['studentId'] },
     'GET /api/my-courses': { who: 'any', mine: ['userId'], roleParam: 'role' },
     'POST /api/enroll': { who: 'any', self: ['studentId'] },

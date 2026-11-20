@@ -5,6 +5,7 @@ import { UI } from './ui-feedback.js';
 import { ExamBuilder } from './exam-builder.js';
 import { ExamShare } from './exam-share.js';
 import { toInputValue, formatSchedule } from './schedule-time.js';
+import { bindPaperSelect, savePaper } from './print-prefs.js';
 import { fromExamData, toCsv, typeKey, pointsOf } from './exam-builder-model.js';
 import { buildExamPrintHtml } from './exam-print.js';
 import { ExamReview } from './exam-review.js';
@@ -1455,7 +1456,7 @@ export const CourseExam = {
                     <div class="flex items-center justify-between mb-3"><h4 class="font-bold text-gray-800">Print exam</h4>
                         <button type="button" id="closePrintExamBtn" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button></div>
                     <label for="printExamPaper" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Paper size (questions, keys, answer sheet)</label>
-                    <select id="printExamPaper" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3"><option value="letter">Letter</option><option value="a4">A4</option><option value="legal">Legal</option></select>
+                    <select id="printExamPaper" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3"><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select>
                     <label for="printExamSets" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sets</label>
                     <select id="printExamSets" class="w-full px-2 py-2 border border-gray-300 rounded-md text-sm bg-white mb-3">
                         <option value="1">1 set</option><option value="2">2 sets (A-B)</option><option value="3">3 sets (A-C)</option>
@@ -1486,7 +1487,7 @@ export const CourseExam = {
         CourseExam.printScannable = items.length > 0;
         document.getElementById('printExamSets').value = String(getSetCount(examId, 4));
         document.getElementById('printExamSheetWrap').classList.toggle('hidden', !items.length);
-        try { document.getElementById('printExamPaper').value = localStorage.getItem('lms_print_paper') || 'letter'; } catch (err) { /* storage unavailable */ }
+        bindPaperSelect(document.getElementById('printExamPaper'));
         CourseExam.fillPrintSets();
         m.classList.remove('hidden');
     },
@@ -1505,8 +1506,8 @@ export const CourseExam = {
         if (!questions.length) { UI.warning('This exam has no questions to print.'); return; }
         const count = Number((document.getElementById('printExamSets') || {}).value) || 1;
         saveSetCount(examId, count);
-        const paperSize = (document.getElementById('printExamPaper') || {}).value || 'letter';
-        try { localStorage.setItem('lms_print_paper', paperSize); } catch (err) { /* storage unavailable */ }
+        const paperSize = (document.getElementById('printExamPaper') || {}).value || 'a4';
+        savePaper(paperSize);
         const set = Math.min(count - 1, Math.max(0, Number((document.getElementById('printExamSet') || {}).value) || 0));
         const title = String(ex.Title || '');
         CourseExam.closePrintDialog();
@@ -1553,7 +1554,7 @@ export const CourseExam = {
         if (!ex) return;
         const count = Number((document.getElementById('printExamSets') || {}).value) || 1;
         saveSetCount(examId, count);
-        const paper = (document.getElementById('printExamPaper') || {}).value || 'letter';
+        const paper = (document.getElementById('printExamPaper') || {}).value || 'a4';
         CourseExam.closePrintDialog();
         const copies = Number((document.getElementById('printExamCopies') || {}).value) === 2 ? 2 : 1;
         const err = await printExamAnswerSheet(ex, { sets: count, paper, copies, course: String(ex.Course || '').trim() || await CourseExam.classCourseTitle() });

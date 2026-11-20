@@ -11,6 +11,7 @@ import { CourseScanRecords } from './course-scan-records.js';
 import { ScanQueue } from './course-scan-queue.js';
 import { ScanPhotos } from './course-scan-photos.js';
 import { buildSheetHtml, MAX_QUESTIONS, MAX_CHOICES } from './omr-sheet.js';
+import { bindPaperSelect } from './print-prefs.js';
 import { scannableItems, buildSets } from './exam-sets.js';
 import { buildScanSets, gradingSets, itemLabel, geoFor, writtenItems } from './scan-items.js';
 import { gradeScanSet, setMaxPoints } from './scan-grade.js';
@@ -179,6 +180,7 @@ export const CourseScanner = {
 
         CourseScanner.setAlert('');
         if (!val('scnDate')) $('scnDate').value = getLocalDateString();
+        bindPaperSelect($('scnPaper'));
         CourseScanner.showView('setup');
         CourseScanner.flush();
         await CourseScanner.load();
@@ -434,14 +436,14 @@ export const CourseScanner = {
         const header = String(cfg.title || '').trim();   // the exam title is the header
 
         const html = buildSheetHtml(cfg.mixed
-            ? { title: header, course: cfg.course || (CourseScanner.course && CourseScanner.course.CourseTitle) || '', copies: Number(val('scnCopies')) === 2 ? 2 : 1, cells: cfg.cells, paper: val('scnPaper') || 'letter', sets: cfg.sets && cfg.sets.length > 1 ? cfg.sets.length : 0, written: cfg.written || [] }
+            ? { title: header, course: cfg.course || (CourseScanner.course && CourseScanner.course.CourseTitle) || '', copies: Number(val('scnCopies')) === 2 ? 2 : 1, cells: cfg.cells, paper: val('scnPaper') || 'a4', sets: cfg.sets && cfg.sets.length > 1 ? cfg.sets.length : 0, written: cfg.written || [] }
             : {
                 title: header,
                 course: cfg.course || (CourseScanner.course && CourseScanner.course.CourseTitle) || '',
                 copies: Number(val('scnCopies')) === 2 ? 2 : 1,
                 n: cfg.n,
                 c: cfg.c,
-                paper: val('scnPaper') || 'letter',
+                paper: val('scnPaper') || 'a4',
                 parts: cfg.parts || null,
                 sets: cfg.sets ? cfg.sets.length : 0
             });

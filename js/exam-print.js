@@ -103,7 +103,7 @@ const keyOf = (q) => {
 
 // set = which set to print (0 = A, 1 = B ...; makeSet makes it from the exam, the same every time).
 // sets = how many sets the exam has (only decides whether the SET letter is shown). course = optional first title line.
-export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey = false, set = 0, sets = 1, seed = 'exam', paperSize = 'letter' }) => {
+export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey = false, set = 0, sets = 1, seed = 'exam', paperSize = 'a4' }) => {
     const qs = makeSet(questions, Math.min(PRINT_MAX_SETS - 1, Math.max(0, set)), seed);
     const subtitle = esc(title) + (sets > 1 ? ` - SET ${SET_LETTERS[set]}` : '');
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle.toUpperCase()}${withKey ? ' - ANSWER KEY' : ''}</div></div>`;
@@ -131,4 +131,4 @@ export const buildExamPrintHtml = ({ title = '', course = '', questions, withKey
     return doc(title, `<div id="src">${head}${paper}</div>`, true, paperSize);
 };
 
-const doc = (title, inner, paginate = false, paper = 'letter') => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${printCss(paper)}</style></head><body>${inner}${paginate ? PAGINATE_SCRIPT : ''}</body></html>`;
+const doc = (title, inner, paginate = false, paper = 'a4') => `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${printCss(paper)}</style></head><body>${inner}${paginate ? PAGINATE_SCRIPT : ''}</body></html>`;

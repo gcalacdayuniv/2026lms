@@ -48,7 +48,7 @@ const keyOf = (it) => {
 };
 
 // built = buildScanSets(...); set = 0-based set to print; mode = 'papers' | 'keys'
-export const buildScanPaperHtml = ({ title = '', course = '', built, set = 0, mode = 'papers', paperSize = 'letter' }) => {
+export const buildScanPaperHtml = ({ title = '', course = '', built, set = 0, mode = 'papers', paperSize = 'a4' }) => {
     const sel = built.sets[Math.min(built.sets.length - 1, Math.max(0, set))];
     const subtitle = esc(title) + (built.sets.length > 1 ? ` - SET ${SET_LETTERS[sel ? built.sets.indexOf(sel) : 0]}` : '');
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle.toUpperCase()}${mode === 'keys' ? ' - ANSWER KEY' : ''}</div></div>`;

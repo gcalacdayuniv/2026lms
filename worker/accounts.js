@@ -4,7 +4,7 @@
 import { signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL } from './shared.js';
-import { ensureYearAdvanceTables, ensureReactivationColumns } from './schema.js';
+import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs } from './schema.js';
 import { gasUrl } from './gas.js';
 
 const MAX_AVATAR_B64 = 8000000;   // about 6 MB of photo; the app shrinks pictures to about 150 KB before sending
@@ -220,6 +220,24 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         }
 
         return new Response(JSON.stringify({ success: true, message: "Password updated successfully", token }), { status: 200, headers: corsHeaders });
+    }
+
+    // Preferred paper size, kept on the server so it follows the lecturer to every device.
+    if (path === "/api/my-prefs" && request.method === "GET") {
+        await ensureUserPrefs(env);
+        const row = await env.DB.prepare("SELECT Paper FROM User_Prefs WHERE User_ID = ?").bind(url.searchParams.get("userId") || "").first();
+        return new Response(JSON.stringify({ success: true, paper: row && row.Paper ? row.Paper : null }), { status: 200, headers: corsHeaders });
+    }
+
+    if (path === "/api/my-prefs" && request.method === "POST") {
+        const body = await request.json();
+        const paper = String(body.paper || "").toLowerCase();
+        if (!body.userId || !["a4", "letter", "legal"].includes(paper)) {
+            return new Response(JSON.stringify({ error: "Choose A4, Letter or Legal." }), { status: 400, headers: corsHeaders });
+        }
+        await ensureUserPrefs(env);
+        await env.DB.prepare("INSERT INTO User_Prefs (User_ID, Paper, Updated_At) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(User_ID) DO UPDATE SET Paper = excluded.Paper, Updated_At = CURRENT_TIMESTAMP").bind(body.userId, paper).run();
+        return new Response(JSON.stringify({ success: true, paper }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/update-details") {

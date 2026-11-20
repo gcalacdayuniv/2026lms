@@ -92,7 +92,7 @@ export const buildSets = (items, { seed = 'exam', count = 4 } = {}) => {
 
 // mode: 'papers' = question paper of ONE set; 'keys' = its answer key (teacher copy).
 // set = index of the set to print (0 = A). Two columns, like a normal paper test.
-export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = 'papers', paperSize = 'letter' }) => {
+export const buildSetsHtml = ({ title = '', course = '', sets, set = 0, mode = 'papers', paperSize = 'a4' }) => {
     const sel = sets[Math.min(sets.length - 1, Math.max(0, set))];
     const subtitle = esc(title).toUpperCase() + (sets.length > 1 ? ` - SET ${sel.letter}` : '') + (mode === 'keys' ? ' - ANSWER KEY' : '');
     const head = `<div class="hd">${course ? `<div>${esc(course).toUpperCase()}</div>` : ''}<div>${subtitle}</div></div>`;

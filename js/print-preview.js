@@ -16,8 +16,8 @@ export const partTitle = (part, types) => {
 
 const PAGES = { letter: [215.9, 279.4], a4: [210, 297], legal: [215.9, 355.6] };
 // Print style for a paper size (letter, a4 or legal): 12 mm margins, the pages are laid out by PAGINATE_SCRIPT.
-export const printCss = (paper = 'letter') => {
-    const [w, h] = PAGES[paper] || PAGES.letter;
+export const printCss = (paper = 'a4') => {
+    const [w, h] = PAGES[paper] || PAGES.a4;
     return `@page{size:${w}mm ${h}mm;margin:12mm}
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.18;color:#000;margin:0}
@@ -40,7 +40,7 @@ body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.18;colo
 .pcol{flex:1 1 0;min-width:0;height:100%;overflow:hidden}
 @media screen{.page{border-bottom:1px dashed #aaa;margin-bottom:8mm}}`;
 };
-export const PRINT_CSS = printCss('letter');
+export const PRINT_CSS = printCss('a4');
 
 // Lays the questions out in two columns on fixed-size pages. Done with script instead of CSS columns because
 // iPhone printing ignores CSS columns. Items inside #src: .hd (title), then .part and .q in order.

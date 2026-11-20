@@ -68,7 +68,7 @@ export const askSheetHeader = () => new Promise((resolve) => {
 
 // Prints the bubble answer sheet that matches an exam saved in Manage Exams (its multiple-choice questions only).
 // Returns an error text, or '' when the preview opened.
-export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'letter', copies = 1, course = '' } = {}) => {
+export const printExamAnswerSheet = async (exam, { sets = 1, paper = 'a4', copies = 1, course = '' } = {}) => {
     const built = buildScanSets(exam.ExamData, { seed: exam.Exam_ID, count: sets });
     const mixed = built.sets[0] && built.sets[0].items.some(i => i.t !== 'mc');
     const items = scannableItems(exam.ExamData, MAX_CHOICES);
