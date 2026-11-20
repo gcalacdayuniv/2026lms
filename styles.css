@@ -184,6 +184,9 @@ body { overscroll-behavior-y: contain; }
 
 
 /* ---------- No auto-zoom on iPhone ---------- */
+/* Double-tapping a button (the + / - points, status buttons) zoomed the page on iPhone. This turns off only
+   double-tap zoom; pinch zoom still works, which low-vision users need. */
+html, body { touch-action: manipulation; }
 /* iOS Safari zooms the page into any text field below 16px. Every text field on a touch device is 16px
    (phones and landscape). Page zoom by the user stays allowed; the viewport is not locked. */
 @media (hover: none) and (pointer: coarse) {
