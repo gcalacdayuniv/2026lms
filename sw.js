@@ -2,7 +2,7 @@
 // Pages, scripts and styles: network first (so a new deploy shows at once), the last copy when offline or slow.
 // API calls and anything else are never touched.
 const CACHE = 'portal-shell-v8';
-const SHELL = ['./', 'index.html', 'styles.css', 'dark.css', 'tailwind.css', 'js/theme-boot.js', 'vendor/fontawesome/css/all.min.css', 'vendor/fontawesome/webfonts/fa-solid-900.woff2', 'vendor/fontawesome/webfonts/fa-regular-400.woff2'];
+const SHELL = ['./', 'index.html', 'styles.css', 'dark.css', 'tailwind.css', 'js/theme-boot.js', 'vendor/fontawesome/fontawesome.css'];
 const CDN_HOSTS = ['cdnjs.cloudflare.com'];
 const NETWORK_WAIT_MS = 4000;
 
