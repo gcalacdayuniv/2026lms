@@ -82,6 +82,9 @@ html.dialog-open body {
 
 /* ---------- Student rows on phones: bigger targets and swipe hint ---------- */
 .student-row { position: relative; }
+/* Roster: tint the whole card so Absent and Late students stand out in a long list. */
+.student-row:has(.attendance-btn[data-selected="true"][data-status="Absent"]) { background-color: #fee2e2; box-shadow: inset 4px 0 0 #ef4444; }
+.student-row:has(.attendance-btn[data-selected="true"][data-status="Late"]) { background-color: #ffedd5; box-shadow: inset 4px 0 0 #f97316; }
 .student-row[data-swipe]::after {
     position: absolute; top: 50%; transform: translateY(-50%); font-size: .8rem; font-weight: 800;
     letter-spacing: .04em; text-transform: uppercase; pointer-events: none; opacity: .75;

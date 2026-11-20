@@ -160,3 +160,7 @@ html[data-theme="dark"] .bg-indigo-50\/60 { background-color: rgba(99, 102, 241,
 html[data-theme="dark"] .bg-blue-50\/95 { background-color: rgba(30, 41, 66, .96); }
 html[data-theme="dark"] .bg-amber-50\/40, html[data-theme="dark"] .bg-amber-50\/30 { background-color: rgba(245, 158, 11, .08); }
 html[data-theme="dark"] #attendanceBar { border-color: #2b3649; }
+
+/* Roster cards for Absent / Late students */
+html[data-theme="dark"] .student-row:has(.attendance-btn[data-selected="true"][data-status="Absent"]) { background-color: #3f1d1d; box-shadow: inset 4px 0 0 #ef4444; }
+html[data-theme="dark"] .student-row:has(.attendance-btn[data-selected="true"][data-status="Late"]) { background-color: #3f2a14; box-shadow: inset 4px 0 0 #f97316; }
