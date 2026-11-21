@@ -37,8 +37,6 @@ const open = (userId) => {
                     ${input('esContact', 'Contact number', u.Contact_Number, 'inputmode="tel"')}
                 </div>
                 ${input('esEmail', 'Email', u.Email, 'inputmode="email"')}
-                <p class="text-xs font-bold text-gray-700 pt-1">Class</p>
-                <div class="grid grid-cols-3 gap-3">${input('esCourse', 'Course', u.course)}${input('esYear', 'Year', u.year)}${input('esSection', 'Section', u.section)}</div>
                 <p class="text-xs font-bold text-gray-700 pt-1">Program</p>
                 <div class="grid grid-cols-3 gap-3">${input('esPCourse', 'Course', u.Program_Course)}${input('esPYear', 'Year', u.Program_Year)}${input('esPSection', 'Section', u.Program_Section)}</div>
                 <div><label for="esEye" class="${LABEL}">Eye condition / disability tag</label>
@@ -64,7 +62,7 @@ const save = async () => {
             method: 'POST',
             body: JSON.stringify({
                 studentId: m.dataset.userId, name: $('esName').value, studentNumber: $('esNo').value, contact: $('esContact').value, email: $('esEmail').value,
-                course: $('esCourse').value, year: $('esYear').value, section: $('esSection').value,
+                
                 programCourse: $('esPCourse').value, programYear: $('esPYear').value, programSection: $('esPSection').value, eyeCondition: $('esEye').value
             })
         });

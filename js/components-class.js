@@ -431,21 +431,6 @@ const ClassUI = {
                             <input type="text" id="manageContactInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
                         </div>
 
-                            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Class Course / Year / Section</div>
-                            <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Course</label>
-                            <input type="text" id="manageClassCourseInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Year</label>
-                            <input type="text" id="manageClassYearInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Section</label>
-                            <input type="text" id="manageClassSectionInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition text-center" placeholder="">
-                        </div>
-                            </div>
                             <button type="button" id="manageSaveDetailsBtn" class="w-full py-2 bg-blue-600 text-white hover:bg-blue-700 rounded text-sm font-bold transition focus:outline-none">
                                 <i class="fa-solid fa-floppy-disk mr-2"></i> Save Details
                             </button>
@@ -808,7 +793,6 @@ export const ClassComponents = {
 
         const studentList = students.map((s, index) => {
             const avatarSrc = getLoadableAvatarSrc(s.Avatar);
-            const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
             const displayProgram = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
 
             const avatarImg = avatarSrc
@@ -839,7 +823,7 @@ export const ClassComponents = {
                             <div>
                                 <div class="font-bold text-blue-600 text-sm sm:text-base cursor-pointer view-summary-trigger hover:underline hover:text-blue-800 transition inline-block" data-name="${escapeHtml(s.Name)}" title="View Performance Summary">${escapeHtml(s.Name)}</div>
                                 <div class="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
-                                    <span class="font-medium text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayCourse || 'N/A')} ${eyeConditionBadge}
+                                    <span class="font-medium text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayProgram || 'N/A')} ${eyeConditionBadge}
                                 </div>
                                 ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${escapeHtml(displayProgram)}</div>` : ''}
                                 <div class="text-[10px] font-bold text-gray-500 mt-1 uppercase">

@@ -637,8 +637,6 @@ export const AuthModule = {
                             <span class="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">${escapeHtml(u.Student_Number || 'N/A')}</span>
                             <a href="mailto:${escapeHtml(u.Email || '')}" class="text-blue-600 hover:underline truncate bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 transition inline-flex items-center" title="Send Email"><i class="fa-regular fa-envelope mr-1.5"></i>${escapeHtml(u.Email || 'No Email Provided')}</a>
                         </div>
-                        
-                        <div class="text-[10px] sm:text-[11px] text-gray-500 mt-1.5 truncate"><i class="fa-solid fa-graduation-cap mr-1.5 text-gray-400"></i>${escapeHtml(u.course || 'N/A')} ${escapeHtml(u.year || '')} ${escapeHtml(u.section || '')}</div>
                         ${(u.Program_Course || u.Program_Year || u.Program_Section) ? `<div class="text-[10px] sm:text-[11px] text-blue-700 mt-1 truncate"><i class="fa-solid fa-book-open mr-1.5"></i>Program: ${escapeHtml(u.Program_Course || '')} ${escapeHtml(u.Program_Year || '')} ${escapeHtml(u.Program_Section || '')}</div>` : ''}
                         <div class="text-[9px] sm:text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-wider"><i class="fa-regular fa-clock mr-1"></i>Reg: ${regDate}</div>
                     </div>

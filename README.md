@@ -439,7 +439,7 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 
 ## Registration: program vs class fields
 - Sign-up requires the student's **program** (Program course, year, section: `Users.Program_Course/Program_Year/Program_Section`). The server rejects a registration without them (400).
-- The sign-up form asks for the program only. The old "Class course/year/section" fields are gone; the server copies the program values into `Users.course/year/section` so older screens keep working. Students join classes with an invite code.
+- The sign-up form asks for the program only. Students no longer have a separate class course/year/section: it is gone from registration, Edit details, rosters, the profile and the grade export. The class carries it (Create Course / Edit Class). `Users.course/year/section` stay as unused columns; the first login after deploy copies them into any blank Program value and then clears them once (`clearStudentClassFields`, flag `class_fields_cleared` in `App_Settings`). Students join classes with an invite code.
 - After Create Account (error or success) the page scrolls back to the top so the message is visible.
 - Both groups are editable by a lecturer in Manage Users > Edit details. Advance Year Level groups students by Program course (falls back to the class course for older accounts with no program).
 
@@ -451,7 +451,8 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - **Archived classes are hidden from their students**: they disappear from the student's class list, their exams are not listed, opened, started, submitted or reviewed, class pages for that student are refused, and the invite code stops working. Nothing is deleted; un-archiving brings it all back. The lecturer still sees the class in the archive.
 - **Every class has a code** (7-day expiry, see below), existing ones included: the worker fills in a code for any class without one (`ensureInviteCode`), and new or copied classes get one when created.
 - **Target audience is gone** from Create Course and Edit Class, and the student dashboard no longer lists "Available Courses": students join with the code only. `POST /api/enroll` is now lecturer-only. Old `Target_*` values stay in the database untouched (Edit Class keeps them if the field is not sent); the class course/year/section on a student still exists but no longer controls what they see.
-- **Class identification:** Create Course and Edit Class have optional **Class course, year and section** (stored in `Target_Course/Year/Section`). They only label the class (for example `BSIT 3-A` on the class card and class header); they do not limit who can join.
+- **Class identification:** Create Course and Edit Class have optional **Class course, year and section** (stored in `Target_Course/Year/Section`). They only label the class (for example `BSIT 3-A` on the class card and class header); they do not limit who can join. The form shows no explanatory text.
+- **Compact lecturer class card:** code with the identification badge, title, one line for day, time and room, one row of chips (term, students, attendance, exam), and one row of five buttons: Attendance, Scan, Scores, Copy (to another term), Archive/Restore.
 - **Admin tab badge:** the lecturer's bottom-bar Admin tab shows a red count of pending password reset requests, the same number as the Manage Users tile.
 - The temporary Fill Program Details tool has been removed.
 

@@ -274,6 +274,8 @@ const chip = (icon, text, tone = 'gray') =>
 const courseChipsHtml = (c) => {
     const today = getLocalDateString();
     const chips = [];
+    const term = [c.AcademicYear, c.Semester && String(c.Semester).replace(' Semester', ' Sem')].filter(Boolean).join(' ');
+    if (term) chips.push(chip('fa-graduation-cap', term));
     const count = Number(c.StudentCount);
     if (c.StudentCount !== undefined && c.StudentCount !== null && !Number.isNaN(count)) {
         chips.push(chip('fa-users', `${count} student${count === 1 ? '' : 's'}`));
@@ -286,37 +288,32 @@ const courseChipsHtml = (c) => {
     }
     const exam = examBadge(c, today);
     if (exam) chips.push(chip('fa-file-pen', exam.text, exam.tone));
-    return chips.length ? `<div class="flex flex-wrap gap-1.5 mt-3">${chips.join('')}</div>` : '';
+    return chips.length ? `<div class="flex flex-wrap gap-1.5 mt-2">${chips.join('')}</div>` : '';
 };
 
 // Card = link to the class plus a row of shortcuts. A shortcut opens the class and then that page (data-intent).
 const lecturerCourseCardHtml = (c) => `
                 <div data-course-card data-day="${escapeHtml(c.ScheduleDay)}" data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.ScheduleDay, c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ').toLowerCase())}" class="border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300 overflow-hidden">
-                    <a href="#class-${c.Course_ID}" class="block p-5 pb-3">
-                        <div class="flex justify-between items-start mb-1">
-                            <div class="font-bold text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
+                    <a href="#class-${c.Course_ID}" class="block px-4 pt-3 pb-2">
+                        <div class="flex justify-between items-center gap-2">
+                            <div class="font-bold text-lg text-blue-700 truncate">${escapeHtml(c.CourseCode)}</div>
                             ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
-                                `<span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded border uppercase">
-                                    ${escapeHtml([c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' '))}
-                                </span>` : ''
-
-                            }
+                                `<span class="shrink-0 bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded border uppercase">${escapeHtml([c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' '))}</span>` : ''}
                         </div>
-                        <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
-                        <div class="text-sm text-gray-500 bg-gray-50 inline-block px-3 py-1 rounded-md border">
-                            <i class="fa-regular fa-calendar mr-1"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock mr-1"></i> ${escapeHtml(c.TimePeriod)}${c.Room ? ` &nbsp;|&nbsp; <i class="fa-solid fa-door-open mr-1"></i> ${escapeHtml(c.Room)}` : ''}
+                        <div class="text-gray-800 font-semibold text-sm leading-snug truncate">${escapeHtml(c.CourseTitle)}</div>
+                        <div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                            <span><i class="fa-regular fa-calendar mr-1" aria-hidden="true"></i>${escapeHtml(String(c.ScheduleDay || '').slice(0, 3))}</span>
+                            <span><i class="fa-regular fa-clock mr-1" aria-hidden="true"></i>${escapeHtml(c.TimePeriod)}</span>
+                            ${c.Room ? `<span><i class="fa-solid fa-door-open mr-1" aria-hidden="true"></i>${escapeHtml(c.Room)}</span>` : ''}
                         </div>
-                        ${(c.AcademicYear || c.Semester) ? `<div class="mt-2 text-[11px] font-bold text-gray-500"><i class="fa-solid fa-graduation-cap mr-1" aria-hidden="true"></i>${escapeHtml([c.AcademicYear && 'AY ' + c.AcademicYear, c.Semester].filter(Boolean).join(' · '))}</div>` : ''}
                         ${courseChipsHtml(c)}
                     </a>
-                    <div class="grid grid-cols-3 border-t border-gray-100 text-xs font-bold text-gray-600">
-                        <a href="#class-${c.Course_ID}" class="card-action" data-intent="top"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i>Attendance</a>
-                        <a href="#class-${c.Course_ID}" class="card-action border-x border-gray-100" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
-                        <a href="#class-${c.Course_ID}" class="card-action" data-intent="openScoresModalBtn"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Scores</a>
-                    </div>
-                    <div class="border-t border-gray-100 px-3 py-1.5 flex items-center justify-between gap-3">
-                        <button type="button" class="duplicate-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" aria-label="Copy to another term: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Copy to another term</button>
-                        <button type="button" class="archive-course-btn text-[11px] font-bold text-gray-500 hover:text-indigo-700" data-course-id="${c.Course_ID}" data-archive="${Number(c.Archived) === 1 ? '0' : '1'}" aria-label="${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}: ${escapeHtml(c.CourseCode)}"><i class="fa-solid ${Number(c.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'} mr-1" aria-hidden="true"></i>${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}</button>
+                    <div class="grid grid-cols-5 border-t border-gray-100 text-[10px] font-bold text-gray-600">
+                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="top"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i>Attendance</a>
+                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
+                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openScoresModalBtn"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Scores</a>
+                        <button type="button" class="duplicate-course-btn card-action stacked" data-course-id="${c.Course_ID}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" aria-label="Copy to another term: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-copy" aria-hidden="true"></i>Copy</button>
+                        <button type="button" class="archive-course-btn card-action stacked" data-course-id="${c.Course_ID}" data-archive="${Number(c.Archived) === 1 ? '0' : '1'}" aria-label="${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}: ${escapeHtml(c.CourseCode)}"><i class="fa-solid ${Number(c.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'}" aria-hidden="true"></i>${Number(c.Archived) === 1 ? 'Restore' : 'Archive'}</button>
                     </div>
                 </div>
             `;
@@ -542,7 +539,7 @@ export const CourseDashboard = {
             const studentName = user.Name.replace(/[^a-zA-Z0-9_-]/g, ' ');
             const baseFilename = `${term}_${timestamp}_${user.Student_Number}_${studentName}_${safeTitle}`;
 
-            const courseYearSection = [user.course, user.year, user.section].filter(Boolean).join(" ") || "General";
+            const courseYearSection = [user.Program_Course, user.Program_Year, user.Program_Section].filter(Boolean).join(" ") || "General";
 
             let base64Data = "";
             let mimeType = "";

@@ -107,6 +107,21 @@ export async function ensureAppSettings(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS App_Settings (Key TEXT PRIMARY KEY, Value TEXT, Updated_By TEXT, Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP)").run();
 }
 
+// One time: students no longer have a separate class course/year/section (the class carries it).
+// Any program value still blank is filled from the old class value first, so nothing is lost.
+export async function clearStudentClassFields(env) {
+    await ensureAppSettings(env);
+    const done = await env.DB.prepare("SELECT Value FROM App_Settings WHERE Key = 'class_fields_cleared'").first();
+    if (done) return;
+    await env.DB.batch([
+        env.DB.prepare("UPDATE Users SET Program_Course = course WHERE (Program_Course IS NULL OR Program_Course = '') AND course IS NOT NULL AND course != ''"),
+        env.DB.prepare("UPDATE Users SET Program_Year = year WHERE (Program_Year IS NULL OR Program_Year = '') AND year IS NOT NULL AND year != ''"),
+        env.DB.prepare("UPDATE Users SET Program_Section = section WHERE (Program_Section IS NULL OR Program_Section = '') AND section IS NOT NULL AND section != ''"),
+        env.DB.prepare("UPDATE Users SET course = NULL, year = NULL, section = NULL"),
+        env.DB.prepare("INSERT OR REPLACE INTO App_Settings (Key, Value, Updated_By) VALUES ('class_fields_cleared', '1', 'system')")
+    ]);
+}
+
 // An exam its owner shares with other lecturers (they can see, print, copy and assign it, but not change it).
 export async function ensureExamShares(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Exam_Shares (Exam_ID TEXT NOT NULL, Lecturer_ID TEXT NOT NULL, Shared_At DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (Exam_ID, Lecturer_ID))").run();

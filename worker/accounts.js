@@ -5,7 +5,7 @@ import { findClassByCode, ensureEnrolled } from './join.js';
 import { signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL, getCurrentTerm, validTerm, getTermEnds, termKey } from './shared.js';
-import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings, ensurePasswordResetRequests } from './schema.js';
+import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings, ensurePasswordResetRequests, clearStudentClassFields } from './schema.js';
 import { gasUrl } from './gas.js';
 
 const MAX_AVATAR_B64 = 8000000;   // about 6 MB of photo; the app shrinks pictures to about 150 KB before sending
@@ -144,7 +144,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         ).bind(
             userId, body.username, hashedPassword, body.name, finalAvatarUrl,
             body.email, body.contact_number, body.student_number,
-            joinClass ? 'Active' : 'Inactive', body.program_course.trim(), body.program_year.trim(), body.program_section.trim(), body.eye_condition ? body.eye_condition.trim() : null, 'Student',
+            joinClass ? 'Active' : 'Inactive', null, null, null, body.eye_condition ? body.eye_condition.trim() : null, 'Student',
             body.program_course.trim(), body.program_year.trim(), body.program_section.trim()
         ).run();
 
@@ -155,6 +155,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
     if (request.method === "POST" && path === "/api/login") {
         const body = await request.json();
         const id = body.identifier;
+        await clearStudentClassFields(env);
         const lk = loginKeys(request, id);
         const locked = await loginLockedFor(env, lk);
         if (locked) return tooManyTries(corsHeaders, locked);
@@ -359,7 +360,6 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const clean = (v, max) => { const t = v == null ? "" : String(v).trim(); return t.length > max ? undefined : (t || null); };
         const f = {
             Name: clean(body.name, 120), Email: clean(body.email, 120), Contact_Number: clean(body.contact, 30), Student_Number: clean(body.studentNumber, 20),
-            course: clean(body.course, 80), year: clean(body.year, 40), section: clean(body.section, 40),
             Program_Course: clean(body.programCourse, 80), Program_Year: clean(body.programYear, 40), Program_Section: clean(body.programSection, 40)
         };
         if (Object.values(f).includes(undefined)) {
@@ -385,8 +385,8 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: `Already used by another account: ${c.join(", ")}.` }), { status: 400, headers: corsHeaders });
         }
         await env.DB.prepare(
-            `UPDATE Users SET Name = ?, Email = ?, Contact_Number = ?, Student_Number = ?, course = ?, year = ?, section = ?, Program_Course = ?, Program_Year = ?, Program_Section = ?, eye_condition = ? WHERE User_ID = ?`
-        ).bind(f.Name, f.Email, f.Contact_Number, f.Student_Number, f.course, f.year, f.section, f.Program_Course, f.Program_Year, f.Program_Section, eye, stu.User_ID).run();
+            `UPDATE Users SET Name = ?, Email = ?, Contact_Number = ?, Student_Number = ?, Program_Course = ?, Program_Year = ?, Program_Section = ?, eye_condition = ? WHERE User_ID = ?`
+        ).bind(f.Name, f.Email, f.Contact_Number, f.Student_Number, f.Program_Course, f.Program_Year, f.Program_Section, eye, stu.User_ID).run();
         return new Response(JSON.stringify({ success: true, student: { User_ID: stu.User_ID, ...f, eye_condition: eye } }), { status: 200, headers: corsHeaders });
     }
 

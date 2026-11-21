@@ -18,8 +18,7 @@ export const classIdentityBlock = (ids, v = {}, f = {}) => {
     const label = f.label || 'block text-xs font-bold text-gray-500 uppercase tracking-wider';
     const esc = escapeHtml;
     return `<div class="border-t border-gray-200 pt-4 mt-4">
-        <p class="text-xs font-bold text-gray-800 mb-1 uppercase">Class course, year and section</p>
-        <p class="text-[11px] text-gray-500 mb-2">Only to identify the class (for example BSIT 3-A). It does not limit who can join; students join with the class code.</p>
+        <p class="text-xs font-bold text-gray-800 mb-1 uppercase mb-2">Class course, year and section</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label class="${label}" for="${ids.course}">Course</label>
                 <select id="${ids.course}" class="${field}"><option value="">Not set</option>${v.course ? `<option value="${esc(v.course)}" selected>${esc(v.course)}</option>` : ''}</select></div>

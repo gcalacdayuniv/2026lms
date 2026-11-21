@@ -649,8 +649,8 @@ export const DashboardComponents = {
         const headerAvatar = avatarSrc ? `<img src="${safeUrl(avatarSrc)}" class="w-10 h-10 rounded-full object-cover aspect-square border-2 border-gray-200 shadow-sm" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-3xl text-gray-400"></i>';
 
         let displayCourse = 'N/A';
-        if (user.course) {
-            displayCourse = `${user.course} ${user.year || ''} ${user.section ? '- ' + user.section : ''}`.trim().replace(/\s+/g, ' ');
+        if (user.Program_Course) {
+            displayCourse = `${user.Program_Course} ${user.Program_Year || ''} ${user.Program_Section ? '- ' + user.Program_Section : ''}`.trim().replace(/\s+/g, ' ');
         }
 
         const panelAvatar = avatarSrc ? `<img src="${safeUrl(avatarSrc)}" class="w-28 h-28 rounded-full object-cover aspect-square border-4 border-white shadow-lg mx-auto cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(user.Name)}" data-info="${displayCourse}" role="button" tabindex="0" alt="Profile Picture" />` : '<i class="fa-solid fa-circle-user text-7xl text-gray-400 mx-auto block text-center"></i>';

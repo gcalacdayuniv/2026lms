@@ -157,7 +157,9 @@ const noProgYear = await reg('26-0091', { program_year: undefined });
 ok('registration needs the program year', noProgYear.s === 400, JSON.stringify(noProgYear));
 const okReg = await reg('26-0095', { username: 'prog95', email: 'p95@x.com', contact_number: '0995', program_course: 'BSArch', program_year: '5', program_section: '3' });
 const prow = sql.prepare("select Program_Course c, Program_Year y, Program_Section s, course cc from Users where Student_Number='26-0095'").get();
-ok('registration saves the program (no separate class fields)', okReg.s === 201 && prow && prow.c === 'BSArch' && prow.y === '5' && prow.s === '3' && prow.cc === 'BSArch', JSON.stringify([okReg, prow]));
+const clr = sql.prepare("select count(*) n from Users where course is not null or year is not null or section is not null").get().n;
+ok('login clears old class course/year/section once', clr === 0 || sql.prepare("select Value v from App_Settings where Key='class_fields_cleared'").get(), String(clr));
+ok('registration saves the program only (no class fields)', okReg.s === 201 && prow && prow.c === 'BSArch' && prow.y === '5' && prow.s === '3' && prow.cc === null, JSON.stringify([okReg, prow]));
 sql.exec("delete from Users where Student_Number='26-0095'");
 const big = await reg('26-0001', { avatarBase64: 'A'.repeat(8000001) });
 ok('oversized avatar rejected', big.s === 400 && /too large/.test(big.j.error), JSON.stringify(big));
@@ -266,7 +268,7 @@ ok('student cannot use it', (await call('POST', '/api/advance-year-level', { tok
 
 // ---- lecturer edits a student's details and eye condition ----
 const ed = (who, body) => call('POST', '/api/admin-update-student', { token: who, body });
-const base = { studentId: 'S1', name: 'Student One', studentNumber: '24-0001', contact: '0917', email: 'one@x.com', course: 'BSCS', year: '2', section: 'A', eyeCondition: 'Legally Blind' };
+const base = { studentId: 'S1', name: 'Student One', studentNumber: '24-0001', contact: '0917', email: 'one@x.com', eyeCondition: 'Legally Blind' };
 const e1 = await ed(l1.j.token, base);
 ok('lecturer edits student details + eye condition', e1.s === 200 && sql.prepare("select eye_condition e, Name n, year y from Users where User_ID='S1'").get().e === 'Legally Blind', JSON.stringify(e1.j));
 ok('student cannot edit', (await ed(s2b.j.token, base)).s === 403);

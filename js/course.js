@@ -502,9 +502,6 @@ export const CourseModule = {
             setVal('manageStudentNumberInput', stuData.Student_Number);
             setVal('manageEmailInput', stuData.Email);
             setVal('manageContactInput', stuData.Contact_Number);
-            setVal('manageClassCourseInput', stuData.course);
-            setVal('manageClassYearInput', stuData.year);
-            setVal('manageClassSectionInput', stuData.section);
             const detailsBox = document.getElementById('manageDetailsBox');
             if (detailsBox) detailsBox.open = false;
 
@@ -529,9 +526,6 @@ export const CourseModule = {
                 studentNumber: val('manageStudentNumberInput'),
                 email: val('manageEmailInput'),
                 contact: val('manageContactInput'),
-                course: val('manageClassCourseInput'),
-                year: val('manageClassYearInput'),
-                section: val('manageClassSectionInput'),
                 programCourse: val('manageProgramCourseInput'),
                 programYear: val('manageProgramYearInput'),
                 programSection: val('manageProgramSectionInput')
