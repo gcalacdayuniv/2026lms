@@ -442,6 +442,10 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - The **class** course, year and section (`Users.course/year/section`) are for enrolling in classes: they decide which classes a student can see and join.
 - Both groups are editable by a lecturer in Manage Users > Edit details. Advance Year Level groups students by Program course (falls back to the class course for older accounts with no program).
 
+## TEMPORARY: Fill Program Course
+- Admin tools > Manage > **Fill Program Course** copies each student's class course into a blank Program Course (students who already have one are not changed). It shows how many will change and asks to confirm first.
+- Files to delete once every student has a program: `js/temp-fill-program.js`, its import in `js/course.js`, the `fillProgramBtn` tile in `js/components-dashboard.js`, `POST /api/fill-program-course` in `worker/accounts.js` and `worker/auth.js`, and its test block in `tools/tests/worker.test.mjs`.
+
 ## Edit Student Details (Manage Users)
 - Dashboard menu > Manage > **Manage Users** > **Edit details** on a student card (`js/edit-student.js`, endpoint `POST /api/admin-update-student`, lecturer only, students only).
 - Editable: name, student number (00-0000, must be unique), contact, email (unique), class course/year/section, program course/year/section, and the **eye condition tag** (No Eye Condition, Near Sighted, Far Sighted, Legally Blind). Legally Blind turns on the accessible read-aloud exam for that student.

@@ -12,6 +12,7 @@ import { LecturerNotes } from './lecturer-notes.js';
 import './year-advance.js';
 import './current-term.js';
 import './edit-student.js';
+import './temp-fill-program.js';   // TEMPORARY, delete with its tile when done
 import './duplicate-course.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 

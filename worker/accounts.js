@@ -315,6 +315,16 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         return new Response(JSON.stringify({ success: true, message: "Details updated successfully" }), { status: 200, headers: corsHeaders });
     }
 
+    // TEMPORARY (remove when every student has a program): copy the class course into a blank Program Course.
+    if (request.method === "POST" && path === "/api/fill-program-course") {
+        const body = await request.json();
+        const where = "role COLLATE NOCASE = 'student' AND (Program_Course IS NULL OR TRIM(Program_Course) = '') AND course IS NOT NULL AND TRIM(course) <> ''";
+        const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM Users WHERE ${where}`).first();
+        if (body.dryRun) return new Response(JSON.stringify({ success: true, count: row.n }), { status: 200, headers: corsHeaders });
+        await env.DB.prepare(`UPDATE Users SET Program_Course = TRIM(course) WHERE ${where}`).run();
+        return new Response(JSON.stringify({ success: true, count: row.n, filled: row.n }), { status: 200, headers: corsHeaders });
+    }
+
     // A lecturer corrects a student's details (including the eye condition tag) from Manage Users.
     if (request.method === "POST" && path === "/api/admin-update-student") {
         const body = await request.json();

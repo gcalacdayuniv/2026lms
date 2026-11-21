@@ -128,6 +128,10 @@ const DashboardUI = {
                             <span class="menu-tile-icon bg-purple-100 text-purple-700"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Registration List</span>
                         </button>
+                        <button type="button" id="fillProgramBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-teal-100 text-teal-700"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Fill Program Course</span>
+                        </button>
                         <button type="button" id="openCtModalBtn" class="menu-tile">
                             <span class="menu-tile-icon bg-blue-100 text-blue-700"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Academic Term</span>
