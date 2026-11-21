@@ -216,9 +216,10 @@ export const newInviteCode = () => {
 };
 
 // Sets a fresh unique code on one class and returns it ('' if it could not).
-export async function setInviteCode(env, courseId) {
+export async function setInviteCode(env, courseId, avoid = "") {
     for (let i = 0; i < 8; i++) {
         const c = newInviteCode();
+        if (c === avoid) continue;   // a renewed code is always different from the one it replaces
         try { await env.DB.prepare("UPDATE Courses SET Invite_Code = ? WHERE Course_ID = ?").bind(c, courseId).run(); return c; } catch (e) { /* clashed with another class: try again */ }
     }
     return "";

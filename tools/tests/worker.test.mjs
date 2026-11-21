@@ -306,6 +306,8 @@ ok('wrong code is refused', (await jn(q2Tok, { studentId: 'Q2', code: 'ZZZZZZ' }
 ok('a student cannot join as someone else', (await jn(joinTok, { studentId: 'Q2', code: inv.code })).s === 403);
 const inv2 = (await call('POST', '/api/class-invite', { token: l1.j.token, body: { courseId: invCourse.id, renew: true } })).j.code;
 ok('renewing makes the old code stop working', inv2 !== inv.code && (await jn(q2Tok, { studentId: 'Q2', code: inv.code })).s === 404 && (await jn(q2Tok, { studentId: 'Q2', code: inv2 })).s === 201);
+let renewedDiffer = true; for (let i = 0; i < 20; i++) { const before = (await call('GET', `/api/class-invite?courseId=${invCourse.id}`, { token: l1.j.token })).j.code; const after = (await call('POST', '/api/class-invite', { token: l1.j.token, body: { courseId: invCourse.id, renew: true } })).j.code; if (before === after) renewedDiffer = false; }
+ok('a renewed code is always different from the old one', renewedDiffer);
 sql.exec("delete from Enrollments where Student_ID like 'Q%'"); sql.exec("delete from Users where User_ID like 'Q%'"); sql.exec("delete from Courses where Course_ID='CINV'");
 
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----

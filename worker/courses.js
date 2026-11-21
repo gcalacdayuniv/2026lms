@@ -298,7 +298,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
         const crs = await env.DB.prepare("SELECT Course_ID, Invite_Code FROM Courses WHERE Course_ID = ?").bind(courseId || "").first();
         if (!crs) return new Response(JSON.stringify({ error: "Class not found." }), { status: 404, headers: corsHeaders });
         let code = crs.Invite_Code;
-        if (!code || body.renew) code = (await setInviteCode(env, crs.Course_ID)) || code;
+        if (!code || body.renew) code = (await setInviteCode(env, crs.Course_ID, crs.Invite_Code || "")) || code;
         return new Response(JSON.stringify({ success: true, code }), { status: 200, headers: corsHeaders });
     }
 
