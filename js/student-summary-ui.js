@@ -114,13 +114,13 @@ export const StudentSummaryUI = {
             details.style.top = open && head ? `${Math.ceil(head.getBoundingClientRect().bottom)}px` : '';
         };
         if (details) new MutationObserver(fit).observe(details, { attributes: true, attributeFilter: ['class'] });
-        // On phones History and Upload cover that same area: below the summary header, above the action bar.
+        // On phones History and Upload sit below the summary header and cover the action bar (Back returns to it).
         const phone = window.matchMedia ? window.matchMedia('(max-width: 639px)') : { matches: false };
         const fitSub = (el) => {
             const bar = $('ssActionBar'), head = modal.querySelector('.ss-top');
             const on = el && !el.classList.contains('hidden') && !modal.classList.contains('hidden') && phone.matches && bar && !bar.classList.contains('hidden') && head;
             el.style.top = on ? `${Math.ceil(head.getBoundingClientRect().bottom)}px` : '';
-            el.style.bottom = on ? `${Math.ceil(bar.getBoundingClientRect().height)}px` : '';
+            el.style.bottom = '';
         };
         ['submissionHistoryModal', 'submitDocModal'].forEach((id) => {
             const el = $(id);
