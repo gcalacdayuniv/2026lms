@@ -820,9 +820,9 @@ export const CourseDashboard = {
 
             container.innerHTML = `
                 <div class="space-y-12 fade-in">
+                    ${joinFormHtml()}
                     ${studentOverviewHtml(myCoursesRes.courses, assignedExams.filter(e => e.status !== 'Completed').length)}
                     ${assignedExamsSectionHtml}
-                    ${joinFormHtml()}
                     ${myCoursesRes.courses.length >= 4 ? searchBarHtml() : ''}
                     <section id="studentCoursesSection" class="scroll-mt-20">
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
