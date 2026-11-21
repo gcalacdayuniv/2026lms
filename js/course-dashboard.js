@@ -312,7 +312,7 @@ const lecturerCourseCardHtml = (c) => `
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="top"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i>Attendance</a>
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openClassSummaryBtn"><i class="fa-solid fa-table-list" aria-hidden="true"></i>Summary</a>
-                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openCourseMenuBtn"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i>More</a>
+                        <button type="button" class="card-action stacked card-more" data-course-id="${c.Course_ID}" data-code="${escapeHtml(c.CourseCode)}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" data-archived="${Number(c.Archived) === 1 ? '1' : '0'}" aria-label="More actions: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i>More</button>
                     </div>
                 </div>
             `;

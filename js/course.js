@@ -16,6 +16,7 @@ import './class-invite.js';
 import './password-requests.js';
 import './forgot-password.js';
 import './duplicate-course.js';
+import './card-more.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
 export const CourseModule = {
