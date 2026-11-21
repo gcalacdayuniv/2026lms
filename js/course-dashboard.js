@@ -291,7 +291,7 @@ const courseChipsHtml = (c) => {
     return chips.length ? `<div class="flex flex-wrap gap-1.5 mt-2">${chips.join('')}</div>` : '';
 };
 
-// Card = link to the class plus a row of shortcuts. A shortcut opens the class and then that page (data-intent).
+// Card = link to the class plus a row of shortcuts (Attendance, Scan, Summary, More = the class's Course Actions menu). A shortcut opens the class and then that page (data-intent).
 const lecturerCourseCardHtml = (c) => `
                 <div data-course-card data-day="${escapeHtml(c.ScheduleDay)}" data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.ScheduleDay, c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ').toLowerCase())}" class="border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300 overflow-hidden">
                     <a href="#class-${c.Course_ID}" class="block px-4 pt-3 pb-2">
@@ -308,12 +308,11 @@ const lecturerCourseCardHtml = (c) => `
                         </div>
                         ${courseChipsHtml(c)}
                     </a>
-                    <div class="grid grid-cols-5 border-t border-gray-100 text-[10px] font-bold text-gray-600">
+                    <div class="grid grid-cols-4 border-t border-gray-100 text-[11px] font-bold text-gray-600">
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="top"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i>Attendance</a>
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
-                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openScoresModalBtn"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Scores</a>
-                        <button type="button" class="duplicate-course-btn card-action stacked" data-course-id="${c.Course_ID}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" aria-label="Copy to another term: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-copy" aria-hidden="true"></i>Copy</button>
-                        <button type="button" class="archive-course-btn card-action stacked" data-course-id="${c.Course_ID}" data-archive="${Number(c.Archived) === 1 ? '0' : '1'}" aria-label="${Number(c.Archived) === 1 ? 'Restore class' : 'Archive class'}: ${escapeHtml(c.CourseCode)}"><i class="fa-solid ${Number(c.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'}" aria-hidden="true"></i>${Number(c.Archived) === 1 ? 'Restore' : 'Archive'}</button>
+                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openClassSummaryBtn"><i class="fa-solid fa-table-list" aria-hidden="true"></i>Summary</a>
+                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openCourseMenuBtn"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i>More</a>
                     </div>
                 </div>
             `;
@@ -452,6 +451,7 @@ document.addEventListener('click', async (e) => {
         const course = CourseDashboard.lecturerData && CourseDashboard.lecturerData.courses.find(c => c.Course_ID === btn.dataset.courseId);
         if (course) course.Archived = archive ? 1 : 0;
         UI.success(archive ? 'Class archived' : 'Class restored');
+        if (document.getElementById('classTabBar')) { window.location.hash = 'dashboard'; }
         if (CourseDashboard.repaintLecturer) CourseDashboard.repaintLecturer();
     } catch (err) {
         UI.error(err.message || 'Could not update the class.');

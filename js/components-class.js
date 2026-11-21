@@ -94,6 +94,19 @@ const ClassUI = {
                         </button>
                         </div>
                     </section>
+                    <section aria-label="This class">
+                        <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">This class</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                        <button type="button" class="menu-tile duplicate-course-btn" data-course-id="${course.Course_ID}" data-term="${escapeHtml([course.AcademicYear, course.Semester].filter(Boolean).join('|'))}">
+                            <span class="menu-tile-icon bg-indigo-100 text-indigo-700"><i class="fa-solid fa-copy" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Copy to another term</span>
+                        </button>
+                        <button type="button" class="menu-tile archive-course-btn" data-course-id="${course.Course_ID}" data-archive="${Number(course.Archived) === 1 ? '0' : '1'}">
+                            <span class="menu-tile-icon bg-gray-200 text-gray-800"><i class="fa-solid ${Number(course.Archived) === 1 ? 'fa-box-open' : 'fa-box-archive'}" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">${Number(course.Archived) === 1 ? 'Restore class' : 'Archive class'}</span>
+                        </button>
+                        </div>
+                    </section>
                     <section aria-label="Calendar">
                         <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Calendar</h4>
                         <div class="grid grid-cols-3 gap-2">

@@ -65,6 +65,7 @@ const copy = async () => {
         close();
         UI.success('Class copied');
         CourseDashboard.termFilter = `${academicYear}|${semester}`;   // show the new term
+        if (document.getElementById('classTabBar')) window.location.hash = 'dashboard';
         await CourseDashboard.loadDashboardData('fresh');
     } catch (e) {
         const box = $('dcError');
