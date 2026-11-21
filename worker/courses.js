@@ -1,6 +1,8 @@
 // worker/courses.js
 // Programs, classes (create, copy, edit, archive), enrollment, rosters, student details, lecturer notes and groups.
 
+import { findClassByCode, enrollStudent } from './join.js';
+import { sweepEndedAccounts } from './term-sweep.js';
 import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode, ensureCourseRoom } from './schema.js';
 import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
 
@@ -18,37 +20,6 @@ function cleanTerm(ay, sem) {
 }
 
 // Returns a Response when the request is handled here, otherwise null.
-// Enrol one student in one class; shared by lecturer enrol, class catalog and invite code.
-async function enrollStudent(env, courseId, studentId) {
-    const existing = await env.DB.prepare(
-        `SELECT Enrollment_ID FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
-    ).bind(courseId, studentId).first();
-    if (existing) return { error: "You are already enrolled in this course." };
-
-    await env.DB.prepare(
-        `INSERT INTO Enrollments (Enrollment_ID, Course_ID, Student_ID) VALUES (?, ?, ?)`
-    ).bind(crypto.randomUUID(), courseId, studentId).run();
-
-    // A student set Inactive by Advance Year Level is reactivated when enrolled in a class of the term they were
-    // advanced into, or of the current term.
-    let reactivated = false;
-    try {
-        await ensureReactivationColumns(env);
-        const stu = await env.DB.prepare("SELECT account_status, Advanced_Term FROM Users WHERE User_ID = ?").bind(studentId).first();
-        if (stu && stu.Advanced_Term && String(stu.account_status || "").toLowerCase() === "inactive") {
-            const crs = await env.DB.prepare("SELECT AcademicYear, Semester FROM Courses WHERE Course_ID = ?").bind(courseId).first();
-            const now = await getCurrentTerm(env);
-            const thisYear = crs && crs.AcademicYear && crs.AcademicYear === stu.Advanced_Term;
-            const thisTerm = crs && crs.AcademicYear === now.ay && (!crs.Semester || crs.Semester === now.sem);
-            if (thisYear || thisTerm) {
-                await env.DB.prepare(`UPDATE Users SET account_status = 'Active', ${CLEAR_REACTIVATION_SQL} WHERE User_ID = ?`).bind(studentId).run();
-                reactivated = true;
-            }
-        }
-    } catch (e) { /* enrollment is saved; reactivation can be done by hand */ }
-    return { reactivated };
-}
-
 export async function handleCourses(request, env, path, url, corsHeaders) {
     if (request.method === "POST" && path === "/api/programs") {
         const body = await request.json();
@@ -218,6 +189,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: "Only the lecturer of this class can archive it." }), { status: 403, headers: corsHeaders });
         }
         await env.DB.prepare("UPDATE Courses SET Archived = ? WHERE Course_ID = ?").bind(body.archived ? 1 : 0, body.courseId).run();
+        if (body.archived) { try { await sweepEndedAccounts(env); } catch (e) { /* the periodic sweep will catch up */ } }
         return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
     }
 
@@ -267,18 +239,14 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
     // A student joins a class with the invite code the lecturer gave them.
     if (request.method === "POST" && path === "/api/join-class") {
         const body = await request.json();
-        const code = String(body.code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
         const me = await env.DB.prepare("SELECT role FROM Users WHERE User_ID = ?").bind(body.studentId || "").first();
         if (!me || String(me.role).toLowerCase() !== "student") {
             return new Response(JSON.stringify({ error: "Only students can join with a code." }), { status: 403, headers: corsHeaders });
         }
-        await ensureInviteCode(env);
-        const crs = code.length >= 6 ? await env.DB.prepare(
-            `SELECT c.Course_ID, c.CourseCode, c.CourseTitle, c.ScheduleDay, c.TimePeriod, c.Room, u.Name AS LecturerName
-             FROM Courses c LEFT JOIN Users u ON u.User_ID = c.Lecturer_ID WHERE c.Invite_Code = ? AND COALESCE(c.Archived, 0) = 0`
-        ).bind(code).first() : null;
-        if (!crs) return new Response(JSON.stringify({ error: "That code is not valid. Check it with your lecturer." }), { status: 404, headers: corsHeaders });
-        const course = { Course_ID: crs.Course_ID, CourseCode: crs.CourseCode, CourseTitle: crs.CourseTitle, ScheduleDay: crs.ScheduleDay, TimePeriod: crs.TimePeriod, Room: crs.Room || "", LecturerName: crs.LecturerName || "" };
+        const found = await findClassByCode(env, body.code);
+        if (found.error) return new Response(JSON.stringify({ error: found.error }), { status: found.status, headers: corsHeaders });
+        const crs = found.course;
+        const course = crs;
         // preview: show the class so the student can check it is the right one; nothing is saved.
         if (body.preview) {
             const already = await env.DB.prepare("SELECT 1 AS x FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?").bind(crs.Course_ID, body.studentId).first();
@@ -295,11 +263,13 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
         const body = request.method === "POST" ? await request.json() : {};
         const courseId = request.method === "POST" ? body.courseId : url.searchParams.get("courseId");
         await ensureInviteCode(env);
-        const crs = await env.DB.prepare("SELECT Course_ID, Invite_Code FROM Courses WHERE Course_ID = ?").bind(courseId || "").first();
+        const crs = await env.DB.prepare("SELECT Course_ID, Invite_Code, CourseCode, CourseTitle FROM Courses WHERE Course_ID = ?").bind(courseId || "").first();
         if (!crs) return new Response(JSON.stringify({ error: "Class not found." }), { status: 404, headers: corsHeaders });
         let code = crs.Invite_Code;
         if (!code || body.renew) code = (await setInviteCode(env, crs.Course_ID, crs.Invite_Code || "")) || code;
-        return new Response(JSON.stringify({ success: true, code }), { status: 200, headers: corsHeaders });
+        const exp = await env.DB.prepare("SELECT Invite_Expires FROM Courses WHERE Course_ID = ?").bind(crs.Course_ID).first();
+        const expiresAt = exp && exp.Invite_Expires ? exp.Invite_Expires : null;
+        return new Response(JSON.stringify({ success: true, code, courseCode: crs.CourseCode, courseTitle: crs.CourseTitle, expiresAt, expired: !!expiresAt && Date.parse(expiresAt) < Date.now() }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/unenroll") {

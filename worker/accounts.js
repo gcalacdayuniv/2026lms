@@ -1,9 +1,10 @@
 // worker/accounts.js
 // Sign-up, sign-in, password changes, profile details, year-level advance and the user list.
 
+import { findClassByCode, ensureEnrolled } from './join.js';
 import { signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
-import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL, getCurrentTerm, validTerm } from './shared.js';
+import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL, getCurrentTerm, validTerm, getTermEnds, termKey } from './shared.js';
 import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings } from './schema.js';
 import { gasUrl } from './gas.js';
 
@@ -40,7 +41,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const tooLong = (v, max) => v != null && String(v).length > max;
         if (!body || typeof body.password !== 'string' || body.password.length < 6 || body.password.length > 200
             || tooLong(body.username, 60) || tooLong(body.name, 120) || tooLong(body.email, 120) || tooLong(body.contact_number, 30)
-            || tooLong(body.course, 80) || tooLong(body.year, 40) || tooLong(body.section, 40) || tooLong(body.eye_condition, 120)
+            || tooLong(body.course, 80) || tooLong(body.year, 40) || tooLong(body.section, 40) || tooLong(body.eye_condition, 120) || tooLong(body.invite_code, 20)
             || tooLong(body.program_course, 80) || tooLong(body.program_year, 40) || tooLong(body.program_section, 40)) {
             return new Response(JSON.stringify({ error: "Some details are missing or too long. Passwords need 6 to 200 characters." }), { status: 400, headers: corsHeaders });
         }
@@ -77,6 +78,14 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             if (existing.Contact_Number && body.contact_number && existing.Contact_Number === body.contact_number) conflicts.push("Contact Number");
 
             return new Response(JSON.stringify({ error: `The following is already registered to another account: ${conflicts.join(', ')}.` }), { status: 400, headers: corsHeaders });
+        }
+
+        // An optional class code activates the account and puts the student in that class.
+        let joinClass = null;
+        if (body.invite_code && String(body.invite_code).trim()) {
+            const found = await findClassByCode(env, body.invite_code);
+            if (found.error) return new Response(JSON.stringify({ error: found.error }), { status: found.status, headers: corsHeaders });
+            joinClass = found.course;
         }
 
         let finalAvatarUrl = null;
@@ -135,11 +144,12 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         ).bind(
             userId, body.username, hashedPassword, body.name, finalAvatarUrl,
             body.email, body.contact_number, body.student_number,
-            'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, body.eye_condition ? body.eye_condition.trim() : null, 'Student',
+            joinClass ? 'Active' : 'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, body.eye_condition ? body.eye_condition.trim() : null, 'Student',
             body.program_course.trim(), body.program_year.trim(), body.program_section.trim()
         ).run();
 
-        return new Response(JSON.stringify({ success: true, message: "User registered" }), { status: 201, headers: corsHeaders });
+        if (joinClass) await ensureEnrolled(env, joinClass.Course_ID, userId);
+        return new Response(JSON.stringify({ success: true, message: "User registered", activated: !!joinClass, course: joinClass }), { status: 201, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/login") {
@@ -160,6 +170,18 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         }
         await loginCleared(env, lk);
 
+        // A deactivated (Inactive) account is activated by a valid class code, and the student joins that class.
+        let joined = null;
+        if (body.inviteCode && String(body.inviteCode).trim() && user.account_status.toLowerCase() === 'inactive') {
+            const found = await findClassByCode(env, body.inviteCode);
+            if (found.error) return new Response(JSON.stringify({ error: found.error, codeActivation: true }), { status: found.status, headers: corsHeaders });
+            await ensureReactivationColumns(env);
+            await ensureEnrolled(env, found.course.Course_ID, user.User_ID);
+            await env.DB.prepare(`UPDATE Users SET account_status = 'Active', ${CLEAR_REACTIVATION_SQL} WHERE User_ID = ?`).bind(user.User_ID).run();
+            user.account_status = 'Active';
+            joined = found.course;
+        }
+
         if (user.account_status.toLowerCase() !== 'active') {
             let errorMessage = "";
             const statusLower = user.account_status.toLowerCase();
@@ -176,17 +198,17 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
                         if (!re.Reactivation_Requested) {
                             await env.DB.prepare("UPDATE Users SET Reactivation_Requested = ? WHERE User_ID = ?").bind(new Date().toISOString(), user.User_ID).run();
                         }
-                        return new Response(JSON.stringify({ error: "Reactivation requested. Your lecturer will review it, then you can sign in.", reactivation: { allowed: false, requested: true } }), { status: 403, headers: corsHeaders });
+                        return new Response(JSON.stringify({ error: "Reactivation requested. Your lecturer will review it, then you can sign in.", codeActivation: true, reactivation: { allowed: false, requested: true } }), { status: 403, headers: corsHeaders });
                     }
                     const msg = open
                         ? `Your account is inactive for the new year level (${re.Advanced_Term}). It is reactivated when a lecturer enrolls you in a class for the current term, or you can request reactivation.`
                         : `Your account is inactive and the reactivation period ended on ${re.Reactivation_Until}. Please ask your lecturer to reactivate it.`;
-                    return new Response(JSON.stringify({ error: msg, reactivation: { allowed: open && !re.Reactivation_Requested, requested: !!re.Reactivation_Requested, until: re.Reactivation_Until || null } }), { status: 403, headers: corsHeaders });
+                    return new Response(JSON.stringify({ error: msg, codeActivation: true, reactivation: { allowed: open && !re.Reactivation_Requested, requested: !!re.Reactivation_Requested, until: re.Reactivation_Until || null } }), { status: 403, headers: corsHeaders });
                 }
             }
 
             if (statusLower === 'inactive') {
-                errorMessage = "Account is pending approval. Please wait for an admin or lecturer to activate your account.";
+                errorMessage = "Your account is not active yet (new, or deactivated because your class ended). Enter a class code from your lecturer to activate it, or wait for a lecturer to activate you.";
             } else if (statusLower === 'suspended') {
                 errorMessage = "Account is Suspended";
             } else if (statusLower === 'ud') {
@@ -198,12 +220,13 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             }
 
             return new Response(JSON.stringify({
-                error: errorMessage
+                error: errorMessage,
+                codeActivation: statusLower === 'inactive'
             }), { status: 403, headers: corsHeaders });
         }
 
         const token = authEnabled(env) ? await signToken(env, user.User_ID) : undefined;
-        return new Response(JSON.stringify({ success: true, user, token }), { status: 200, headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, user, token, joined }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/change-password") {
@@ -262,6 +285,17 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
                 return new Response(JSON.stringify({ error: "Use an academic year like 2026-2027 and pick a semester." }), { status: 400, headers: corsHeaders });
             }
             await env.DB.prepare("INSERT INTO App_Settings (Key, Value, Updated_By, Updated_At) VALUES ('current_term', ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value, Updated_By = excluded.Updated_By, Updated_At = CURRENT_TIMESTAMP").bind(JSON.stringify({ ay: body.ay, sem: body.sem }), String(body.userId || "")).run();
+        }
+        // Last day of the term (end of Finals), kept per term. Accounts of classes that ended 2 weeks after it are deactivated.
+        if (!body.reset && body.endDate !== undefined) {
+            const d = String(body.endDate || "").trim();
+            if (d && (!/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d)))) {
+                return new Response(JSON.stringify({ error: "Enter the last day of the term as a date." }), { status: 400, headers: corsHeaders });
+            }
+            const cur = await getCurrentTerm(env);
+            const ends = await getTermEnds(env);
+            if (d) ends[termKey(cur.ay, cur.sem)] = d; else delete ends[termKey(cur.ay, cur.sem)];
+            await env.DB.prepare("INSERT INTO App_Settings (Key, Value, Updated_By, Updated_At) VALUES ('term_ends', ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value, Updated_By = excluded.Updated_By, Updated_At = CURRENT_TIMESTAMP").bind(JSON.stringify(ends), String(body.userId || "")).run();
         }
         return new Response(JSON.stringify({ success: true, ...(await getCurrentTerm(env)) }), { status: 200, headers: corsHeaders });
     }

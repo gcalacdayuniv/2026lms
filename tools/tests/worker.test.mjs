@@ -313,10 +313,69 @@ const arch = (flag) => call('POST', '/api/archive-course', { token: l1.j.token, 
 ok('an enrolled student sees the class', (await qMine()).includes('CINV'));
 await arch(true);
 ok('archiving hides the class from its students', !(await qMine()).includes('CINV'));
+ok('a student whose only class was archived is deactivated', sql.prepare("select account_status s from Users where User_ID='Q1'").get().s === 'Inactive');
 ok('a student of an archived class cannot open it', (await call('GET', `/api/course-details?courseId=${invCourse.id}&studentId=Q1`, { token: joinTok })).s === 403);
 ok('the lecturer still sees the archived class', ((await call('GET', '/api/my-courses?userId=L1&role=lecturer', { token: l1.j.token })).j.courses || []).some(c => c.Course_ID === 'CINV'));
+sql.exec("update Users set account_status='Active' where User_ID in ('Q1','Q2')");
 await arch(false);
 ok('restoring shows the class to students again', (await qMine()).includes('CINV') && (await call('GET', `/api/course-details?courseId=${invCourse.id}&studentId=Q1`, { token: joinTok })).s !== 403);
+// ---- invite code: 7-day expiry, sign-up and sign-in with a code, share data ----
+const invNow = (await call('GET', `/api/class-invite?courseId=${invCourse.id}`, { token: l1.j.token })).j;
+const days = (Date.parse(invNow.expiresAt) - Date.now()) / 86400000;
+ok('a code expires in 7 days', days > 6.99 && days <= 7 && invNow.expired === false, JSON.stringify(invNow));
+sql.exec("update Courses set Invite_Expires='2020-01-01T00:00:00.000Z' where Course_ID='CINV'");
+const exp1 = (await call('GET', `/api/class-invite?courseId=${invCourse.id}`, { token: l1.j.token })).j;
+ok('an expired code is reported as expired', exp1.expired === true && exp1.code === invNow.code);
+const expJoin = await jn(q2Tok, { studentId: 'Q2', preview: true, code: invNow.code });
+ok('an expired code cannot be used to join', expJoin.s === 410 && /expired/i.test(expJoin.j.error), JSON.stringify(expJoin));
+const expReg = await reg('26-0071', { username: 'exp71', email: 'e71@x.com', contact_number: '0971', invite_code: invNow.code });
+ok('an expired code cannot be used at sign-up, and no account is made', expReg.s === 410 && !sql.prepare("select 1 x from Users where Student_Number='26-0071'").get());
+const renewed = (await call('POST', '/api/class-invite', { token: l1.j.token, body: { courseId: invCourse.id, renew: true } })).j;
+const rdays = (Date.parse(renewed.expiresAt) - Date.now()) / 86400000;
+ok('a new code gets a fresh 7 days', renewed.code !== invNow.code && rdays > 6.99 && renewed.expired === false);
+const badReg = await reg('26-0072', { username: 'bad72', email: 'b72@x.com', contact_number: '0972', invite_code: 'ZZZZZZ' });
+ok('a wrong code at sign-up is refused and no account is made', badReg.s === 404 && !sql.prepare("select 1 x from Users where Student_Number='26-0072'").get());
+const codeReg = await reg('26-0073', { username: 'code73', email: 'c73@x.com', contact_number: '0973', invite_code: ' ' + renewed.code.toLowerCase() + ' ' });
+const cu = sql.prepare("select User_ID, account_status s from Users where Student_Number='26-0073'").get();
+ok('sign-up with a code gives an active account in that class', codeReg.s === 201 && codeReg.j.activated === true && cu.s === 'Active' && !!sql.prepare("select 1 x from Enrollments where Course_ID='CINV' and Student_ID=?").get(cu.User_ID), JSON.stringify(codeReg));
+const plainReg = await reg('26-0074', { username: 'plain74', email: 'p74@x.com', contact_number: '0974' });
+ok('sign-up without a code is still pending', plainReg.s === 201 && sql.prepare("select account_status s from Users where Student_Number='26-0074'").get().s === 'Inactive');
+// a deactivated student comes back with the code
+const inactiveLogin = await call('POST', '/api/login', { body: { identifier: 'plain74', password: 'secret12' } });
+ok('a deactivated student is told they can use a code', inactiveLogin.s === 403 && inactiveLogin.j.codeActivation === true);
+const wrongLogin = await call('POST', '/api/login', { body: { identifier: 'plain74', password: 'secret12', inviteCode: 'ZZZZZZ' } });
+ok('a wrong code does not activate', wrongLogin.s === 404 && sql.prepare("select account_status s from Users where Student_Number='26-0074'").get().s === 'Inactive');
+const okLogin = await call('POST', '/api/login', { body: { identifier: 'plain74', password: 'secret12', inviteCode: renewed.code } });
+const pid = sql.prepare("select User_ID u from Users where Student_Number='26-0074'").get().u;
+ok('the code activates the account, joins the class and signs in', okLogin.s === 200 && !!okLogin.j.token && okLogin.j.joined.CourseCode === 'INV1' && sql.prepare("select account_status s from Users where User_ID=?").get(pid).s === 'Active' && !!sql.prepare("select 1 x from Enrollments where Course_ID='CINV' and Student_ID=?").get(pid));
+sql.prepare("update Users set account_status='Suspended' where User_ID=?").run(pid);
+const susp = await call('POST', '/api/login', { body: { identifier: 'plain74', password: 'secret12', inviteCode: renewed.code } });
+ok('a suspended account cannot be activated by a code', susp.s === 403 && sql.prepare("select account_status s from Users where User_ID=?").get(pid).s === 'Suspended');
+const badPw = await call('POST', '/api/login', { body: { identifier: 'plain74', password: 'nope', inviteCode: renewed.code } });
+ok('a code does not replace the password', badPw.s === 401);
+
+// ---- accounts are deactivated when every class has ended (2 weeks after the term's last day) or is archived ----
+const { sweepEndedAccounts, endedTermKeys } = await import('../../worker/term-sweep.js');
+const setEnd = (endDate, userId = 'L1', tok = l1.j.token) => call('POST', '/api/current-term', { token: tok, body: { userId, ay: '2026-2027', sem: '1st Semester', endDate } });
+ok('a bad last-day date is refused', (await setEnd('soon')).s === 400);
+const t = (await setEnd('2026-12-19')).j;
+ok('the last day of the term is saved and returned', t.endDate === '2026-12-19');
+ok('a term is over 14 days after its last day, not before', endedTermKeys({ a: '2026-12-19' }, Date.parse('2027-01-02T00:00:00+08:00')).length === 0 && endedTermKeys({ a: '2026-12-19' }, Date.parse('2027-01-03T00:00:00+08:00')).length === 1);
+sql.exec("update Courses set AcademicYear='2026-2027', Semester='1st Semester' where Course_ID in ('C1','CINV')");
+sql.exec("insert into Courses(Course_ID,CourseCode,CourseTitle,Lecturer_ID,AcademicYear,Semester) values('CLIVE','LIVE','Live','L1','2026-2028','2nd Semester')");
+for (const id of ['E1', 'E2', 'E3', 'E4']) { sql.prepare("insert into Users(User_ID,Username,Name,role,account_status) values(?,?,?,?,?)").run(id, id, id, 'student', 'Active'); }
+sql.exec("insert into Enrollments(Course_ID,Student_ID) values('CINV','E1'),('CINV','E2'),('CLIVE','E2'),('CINV','E3')");
+const later = Date.parse('2027-01-04T00:00:00+08:00');
+const preCount = await sweepEndedAccounts(env, { dryRun: true, now: later });
+const swept = await sweepEndedAccounts(env, { now: later });
+const eSt = (id) => sql.prepare("select account_status s from Users where User_ID=?").get(id).s;
+ok('students whose classes all ended are deactivated', eSt('E1') === 'Inactive' && eSt('E3') === 'Inactive' && swept >= 2 && preCount === swept, `${preCount} ${swept}`);
+ok('a student with a class still running stays active', eSt('E2') === 'Active');
+ok('a student with no class is left alone', eSt('E4') === 'Active');
+const early = await sweepEndedAccounts(env, { dryRun: true, now: Date.parse('2026-12-25T00:00:00+08:00') });
+ok('nothing is deactivated before the 2 weeks pass', early === 0, String(early));
+sql.exec("delete from Enrollments where Student_ID like 'E%'; delete from Users where User_ID like 'E%'; delete from Courses where Course_ID='CLIVE'; delete from App_Settings where Key='term_ends'");
+
 sql.exec("delete from Enrollments where Student_ID like 'Q%'"); sql.exec("delete from Users where User_ID like 'Q%'"); sql.exec("delete from Courses where Course_ID='CINV'");
 
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----

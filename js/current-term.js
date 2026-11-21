@@ -26,7 +26,7 @@ export const getTerm = () => term || (term = read()) || calendarTerm();
 
 const apply = (t) => {
     const before = JSON.stringify(getTerm());
-    term = { ay: t.ay, sem: t.sem, source: t.source || 'calendar', updatedBy: t.updatedBy || null, updatedAt: t.updatedAt || null };
+    term = { ay: t.ay, sem: t.sem, source: t.source || 'calendar', updatedBy: t.updatedBy || null, updatedAt: t.updatedAt || null, endDate: t.endDate || null };
     save(term);
     if (JSON.stringify(term) !== before) document.dispatchEvent(new CustomEvent('term-changed', { detail: term }));
     return term;
@@ -70,6 +70,9 @@ const open = async () => {
             <label for="ctSem" class="${LABEL}">Semester</label>
             <select id="ctSem" class="${FIELD} mb-2">${SEMESTERS.map(s => `<option${s === t.sem ? ' selected' : ''}>${s}</option>`).join('')}</select>
             <p id="ctNote" class="text-xs text-gray-500 mb-4">${note(t)}</p>
+            <label for="ctEnd" class="${LABEL}">Last day of this term (end of Finals)</label>
+            <input id="ctEnd" type="date" value="${escapeHtml(t.endDate || '')}" class="${FIELD} mb-1">
+            <p class="text-xs text-gray-500 mb-4">2 weeks after this date, students whose classes have all ended (or been archived) are deactivated. They can come back with a class code. Leave empty to turn this off for the term.</p>
             <div class="flex flex-wrap justify-end gap-2">
                 <button type="button" id="ctResetBtn" class="px-3 py-2 min-h-[44px] text-sm font-bold text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Use calendar</button>
                 <button type="button" id="ctCloseBtn" class="px-3 py-2 min-h-[44px] text-sm font-bold text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Close</button>
@@ -86,7 +89,7 @@ const send = async (body) => {
     try {
         const r = await apiFetch('/api/current-term', { method: 'POST', body: JSON.stringify({ ...body, userId: AppState.user && AppState.user.User_ID }) });
         apply(r);
-        $('ctAY').value = r.ay; $('ctSem').value = r.sem; $('ctNote').innerHTML = note(r);
+        $('ctAY').value = r.ay; $('ctSem').value = r.sem; $('ctEnd').value = r.endDate || ''; $('ctNote').innerHTML = note(r);
         UI.success(`Current term: AY ${r.ay}, ${r.sem}`);
     } catch (e) {
         err.textContent = (e && e.message) || 'Could not save the term.';
@@ -97,7 +100,9 @@ const send = async (body) => {
 document.addEventListener('click', (e) => {
     if (e.target.closest('#openCtModalBtn')) { open(); return; }
     if (e.target.closest('#ctCloseBtn') || e.target.id === 'ctBg') { close(); return; }
-    if (e.target.closest('#ctSaveBtn')) { send({ ay: $('ctAY').value.trim(), sem: $('ctSem').value }); return; }
+    if (e.target.closest('#ctSaveBtn')) { send({ ay: $('ctAY').value.trim(), sem: $('ctSem').value, endDate: $('ctEnd').value }); return; }
     if (e.target.closest('#ctResetBtn')) send({ reset: true });
 });
+// Changing the term clears the last-day date: it belongs to the term it was set for.
+document.addEventListener('change', (e) => { if ((e.target.id === 'ctAY' || e.target.id === 'ctSem') && $('ctEnd')) $('ctEnd').value = ''; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('ctModal')) close(); });

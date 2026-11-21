@@ -217,11 +217,15 @@ export const newInviteCode = () => {
 };
 
 // Sets a fresh unique code on one class and returns it ('' if it could not).
+// An invite code works for 7 days; then the lecturer must make a new one.
+export const INVITE_DAYS = 7;
+export const inviteExpiryIso = (now = Date.now()) => new Date(now + INVITE_DAYS * 86400000).toISOString();
+
 export async function setInviteCode(env, courseId, avoid = "") {
     for (let i = 0; i < 8; i++) {
         const c = newInviteCode();
         if (c === avoid) continue;   // a renewed code is always different from the one it replaces
-        try { await env.DB.prepare("UPDATE Courses SET Invite_Code = ? WHERE Course_ID = ?").bind(c, courseId).run(); return c; } catch (e) { /* clashed with another class: try again */ }
+        try { await env.DB.prepare("UPDATE Courses SET Invite_Code = ?, Invite_Expires = ? WHERE Course_ID = ?").bind(c, inviteExpiryIso(), courseId).run(); return c; } catch (e) { /* clashed with another class: try again */ }
     }
     return "";
 }
@@ -231,7 +235,10 @@ let inviteReady = false;
 export async function ensureInviteCode(env) {
     if (inviteReady) return;
     try { await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Invite_Code TEXT").run(); } catch (e) { /* already there */ }
+    try { await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Invite_Expires TEXT").run(); } catch (e) { /* already there */ }
     await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_invite ON Courses (Invite_Code)").run();
+    // Codes made before expiry existed get 7 days from now.
+    await env.DB.prepare("UPDATE Courses SET Invite_Expires = ? WHERE Invite_Code IS NOT NULL AND Invite_Expires IS NULL").bind(inviteExpiryIso()).run();
     const missing = (await env.DB.prepare("SELECT Course_ID FROM Courses WHERE Invite_Code IS NULL OR TRIM(Invite_Code) = ''").all()).results || [];
     for (const r of missing) await setInviteCode(env, r.Course_ID);
     inviteReady = true;

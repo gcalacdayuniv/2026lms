@@ -142,6 +142,17 @@ export function validTerm(ay, sem) {
     return !!m && Number(m[2]) === Number(m[1]) + 1 && SEMESTERS.includes(sem);
 }
 
+// Last day of each term (end of Finals), set by an admin: { "2026-2027|1st Semester": "2026-12-19" }.
+export const termKey = (ay, sem) => `${ay}|${sem}`;
+export async function getTermEnds(env) {
+    try {
+        await ensureAppSettings(env);
+        const row = await env.DB.prepare("SELECT Value FROM App_Settings WHERE Key = 'term_ends'").first();
+        const m = row && row.Value ? JSON.parse(row.Value) : {};
+        return m && typeof m === "object" ? m : {};
+    } catch (e) { return {}; }
+}
+
 // The term an admin set, else the calendar term. source says which one it is.
 export async function getCurrentTerm(env, now = new Date()) {
     try {
@@ -149,8 +160,9 @@ export async function getCurrentTerm(env, now = new Date()) {
         const row = await env.DB.prepare("SELECT Value, Updated_By, Updated_At FROM App_Settings WHERE Key = 'current_term'").first();
         if (row && row.Value) {
             const t = JSON.parse(row.Value);
-            if (validTerm(t.ay, t.sem)) return { ay: t.ay, sem: t.sem, source: "set", updatedBy: row.Updated_By || null, updatedAt: row.Updated_At || null };
+            if (validTerm(t.ay, t.sem)) return { ay: t.ay, sem: t.sem, source: "set", updatedBy: row.Updated_By || null, updatedAt: row.Updated_At || null, endDate: (await getTermEnds(env))[termKey(t.ay, t.sem)] || null };
         }
     } catch (e) { /* fall back to the calendar */ }
-    return { ...calendarTerm(now), source: "calendar" };
+    const cal = calendarTerm(now);
+    return { ...cal, source: "calendar", endDate: (await getTermEnds(env))[termKey(cal.ay, cal.sem)] || null };
 }

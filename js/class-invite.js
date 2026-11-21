@@ -8,9 +8,35 @@ const $ = (id) => document.getElementById(id);
 const closeDlg = () => { const m = $('invModal'); if (m) m.remove(); };
 const BTN = 'px-4 min-h-[44px] text-sm font-bold rounded-md';
 
-const showCode = (code) => {
-    const el = $('invCode');
-    if (el) el.textContent = code;
+// Date and time in GMT+8, e.g. "Dec 5, 2026, 8:34 PM (GMT+8)".
+const when = (iso) => `${new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))} (GMT+8)`;
+
+// The message a lecturer sends to students: how to register or activate with the code, and when it expires.
+export const inviteMessage = ({ courseCode, courseTitle, code, expiresAt }) => {
+    const url = `${location.origin}${location.pathname}`;
+    return `Join ${courseCode}${courseTitle ? ` - ${courseTitle}` : ''}\n\n` +
+        `Class code: ${code}\n` +
+        `Valid until: ${when(expiresAt)}\n\n` +
+        `New here? Register at ${url} and type the class code in the "Class code" box. Your account is activated and you are added to the class right away.\n\n` +
+        `Already registered, or your account was deactivated? Sign in at ${url} and enter the class code when asked. That activates your account and adds you to the class.\n\n` +
+        `Already active? Tap "Join" on your dashboard and enter the code.\n\n` +
+        `The code stops working after ${when(expiresAt)}. After that, ask your lecturer for a new code.`;
+};
+
+const showInvite = (r) => {
+    const m = $('invModal');
+    if (!m) return;
+    m.dataset.info = JSON.stringify(r);
+    $('invCode').textContent = r.code;
+    const exp = $('invExpiry');
+    if (r.expired) {
+        exp.textContent = `Expired on ${when(r.expiresAt)}. Make a new code.`;
+        exp.className = 'text-sm font-bold text-red-700 mb-3';
+    } else {
+        exp.textContent = `Valid until ${when(r.expiresAt)}`;
+        exp.className = 'text-sm font-bold text-gray-700 mb-3';
+    }
+    $('invMessage').value = inviteMessage(r);
 };
 
 const openDialog = async (courseId) => {
@@ -25,22 +51,27 @@ const openDialog = async (courseId) => {
     m.setAttribute('aria-modal', 'true');
     m.setAttribute('aria-label', 'Class invite code');
     m.innerHTML = `<div id="invBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 relative z-10 text-center">
-            <h3 class="text-lg font-bold text-gray-800 mb-1"><i class="fa-solid fa-key text-amber-600 mr-2" aria-hidden="true"></i>Class invite code</h3>
-            <p class="text-xs text-gray-600 mb-4">Give this code to your students. They enter it on their dashboard to join this class.</p>
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-5 relative z-10 max-h-[92vh] overflow-y-auto">
+            <h3 class="text-lg font-bold text-gray-800 mb-1 text-center"><i class="fa-solid fa-key text-amber-600 mr-2" aria-hidden="true"></i>Class invite code</h3>
+            <p class="text-xs text-gray-600 mb-3 text-center">Students use this code to register, to activate a deactivated account, or to join this class. It expires every 7 days.</p>
             <div id="invError" role="alert" class="hidden bg-red-100 text-red-700 p-2 rounded text-sm font-medium mb-3"></div>
-            <div id="invCode" aria-live="polite" class="text-4xl font-black tracking-[0.3em] text-gray-900 bg-gray-50 border border-gray-200 rounded-lg py-4 mb-4 select-all">······</div>
-            <div class="flex flex-wrap justify-center gap-2">
-                <button type="button" id="invCopyBtn" class="${BTN} text-white bg-blue-600 hover:bg-blue-700"><i class="fa-regular fa-copy mr-1.5" aria-hidden="true"></i>Copy</button>
+            <div id="invCode" aria-live="polite" class="text-4xl font-black tracking-[0.3em] text-gray-900 bg-gray-50 border border-gray-200 rounded-lg py-4 mb-2 select-all text-center">······</div>
+            <p id="invExpiry" class="text-sm font-bold text-gray-700 mb-3 text-center" aria-live="polite"></p>
+            <div class="flex flex-wrap justify-center gap-2 mb-4">
+                <button type="button" id="invCopyBtn" class="${BTN} text-gray-700 bg-gray-100 hover:bg-gray-200"><i class="fa-regular fa-copy mr-1.5" aria-hidden="true"></i>Copy code</button>
                 <button type="button" id="invRenewBtn" class="${BTN} text-gray-700 bg-gray-100 hover:bg-gray-200">New code</button>
-                <button type="button" id="invCloseBtn" class="${BTN} text-gray-700 bg-gray-100 hover:bg-gray-200">Close</button>
             </div>
-            <p class="text-[11px] text-gray-500 mt-3">A new code stops the old one from working. Students already enrolled stay enrolled.</p>
+            <label for="invMessage" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Message to share</label>
+            <textarea id="invMessage" rows="9" class="w-full border border-gray-300 rounded-md p-2 text-base focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+            <div class="flex flex-wrap justify-end gap-2 mt-3">
+                <button type="button" id="invCloseBtn" class="${BTN} text-gray-700 bg-gray-100 hover:bg-gray-200">Close</button>
+                <button type="button" id="invCopyMsgBtn" class="${BTN} text-gray-700 bg-gray-100 hover:bg-gray-200">Copy message</button>
+                <button type="button" id="invShareBtn" class="${BTN} text-white bg-blue-600 hover:bg-blue-700"><i class="fa-solid fa-share-nodes mr-1.5" aria-hidden="true"></i>Share</button>
+            </div>
         </div>`;
     document.body.appendChild(m);
     try {
-        const r = await apiFetch(`/api/class-invite?courseId=${encodeURIComponent(courseId)}&_t=${Date.now()}`);
-        showCode(r.code);
+        showInvite(await apiFetch(`/api/class-invite?courseId=${encodeURIComponent(courseId)}&_t=${Date.now()}`));
     } catch (e) {
         const err = $('invError');
         err.textContent = e.message || 'Could not load the code.';
@@ -51,19 +82,27 @@ const openDialog = async (courseId) => {
 const renew = async () => {
     const m = $('invModal');
     if (!m) return;
-    const ok = await UI.confirm({ title: 'Make a new code?', message: 'The old code will stop working. Students already enrolled stay enrolled.', confirmText: 'New code' });
+    const ok = await UI.confirm({ title: 'Make a new code?', message: 'The old code will stop working and the new one is valid for 7 days. Students already enrolled stay enrolled.', confirmText: 'New code' });
     if (!ok) return;
     try {
-        const r = await apiFetch('/api/class-invite', { method: 'POST', body: JSON.stringify({ courseId: m.dataset.courseId, renew: true }) });
-        showCode(r.code);
+        showInvite(await apiFetch('/api/class-invite', { method: 'POST', body: JSON.stringify({ courseId: m.dataset.courseId, renew: true }) }));
         UI.success('New code ready');
     } catch (e) { UI.error(e.message || 'Could not make a new code'); }
 };
 
-const copy = async () => {
-    const code = ($('invCode') || {}).textContent || '';
-    try { await navigator.clipboard.writeText(code); UI.success('Code copied'); }
-    catch (e) { UI.warning('Select the code and copy it by hand.'); }
+const copyText = async (text, done) => {
+    try { await navigator.clipboard.writeText(text); UI.success(done); }
+    catch (e) { UI.warning('Select the text and copy it by hand.'); }
+};
+
+// Opens the phone's share sheet when there is one, otherwise copies the message.
+const share = async () => {
+    const text = ($('invMessage') || {}).value || '';
+    if (navigator.share) {
+        try { await navigator.share({ text }); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    copyText(text, 'Message copied. Paste it into your chat or email.');
 };
 
 // Student: join a class by code. Step 1 asks for the code, step 2 shows the class to confirm.
@@ -152,7 +191,9 @@ document.addEventListener('click', (e) => {
     const open = e.target.closest('#openInviteBtn');
     if (open) { openDialog(window.location.hash.replace('#class-', '')); return; }
     if (e.target.closest('#invCloseBtn') || e.target.id === 'invBg') { closeDlg(); return; }
-    if (e.target.closest('#invCopyBtn')) { copy(); return; }
+    if (e.target.closest('#invCopyBtn')) { copyText(($('invCode') || {}).textContent || '', 'Code copied'); return; }
+    if (e.target.closest('#invCopyMsgBtn')) { copyText(($('invMessage') || {}).value || '', 'Message copied'); return; }
+    if (e.target.closest('#invShareBtn')) { share(); return; }
     if (e.target.closest('#invRenewBtn')) { renew(); return; }
     if (e.target.closest('#openJoinBtn')) { openJoin(); return; }
     if (e.target.closest('.joinCancel') || e.target.id === 'joinBg') { closeJoin(); return; }

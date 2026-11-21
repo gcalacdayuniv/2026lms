@@ -24,6 +24,11 @@ export const AuthUI = {
                             </button>
                         </div>
                     </div>
+                    <div id="loginCodeBox" class="hidden border border-amber-200 bg-amber-50 rounded-md p-3">
+                        <label for="loginInviteCode" class="block text-sm font-bold text-gray-800"><i class="fa-solid fa-key text-amber-600 mr-1.5" aria-hidden="true"></i>Class code</label>
+                        <p class="text-xs text-gray-600 mb-2">Enter the code from your lecturer to activate your account and join that class, then sign in.</p>
+                        <input type="text" id="loginInviteCode" maxlength="10" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABC234" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md uppercase tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
                     <button type="submit" id="loginBtn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         Sign In
                     </button>
@@ -175,6 +180,11 @@ export const AuthUI = {
                         </div>
                     </div>
                     
+                    <div class="mt-5 border border-amber-200 bg-amber-50 rounded-md p-3">
+                        <label for="regInviteCode" class="block text-sm font-bold text-gray-800"><i class="fa-solid fa-key text-amber-600 mr-1.5" aria-hidden="true"></i>Class code <span class="font-normal text-gray-500">(optional)</span></label>
+                        <p class="text-xs text-gray-600 mb-2">Got a code from your lecturer? Enter it to activate your account now and join that class right away.</p>
+                        <input type="text" id="regInviteCode" maxlength="10" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABC234" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md uppercase tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-green-500">
+                    </div>
                     <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
                         Create Account
                     </button>

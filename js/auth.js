@@ -56,15 +56,19 @@ export const AuthModule = {
                     body: JSON.stringify({
                         identifier: document.getElementById('loginId')?.value.trim() || document.getElementById('loginIdentifier')?.value.trim(),
                         password: document.getElementById('loginPassword').value,
-                        requestReactivation: e.submitter && e.submitter.id === 'requestReactivationBtn' ? true : undefined
+                        requestReactivation: e.submitter && e.submitter.id === 'requestReactivationBtn' ? true : undefined,
+                        inviteCode: (document.getElementById('loginInviteCode') || {}).value || undefined
                     })
                 });
                 
                 AppState.setUser(data.user);
                 AppState.setToken(data.token);
+                if (data.joined) UI.success(`Account activated. You joined ${data.joined.CourseCode}.`);
                 window.location.hash = 'dashboard';
             } catch (err) {
                 errorDiv.textContent = err.message;
+                // A not-yet-active or deactivated account can be activated with a class code.
+                if (err.data && err.data.codeActivation) { const box = document.getElementById('loginCodeBox'); if (box) { box.classList.remove('hidden'); } }
                 // Moved up a year level: offer to ask for reactivation (the password was already checked).
                 if (err.data && err.data.reactivation && err.data.reactivation.allowed) {
                     const ask = document.createElement('button');
@@ -110,6 +114,7 @@ export const AuthModule = {
                     program_year: document.getElementById('regPYear').value,
                     program_section: document.getElementById('regPSection').value.trim().toUpperCase(),
                     eye_condition: document.getElementById('regEyeCondition').value,
+                    invite_code: document.getElementById('regInviteCode').value.trim() || undefined,
                     avatarBase64: null
                 };
 
@@ -126,12 +131,14 @@ export const AuthModule = {
                      throw new Error("Profile photo is required.");
                 }
 
-                await apiFetch('/api/register', {
+                const reg = await apiFetch('/api/register', {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
 
-                successDiv.textContent = "Registration successful! You can now log in once approved.";
+                successDiv.textContent = reg.activated
+                    ? `Registration successful! Your account is active and you joined ${reg.course.CourseCode}. You can log in now.`
+                    : "Registration successful! You can now log in once approved, or log in with a class code from your lecturer to activate it.";
                 successDiv.classList.remove('hidden');
                 e.target.reset();
                 document.getElementById('avatarPreview').classList.add('hidden');

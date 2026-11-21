@@ -9,6 +9,7 @@ import { handleAccounts } from './accounts.js';
 import { handleCourses } from './courses.js';
 import { handleScanSheets } from './scan-sheets.js';
 import { purgeOldAttempts } from './shared.js';
+import { maybeSweep } from './term-sweep.js';
 
 // Origins allowed to call this API. ALLOWED_ORIGIN may hold several origins separated by commas.
 // Never falls back to "*": an unknown origin simply receives the primary allowed origin,
@@ -50,6 +51,8 @@ export default {
             ctx.waitUntil(ensureCoreIndexes(env).catch(() => {}));
             // About 1 request in 100 tidies old sign-in attempt rows in the background.
             if (Math.random() < 0.01) ctx.waitUntil(purgeOldAttempts(env).catch(() => {}));
+            // About 1 request in 20 checks (at most every 6 hours) for accounts whose classes have all ended.
+            if (Math.random() < 0.05) ctx.waitUntil(maybeSweep(env).catch(() => {}));
 
             // Who is calling, and may they do this? (Off until the SESSION_SECRET secret is set.)
             const gate = await authorize(request, env, path, url);
