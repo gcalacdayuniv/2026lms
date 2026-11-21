@@ -7,8 +7,8 @@ set -e
 cd "$(dirname "$0")/../.."
 echo "== 1/4 JavaScript syntax"
 for f in js/*.js worker/*.js sw.js tailwind.config.js; do node --check "$f" 2>/dev/null || node --input-type=module --check < "$f" || { echo "syntax error in $f"; exit 1; }; done
-echo "== 2/4 Worker lint (undefined names)"
-npx --yes eslint@9 -c tools/tests/eslint.config.mjs worker
+echo "== 2/4 Worker + front-end lint (undefined names)"
+npx --yes eslint@9 -c tools/tests/eslint.config.mjs worker js
 echo "== 3/4 Worker tests"
 node tools/tests/worker.test.mjs
 echo "== 4/4 tailwind.css up to date"

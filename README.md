@@ -544,3 +544,5 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
   - `GET /api/class-exams`, the student's exam list, loading, starting and submitting an exam all skip an exam whose course title does not match the class.
 - The class Exam tab and the Scanner (`js/course-exam.js`, `js/course-scanner.js`) request exams for their class only.
 - If a class's Course Title is changed so it no longer matches an exam already assigned, that exam is hidden from the class and its students until the titles match again. Its scores stay recorded.
+
+- **Front-end lint:** `sh tools/tests/run-tests.sh` now also checks `js/` for undefined names (the check that would have caught the `displayCourse` crash on the class screen).
