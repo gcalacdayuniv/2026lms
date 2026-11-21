@@ -1,5 +1,6 @@
 // js/components-dashboard.js
 import { getLoadableAvatarSrc } from './components-utils.js';
+import { classIdentityBlock } from './class-identity.js';
 import { ExamUI } from './components-exam.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
@@ -100,7 +101,7 @@ const DashboardUI = {
             <button type="button" class="class-tab is-active" data-dash-tab="courses" aria-current="page"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Courses</span></button>
             ${isLecturer ? `
             <button type="button" class="class-tab" data-dash-tab="new"><i class="fa-solid fa-circle-plus" aria-hidden="true"></i><span>New</span></button>
-            <button type="button" class="class-tab" data-dash-tab="admin"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>Admin</span></button>` : `
+            <button type="button" class="class-tab relative" data-dash-tab="admin"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>Admin</span><span id="adminTabBadge" class="hidden absolute top-1 right-[22%] min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold items-center justify-center" aria-hidden="true"></span></button>` : `
             <button type="button" class="class-tab" data-dash-tab="exams"><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>Exams</span></button>
             <button type="button" class="class-tab" data-dash-tab="browse"><i class="fa-solid fa-key" aria-hidden="true"></i><span>Join</span></button>`}
             <button type="button" class="class-tab" data-dash-tab="profile"><i class="fa-solid fa-circle-user" aria-hidden="true"></i><span>Profile</span></button>
@@ -423,6 +424,8 @@ const DashboardUI = {
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Classroom <span class="font-normal normal-case text-gray-400">(optional)</span></label>
                         <input type="text" id="courseRoom" maxlength="60" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. Room 204, Computer Lab 2">
                     </div>
+
+                    ${classIdentityBlock({ course: 'targetCourse', year: 'targetYear', section: 'targetSection' })}
 
                     <button type="submit" id="addCourseBtn" class="form-save w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors mt-4">
                         Create Course

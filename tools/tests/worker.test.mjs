@@ -150,14 +150,14 @@ const again = await call('POST', '/api/start-accessible-exam', { token: sOwn, bo
 ok('completed exam cannot be started again', again.s === 403, JSON.stringify(again));
 
 // ---- registration limits ----
-const reg = (sn, extra = {}, ip) => call('POST', '/api/register', { body: { username: 'new' + sn, password: 'secret12', name: 'N', email: 'n@x.com', student_number: sn, contact_number: '09', course: 'C', year: '1', section: 'A', eye_condition: 'None', program_course: 'BSCS', program_year: '1', program_section: '1', ...extra } });
+const reg = (sn, extra = {}, ip) => call('POST', '/api/register', { body: { username: 'new' + sn, password: 'secret12', name: 'N', email: 'n@x.com', student_number: sn, contact_number: '09', eye_condition: 'None', program_course: 'BSCS', program_year: '1', program_section: '1', ...extra } });
 const noProg = await reg('26-0090', { program_course: '' });
 ok('registration needs the program course', noProg.s === 400 && /program/i.test(noProg.j.error), JSON.stringify(noProg));
 const noProgYear = await reg('26-0091', { program_year: undefined });
 ok('registration needs the program year', noProgYear.s === 400, JSON.stringify(noProgYear));
 const okReg = await reg('26-0095', { username: 'prog95', email: 'p95@x.com', contact_number: '0995', program_course: 'BSArch', program_year: '5', program_section: '3' });
 const prow = sql.prepare("select Program_Course c, Program_Year y, Program_Section s, course cc from Users where Student_Number='26-0095'").get();
-ok('registration saves program and class fields', okReg.s === 201 && prow && prow.c === 'BSArch' && prow.y === '5' && prow.s === '3' && prow.cc === 'C', JSON.stringify([okReg, prow]));
+ok('registration saves the program (no separate class fields)', okReg.s === 201 && prow && prow.c === 'BSArch' && prow.y === '5' && prow.s === '3' && prow.cc === 'BSArch', JSON.stringify([okReg, prow]));
 sql.exec("delete from Users where Student_Number='26-0095'");
 const big = await reg('26-0001', { avatarBase64: 'A'.repeat(8000001) });
 ok('oversized avatar rejected', big.s === 400 && /too large/.test(big.j.error), JSON.stringify(big));

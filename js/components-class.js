@@ -922,7 +922,7 @@ export const ClassComponents = {
                         </a>
                         <div class="overflow-hidden">
                             <h1 class="text-base sm:text-lg font-bold text-white truncate">${escapeHtml(course.CourseCode)}</h1>
-                            <p class="text-[11px] sm:text-xs text-blue-200 truncate">${escapeHtml(course.CourseTitle)}</p>
+                            <p class="text-[11px] sm:text-xs text-blue-200 truncate">${escapeHtml(course.CourseTitle)}${(course.Target_Course || course.Target_Year || course.Target_Section) ? ' &bull; ' + escapeHtml([course.Target_Course, [course.Target_Year, course.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' ')) : ''}</p>
                             ${(course.AcademicYear || course.Semester) ? `<p class="text-[10px] text-blue-100 truncate">${escapeHtml([course.AcademicYear && 'AY ' + course.AcademicYear, course.Semester].filter(Boolean).join(' · '))}</p>` : ''}
                         </div>
                         <div class="ml-auto pl-2 flex flex-col items-end text-[10px] sm:text-xs text-blue-100 leading-tight min-w-0 flex-shrink-0 max-w-[55%]">

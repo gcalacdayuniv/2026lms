@@ -94,9 +94,9 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
                 return new Response(JSON.stringify({ error: "Server Configuration Error: GAS_WEBHOOK_URL is missing. Please redeploy the Cloudflare Worker." }), { status: 500, headers: corsHeaders });
             }
 
-            const courseVal = body.course ? body.course.trim() : "";
-            const yearVal = body.year ? body.year.trim() : "";
-            const sectionVal = body.section ? body.section.trim() : "";
+            const courseVal = body.program_course.trim();
+            const yearVal = body.program_year.trim();
+            const sectionVal = body.program_section.trim();
             const courseYearSection = [courseVal, yearVal, sectionVal].filter(Boolean).join(" ") || "General";
             const formattedFilename = `${body.student_number}_${body.name}.jpg`;
 
@@ -144,7 +144,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         ).bind(
             userId, body.username, hashedPassword, body.name, finalAvatarUrl,
             body.email, body.contact_number, body.student_number,
-            joinClass ? 'Active' : 'Inactive', body.course ? body.course.trim() : null, body.year ? body.year.trim() : null, body.section ? body.section.trim() : null, body.eye_condition ? body.eye_condition.trim() : null, 'Student',
+            joinClass ? 'Active' : 'Inactive', body.program_course.trim(), body.program_year.trim(), body.program_section.trim(), body.eye_condition ? body.eye_condition.trim() : null, 'Student',
             body.program_course.trim(), body.program_year.trim(), body.program_section.trim()
         ).run();
 

@@ -296,10 +296,10 @@ const lecturerCourseCardHtml = (c) => `
                         <div class="flex justify-between items-start mb-1">
                             <div class="font-bold text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
                             ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
-                                `<span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded border uppercase">
-                                    ${[c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ')} Only
-                                </span>` :
-                                `<span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded border uppercase">All Students</span>`
+                                `<span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded border uppercase">
+                                    ${escapeHtml([c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' '))}
+                                </span>` : ''
+
                             }
                         </div>
                         <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
@@ -689,6 +689,9 @@ export const CourseDashboard = {
             courseCode: document.getElementById('courseCode').value.trim(),
             courseTitle: document.getElementById('courseTitle').value.trim(),
             scheduleDay: document.getElementById('scheduleDay').value,
+            targetCourse: document.getElementById('targetCourse').value.trim(),
+            targetYear: document.getElementById('targetYear').value.trim(),
+            targetSection: document.getElementById('targetSection').value.trim(),
             timePeriod: document.getElementById('timePeriod').value.trim(),
             room: document.getElementById('courseRoom').value.trim(),
             academicYear: document.getElementById('courseAY').value.trim(),

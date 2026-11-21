@@ -19,10 +19,15 @@ const load = async () => {
 // The red number on the Manage Users tile.
 export const refreshResetBadge = async () => {
     await load();
+    const n = String(requests.length);
     const b = $('muReqBadge');
-    if (!b) return;
-    b.textContent = String(requests.length);
-    b.classList.toggle('hidden', !requests.length);
+    if (b) { b.textContent = n; b.classList.toggle('hidden', !requests.length); }
+    const t = $('adminTabBadge');
+    if (t) {
+        t.textContent = n; t.classList.toggle('hidden', !requests.length); t.classList.toggle('flex', !!requests.length);
+        const btn = t.closest('button');
+        if (btn) btn.setAttribute('aria-label', requests.length ? `Admin, ${n} password reset request${requests.length > 1 ? 's' : ''}` : 'Admin');
+    }
 };
 
 const when = (iso) => { try { return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso)); } catch (e) { return ''; } };

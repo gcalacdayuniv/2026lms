@@ -8,6 +8,7 @@ import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 import { showPrintPreview } from './print-preview.js';
+import { classIdentityBlock, fillClassCourseOptions } from './class-identity.js';
 
 // ---- Saved copy of the class screen, so reopening a class paints at once (see loadClassScreen). ----
 const CLASS_CACHE_PREFIX = 'class_cache:';
@@ -597,10 +598,12 @@ const openEditClass = async (btn) => {
                     <div><label class="${LABEL}" for="ecTime">Time Period</label><input type="text" id="ecTime" required maxlength="60" class="${FIELD}" value="${escapeHtml(d.time)}" placeholder="9:00 AM - 12:00 PM"></div>
                 </div>
                 <div><label class="${LABEL}" for="ecRoom">Classroom <span class="font-normal normal-case text-gray-400">(optional)</span></label><input type="text" id="ecRoom" maxlength="60" class="${FIELD}" value="${escapeHtml(d.room)}"></div>
+                ${classIdentityBlock({ course: 'ecTargetCourse', year: 'ecTargetYear', section: 'ecTargetSection' }, { course: d.targetCourse, year: d.targetYear, section: d.targetSection }, { field: FIELD, label: LABEL })}
                 <button type="submit" id="ecSaveBtn" data-course-id="${escapeHtml(d.courseId)}" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors">Save changes</button>
             </form>
         </div>`;
     document.body.appendChild(m);
+    fillClassCourseOptions('ecTargetCourse', d.targetCourse || '');
 };
 
 const saveEditClass = async (form) => {
@@ -617,7 +620,7 @@ const saveEditClass = async (form) => {
             body: JSON.stringify({
                 courseId, lecturerId: AppState.user.User_ID,
                 courseCode: v('ecCode'), courseTitle: v('ecTitle'), scheduleDay: document.getElementById('ecDay').value, timePeriod: v('ecTime'),
-                room: v('ecRoom'),
+                room: v('ecRoom'), targetCourse: v('ecTargetCourse'), targetYear: v('ecTargetYear'), targetSection: v('ecTargetSection'),
                 academicYear: v('ecAY'), semester: document.getElementById('ecSemester').value
             })
         });

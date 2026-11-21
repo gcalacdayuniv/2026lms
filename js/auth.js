@@ -5,6 +5,7 @@ import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 import { getTerm } from './current-term.js';
+import { fillClassCourseOptions } from './class-identity.js';
 
 export const AuthModule = {
     // Shrinks a profile photo to at most 1024 px on the long side (JPEG) so a phone photo of several MB becomes about 150 KB.
@@ -107,9 +108,6 @@ export const AuthModule = {
                     email: document.getElementById('regEmail').value.trim(),
                     contact_number: document.getElementById('regContact').value.trim(),
                     student_number: document.getElementById('regStudentNo').value.trim(),
-                    course: document.getElementById('regCourse').value,
-                    year: document.getElementById('regYear').value,
-                    section: document.getElementById('regSection').value.trim().toUpperCase(),
                     program_course: document.getElementById('regPCourse').value,
                     program_year: document.getElementById('regPYear').value,
                     program_section: document.getElementById('regPSection').value.trim().toUpperCase(),
@@ -147,6 +145,8 @@ export const AuthModule = {
                 errorDiv.textContent = err.message;
                 errorDiv.classList.remove('hidden');
             } finally {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                (errorDiv.classList.contains('hidden') ? successDiv : errorDiv).scrollIntoView({ block: 'center', behavior: 'smooth' });
                 btn.disabled = false;
                 btn.innerHTML = originalBtnText;
             }
@@ -468,6 +468,7 @@ export const AuthModule = {
             const term = getTerm();
             if (ay && !ay.value) ay.value = term.ay;
             if (sem && !sem.value) sem.value = term.sem;
+            fillClassCourseOptions('targetCourse', document.getElementById('targetCourse').value);
         }
 
         if (e.target.closest('#closeCcModalBtn') || e.target.id === 'ccModalOverlay') {
@@ -545,7 +546,7 @@ export const AuthModule = {
     },
 
     loadPrograms: async () => {
-        const selects = ['regPCourse', 'regCourse'].map(id => document.getElementById(id)).filter(Boolean);
+        const selects = ['regPCourse'].map(id => document.getElementById(id)).filter(Boolean);
         if (!selects.length) return;
         const fill = (html) => selects.forEach(s => { s.innerHTML = html; });
 
