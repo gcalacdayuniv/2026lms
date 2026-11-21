@@ -364,7 +364,8 @@ ok('a term is over 14 days after its last day, not before', endedTermKeys({ a: '
 sql.exec("update Courses set AcademicYear='2026-2027', Semester='1st Semester' where Course_ID in ('C1','CINV')");
 sql.exec("insert into Courses(Course_ID,CourseCode,CourseTitle,Lecturer_ID,AcademicYear,Semester) values('CLIVE','LIVE','Live','L1','2026-2028','2nd Semester')");
 for (const id of ['E1', 'E2', 'E3', 'E4']) { sql.prepare("insert into Users(User_ID,Username,Name,role,account_status) values(?,?,?,?,?)").run(id, id, id, 'student', 'Active'); }
-sql.exec("insert into Enrollments(Course_ID,Student_ID) values('CINV','E1'),('CINV','E2'),('CLIVE','E2'),('CINV','E3')");
+for (const [id, status] of [['E5', 'UD'], ['E6', 'Suspended'], ['E7', 'Dropped'], ['E8', 'Graduated'], ['E9', 'Inactive']]) { sql.prepare("insert into Users(User_ID,Username,Name,role,account_status) values(?,?,?,?,?)").run(id, id, id, 'student', status); }
+sql.exec("insert into Enrollments(Course_ID,Student_ID) values('CINV','E1'),('CINV','E2'),('CLIVE','E2'),('CINV','E3'),('CINV','E5'),('CINV','E6'),('CINV','E7'),('CINV','E8'),('CINV','E9')");
 const later = Date.parse('2027-01-04T00:00:00+08:00');
 const preCount = await sweepEndedAccounts(env, { dryRun: true, now: later });
 const swept = await sweepEndedAccounts(env, { now: later });
@@ -372,11 +373,32 @@ const eSt = (id) => sql.prepare("select account_status s from Users where User_I
 ok('students whose classes all ended are deactivated', eSt('E1') === 'Inactive' && eSt('E3') === 'Inactive' && swept >= 2 && preCount === swept, `${preCount} ${swept}`);
 ok('a student with a class still running stays active', eSt('E2') === 'Active');
 ok('a student with no class is left alone', eSt('E4') === 'Active');
+ok('only Active accounts are changed: UD, Suspended, Dropped, Graduated stay as they are', eSt('E5') === 'UD' && eSt('E6') === 'Suspended' && eSt('E7') === 'Dropped' && eSt('E8') === 'Graduated' && eSt('E9') === 'Inactive');
 const early = await sweepEndedAccounts(env, { dryRun: true, now: Date.parse('2026-12-25T00:00:00+08:00') });
 ok('nothing is deactivated before the 2 weeks pass', early === 0, String(early));
 sql.exec("delete from Enrollments where Student_ID like 'E%'; delete from Users where User_ID like 'E%'; delete from Courses where Course_ID='CLIVE'; delete from App_Settings where Key='term_ends'");
 
 sql.exec("delete from Enrollments where Student_ID like 'Q%'"); sql.exec("delete from Users where User_ID like 'Q%'"); sql.exec("delete from Courses where Course_ID='CINV'");
+
+// ---- forgot password: ask the lecturer ----
+const rq = (identifier) => call('POST', '/api/request-password-reset', { body: { identifier } });
+const known = await rq('stu1'), byNo = await rq('nobody-here'), lecId = await rq('lec1');
+ok('the answer is the same whether the account exists or not', known.s === 200 && byNo.s === 200 && known.j.message === byNo.j.message && lecId.j.message === known.j.message);
+ok('only a student gets a request', !!sql.prepare("select 1 x from Password_Reset_Requests where User_ID='S1'").get() && !sql.prepare("select 1 x from Password_Reset_Requests where User_ID in ('L1')").get());
+sql.exec("insert into Users(User_ID,Username,Name,role,account_status,Student_Number,Email) values('NOCLASS','noclass','No Class','student','Inactive','25-0999','nc@x.com')");
+await rq('25-0999');
+const lst = async (tok, id) => (await call('GET', `/api/password-reset-requests?lecturerId=${id}`, { token: tok })).j.requests?.map(r => r.User_ID) || [];
+const l2Tok = (await login('lec2')).j.token;
+const lec1List = await lst(l1.j.token, 'L1'), lec2List = await lst(l2Tok, 'L2');
+ok('the lecturer of the class sees the request', lec1List.includes('S1') && lec1List.includes('NOCLASS'));
+ok('another lecturer does not see a student of someone else, but sees one with no class', !lec2List.includes('S1') && lec2List.includes('NOCLASS'));
+ok('a student cannot read the requests', (await call('GET', '/api/password-reset-requests?lecturerId=L1', { token: s2b.j.token })).s === 403);
+ok('a lecturer cannot read another lecturer\'s list', (await call('GET', '/api/password-reset-requests?lecturerId=L2', { token: l1.j.token })).s === 403);
+const rsReq = await call('POST', '/api/reset-student-password', { token: l1.j.token, body: { studentId: 'S1' } });
+ok('resetting the password clears the request', rsReq.s === 200 && !sql.prepare("select 1 x from Password_Reset_Requests where User_ID='S1'").get());
+await call('POST', '/api/dismiss-password-request', { token: l1.j.token, body: { studentId: 'NOCLASS' } });
+ok('a request can be dismissed', !sql.prepare("select 1 x from Password_Reset_Requests where User_ID='NOCLASS'").get());
+sql.exec("delete from Users where User_ID='NOCLASS'");
 
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----
 import { readFileSync, readdirSync } from 'node:fs';

@@ -13,6 +13,8 @@ import './year-advance.js';
 import './current-term.js';
 import './edit-student.js';
 import './class-invite.js';
+import './password-requests.js';
+import './forgot-password.js';
 import './duplicate-course.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 

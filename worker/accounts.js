@@ -5,7 +5,7 @@ import { findClassByCode, ensureEnrolled } from './join.js';
 import { signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL, getCurrentTerm, validTerm, getTermEnds, termKey } from './shared.js';
-import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings } from './schema.js';
+import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings, ensurePasswordResetRequests } from './schema.js';
 import { gasUrl } from './gas.js';
 
 const MAX_AVATAR_B64 = 8000000;   // about 6 MB of photo; the app shrinks pictures to about 150 KB before sending
@@ -390,6 +390,48 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         return new Response(JSON.stringify({ success: true, student: { User_ID: stu.User_ID, ...f, eye_condition: eye } }), { status: 200, headers: corsHeaders });
     }
 
+    // A student who forgot their password asks their lecturer. The answer is always the same so nobody
+    // can use this to find out which accounts exist.
+    if (request.method === "POST" && path === "/api/request-password-reset") {
+        const body = await request.json();
+        const id = String(body.identifier || "").trim();
+        const same = new Response(JSON.stringify({ success: true, message: "If that account exists, your lecturer has been asked to reset your password." }), { status: 200, headers: corsHeaders });
+        if (!id || id.length > 120) return same;
+        await ensurePasswordResetRequests(env);
+        const u = await env.DB.prepare(
+            `SELECT User_ID, role FROM Users WHERE Username COLLATE NOCASE = ? OR Student_Number COLLATE NOCASE = ? OR Email COLLATE NOCASE = ? OR Contact_Number = ?`
+        ).bind(id, id, id, id).first();
+        if (u && String(u.role || "").toLowerCase() === "student") {
+            const prev = await env.DB.prepare("SELECT Requested_At FROM Password_Reset_Requests WHERE User_ID = ?").bind(u.User_ID).first();
+            if (!prev || Date.now() - Date.parse(prev.Requested_At) > 60000) {
+                await env.DB.prepare("INSERT INTO Password_Reset_Requests (User_ID, Requested_At) VALUES (?, ?) ON CONFLICT(User_ID) DO UPDATE SET Requested_At = excluded.Requested_At").bind(u.User_ID, new Date().toISOString()).run();
+            }
+        }
+        return same;
+    }
+
+    // Requests a lecturer can act on: students in their classes, and students who are in no class yet.
+    if (request.method === "GET" && path === "/api/password-reset-requests") {
+        await ensurePasswordResetRequests(env);
+        const lecturerId = url.searchParams.get("lecturerId") || "";
+        const rows = await env.DB.prepare(
+            `SELECT r.User_ID, r.Requested_At, u.Name, u.Username, u.Student_Number, u.account_status,
+                    (SELECT GROUP_CONCAT(c.CourseCode, ', ') FROM Enrollments e JOIN Courses c ON c.Course_ID = e.Course_ID WHERE e.Student_ID = r.User_ID) AS Classes
+             FROM Password_Reset_Requests r JOIN Users u ON u.User_ID = r.User_ID
+             WHERE NOT EXISTS (SELECT 1 FROM Enrollments e0 WHERE e0.Student_ID = r.User_ID)
+                OR EXISTS (SELECT 1 FROM Enrollments e1 JOIN Courses c1 ON c1.Course_ID = e1.Course_ID WHERE e1.Student_ID = r.User_ID AND c1.Lecturer_ID = ?)
+             ORDER BY r.Requested_At DESC LIMIT 100`
+        ).bind(lecturerId).all();
+        return new Response(JSON.stringify({ success: true, requests: rows.results }), { status: 200, headers: corsHeaders });
+    }
+
+    if (request.method === "POST" && path === "/api/dismiss-password-request") {
+        const body = await request.json();
+        await ensurePasswordResetRequests(env);
+        await env.DB.prepare("DELETE FROM Password_Reset_Requests WHERE User_ID = ?").bind(body.studentId || "").run();
+        return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+    }
+
     if (request.method === "POST" && path === "/api/reset-student-password") {
         const body = await request.json();
         const { studentId } = body;
@@ -410,6 +452,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const newHash = await hashPassword(tempPassword, env);
         await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, studentId).run();
         if (authEnabled(env)) await markPasswordChanged(env, studentId);
+        try { await ensurePasswordResetRequests(env); await env.DB.prepare("DELETE FROM Password_Reset_Requests WHERE User_ID = ?").bind(studentId).run(); } catch (e) { /* the request list is tidied later */ }
 
         return new Response(JSON.stringify({ success: true, message: "Password reset successfully", tempPassword }), { status: 200, headers: corsHeaders });
     }

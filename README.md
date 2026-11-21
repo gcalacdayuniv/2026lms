@@ -460,6 +460,11 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - **Automatic deactivation:** a student becomes **Inactive** when every class they are in is archived, or ended. A class has ended 14 days after the **last day of its term**, which an admin sets in Admin tools > Academic Term > "Last day of this term (end of Finals)" (stored per term in `App_Settings` `term_ends`). With no last day set for a term, its classes never count as ended. Students with no class are left alone; classes with no academic year/semester only count when archived. Code: `worker/term-sweep.js`; runs when a class is archived and on about 1 request in 20 (at most every 6 hours, `last_end_sweep`).
 - Un-archiving a class does not re-activate students who were deactivated; they use the class code (or a lecturer sets them Active).
 
+## Forgot password: ask the lecturer
+- Sign-in screen > **Forgot password? Ask my lecturer to reset it** (type the username, student number or email first). `POST /api/request-password-reset` is public and always gives the same answer, so it cannot be used to find out which accounts exist. One open request per student (`Password_Reset_Requests`); only students can ask.
+- Lecturers see the requests in **Manage Users** (a red number on the tile and a panel at the top of the list): the students in their own classes, plus students who are in no class yet. **Reset password** gives a temporary password once (same as the class screen) and clears the request; **Dismiss** just clears it. `GET /api/password-reset-requests?lecturerId=`, `POST /api/dismiss-password-request`.
+- Account status rule: only **Active** accounts are ever changed automatically (class-ended deactivation). UD, Suspended, Dropped, Graduated and Inactive stay as they are, and a class code only activates an **Inactive** account.
+
 ## Edit Student Details (Manage Users)
 - Dashboard menu > Manage > **Manage Users** > **Edit details** on a student card (`js/edit-student.js`, endpoint `POST /api/admin-update-student`, lecturer only, students only).
 - Editable: name, student number (00-0000, must be unique), contact, email (unique), class course/year/section, program course/year/section, and the **eye condition tag** (No Eye Condition, Near Sighted, Far Sighted, Legally Blind). Legally Blind turns on the accessible read-aloud exam for that student.

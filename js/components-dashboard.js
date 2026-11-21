@@ -136,7 +136,8 @@ const DashboardUI = {
                             <span class="menu-tile-icon bg-orange-100 text-orange-700"><i class="fa-solid fa-turn-up" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Advance Year Level</span>
                         </button>
-                        <button type="button" id="openMuModalBtn" class="menu-tile">
+                        <button type="button" id="openMuModalBtn" class="menu-tile relative">
+                            <span id="muReqBadge" class="hidden absolute top-1.5 right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center" title="Password reset requests"></span>
                             <span class="menu-tile-icon bg-green-100 text-green-700"><i class="fa-solid fa-users-gear" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Manage Users</span>
                         </button>
@@ -224,6 +225,7 @@ const DashboardUI = {
                     <p class="text-[11px] text-gray-400 mt-1 sm:hidden"><i class="fa-solid fa-hand-pointer mr-1" aria-hidden="true"></i>Swipe a card right to activate, left for more statuses.</p>
                 </div>
 
+                <div id="muResetPanel" class="hidden mb-2"></div>
                 <div id="manageUsersList" class="flex-1 overflow-y-auto space-y-2 min-h-[300px] bg-gray-50 p-2 rounded border border-gray-200">
                 </div>
             </div>

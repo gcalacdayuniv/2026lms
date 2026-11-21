@@ -97,6 +97,11 @@ export async function ensureUserPrefs(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS User_Prefs (User_ID TEXT PRIMARY KEY, Paper TEXT, Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP)").run();
 }
 
+// A student who forgot their password asks their lecturer for a reset (one open request per student).
+export async function ensurePasswordResetRequests(env) {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Password_Reset_Requests (User_ID TEXT PRIMARY KEY, Requested_At TEXT)").run();
+}
+
 // Settings an admin lecturer sets for the whole school (for example the current academic term).
 export async function ensureAppSettings(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS App_Settings (Key TEXT PRIMARY KEY, Value TEXT, Updated_By TEXT, Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP)").run();

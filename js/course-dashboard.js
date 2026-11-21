@@ -8,6 +8,7 @@ import { formatSchedule } from './schedule-time.js';
 import { getLocalDateString } from './date-utils.js';
 import { getTerm, loadTerm } from './current-term.js';
 import { joinFormHtml } from './class-invite.js';
+import { refreshResetBadge } from './password-requests.js';
 
 // Maximum size of an uploaded submission file.
 const DASH_CACHE_PREFIX = 'dash_cache:';
@@ -851,7 +852,7 @@ export const CourseDashboard = {
         }
 
         // Refresh the shared current term in the background; the list repaints if it changed.
-        if (isLecturer) loadTerm();
+        if (isLecturer) { loadTerm(); refreshResetBadge(); }
 
         return isLecturer
             ? CourseDashboard.renderLecturerDashboard(container, mode)
