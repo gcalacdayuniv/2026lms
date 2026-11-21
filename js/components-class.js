@@ -913,11 +913,6 @@ export const ClassComponents = {
             <button type="button" class="open-add-student bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-md shadow-sm">Add students</button>
         </div>`;
 
-        const targetDisplay = [course.Target_Course, course.Target_Year, course.Target_Section].filter(Boolean).join(' ');
-        const audienceBadge = targetDisplay
-            ? `<span class="inline-block bg-blue-100 text-blue-800 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-200 uppercase align-middle ml-2 whitespace-nowrap">${escapeHtml(targetDisplay)} Only</span>`
-            : `<span class="inline-block bg-gray-100 text-gray-600 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border border-gray-200 uppercase align-middle ml-2 whitespace-nowrap">All Students</span>`;
-
         return `
             <header class="bg-blue-700 shadow-md fixed top-0 w-full z-40">
                 <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
@@ -934,7 +929,6 @@ export const ClassComponents = {
                             <span class="truncate max-w-full"><i class="fa-regular fa-clock mr-1" aria-hidden="true"></i>${escapeHtml(course.ScheduleDay)} | ${escapeHtml(course.TimePeriod)}</span>
                             <span class="flex items-center max-w-full min-w-0">
                                 <i class="fa-solid fa-door-open mr-1" aria-hidden="true"></i><span id="classRoomText" class="truncate" data-room="${escapeHtml(course.Room || '')}">${course.Room ? escapeHtml(course.Room) : '<span class="italic text-blue-200">No room</span>'}</span>
-                                ${audienceBadge}
                                 <button type="button" id="editRoomBtn" data-course-id="${escapeHtml(course.Course_ID)}" data-code="${escapeHtml(course.CourseCode || '')}" data-title="${escapeHtml(course.CourseTitle || '')}" data-day="${escapeHtml(course.ScheduleDay || '')}" data-time="${escapeHtml(course.TimePeriod || '')}" data-room="${escapeHtml(course.Room || '')}" data-target-course="${escapeHtml(course.Target_Course || '')}" data-target-year="${escapeHtml(course.Target_Year || '')}" data-target-section="${escapeHtml(course.Target_Section || '')}" data-academic-year="${escapeHtml(course.AcademicYear || '')}" data-semester="${escapeHtml(course.Semester || '')}" class="ml-1 w-7 h-7 inline-flex items-center justify-center rounded-md text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-white flex-shrink-0" aria-label="Edit class details" title="Edit class details"><i class="fa-solid fa-pen text-[11px]" aria-hidden="true"></i></button>
                             </span>
                         </div>

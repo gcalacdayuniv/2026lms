@@ -102,7 +102,7 @@ const DashboardUI = {
             <button type="button" class="class-tab" data-dash-tab="new"><i class="fa-solid fa-circle-plus" aria-hidden="true"></i><span>New</span></button>
             <button type="button" class="class-tab" data-dash-tab="admin"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>Admin</span></button>` : `
             <button type="button" class="class-tab" data-dash-tab="exams"><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>Exams</span></button>
-            <button type="button" class="class-tab" data-dash-tab="browse"><i class="fa-solid fa-book-open" aria-hidden="true"></i><span>Browse</span></button>`}
+            <button type="button" class="class-tab" data-dash-tab="browse"><i class="fa-solid fa-key" aria-hidden="true"></i><span>Join</span></button>`}
             <button type="button" class="class-tab" data-dash-tab="profile"><i class="fa-solid fa-circle-user" aria-hidden="true"></i><span>Profile</span></button>
         </nav>
     `,
@@ -420,27 +420,6 @@ const DashboardUI = {
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Classroom <span class="font-normal normal-case text-gray-400">(optional)</span></label>
                         <input type="text" id="courseRoom" maxlength="60" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. Room 204, Computer Lab 2">
-                    </div>
-
-                    <div class="border-t border-gray-200 pt-4 mt-4">
-                        <p class="text-xs font-bold text-gray-800 mb-2 uppercase">Target Audience (Restriction)</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Course</label>
-                                <select id="targetCourse" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
-                                    <option value="">All Courses</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Year</label>
-                                <input type="text" id="targetYear" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. 1">
-                            </div>
-                        </div>
-                        <div class="mt-4">
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Target Section</label>
-                            <input type="text" id="targetSection" class="w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm" placeholder="e.g. A">
-                        </div>
-                        <p class="text-[10px] text-gray-500 mt-1 italic">*Leave blank to make it available to all students.</p>
                     </div>
 
                     <button type="submit" id="addCourseBtn" class="form-save w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors mt-4">

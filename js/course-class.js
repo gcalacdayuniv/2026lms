@@ -597,33 +597,10 @@ const openEditClass = async (btn) => {
                     <div><label class="${LABEL}" for="ecTime">Time Period</label><input type="text" id="ecTime" required maxlength="60" class="${FIELD}" value="${escapeHtml(d.time)}" placeholder="9:00 AM - 12:00 PM"></div>
                 </div>
                 <div><label class="${LABEL}" for="ecRoom">Classroom <span class="font-normal normal-case text-gray-400">(optional)</span></label><input type="text" id="ecRoom" maxlength="60" class="${FIELD}" value="${escapeHtml(d.room)}"></div>
-                <div class="border-t border-gray-200 pt-4">
-                    <p class="text-xs font-bold text-gray-800 mb-2 uppercase">Target Audience (Restriction)</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><label class="${LABEL}" for="ecTargetCourse">Target Course</label>
-                            <select id="ecTargetCourse" class="${FIELD}"><option value="">All Courses</option>${d.targetCourse ? `<option value="${escapeHtml(d.targetCourse)}" selected>${escapeHtml(d.targetCourse)}</option>` : ''}</select></div>
-                        <div><label class="${LABEL}" for="ecTargetYear">Target Year</label><input type="text" id="ecTargetYear" maxlength="20" class="${FIELD}" value="${escapeHtml(d.targetYear)}" placeholder="e.g. 1"></div>
-                    </div>
-                    <div class="mt-4"><label class="${LABEL}" for="ecTargetSection">Target Section</label><input type="text" id="ecTargetSection" maxlength="20" class="${FIELD}" value="${escapeHtml(d.targetSection)}" placeholder="e.g. A"></div>
-                    <p class="text-[10px] text-gray-500 mt-1 italic">*Leave blank to make it available to all students. Students already enrolled stay enrolled.</p>
-                </div>
                 <button type="submit" id="ecSaveBtn" data-course-id="${escapeHtml(d.courseId)}" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors">Save changes</button>
             </form>
         </div>`;
     document.body.appendChild(m);
-    // Fill the target course list with the programs (the current value stays selected).
-    try {
-        const pr = await apiFetch(`/api/programs?_t=${Date.now()}`);
-        const sel = document.getElementById('ecTargetCourse');
-        if (sel && pr.programs) {
-            sel.innerHTML = '<option value="">All Courses</option>' +
-                pr.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
-            if (d.targetCourse && !pr.programs.some(p => p.ProgramCode === d.targetCourse)) {
-                sel.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(d.targetCourse)}">${escapeHtml(d.targetCourse)}</option>`);
-            }
-            sel.value = d.targetCourse || '';
-        }
-    } catch (err) { /* the current value is still listed */ }
 };
 
 const saveEditClass = async (form) => {
@@ -640,7 +617,7 @@ const saveEditClass = async (form) => {
             body: JSON.stringify({
                 courseId, lecturerId: AppState.user.User_ID,
                 courseCode: v('ecCode'), courseTitle: v('ecTitle'), scheduleDay: document.getElementById('ecDay').value, timePeriod: v('ecTime'),
-                room: v('ecRoom'), targetCourse: v('ecTargetCourse'), targetYear: v('ecTargetYear'), targetSection: v('ecTargetSection'),
+                room: v('ecRoom'),
                 academicYear: v('ecAY'), semester: document.getElementById('ecSemester').value
             })
         });

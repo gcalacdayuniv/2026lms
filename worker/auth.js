@@ -101,7 +101,7 @@ export const RULES = {
     'POST /api/current-term': { who: 'lecturer', mine: ['userId'] },
     'GET /api/courses': { who: 'any', self: ['studentId'] },
     'GET /api/my-courses': { who: 'any', mine: ['userId'], roleParam: 'role' },
-    'POST /api/enroll': { who: 'any', self: ['studentId'] },
+    'POST /api/enroll': { who: 'lecturer' },   // students join with an invite code (/api/join-class)
     'POST /api/join-class': { who: 'any', self: ['studentId'] },
     'GET /api/class-invite': { who: 'lecturer' },
     'POST /api/class-invite': { who: 'lecturer' },

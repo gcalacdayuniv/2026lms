@@ -372,18 +372,6 @@ export const CourseModule = {
             document.getElementById('detailsModal')?.classList.add('hidden');
         }
 
-        if (e.target.closest('.enroll-btn')) {
-            const confirmation = await UI.confirm({ title: 'Enroll in course', message: 'Are you sure you want to enroll in this course? This action cannot be undone.', confirmText: 'Enroll' });
-            if (!confirmation) {
-                return;
-            }
-
-            const btn = e.target.closest('.enroll-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            await CourseDashboard.enrollCourse(btn.dataset.id);
-        }
-
         if (e.target.closest('#openCourseMenuBtn')) {
             document.getElementById('courseMenuModal').classList.remove('hidden');
         }

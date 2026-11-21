@@ -150,16 +150,6 @@ const uploadChunked = async (meta, base64Data, setStatus) => {
 
 
 // ---- Dashboard templates (pure functions: data in, HTML out) ----
-// Reloads the program list into the "target course" dropdown of the Create Course form.
-const refreshProgramOptions = async () => {
-    const programsData = await apiFetch(`/api/programs?_t=${new Date().getTime()}`);
-    const targetCourseSelect = document.getElementById('targetCourse');
-    if (targetCourseSelect && programsData.programs) {
-        targetCourseSelect.innerHTML = '<option value="">All Courses</option>' +
-            programsData.programs.map(p => `<option value="${escapeHtml(p.ProgramCode)}">${escapeHtml(p.ProgramCode)}</option>`).join('');
-    }
-};
-
 const DAY_ORDER = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
 
 const parseTimeToMinutes = (timeStr) => {
@@ -359,32 +349,16 @@ const enrolledCourseCardHtml = (c) => `
                 </div>
             `;
 
-const availableCourseCardHtml = (c) => `
-                <div data-course-card data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.LecturerName].filter(Boolean).join(' ').toLowerCase())}" class="p-5 border rounded-xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start md:items-center transition hover:border-blue-300 gap-4">
-                    <div>
-                        <div class="font-black text-xl text-blue-700">${escapeHtml(c.CourseCode)}</div>
-                        <div class="text-gray-800 font-bold mb-2">${escapeHtml(c.CourseTitle)}</div>
-                        <div class="text-sm text-gray-600 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
-                        <div class="text-sm text-gray-600 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
-                        ${c.Room ? `<div class="text-sm text-gray-600 mt-1"><i class="fa-solid fa-door-open w-5 text-gray-400"></i> Room: ${escapeHtml(c.Room)}</div>` : ''}
-                    </div>
-                    <button data-id="${c.Course_ID}" class="enroll-btn w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-bold transition-colors">
-                        Enroll Now
-                    </button>
-                </div>
-            `;
-
-// Row of three tiles at the top of the student dashboard. Each scrolls to its section.
 const overviewTile = (target, icon, tone, value, label) =>
     `<button type="button" data-scroll-to="${target}" class="overview-tile"><span class="overview-icon ${tone}"><i class="fa-solid ${icon}" aria-hidden="true"></i></span><span class="overview-value">${escapeHtml(String(value))}</span><span class="overview-label">${escapeHtml(label)}</span></button>`;
 
-const studentOverviewHtml = (courses, pendingExams, availableCount) => {
+const studentOverviewHtml = (courses, pendingExams) => {
     const absences = courses.reduce((n, c) => n + (Number(c.Att_Absent) || 0), 0);
     const hasAtt = courses.some(c => c.Att_Present !== undefined && c.Att_Present !== null);
     return `<div class="grid grid-cols-3 gap-3">
         ${overviewTile('studentCoursesSection', 'fa-check-double', 'bg-green-100 text-green-700', courses.length, 'Enrolled')}
         ${overviewTile('studentExamsSection', 'fa-file-pen', 'bg-yellow-100 text-yellow-700', pendingExams, 'Exams to take')}
-        ${hasAtt ? overviewTile('studentCoursesSection', 'fa-user-xmark', 'bg-red-100 text-red-700', absences, 'Absences') : overviewTile('studentAvailableSection', 'fa-book-open', 'bg-blue-100 text-blue-700', availableCount, 'Available')}
+        ${hasAtt ? overviewTile('studentCoursesSection', 'fa-user-xmark', 'bg-red-100 text-red-700', absences, 'Absences') : overviewTile('joinClassSection', 'fa-key', 'bg-amber-100 text-amber-700', '+', 'Join a class')}
     </div>`;
 };
 
@@ -703,8 +677,6 @@ export const CourseDashboard = {
             successDiv.classList.remove('hidden');
             document.getElementById('addProgramForm').reset();
 
-            await refreshProgramOptions();
-
             setTimeout(() => {
                 successDiv.classList.add('hidden');
                 document.getElementById('apModal').classList.add('hidden');
@@ -733,9 +705,6 @@ export const CourseDashboard = {
             room: document.getElementById('courseRoom').value.trim(),
             academicYear: document.getElementById('courseAY').value.trim(),
             semester: document.getElementById('courseSemester').value,
-            targetCourse: document.getElementById('targetCourse').value.trim(),
-            targetYear: document.getElementById('targetYear').value.trim(),
-            targetSection: document.getElementById('targetSection').value.trim(),
             lecturerId: AppState.user.User_ID
         };
 
@@ -751,20 +720,6 @@ export const CourseDashboard = {
         } finally {
             btn.disabled = false;
             btn.innerHTML = 'Create Course';
-        }
-    },
-
-    enrollCourse: async (courseId) => {
-        try {
-            await apiFetch('/api/enroll', {
-                method: 'POST',
-                body: JSON.stringify({ courseId: courseId, studentId: AppState.user.User_ID })
-            });
-            UI.success('Enrolled in course');
-            await CourseDashboard.loadDashboardData('fresh');
-        } catch (err) {
-            UI.error(err.message);
-            await CourseDashboard.loadDashboardData('fresh');
         }
     },
 
@@ -832,16 +787,14 @@ export const CourseDashboard = {
             key: `${AppState.user.User_ID}:lecturer`,
             fetchFresh: async () => {
                 const ts = new Date().getTime();
-                const programs = refreshProgramOptions();
                 const data = await apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=lecturer&today=${getLocalDateString()}&_t=${ts}`);
-                await programs;
                 return data;
             }
         });
     },
 
     renderStudentDashboard: async (container, mode = 'open') => {
-        const paint = ({ myCoursesRes, allCoursesRes, examsRes }, isFresh = true) => {
+        const paint = ({ myCoursesRes, examsRes }, isFresh = true) => {
             const assignedExams = examsRes.exams || [];
             CourseExam.studentAssignedExams = assignedExams;
             if (examsRes.student) {
@@ -865,30 +818,16 @@ export const CourseDashboard = {
                 enrolledHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><div class="mx-auto mb-3 w-14 h-14 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-book-open" aria-hidden="true"></i></div><p class="font-bold text-gray-700">Not enrolled yet</p><p class="text-sm mt-1">Pick a course from Available Courses below.</p></div>';
             }
 
-            const availableCourses = allCoursesRes.courses.filter(c => !enrolledIds.includes(c.Course_ID));
-            let availableHtml = availableCourses.map(availableCourseCardHtml).join('');
-
-            if (!availableHtml) {
-                availableHtml = '<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No new courses available for enrollment.</div>';
-            }
-
             container.innerHTML = `
                 <div class="space-y-12 fade-in">
-                    ${studentOverviewHtml(myCoursesRes.courses, assignedExams.filter(e => e.status !== 'Completed').length, availableCourses.length)}
+                    ${studentOverviewHtml(myCoursesRes.courses, assignedExams.filter(e => e.status !== 'Completed').length)}
                     ${assignedExamsSectionHtml}
                     ${joinFormHtml()}
-                    ${(myCoursesRes.courses.length + availableCourses.length) >= 4 ? searchBarHtml() : ''}
+                    ${myCoursesRes.courses.length >= 4 ? searchBarHtml() : ''}
                     <section id="studentCoursesSection" class="scroll-mt-20">
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             ${enrolledHtml}
-                        </div>
-                    </section>
-
-                    <section id="studentAvailableSection" class="scroll-mt-20">
-                        <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center pt-8 border-t border-gray-200"><div class="bg-blue-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-book-open text-blue-600"></i></div>Available Courses</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            ${availableHtml}
                         </div>
                     </section>
                 </div>
@@ -903,12 +842,11 @@ export const CourseDashboard = {
             key: `${AppState.user.User_ID}:student`,
             fetchFresh: async () => {
                 const ts = new Date().getTime();
-                const [myCoursesRes, allCoursesRes, examsRes] = await Promise.all([
+                const [myCoursesRes, examsRes] = await Promise.all([
                     apiFetch(`/api/my-courses?userId=${AppState.user.User_ID}&role=student&_t=${ts}`),
-                    apiFetch(`/api/courses?studentId=${AppState.user.User_ID}&_t=${ts}`),
                     apiFetch(`/api/student-accessible-exams?studentId=${AppState.user.User_ID}&_t=${ts}`).catch(() => ({ exams: [] }))
                 ]);
-                return { myCoursesRes, allCoursesRes, examsRes };
+                return { myCoursesRes, examsRes };
             }
         });
     },

@@ -68,7 +68,7 @@ const copy = async () => {
 
 // Student: join a class by code. The form is drawn by the student dashboard.
 export const joinFormHtml = () => `
-    <section aria-label="Join a class with a code" class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
+    <section id="joinClassSection" aria-label="Join a class with a code" class="scroll-mt-20 bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5">
         <h2 class="text-base font-black text-gray-800 mb-1"><i class="fa-solid fa-key text-amber-600 mr-2" aria-hidden="true"></i>Join a class with a code</h2>
         <p class="text-xs text-gray-500 mb-3">Your lecturer gives you the class code.</p>
         <form id="joinClassForm" class="flex flex-col sm:flex-row gap-2" autocomplete="off">

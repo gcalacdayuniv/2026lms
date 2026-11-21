@@ -291,10 +291,13 @@ const inv = (await call('GET', `/api/class-invite?courseId=${invCourse.id}`, { t
 ok('owner gets an invite code', /^[A-Z2-9]{6}$/.test(inv.code || ''), JSON.stringify(inv));
 ok('code is stable until renewed', (await call('GET', `/api/class-invite?courseId=${invCourse.id}`, { token: l1.j.token })).j.code === inv.code);
 ok('another lecturer cannot read it', (await call('GET', `/api/class-invite?courseId=${invCourse.id}`, { token: l2.j.token })).s === 403);
+ok('existing classes all get a code too', sql.prepare("select count(*) n from Courses where Invite_Code is null or trim(Invite_Code)=''").get().n === 0);
+ok('codes are unique across classes', sql.prepare('select count(distinct Invite_Code) d, count(*) n from Courses').get().d === sql.prepare('select count(*) n from Courses').get().n);
 const joinTok = (await login('qstu1')).j.token, q2Tok = (await login('qstu2')).j.token;
 const jn = (tok, body) => call('POST', '/api/join-class', { token: tok, body });
 ok('student joins with the code (any case, spaced)', (await jn(joinTok, { studentId: 'Q1', code: ' ' + inv.code.toLowerCase().slice(0, 3) + '-' + inv.code.slice(3) + ' ' })).s === 201 && !!sql.prepare("select 1 x from Enrollments where Course_ID=? and Student_ID='Q1'").get(invCourse.id));
 ok('joining twice is refused', (await jn(joinTok, { studentId: 'Q1', code: inv.code })).s === 400);
+ok('a student can no longer enrol themselves without a code', (await call('POST', '/api/enroll', { token: q2Tok, body: { courseId: invCourse.id, studentId: 'Q2' } })).s === 403);
 ok('wrong code is refused', (await jn(q2Tok, { studentId: 'Q2', code: 'ZZZZZZ' })).s === 404);
 ok('a student cannot join as someone else', (await jn(joinTok, { studentId: 'Q2', code: inv.code })).s === 403);
 const inv2 = (await call('POST', '/api/class-invite', { token: l1.j.token, body: { courseId: invCourse.id, renew: true } })).j.code;

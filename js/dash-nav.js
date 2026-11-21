@@ -52,7 +52,7 @@ const openTab = (tab) => {
     const open = openPages();
     if (tab === 'exams' || tab === 'browse') {
         closeAllPages();
-        const found = scrollToId(tab === 'exams' ? 'studentExamsSection' : 'studentAvailableSection');
+        const found = scrollToId(tab === 'exams' ? 'studentExamsSection' : 'joinClassSection');
         if (!found && tab === 'exams') UI.info('No exams assigned to you right now');
         else scrollTab = tab;
         syncTabs();

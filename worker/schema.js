@@ -208,11 +208,30 @@ export async function ensureReactivationColumns(env) {
 }
 
 // Invite code a lecturer gives students so they can join a class themselves.
+// Letters and digits that are hard to mix up (no 0/O, 1/I).
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const newInviteCode = () => {
+    const b = crypto.getRandomValues(new Uint8Array(6));
+    return Array.from(b, x => CODE_CHARS[x % CODE_CHARS.length]).join("");
+};
+
+// Sets a fresh unique code on one class and returns it ('' if it could not).
+export async function setInviteCode(env, courseId) {
+    for (let i = 0; i < 8; i++) {
+        const c = newInviteCode();
+        try { await env.DB.prepare("UPDATE Courses SET Invite_Code = ? WHERE Course_ID = ?").bind(c, courseId).run(); return c; } catch (e) { /* clashed with another class: try again */ }
+    }
+    return "";
+}
+
+// Adds the column once and gives EVERY class that has no code one (existing classes included).
 let inviteReady = false;
 export async function ensureInviteCode(env) {
     if (inviteReady) return;
     try { await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Invite_Code TEXT").run(); } catch (e) { /* already there */ }
     await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_invite ON Courses (Invite_Code)").run();
+    const missing = (await env.DB.prepare("SELECT Course_ID FROM Courses WHERE Invite_Code IS NULL OR TRIM(Invite_Code) = ''").all()).results || [];
+    for (const r of missing) await setInviteCode(env, r.Course_ID);
     inviteReady = true;
 }
 

@@ -1,7 +1,7 @@
 // worker/courses.js
 // Programs, classes (create, copy, edit, archive), enrollment, rosters, student details, lecturer notes and groups.
 
-import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode } from './schema.js';
+import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode } from './schema.js';
 import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
 
 // Academic year ("2026-2027", second year = first + 1) and semester are both optional.
@@ -18,13 +18,6 @@ function cleanTerm(ay, sem) {
 }
 
 // Returns a Response when the request is handled here, otherwise null.
-// Letters and digits that are hard to mix up (no 0/O, 1/I).
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const newInviteCode = () => {
-    const b = crypto.getRandomValues(new Uint8Array(6));
-    return Array.from(b, x => CODE_CHARS[x % CODE_CHARS.length]).join("");
-};
-
 // Enrol one student in one class; shared by lecturer enrol, class catalog and invite code.
 async function enrollStudent(env, courseId, studentId) {
     const existing = await env.DB.prepare(
@@ -102,6 +95,8 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             `INSERT INTO Courses (Course_ID, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Target_Course, Target_Year, Target_Section, Room, AcademicYear, Semester) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(courseId, body.courseCode, body.courseTitle, body.scheduleDay, body.timePeriod, body.lecturerId, targetCourse, targetYear, targetSection, room, term.academicYear, term.semester).run();
 
+        try { await ensureInviteCode(env); await setInviteCode(env, courseId); } catch (e) { /* the code is made when the lecturer first opens it */ }
+
         return new Response(JSON.stringify({ success: true, message: "Course created successfully" }), { status: 201, headers: corsHeaders });
     }
 
@@ -138,6 +133,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             ).bind(crypto.randomUUID(), newId, l.Exam_ID, aId, l.Term || "MidTerm", l.Category || "MajorExam", l.Time_Limit || null));
         }
         for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
+        try { await ensureInviteCode(env); await setInviteCode(env, newId); } catch (e) { /* made when first opened */ }
         return new Response(JSON.stringify({ success: true, courseId: newId, exams: links.length }), { status: 201, headers: corsHeaders });
     }
 
@@ -158,7 +154,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
     // Lecturer edits the details of a class: code, title, schedule, room and target audience.
     if (request.method === "POST" && path === "/api/update-course") {
         const body = await request.json();
-        const course = await env.DB.prepare("SELECT Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
+        const course = await env.DB.prepare("SELECT Lecturer_ID, Target_Course, Target_Year, Target_Section FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
         if (!course) {
             return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
         }
@@ -170,7 +166,10 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
         const d = {
             code: clean(body.courseCode, 40), title: clean(body.courseTitle, 200),
             day: clean(body.scheduleDay, 20), time: clean(body.timePeriod, 60), room: clean(body.room, 60),
-            tc: clean(body.targetCourse, 60), ty: clean(body.targetYear, 20), ts: clean(body.targetSection, 20)
+            // The target audience is no longer edited (students join with a code); an old value is kept as it is.
+            tc: body.targetCourse === undefined ? (course.Target_Course || "") : clean(body.targetCourse, 60),
+            ty: body.targetYear === undefined ? (course.Target_Year || "") : clean(body.targetYear, 20),
+            ts: body.targetSection === undefined ? (course.Target_Section || "") : clean(body.targetSection, 20)
         };
         if (!d.code || !d.title || !d.time) {
             return new Response(JSON.stringify({ error: "Course code, title and time are required." }), { status: 400, headers: corsHeaders });
@@ -289,12 +288,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
         const crs = await env.DB.prepare("SELECT Course_ID, Invite_Code FROM Courses WHERE Course_ID = ?").bind(courseId || "").first();
         if (!crs) return new Response(JSON.stringify({ error: "Class not found." }), { status: 404, headers: corsHeaders });
         let code = crs.Invite_Code;
-        if (!code || body.renew) {
-            for (let i = 0; i < 8; i++) {
-                const c = newInviteCode();
-                try { await env.DB.prepare("UPDATE Courses SET Invite_Code = ? WHERE Course_ID = ?").bind(c, crs.Course_ID).run(); code = c; break; } catch (e) { /* clashed with another class: try again */ }
-            }
-        }
+        if (!code || body.renew) code = (await setInviteCode(env, crs.Course_ID)) || code;
         return new Response(JSON.stringify({ success: true, code }), { status: 200, headers: corsHeaders });
     }
 
