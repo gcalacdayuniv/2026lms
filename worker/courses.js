@@ -1,7 +1,7 @@
 // worker/courses.js
 // Programs, classes (create, copy, edit, archive), enrollment, rosters, student details, lecturer notes and groups.
 
-import { ensureLecturerNotes, ensureReactivationColumns } from './schema.js';
+import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode } from './schema.js';
 import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
 
 // Academic year ("2026-2027", second year = first + 1) and semester are both optional.
@@ -18,6 +18,44 @@ function cleanTerm(ay, sem) {
 }
 
 // Returns a Response when the request is handled here, otherwise null.
+// Letters and digits that are hard to mix up (no 0/O, 1/I).
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const newInviteCode = () => {
+    const b = crypto.getRandomValues(new Uint8Array(6));
+    return Array.from(b, x => CODE_CHARS[x % CODE_CHARS.length]).join("");
+};
+
+// Enrol one student in one class; shared by lecturer enrol, class catalog and invite code.
+async function enrollStudent(env, courseId, studentId) {
+    const existing = await env.DB.prepare(
+        `SELECT Enrollment_ID FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
+    ).bind(courseId, studentId).first();
+    if (existing) return { error: "You are already enrolled in this course." };
+
+    await env.DB.prepare(
+        `INSERT INTO Enrollments (Enrollment_ID, Course_ID, Student_ID) VALUES (?, ?, ?)`
+    ).bind(crypto.randomUUID(), courseId, studentId).run();
+
+    // A student set Inactive by Advance Year Level is reactivated when enrolled in a class of the term they were
+    // advanced into, or of the current term.
+    let reactivated = false;
+    try {
+        await ensureReactivationColumns(env);
+        const stu = await env.DB.prepare("SELECT account_status, Advanced_Term FROM Users WHERE User_ID = ?").bind(studentId).first();
+        if (stu && stu.Advanced_Term && String(stu.account_status || "").toLowerCase() === "inactive") {
+            const crs = await env.DB.prepare("SELECT AcademicYear, Semester FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+            const now = await getCurrentTerm(env);
+            const thisYear = crs && crs.AcademicYear && crs.AcademicYear === stu.Advanced_Term;
+            const thisTerm = crs && crs.AcademicYear === now.ay && (!crs.Semester || crs.Semester === now.sem);
+            if (thisYear || thisTerm) {
+                await env.DB.prepare(`UPDATE Users SET account_status = 'Active', ${CLEAR_REACTIVATION_SQL} WHERE User_ID = ?`).bind(studentId).run();
+                reactivated = true;
+            }
+        }
+    } catch (e) { /* enrollment is saved; reactivation can be done by hand */ }
+    return { reactivated };
+}
+
 export async function handleCourses(request, env, path, url, corsHeaders) {
     if (request.method === "POST" && path === "/api/programs") {
         const body = await request.json();
@@ -222,39 +260,42 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
 
     if (request.method === "POST" && path === "/api/enroll") {
         const body = await request.json();
+        const r = await enrollStudent(env, body.courseId, body.studentId);
+        if (r.error) return new Response(JSON.stringify({ error: r.error }), { status: 400, headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, reactivated: r.reactivated }), { status: 201, headers: corsHeaders });
+    }
 
-        const existing = await env.DB.prepare(
-            `SELECT Enrollment_ID FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?`
-        ).bind(body.courseId, body.studentId).first();
-
-        if (existing) {
-            return new Response(JSON.stringify({ error: "You are already enrolled in this course." }), { status: 400, headers: corsHeaders });
+    // A student joins a class with the invite code the lecturer gave them.
+    if (request.method === "POST" && path === "/api/join-class") {
+        const body = await request.json();
+        const code = String(body.code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+        const me = await env.DB.prepare("SELECT role FROM Users WHERE User_ID = ?").bind(body.studentId || "").first();
+        if (!me || String(me.role).toLowerCase() !== "student") {
+            return new Response(JSON.stringify({ error: "Only students can join with a code." }), { status: 403, headers: corsHeaders });
         }
+        await ensureInviteCode(env);
+        const crs = code.length >= 6 ? await env.DB.prepare("SELECT Course_ID, CourseCode, CourseTitle FROM Courses WHERE Invite_Code = ? AND COALESCE(Archived, 0) = 0").bind(code).first() : null;
+        if (!crs) return new Response(JSON.stringify({ error: "That code is not valid. Check it with your lecturer." }), { status: 404, headers: corsHeaders });
+        const r = await enrollStudent(env, crs.Course_ID, body.studentId);
+        if (r.error) return new Response(JSON.stringify({ error: r.error }), { status: 400, headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, reactivated: r.reactivated, course: { Course_ID: crs.Course_ID, CourseCode: crs.CourseCode, CourseTitle: crs.CourseTitle } }), { status: 201, headers: corsHeaders });
+    }
 
-        const enrollId = crypto.randomUUID();
-        await env.DB.prepare(
-            `INSERT INTO Enrollments (Enrollment_ID, Course_ID, Student_ID) VALUES (?, ?, ?)`
-        ).bind(enrollId, body.courseId, body.studentId).run();
-
-        // A student set Inactive by Advance Year Level is reactivated when enrolled in a class of the term they were
-        // advanced into, or of the current term.
-        let reactivated = false;
-        try {
-            await ensureReactivationColumns(env);
-            const stu = await env.DB.prepare("SELECT account_status, Advanced_Term FROM Users WHERE User_ID = ?").bind(body.studentId).first();
-            if (stu && stu.Advanced_Term && String(stu.account_status || "").toLowerCase() === "inactive") {
-                const crs = await env.DB.prepare("SELECT AcademicYear, Semester FROM Courses WHERE Course_ID = ?").bind(body.courseId).first();
-                const now = await getCurrentTerm(env);
-                const thisYear = crs && crs.AcademicYear && crs.AcademicYear === stu.Advanced_Term;
-                const thisTerm = crs && crs.AcademicYear === now.ay && (!crs.Semester || crs.Semester === now.sem);
-                if (thisYear || thisTerm) {
-                    await env.DB.prepare(`UPDATE Users SET account_status = 'Active', ${CLEAR_REACTIVATION_SQL} WHERE User_ID = ?`).bind(body.studentId).run();
-                    reactivated = true;
-                }
+    // The class owner reads (or renews) the invite code.
+    if (path === "/api/class-invite" && (request.method === "GET" || request.method === "POST")) {
+        const body = request.method === "POST" ? await request.json() : {};
+        const courseId = request.method === "POST" ? body.courseId : url.searchParams.get("courseId");
+        await ensureInviteCode(env);
+        const crs = await env.DB.prepare("SELECT Course_ID, Invite_Code FROM Courses WHERE Course_ID = ?").bind(courseId || "").first();
+        if (!crs) return new Response(JSON.stringify({ error: "Class not found." }), { status: 404, headers: corsHeaders });
+        let code = crs.Invite_Code;
+        if (!code || body.renew) {
+            for (let i = 0; i < 8; i++) {
+                const c = newInviteCode();
+                try { await env.DB.prepare("UPDATE Courses SET Invite_Code = ? WHERE Course_ID = ?").bind(c, crs.Course_ID).run(); code = c; break; } catch (e) { /* clashed with another class: try again */ }
             }
-        } catch (e) { /* enrollment is saved; reactivation can be done by hand */ }
-
-        return new Response(JSON.stringify({ success: true, reactivated }), { status: 201, headers: corsHeaders });
+        }
+        return new Response(JSON.stringify({ success: true, code }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/unenroll") {
@@ -347,7 +388,8 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
 
     if (request.method === "GET" && path === "/api/unenrolled-students") {
         const courseId = url.searchParams.get("courseId");
-        const courseFilter = url.searchParams.get("courseFilter");
+        // Manual enrolment by a lecturer works on the student's PROGRAM (course, year, section).
+        const courseFilter = (url.searchParams.get("courseFilter") || "").trim();
         const yearFilter = url.searchParams.get("yearFilter");
         const sectionFilter = url.searchParams.get("sectionFilter");
         const statusFilter = url.searchParams.get("statusFilter");
@@ -367,15 +409,15 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             params.push(statusFilter);
         }
         if (courseFilter) {
-            query += ` AND course COLLATE NOCASE = ?`;
+            query += ` AND TRIM(COALESCE(Program_Course, '')) COLLATE NOCASE = ?`;
             params.push(courseFilter);
         }
         if (yearFilter) {
-            query += ` AND year COLLATE NOCASE = ?`;
+            query += ` AND TRIM(COALESCE(Program_Year, '')) COLLATE NOCASE = ?`;
             params.push(yearFilter);
         }
         if (sectionFilter) {
-            query += ` AND section COLLATE NOCASE = ?`;
+            query += ` AND TRIM(COALESCE(Program_Section, '')) COLLATE NOCASE = ?`;
             params.push(sectionFilter);
         }
 

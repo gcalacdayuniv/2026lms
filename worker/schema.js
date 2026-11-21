@@ -207,6 +207,15 @@ export async function ensureReactivationColumns(env) {
     reactivationReady = true;
 }
 
+// Invite code a lecturer gives students so they can join a class themselves.
+let inviteReady = false;
+export async function ensureInviteCode(env) {
+    if (inviteReady) return;
+    try { await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Invite_Code TEXT").run(); } catch (e) { /* already there */ }
+    await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_invite ON Courses (Invite_Code)").run();
+    inviteReady = true;
+}
+
 // Indexes for the tables every class screen reads. Created once per Worker start; a table that does not exist yet
 // (some are created on first use) is skipped and tried again on the next start. Plain indexes only, so existing data is never rejected.
 let coreIndexesReady = false;

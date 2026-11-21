@@ -398,7 +398,6 @@ export const CourseClass = {
             }
 
             const html = data.students.map(s => {
-                const displayCourse = `${s.course || ''} ${s.year || ''} ${s.section ? '- ' + s.section : ''}`.trim();
                 const displayProgram = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
                 const statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
                     s.account_status === 'Active' ? 'text-green-600 border-green-200 bg-green-50' :
@@ -415,9 +414,8 @@ export const CourseClass = {
                                 ${escapeHtml(s.Name)} ${statusBadge}
                             </div>
                             <div class="text-[11px] text-gray-500 mt-0.5">
-                                <span class="font-bold text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayCourse || 'N/A')}
+                                <span class="font-bold text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; <span class="text-blue-700 font-medium"><i class="fa-solid fa-graduation-cap mr-1" aria-hidden="true"></i>${escapeHtml(displayProgram || 'No program set')}</span>
                             </div>
-                            ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${escapeHtml(displayProgram)}</div>` : ''}
                         </div>
                         <button type="button" data-student-id="${s.User_ID}" class="lecturer-enroll-btn bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition">
                             Enroll

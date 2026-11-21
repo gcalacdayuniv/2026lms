@@ -442,9 +442,12 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - The **class** course, year and section (`Users.course/year/section`) are for enrolling in classes: they decide which classes a student can see and join.
 - Both groups are editable by a lecturer in Manage Users > Edit details. Advance Year Level groups students by Program course (falls back to the class course for older accounts with no program).
 
-## TEMPORARY: Fill Program Details
-- Admin tools > Manage > **Fill Program Details** copies each student's class course, year and section into a blank Program course, year and section (only the blank ones; filled ones are never changed). It shows how many will change and asks to confirm first.
-- Files to delete once every student has a program: `js/temp-fill-program.js`, its import in `js/course.js`, the `fillProgramBtn` tile in `js/components-dashboard.js`, `POST /api/fill-program-course` in `worker/accounts.js` and `worker/auth.js`, and its test block in `tools/tests/worker.test.mjs`.
+## Enrolling: by program (lecturer) and by invite code (student)
+- **Lecturer, Enroll Student:** the list and its filters use the student's **Program** course, year and section (`Program_*`), and each row shows the program. `GET /api/unenrolled-students` filters on `Program_Course/Year/Section`.
+- **Invite code:** every class has a 6-character code (`Courses.Invite_Code`, created on first view, letters and digits without 0/O/1/I). The class menu > **Invite Code** shows it with Copy and **New code** (the old code stops working; enrolled students stay). Endpoints: `GET/POST /api/class-invite` (class owner only).
+- **Student:** the dashboard has **Join a class with a code**. `POST /api/join-class` (students only, for themselves) enrols them with the same rules as the class list (`enrollStudent` in `worker/courses.js`, including re-activation of an advanced student). Archived classes cannot be joined.
+- The class catalog on the student dashboard (classes matching the class course/year/section) is unchanged for now.
+- The temporary Fill Program Details tool has been removed.
 
 ## Edit Student Details (Manage Users)
 - Dashboard menu > Manage > **Manage Users** > **Edit details** on a student card (`js/edit-student.js`, endpoint `POST /api/admin-update-student`, lecturer only, students only).

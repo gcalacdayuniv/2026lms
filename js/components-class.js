@@ -54,6 +54,10 @@ const ClassUI = {
                             <span class="menu-tile-icon bg-green-100 text-green-700"><i class="fa-solid fa-user-plus" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Enroll Student</span>
                         </button>
+                        <button type="button" id="openInviteBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-amber-100 text-amber-700"><i class="fa-solid fa-key" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Invite Code</span>
+                        </button>
                         <button type="button" id="copyEmailsBtn" class="menu-tile">
                             <span class="menu-tile-icon bg-blue-100 text-blue-700"><i class="fa-regular fa-copy" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Copy Emails</span>
@@ -638,11 +642,11 @@ const ClassUI = {
                             ${[['', 'Default order'], ['name', 'Sort: Name (A-Z)'], ['number', 'Sort: Student number']].map(([v, l]) => `<option value="${v}"${v === savedStudentSort() ? ' selected' : ''}>${l}</option>`).join('')}
                         </select>
                         <select id="filterCourse" class="w-full sm:w-32 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
-                            <option value="">Course (All)</option>
+                            <option value="">Program (All)</option>
                         </select>
                         <div class="flex gap-2 w-full sm:w-auto">
-                            <input type="text" id="filterYear" placeholder="Year" class="w-full sm:w-20 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
-                            <input type="text" id="filterSection" placeholder="Section" class="w-full sm:w-24 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                            <input type="text" id="filterYear" aria-label="Program year" placeholder="Prog. year" class="w-full sm:w-20 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
+                            <input type="text" id="filterSection" aria-label="Program section" placeholder="Prog. section" class="w-full sm:w-24 px-2 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 bg-gray-50">
                         </div>
                     </div>
                 </div>

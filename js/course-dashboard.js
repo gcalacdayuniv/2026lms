@@ -7,6 +7,7 @@ import { escapeHtml } from './html-utils.js';
 import { formatSchedule } from './schedule-time.js';
 import { getLocalDateString } from './date-utils.js';
 import { getTerm, loadTerm } from './current-term.js';
+import { joinFormHtml } from './class-invite.js';
 
 // Maximum size of an uploaded submission file.
 const DASH_CACHE_PREFIX = 'dash_cache:';
@@ -875,6 +876,7 @@ export const CourseDashboard = {
                 <div class="space-y-12 fade-in">
                     ${studentOverviewHtml(myCoursesRes.courses, assignedExams.filter(e => e.status !== 'Completed').length, availableCourses.length)}
                     ${assignedExamsSectionHtml}
+                    ${joinFormHtml()}
                     ${(myCoursesRes.courses.length + availableCourses.length) >= 4 ? searchBarHtml() : ''}
                     <section id="studentCoursesSection" class="scroll-mt-20">
                         <h2 class="text-2xl font-black mb-6 text-gray-800 flex items-center"><div class="bg-green-100 p-2 rounded-lg mr-3"><i class="fa-solid fa-check-double text-green-600"></i></div>My Active Courses</h2>
