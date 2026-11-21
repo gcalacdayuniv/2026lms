@@ -315,13 +315,15 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         return new Response(JSON.stringify({ success: true, message: "Details updated successfully" }), { status: 200, headers: corsHeaders });
     }
 
-    // TEMPORARY (remove when every student has a program): copy the class course into a blank Program Course.
+    // TEMPORARY (remove when every student has a program): copy the class course, year and section into blank Program fields.
     if (request.method === "POST" && path === "/api/fill-program-course") {
         const body = await request.json();
-        const where = "role COLLATE NOCASE = 'student' AND (Program_Course IS NULL OR TRIM(Program_Course) = '') AND course IS NOT NULL AND TRIM(course) <> ''";
+        const gap = (prog, cls) => `((${prog} IS NULL OR TRIM(${prog}) = '') AND ${cls} IS NOT NULL AND TRIM(${cls}) <> '')`;
+        const fill = (prog, cls) => `${prog} = CASE WHEN ${gap(prog, cls)} THEN TRIM(${cls}) ELSE ${prog} END`;
+        const where = `role COLLATE NOCASE = 'student' AND (${gap('Program_Course', 'course')} OR ${gap('Program_Year', 'year')} OR ${gap('Program_Section', 'section')})`;
         const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM Users WHERE ${where}`).first();
         if (body.dryRun) return new Response(JSON.stringify({ success: true, count: row.n }), { status: 200, headers: corsHeaders });
-        await env.DB.prepare(`UPDATE Users SET Program_Course = TRIM(course) WHERE ${where}`).run();
+        await env.DB.prepare(`UPDATE Users SET ${fill('Program_Course', 'course')}, ${fill('Program_Year', 'year')}, ${fill('Program_Section', 'section')} WHERE ${where}`).run();
         return new Response(JSON.stringify({ success: true, count: row.n, filled: row.n }), { status: 200, headers: corsHeaders });
     }
 

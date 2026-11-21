@@ -277,17 +277,18 @@ await ed(l1.j.token, { ...base, studentId: 'S2', name: 'Student Two', studentNum
 ok('duplicate student number rejected', (await ed(l1.j.token, { ...base, studentId: 'S2', name: 'Student Two', studentNumber: '24-0001', contact: '0918', email: 'two@x.com' })).s === 400);
 ok('clearing eye condition resets it', (await ed(l1.j.token, { ...base, eyeCondition: 'No Eye Condition' })).s === 200 && sql.prepare("select eye_condition e from Users where User_ID='S1'").get().e === 'No Eye Condition');
 
-// ---- TEMPORARY: fill blank Program Course from class course ----
+// ---- TEMPORARY: fill blank Program course/year/section from the class fields ----
 sql.exec("delete from Users where User_ID like 'P%'");
-const addP = (id, prog, course) => sql.prepare("insert into Users(User_ID, Username, Name, role, account_status, Program_Course, course) values(?,?,?,?,?,?,?)").run(id, id, id, 'student', 'Active', prog, course);
-addP('P1', null, 'BSIT'); addP('P2', '', ' BSCS '); addP('P3', 'BSArch', 'BSIT'); addP('P4', null, null);
+const addP = (id, p, py, ps, c, y, sc) => sql.prepare("insert into Users(User_ID, Username, Name, role, account_status, Program_Course, Program_Year, Program_Section, course, year, section) values(?,?,?,?,?,?,?,?,?,?,?)").run(id, id, id, 'student', 'Active', p, py, ps, c, y, sc);
+addP('P1', null, null, null, 'BSIT', '2', '3'); addP('P2', '', ' ', '', ' BSCS ', '4', 'B'); addP('P3', 'BSArch', '5', '1', 'BSIT', '2', '3'); addP('P4', null, null, null, null, null, null); addP('P5', 'BSArch', null, null, 'BSIT', '3', '2');
 const fl = (who, body) => call('POST', '/api/fill-program-course', { token: who, body });
-ok('dry run counts blanks without changing them', (await fl(l1.j.token, { dryRun: true })).j.count >= 2 && sql.prepare("select Program_Course p from Users where User_ID='P1'").get().p === null);
+ok('dry run counts blanks without changing them', (await fl(l1.j.token, { dryRun: true })).j.count >= 3 && sql.prepare("select Program_Course p from Users where User_ID='P1'").get().p === null);
 ok('student cannot run it', (await fl(s2b.j.token, {})).s === 403);
 await fl(l1.j.token, {});
-const pc = (id) => sql.prepare("select Program_Course p from Users where User_ID=?").get(id).p;
-ok('blank program course takes the class course', pc('P1') === 'BSIT' && pc('P2') === 'BSCS');
-ok('existing program course is kept, no class course stays blank', pc('P3') === 'BSArch' && pc('P4') === null);
+const pr = (id) => { const r = sql.prepare("select Program_Course c, Program_Year y, Program_Section s from Users where User_ID=?").get(id); return `${r.c}|${r.y}|${r.s}`; };
+ok('blank program course, year and section take the class ones', pr('P1') === 'BSIT|2|3' && pr('P2') === 'BSCS|4|B', pr('P1') + ' ' + pr('P2'));
+ok('filled ones are kept, only blanks are filled', pr('P3') === 'BSArch|5|1' && pr('P5') === 'BSArch|3|2', pr('P3') + ' ' + pr('P5'));
+ok('nothing to copy stays blank', pr('P4') === 'null|null|null', pr('P4'));
 sql.exec("delete from Users where User_ID like 'P%'");
 
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----

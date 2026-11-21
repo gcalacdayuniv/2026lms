@@ -442,8 +442,8 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - The **class** course, year and section (`Users.course/year/section`) are for enrolling in classes: they decide which classes a student can see and join.
 - Both groups are editable by a lecturer in Manage Users > Edit details. Advance Year Level groups students by Program course (falls back to the class course for older accounts with no program).
 
-## TEMPORARY: Fill Program Course
-- Admin tools > Manage > **Fill Program Course** copies each student's class course into a blank Program Course (students who already have one are not changed). It shows how many will change and asks to confirm first.
+## TEMPORARY: Fill Program Details
+- Admin tools > Manage > **Fill Program Details** copies each student's class course, year and section into a blank Program course, year and section (only the blank ones; filled ones are never changed). It shows how many will change and asks to confirm first.
 - Files to delete once every student has a program: `js/temp-fill-program.js`, its import in `js/course.js`, the `fillProgramBtn` tile in `js/components-dashboard.js`, `POST /api/fill-program-course` in `worker/accounts.js` and `worker/auth.js`, and its test block in `tools/tests/worker.test.mjs`.
 
 ## Edit Student Details (Manage Users)
