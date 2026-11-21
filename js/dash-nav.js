@@ -50,9 +50,14 @@ const scrollToId = (id) => {
 
 const openTab = (tab) => {
     const open = openPages();
-    if (tab === 'exams' || tab === 'browse') {
+    if (tab === 'browse') {
         closeAllPages();
-        const found = scrollToId(tab === 'exams' ? 'studentExamsSection' : 'joinClassSection');
+        document.dispatchEvent(new CustomEvent('open-join-dialog'));
+        return;
+    }
+    if (tab === 'exams') {
+        closeAllPages();
+        const found = scrollToId('studentExamsSection');
         if (!found && tab === 'exams') UI.info('No exams assigned to you right now');
         else scrollTab = tab;
         syncTabs();

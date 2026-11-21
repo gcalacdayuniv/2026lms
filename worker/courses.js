@@ -273,11 +273,21 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: "Only students can join with a code." }), { status: 403, headers: corsHeaders });
         }
         await ensureInviteCode(env);
-        const crs = code.length >= 6 ? await env.DB.prepare("SELECT Course_ID, CourseCode, CourseTitle FROM Courses WHERE Invite_Code = ? AND COALESCE(Archived, 0) = 0").bind(code).first() : null;
+        const crs = code.length >= 6 ? await env.DB.prepare(
+            `SELECT c.Course_ID, c.CourseCode, c.CourseTitle, c.ScheduleDay, c.TimePeriod, c.Room, u.Name AS LecturerName
+             FROM Courses c LEFT JOIN Users u ON u.User_ID = c.Lecturer_ID WHERE c.Invite_Code = ? AND COALESCE(c.Archived, 0) = 0`
+        ).bind(code).first() : null;
         if (!crs) return new Response(JSON.stringify({ error: "That code is not valid. Check it with your lecturer." }), { status: 404, headers: corsHeaders });
+        const course = { Course_ID: crs.Course_ID, CourseCode: crs.CourseCode, CourseTitle: crs.CourseTitle, ScheduleDay: crs.ScheduleDay, TimePeriod: crs.TimePeriod, Room: crs.Room || "", LecturerName: crs.LecturerName || "" };
+        // preview: show the class so the student can check it is the right one; nothing is saved.
+        if (body.preview) {
+            const already = await env.DB.prepare("SELECT 1 AS x FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?").bind(crs.Course_ID, body.studentId).first();
+            if (already) return new Response(JSON.stringify({ error: "You are already enrolled in this course." }), { status: 400, headers: corsHeaders });
+            return new Response(JSON.stringify({ success: true, preview: true, course }), { status: 200, headers: corsHeaders });
+        }
         const r = await enrollStudent(env, crs.Course_ID, body.studentId);
         if (r.error) return new Response(JSON.stringify({ error: r.error }), { status: 400, headers: corsHeaders });
-        return new Response(JSON.stringify({ success: true, reactivated: r.reactivated, course: { Course_ID: crs.Course_ID, CourseCode: crs.CourseCode, CourseTitle: crs.CourseTitle } }), { status: 201, headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, reactivated: r.reactivated, course }), { status: 201, headers: corsHeaders });
     }
 
     // The class owner reads (or renews) the invite code.

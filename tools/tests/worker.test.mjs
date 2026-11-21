@@ -282,6 +282,7 @@ const addQ = (id, name, pc, py, ps, c) => { U(id, name, 'student'); sql.prepare(
 addQ('Q1', 'qstu1', 'BSArch', '5', '2', 'BSCS'); addQ('Q2', 'qstu2', 'BSCS', '1', '1', 'BSArch');
 try { sql.exec('alter table Courses add column Archived integer default 0'); } catch (e) { /* already there */ }
 try { sql.exec('alter table Enrollments add column Enrollment_ID'); } catch (e) { /* already there */ }
+try { sql.exec('alter table Courses add column Room'); } catch (e) { /* already there */ }
 sql.exec("insert into Courses(Course_ID,CourseCode,CourseTitle,Lecturer_ID) values('CINV','INV1','Invite','L1')");
 const invCourse = { id: 'CINV' };
 const un = async (qs) => ((await call('GET', `/api/unenrolled-students?courseId=${invCourse.id}&statusFilter=Active&${qs}`, { token: l1.j.token })).j.students || []).map(x => x.User_ID);
@@ -295,7 +296,10 @@ ok('existing classes all get a code too', sql.prepare("select count(*) n from Co
 ok('codes are unique across classes', sql.prepare('select count(distinct Invite_Code) d, count(*) n from Courses').get().d === sql.prepare('select count(*) n from Courses').get().n);
 const joinTok = (await login('qstu1')).j.token, q2Tok = (await login('qstu2')).j.token;
 const jn = (tok, body) => call('POST', '/api/join-class', { token: tok, body });
+const pvw = await jn(joinTok, { studentId: 'Q1', preview: true, code: inv.code });
+ok('preview shows the class details without enrolling', pvw.s === 200 && pvw.j.preview && pvw.j.course.CourseCode === 'INV1' && 'LecturerName' in pvw.j.course && 'Room' in pvw.j.course && 'TimePeriod' in pvw.j.course && !sql.prepare("select 1 x from Enrollments where Course_ID=? and Student_ID='Q1'").get(invCourse.id), JSON.stringify(pvw.j));
 ok('student joins with the code (any case, spaced)', (await jn(joinTok, { studentId: 'Q1', code: ' ' + inv.code.toLowerCase().slice(0, 3) + '-' + inv.code.slice(3) + ' ' })).s === 201 && !!sql.prepare("select 1 x from Enrollments where Course_ID=? and Student_ID='Q1'").get(invCourse.id));
+ok('preview of a class already joined is refused', (await jn(joinTok, { studentId: 'Q1', preview: true, code: inv.code })).s === 400);
 ok('joining twice is refused', (await jn(joinTok, { studentId: 'Q1', code: inv.code })).s === 400);
 ok('a student can no longer enrol themselves without a code', (await call('POST', '/api/enroll', { token: q2Tok, body: { courseId: invCourse.id, studentId: 'Q2' } })).s === 403);
 ok('wrong code is refused', (await jn(q2Tok, { studentId: 'Q2', code: 'ZZZZZZ' })).s === 404);
