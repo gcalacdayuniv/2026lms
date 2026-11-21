@@ -4,13 +4,13 @@ This section is the standing instruction for every task. Keep it current when a 
 
 **How to work**
 1. Plan briefly, then work in batches that stay within the token limit. Give the output of each batch so progress is not lost.
-2. Do not change GitHub directly. Work on copies; the owner uploads the files.
+2. Commit and push finished work straight to `main` of the GitHub repo (no zip needed). Commit only after the tests pass, with a message that says what changed. If a push is refused, say so and send a zip of the changed files instead.
 3. Test before delivering: worker changes against a local SQLite D1 test, UI changes in a browser (Playwright). Say what was tested and what was not.
 
 **Delivery (every task)**
 - Give full replacement files, never snippets.
-- Zip only the changed files, named for what changed, and send it as a downloadable file.
-- Update this README in the same zip so it matches the current setup (add or remove only what changed), including the "Setup & Deploy" notes: required secrets and vars, tables created automatically vs. anything to run manually, deploy steps for the worker and the front end, and any one-time action after an update.
+- Commit and push the changed files to `main`; the commit includes the README update. Do not send a zip unless a push is not possible.
+- Update this README in the same commit so it matches the current setup (add or remove only what changed), including the "Setup & Deploy" notes: required secrets and vars, tables created automatically vs. anything to run manually, deploy steps for the worker and the front end, and any one-time action after an update.
 
 **Code rules**
 - Keep existing element IDs. Escape all user text (`escapeHtml` / `safeUrl` in `js/html-utils.js`).
