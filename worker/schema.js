@@ -108,6 +108,7 @@ export async function ensureExamShares(env) {
 }
 
 export async function ensureAccessibleExamTables(env) {
+    await ensureCourseRoom(env);   // exam queries check Courses.Archived
     await env.DB.batch([
         env.DB.prepare(`
             CREATE TABLE IF NOT EXISTS Class_Exams (

@@ -1,7 +1,7 @@
 // worker/courses.js
 // Programs, classes (create, copy, edit, archive), enrollment, rosters, student details, lecturer notes and groups.
 
-import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode } from './schema.js';
+import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode, ensureCourseRoom } from './schema.js';
 import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
 
 // Academic year ("2026-2027", second year = first + 1) and semester are both optional.
@@ -353,6 +353,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             ).bind(today, userId).all();
             return new Response(JSON.stringify({ success: true, courses: myCourses.results }), { status: 200, headers: corsHeaders });
         } else {
+            await ensureCourseRoom(env);
             const enrolled = await env.DB.prepare(
                 `SELECT c.*, u.Name as LecturerName, e.Seat_Number,
                     (SELECT COUNT(*) FROM Attendance a WHERE a.Course_ID = c.Course_ID AND a.Student_ID = e.Student_ID AND a.Status = 'Present') AS Att_Present,
@@ -362,7 +363,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
                  FROM Enrollments e
                  JOIN Courses c ON e.Course_ID = c.Course_ID
                  JOIN Users u ON c.Lecturer_ID = u.User_ID
-                 WHERE e.Student_ID = ?`
+                 WHERE e.Student_ID = ? AND COALESCE(c.Archived, 0) = 0`
             ).bind(userId).all();
             return new Response(JSON.stringify({ success: true, courses: enrolled.results }), { status: 200, headers: corsHeaders });
         }

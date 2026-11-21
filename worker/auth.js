@@ -7,7 +7,7 @@
 //    request, so a suspended account or a changed role takes effect at once.
 //  - Routes are listed in RULES. A route that is not listed is lecturer-only.
 
-import { ensureExamShares } from './schema.js';
+import { ensureExamShares, ensureCourseRoom } from './schema.js';
 
 const TOKEN_DAYS = 7;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;   // larger bodies (photos) are checked by role and query only
@@ -227,8 +227,9 @@ export async function authorize(request, env, path, url) {
             if (fields[f] !== undefined && fields[f] !== '' && fields[f] !== user.id) return deny(403, 'You can only see or change your own records.');
         }
         if (rule.enrolled && fields.courseId) {
-            const e = await env.DB.prepare('SELECT 1 AS ok FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?').bind(fields.courseId, user.id).first();
-            if (!e) return deny(403, 'You are not enrolled in this class.');
+            await ensureCourseRoom(env);
+            const e = await env.DB.prepare('SELECT 1 AS ok FROM Enrollments en JOIN Courses c ON c.Course_ID = en.Course_ID WHERE en.Course_ID = ? AND en.Student_ID = ? AND COALESCE(c.Archived, 0) = 0').bind(fields.courseId, user.id).first();
+            if (!e) return deny(403, 'You are not enrolled in this class, or it is archived.');
         }
     } else {
         for (const key of Object.keys(OWNER_SQL)) {

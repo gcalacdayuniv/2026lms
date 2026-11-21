@@ -308,6 +308,15 @@ const inv2 = (await call('POST', '/api/class-invite', { token: l1.j.token, body:
 ok('renewing makes the old code stop working', inv2 !== inv.code && (await jn(q2Tok, { studentId: 'Q2', code: inv.code })).s === 404 && (await jn(q2Tok, { studentId: 'Q2', code: inv2 })).s === 201);
 let renewedDiffer = true; for (let i = 0; i < 20; i++) { const before = (await call('GET', `/api/class-invite?courseId=${invCourse.id}`, { token: l1.j.token })).j.code; const after = (await call('POST', '/api/class-invite', { token: l1.j.token, body: { courseId: invCourse.id, renew: true } })).j.code; if (before === after) renewedDiffer = false; }
 ok('a renewed code is always different from the old one', renewedDiffer);
+const qMine = async () => ((await call('GET', '/api/my-courses?userId=Q1&role=student', { token: joinTok })).j.courses || []).map(c => c.Course_ID);
+const arch = (flag) => call('POST', '/api/archive-course', { token: l1.j.token, body: { courseId: invCourse.id, lecturerId: 'L1', archived: flag } });
+ok('an enrolled student sees the class', (await qMine()).includes('CINV'));
+await arch(true);
+ok('archiving hides the class from its students', !(await qMine()).includes('CINV'));
+ok('a student of an archived class cannot open it', (await call('GET', `/api/course-details?courseId=${invCourse.id}&studentId=Q1`, { token: joinTok })).s === 403);
+ok('the lecturer still sees the archived class', ((await call('GET', '/api/my-courses?userId=L1&role=lecturer', { token: l1.j.token })).j.courses || []).some(c => c.Course_ID === 'CINV'));
+await arch(false);
+ok('restoring shows the class to students again', (await qMine()).includes('CINV') && (await call('GET', `/api/course-details?courseId=${invCourse.id}&studentId=Q1`, { token: joinTok })).s !== 403);
 sql.exec("delete from Enrollments where Student_ID like 'Q%'"); sql.exec("delete from Users where User_ID like 'Q%'"); sql.exec("delete from Courses where Course_ID='CINV'");
 
 // ---- every route written in the source is still reachable (catches a route lost when a file is split or moved) ----

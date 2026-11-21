@@ -58,7 +58,7 @@ async function getStudentAccessibleExamsList(env, studentId, request) {
          JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
          JOIN Exams e ON ce.Exam_ID = e.Exam_ID
          JOIN Courses c ON ce.Course_ID = c.Course_ID
-         WHERE ea.Student_ID = ? AND ea.Is_Enabled = 1 AND ce.Is_Active = 1 AND ${EXAM_FITS_CLASS_SQL}
+         WHERE ea.Student_ID = ? AND ea.Is_Enabled = 1 AND ce.Is_Active = 1 AND ${EXAM_FITS_CLASS_SQL} AND ${NOT_ARCHIVED_SQL}
          ORDER BY ce.Created_At DESC`
     ).bind(studentId).all();
 
@@ -111,6 +111,9 @@ async function getStudentAccessibleExamsList(env, studentId, request) {
 }
 
 // An exam tied to a course title (Exams.Course) may only be shown and used by classes with that same Course Title (ignoring case and spaces).
+// A class the lecturer archived is hidden from its students: their exams in it are not listed or taken. Alias: ce = Class_Exams.
+const NOT_ARCHIVED_SQL = "NOT EXISTS (SELECT 1 FROM Courses ac WHERE ac.Course_ID = ce.Course_ID AND COALESCE(ac.Archived, 0) = 1)";
+
 // An exam with no course line can be used by any class. Aliases: e = Exams, ce = Class_Exams.
 const EXAM_FITS_CLASS_SQL = "(TRIM(COALESCE(e.Course, '')) = '' OR LOWER(TRIM(e.Course)) = LOWER(TRIM(COALESCE((SELECT CourseTitle FROM Courses WHERE Course_ID = ce.Course_ID), ''))))";
 
@@ -538,7 +541,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         const record = await env.DB.prepare(
             `SELECT ea.Assignment_ID, ea.Status, ea.Is_Enabled, ea.Started_At, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit
              FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID JOIN Exams e ON ce.Exam_ID = e.Exam_ID
-             WHERE ea.Assignment_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
+             WHERE ea.Assignment_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL} AND ${NOT_ARCHIVED_SQL}`
         ).bind(assignmentId, studentId).first();
         if (!record) {
             return new Response(JSON.stringify({ error: "Exam assignment not found." }), { status: 404, headers: corsHeaders });
@@ -703,7 +706,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         const rec = await env.DB.prepare(
             `SELECT ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ce.Release, ce.Adjustments, e.Title as Exam_Title, e.ExamData
              FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID JOIN Exams e ON ce.Exam_ID = e.Exam_ID
-             WHERE ea.Assignment_ID = ? AND ea.Student_ID = ?`
+             WHERE ea.Assignment_ID = ? AND ea.Student_ID = ? AND ${NOT_ARCHIVED_SQL}`
         ).bind(assignmentId, studentId).first();
         if (!rec) return new Response(JSON.stringify({ error: "Exam not found." }), { status: 404, headers: corsHeaders });
         if (rec.Status !== "Completed") return new Response(JSON.stringify({ error: "Submit the exam first." }), { status: 400, headers: corsHeaders });
@@ -788,7 +791,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
              FROM Exam_Assignments ea
              JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
              JOIN Exams e ON ce.Exam_ID = e.Exam_ID
-             WHERE ea.Class_Exam_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
+             WHERE ea.Class_Exam_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL} AND ${NOT_ARCHIVED_SQL}`
         ).bind(classExamId, studentId).first();
         if (!record) {
             return new Response(JSON.stringify({ error: "Exam record not found." }), { status: 404, headers: corsHeaders });
@@ -857,7 +860,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
              FROM Exam_Assignments ea
              JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
              JOIN Exams e ON ce.Exam_ID = e.Exam_ID
-             WHERE ea.Assignment_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
+             WHERE ea.Assignment_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL} AND ${NOT_ARCHIVED_SQL}`
         ).bind(assignmentId, studentId).first();
 
         if (!record) {
