@@ -349,19 +349,6 @@ const enrolledCourseCardHtml = (c) => `
                 </div>
             `;
 
-const overviewTile = (target, icon, tone, value, label) =>
-    `<button type="button" data-scroll-to="${target}" class="overview-tile"><span class="overview-icon ${tone}"><i class="fa-solid ${icon}" aria-hidden="true"></i></span><span class="overview-value">${escapeHtml(String(value))}</span><span class="overview-label">${escapeHtml(label)}</span></button>`;
-
-const studentOverviewHtml = (courses, pendingExams) => {
-    const absences = courses.reduce((n, c) => n + (Number(c.Att_Absent) || 0), 0);
-    const hasAtt = courses.some(c => c.Att_Present !== undefined && c.Att_Present !== null);
-    return `<div class="grid grid-cols-3 gap-3">
-        ${overviewTile('studentCoursesSection', 'fa-check-double', 'bg-green-100 text-green-700', courses.length, 'Enrolled')}
-        ${overviewTile('studentExamsSection', 'fa-file-pen', 'bg-yellow-100 text-yellow-700', pendingExams, 'Exams to take')}
-        ${hasAtt ? overviewTile('studentCoursesSection', 'fa-user-xmark', 'bg-red-100 text-red-700', absences, 'Absences') : overviewTile('joinClassSection', 'fa-key', 'bg-amber-100 text-amber-700', '+', 'Join a class')}
-    </div>`;
-};
-
 const buildAssignedExamsSection = (assignedExams, isBlind) => {
     if (!(assignedExams.length > 0 || isBlind)) return '';
     let assignedExamsSectionHtml = '';
@@ -821,7 +808,6 @@ export const CourseDashboard = {
             container.innerHTML = `
                 <div class="space-y-12 fade-in">
                     ${joinFormHtml()}
-                    ${studentOverviewHtml(myCoursesRes.courses, assignedExams.filter(e => e.status !== 'Completed').length)}
                     ${assignedExamsSectionHtml}
                     ${myCoursesRes.courses.length >= 4 ? searchBarHtml() : ''}
                     <section id="studentCoursesSection" class="scroll-mt-20">

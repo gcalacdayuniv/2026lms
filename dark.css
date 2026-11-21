@@ -138,9 +138,6 @@ html[data-theme="dark"] .day-chip, html[data-theme="dark"] .mu-chip { background
 html[data-theme="dark"] .day-chip.is-on, html[data-theme="dark"] .mu-chip.is-on { background: #2563eb; border-color: #2563eb; color: #fff; }
 html[data-theme="dark"] .card-action { color: #cbd5e1; }
 html[data-theme="dark"] .card-action:hover { background: rgba(59,130,246,.15); color: #93c5fd; }
-html[data-theme="dark"] .overview-tile { background: #1a2233; border-color: #2f3a50; }
-html[data-theme="dark"] .overview-value { color: #f3f4f6; }
-html[data-theme="dark"] .overview-label { color: #9ca3af; }
 html[data-theme="dark"] .auth-screen { background: #0b1220; }
 html[data-theme="dark"] .offline-banner { background: #374151; }
 html[data-theme="dark"] .theme-choice { background: #1a2233; border-color: #3b475e; color: #cbd5e1; }

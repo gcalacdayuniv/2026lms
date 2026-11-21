@@ -140,8 +140,6 @@ export const DashNav = {
                 syncTabs();
                 return;
             }
-            const jump = t.closest('[data-scroll-to]');
-            if (jump) { scrollToId(jump.dataset.scrollTo); return; }
             const shortcut = t.closest('[data-intent]');
             if (shortcut) { CourseFab.goWith(shortcut.dataset.intent); return; }
             const chip = t.closest('.day-chip');
