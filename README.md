@@ -546,3 +546,5 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - If a class's Course Title is changed so it no longer matches an exam already assigned, that exam is hidden from the class and its students until the titles match again. Its scores stay recorded.
 
 - **Front-end lint:** `sh tools/tests/run-tests.sh` now also checks `js/` for undefined names (the check that would have caught the `displayCourse` crash on the class screen).
+
+- **Student summary layout:** the score details page has a white header with an amber top line (it used to be the same blue as the summary header, so the two blended). On phones the History and Upload pages cover the same area as the score details: below the summary header and above the History / Upload bar (`js/student-summary-ui.js`).

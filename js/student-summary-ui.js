@@ -114,6 +114,20 @@ export const StudentSummaryUI = {
             details.style.top = open && head ? `${Math.ceil(head.getBoundingClientRect().bottom)}px` : '';
         };
         if (details) new MutationObserver(fit).observe(details, { attributes: true, attributeFilter: ['class'] });
+        // On phones History and Upload cover that same area: below the summary header, above the action bar.
+        const phone = window.matchMedia ? window.matchMedia('(max-width: 639px)') : { matches: false };
+        const fitSub = (el) => {
+            const bar = $('ssActionBar'), head = modal.querySelector('.ss-top');
+            const on = el && !el.classList.contains('hidden') && !modal.classList.contains('hidden') && phone.matches && bar && !bar.classList.contains('hidden') && head;
+            el.style.top = on ? `${Math.ceil(head.getBoundingClientRect().bottom)}px` : '';
+            el.style.bottom = on ? `${Math.ceil(bar.getBoundingClientRect().height)}px` : '';
+        };
+        ['submissionHistoryModal', 'submitDocModal'].forEach((id) => {
+            const el = $(id);
+            if (!el) return;
+            new MutationObserver(() => fitSub(el)).observe(el, { attributes: true, attributeFilter: ['class'] });
+            window.addEventListener('resize', () => fitSub(el));
+        });
         window.addEventListener('resize', fit);
         // Closing the page hides the action bar too.
         new MutationObserver(() => { if (modal.classList.contains('hidden')) $('ssActionBar')?.classList.add('hidden'); })
