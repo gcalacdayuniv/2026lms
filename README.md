@@ -583,3 +583,6 @@ Code: `worker/exam-session.js`, `worker/accounts.js` (login), `worker/auth.js` (
 - **Lecturer "Let continue":** Results > Students shows it for auto-submitted attempts (`POST /api/exam-continue`). Status goes back to Pending, the submitted answers return as the draft, the score is removed, and the time already used stays used (`Started_At` is moved so the remaining time is unchanged).
 - **Deploy:** worker and front end together (new file `worker/exam-session.js`).
 - **From the class exam's student list** (Manage Exams > the exam > student list): each assigned student has a **Secure exam** selector (Default / On / Off, `POST /api/exam-secure-setting`, same `Users.Exam_Secure` as Manage Users) and, for auto-submitted attempts, a **Let continue** button beside Reset. Results keeps its own Let continue too.
+
+## Uploaded files on iOS
+The **View** button on uploaded files (`js/course-class.js`) opens Drive's preview page (`fileViewUrl` in `js/html-utils.js`) instead of the stored `uc?export=download` link, which iOS Safari and the installed app cannot open. The stored link in `Submissions.File_URL` is unchanged (it is also the key for grading), so no data change or worker deploy is needed.

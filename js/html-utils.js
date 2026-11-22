@@ -19,3 +19,11 @@ export const safeUrl = (value) => {
     const url = String(value == null ? '' : value).trim();
     return /^(https?:\/\/|mailto:)/i.test(url) ? escapeHtml(url) : '#';
 };
+
+// Uploaded files are stored with a Drive download link (drive.google.com/uc?...export=download). iOS Safari and the
+// installed app cannot open that kind of link, so show Drive's preview page instead (it has its own download button).
+export const fileViewUrl = (value) => {
+    const url = String(value == null ? '' : value).trim();
+    const m = /^https:\/\/drive\.google\.com\/uc\?(?:[^#]*&)?id=([\w-]+)/i.exec(url);
+    return m ? `https://drive.google.com/file/d/${m[1]}/view` : url;
+};

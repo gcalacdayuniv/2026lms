@@ -6,7 +6,7 @@ import { RosterTools } from './course-roster-tools.js';
 import { CoursePending } from './course-pending.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
-import { escapeHtml, safeUrl } from './html-utils.js';
+import { escapeHtml, safeUrl, fileViewUrl } from './html-utils.js';
 import { dayPoints } from './participation.js';
 import { showPrintPreview } from './print-preview.js';
 import { classIdentityBlock, fillClassCourseOptions } from './class-identity.js';
@@ -137,7 +137,7 @@ export const CourseClass = {
                         <div class="text-[10px] text-gray-600 mt-1">${descHtml}</div>
                         <div class="text-[9px] text-gray-400 mt-1.5 font-medium uppercase"><i class="fa-regular fa-clock"></i> ${new Date(sub.Timestamp + 'Z').toLocaleString()}</div>
                     </div>
-                    <a href="${safeUrl(sub.File_URL)}" target="_blank" rel="noopener noreferrer" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
+                    <a href="${safeUrl(fileViewUrl(sub.File_URL))}" target="_blank" rel="noopener noreferrer" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
                         <i class="fa-solid ${sub.Type === 'url' ? 'fa-link' : 'fa-download'} block text-sm mb-0.5"></i> View
                     </a>
                 </div>
