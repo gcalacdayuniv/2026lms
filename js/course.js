@@ -203,15 +203,7 @@ export const CourseModule = {
         }
 
         if (e.target.name === 'callerMode') {
-            const toggleBtn = document.getElementById('toggleCalledListBtn');
-            const calledContainer = document.getElementById('calledListContainer');
-            if (e.target.value === '2') {
-                toggleBtn.classList.remove('hidden');
-            } else {
-                toggleBtn.classList.add('hidden');
-                calledContainer.classList.add('hidden');
-                toggleBtn.textContent = "View Called List";
-            }
+            document.getElementById('toggleCalledListBtn').classList.toggle('hidden', e.target.value !== '2');
             CourseRecitation.drawWheel();
         }
     },
@@ -282,16 +274,15 @@ export const CourseModule = {
         }
 
         if (e.target.closest('#toggleCalledListBtn')) {
-            const container = document.getElementById('calledListContainer');
-            const btn = document.getElementById('toggleCalledListBtn');
-            if (container.classList.contains('hidden')) {
-                container.classList.remove('hidden');
-                btn.textContent = "Hide Called List";
-            } else {
-                container.classList.add('hidden');
-                btn.textContent = "View Called List";
-            }
+            CourseRecitation.updateCalledListUI();
+            document.getElementById('calledListModal').classList.remove('hidden');
+            document.getElementById('closeCalledListBtn')?.focus();
         }
+        if (e.target.closest('#closeCalledListBtn') || e.target.id === 'calledListModalOverlay') {
+            document.getElementById('calledListModal').classList.add('hidden');
+            document.getElementById('toggleCalledListBtn')?.focus();
+        }
+        if (e.target.closest('#copyCalledListBtn')) await CourseRecitation.copyCalledList();
 
         if (e.target.closest('.remove-called-student')) {
             const btn = e.target.closest('.remove-called-student');

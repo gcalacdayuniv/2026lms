@@ -678,17 +678,8 @@ const ClassUI = {
                         </label>
                     </div>
                     <button type="button" id="toggleCalledListBtn" class="hidden text-xs font-bold text-purple-600 hover:text-purple-800 underline focus:outline-none">
-                        View Called List
+                        Called List
                     </button>
-                </div>
-
-                <div id="calledListContainer" class="hidden w-full mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200 max-h-48 overflow-y-auto">
-                    <div class="flex justify-between items-center mb-2 pb-1 border-b border-gray-200">
-                        <span class="text-xs font-bold text-gray-700">Called Today</span>
-                        <button type="button" id="resetCalledListBtn" class="text-[10px] font-bold text-red-600 hover:text-red-800 uppercase">Reset All</button>
-                    </div>
-                    <div id="calledStudentsListContent" class="space-y-1.5">
-                    </div>
                 </div>
 
                 <div id="wheelContainer" class="w-full flex flex-col items-center">
@@ -729,6 +720,23 @@ const ClassUI = {
                     <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
                         Next Student
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="calledListModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center fade-in p-4" role="dialog" aria-modal="true" aria-labelledby="calledListTitle">
+            <div id="calledListModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 cursor-pointer"></div>
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-5 relative z-10 scale-up flex flex-col max-h-[85vh]">
+                <div class="flex justify-between items-center mb-3 border-b pb-3">
+                    <h3 id="calledListTitle" class="text-lg font-black text-gray-800"><i class="fa-solid fa-list-check text-purple-600 mr-2" aria-hidden="true"></i>Called Today <span id="calledListCount" class="text-sm font-bold text-gray-500"></span></h3>
+                    <button type="button" id="closeCalledListBtn" aria-label="Close called list" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+                        <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div id="calledStudentsListContent" class="space-y-1.5 overflow-y-auto min-h-[4rem] flex-1"></div>
+                <div class="flex gap-2 mt-4 pt-3 border-t">
+                    <button type="button" id="copyCalledListBtn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy list</button>
+                    <button type="button" id="resetCalledListBtn" class="px-4 border border-red-300 text-red-700 hover:bg-red-50 font-bold rounded-lg text-sm">Reset all</button>
                 </div>
             </div>
         </div>

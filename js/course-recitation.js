@@ -47,8 +47,6 @@ export const CourseRecitation = {
             toggleBtn.classList.remove('hidden');
         } else {
             toggleBtn.classList.add('hidden');
-            document.getElementById('calledListContainer').classList.add('hidden');
-            toggleBtn.textContent = "View Called List";
         }
 
         const wheel = document.getElementById('recitationWheel');
@@ -72,7 +70,7 @@ export const CourseRecitation = {
         document.getElementById('recitationResult').classList.add('hidden');
         document.getElementById('wheelContainer').classList.remove('hidden');
         document.getElementById('spinWheelBtn').classList.remove('hidden');
-        document.getElementById('calledListContainer').classList.add('hidden');
+        document.getElementById('calledListModal')?.classList.add('hidden');
     },
 
     resetToWheel: () => {
@@ -83,11 +81,35 @@ export const CourseRecitation = {
         CourseRecitation.drawWheel();
     },
 
+    // Copies the students called today, in the order they were called, as a numbered list.
+    copyCalledList: async () => {
+        const names = readCalled(getCalledKey()).map(id => (CourseRecitation.students.find(s => s.User_ID === id) || {}).Name).filter(Boolean);
+        if (!names.length) return;
+        const header = `Called today (${getLocalDateString()})`;
+        const text = [header, ...names.map((n, i) => `${i + 1}. ${n}`)].join('\n');
+        let done = false;
+        try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); done = true; } } catch (e) { /* fall back */ }
+        if (!done) {   // older iOS: copy through a temporary text field
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+            document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+            try { done = document.execCommand('copy'); } catch (e) { done = false; }
+            ta.remove();
+        }
+        const btn = document.getElementById('copyCalledListBtn');
+        if (btn) { const old = btn.innerHTML; btn.innerHTML = done ? '<i class="fa-solid fa-check" aria-hidden="true"></i> Copied' : 'Could not copy'; setTimeout(() => { btn.innerHTML = old; }, 1800); }
+    },
+
     updateCalledListUI: () => {
         const calledToday = readCalled(getCalledKey());
 
         const contentContainer = document.getElementById('calledStudentsListContent');
         if (!contentContainer) return;
+        const count = calledToday.filter(id => CourseRecitation.students.some(s => s.User_ID === id)).length;
+        const countEl = document.getElementById('calledListCount');
+        if (countEl) countEl.textContent = count ? `(${count})` : '';
+        const copyBtn = document.getElementById('copyCalledListBtn');
+        if (copyBtn) copyBtn.disabled = count === 0;
 
         if (calledToday.length === 0) {
             contentContainer.innerHTML = '<div class="text-xs text-gray-500 italic text-center py-2">No students called yet today.</div>';
