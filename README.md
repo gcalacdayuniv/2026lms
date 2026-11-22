@@ -595,3 +595,8 @@ On phones the Scan setup (`js/components-scanner.js`) is compact: the two answer
 ## Student Caller called list
 The called list is its own dialog (`#calledListModal`, `js/components-class.js`), opened by **Called List** in Mode 2. It shows who was called today with Remove per student, **Copy list** (numbered, in calling order; clipboard API with an iOS fallback, `CourseRecitation.copyCalledList`) and **Reset all**. The list is kept in `localStorage` per class and day.
 - **Next student:** "Call Next Student" in the result view saves the points, redraws the wheel and spins straight away (no extra tap on Call Student).
+
+## Student photos
+- `getLoadableAvatarSrc(src, width)` (`js/components-utils.js`) asks Drive for a thumbnail of `width` px (default 1000). The roster list uses 128 with `loading="lazy"`; the tap-to-enlarge view (`data-src`) keeps the large one; the Student Caller wheel uses 96.
+- Images with class `avatar-img` are retried once if they fail, then replaced by a placeholder (a user icon, or the initials on the wheel), so no broken image is shown.
+- **Student Caller wheel:** each slice shows the student's photo (initials when there is none) on top of the slice color, turned so it stands upright when it reaches the pointer. Photo size shrinks with the number of slices (14 to 56 px).

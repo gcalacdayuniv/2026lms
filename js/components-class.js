@@ -816,7 +816,7 @@ export const ClassComponents = {
             const displayProgram = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
 
             const avatarImg = avatarSrc
-                ? `<img src="${safeUrl(avatarSrc)}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(s.Name)}" data-info="${escapeHtml(displayProgram)}" alt="${escapeHtml(s.Name)}">`
+                ? `<img src="${safeUrl(getLoadableAvatarSrc(s.Avatar, 128))}" loading="lazy" decoding="async" class="avatar-img w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 cursor-pointer view-avatar-btn hover:opacity-80 transition" data-src="${safeUrl(avatarSrc)}" data-name="${escapeHtml(s.Name)}" data-info="${escapeHtml(displayProgram)}" alt="${escapeHtml(s.Name)}">`
                 : `<i class="fa-solid fa-circle-user text-[40px] sm:text-[48px] text-gray-300"></i>`;
 
             let eyeConditionBadge = '';

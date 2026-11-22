@@ -2,6 +2,7 @@
 import { apiFetch } from './globals.js';
 import { CourseAttendance } from './course-attendance.js';
 import { getLoadableAvatarSrc } from './components.js';
+import { initialsOf } from './components-utils.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
 
@@ -327,7 +328,24 @@ export const CourseRecitation = {
         }
 
         wheel.style.background = `conic-gradient(${conicString})`;
-        wheel.innerHTML = '';
+
+        // Each slice carries the student's photo (initials when there is none), turned so it stands upright
+        // when its slice reaches the pointer. The colors stay behind the photos.
+        const ring = 0.68;                                   // distance from the center, as a share of the radius
+        const slicePx = 2 * (124 * ring) * Math.sin((angle * Math.PI / 180) / 2);
+        const size = Math.max(14, Math.min(56, Math.round(slicePx * 0.9)));
+        wheel.innerHTML = availableStudents.map((s, i) => {
+            const theta = (i + 0.5) * angle;
+            const rad = theta * Math.PI / 180;
+            const x = total === 1 ? 50 : 50 + ring * 50 * Math.sin(rad);
+            const y = total === 1 ? 50 : 50 - ring * 50 * Math.cos(rad);
+            const src = getLoadableAvatarSrc(s.Avatar, 96);
+            const style = `position:absolute;left:${x}%;top:${y}%;width:${size}px;height:${size}px;transform:translate(-50%,-50%) rotate(${total === 1 ? 0 : theta}deg)`;
+            const common = `class="avatar-img rounded-full border-2 border-white shadow object-cover bg-white" data-initials="${escapeHtml(initialsOf(s.Name))}" style="${style}"`;
+            return src
+                ? `<img src="${safeUrl(src)}" alt="" ${common} decoding="async">`
+                : `<span class="rounded-full border-2 border-white shadow bg-white text-gray-600 font-black flex items-center justify-center" style="${style};font-size:${Math.max(8, Math.round(size * 0.4))}px">${escapeHtml(initialsOf(s.Name))}</span>`;
+        }).join('');
     },
 
     spin: () => {
