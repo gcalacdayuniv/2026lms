@@ -72,10 +72,10 @@ export function courseLabels(course) {
     const c = course || {};
     const title = safeName(c.CourseTitle || c.CourseCode || 'Course');
     const yearSection = safeName([c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' ')) || 'Year and Section';
-    const ayEs = safeName([c.AcademicYear, c.Semester].filter(Boolean).join(' ')) || 'AY and Sem';
     return {
         sheetName: safeName(`${title} - ${yearSection}`).slice(0, 31) || 'Class Grade',
-        fileName: `${title}_${yearSection}_${ayEs}_CLASS GRADE.xlsx`.replace(/\s+/g, ' '),
+        // Course code_class course year-section_term_Class Grade, e.g. FINMAN 7_FM 3-7_2026-2027 1st Sem_Class Grade.xlsx
+        fileName: `${[safeName(c.CourseCode || c.CourseTitle || 'Course'), safeName([c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' ')), safeName([c.AcademicYear, String(c.Semester || '').replace(/\s*Semester$/i, ' Sem')].filter(Boolean).join(' ')), 'Class Grade'].filter(Boolean).join('_')}.xlsx`.replace(/\s+/g, ' '),
         subject: `SUBJECTCODE: ${safeName(c.CourseCode || '')}`,
         classId: [c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' ')   // e.g. BSIT 3-A
     };
