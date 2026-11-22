@@ -1037,28 +1037,9 @@ export const ClassComponents = {
                     </div>
                 </div>
 
-<div id="classFab" class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3" style="transition: opacity 0.3s;">
-                    <div id="fabBackdrop" class="hidden" style="position:fixed;inset:0;z-index:-1;background:rgba(17,24,39,.35)" aria-hidden="true"></div>
-                    <div id="fabMenu" role="menu" aria-label="Quick actions" class="hidden flex-col items-end gap-3">
-                        <button type="button" role="menuitem" id="openRecitationBtn" class="fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
-                            <span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">Student Caller</span>
-                            <span class="w-11 h-11 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid fa-bullhorn text-lg" aria-hidden="true"></i></span>
-                        </button>
-                        <button type="button" role="menuitem" data-fab-target="openScannerBtn" class="fab-dup fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
-                            <span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">Scan Answer Sheets</span>
-                            <span class="w-11 h-11 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid fa-camera text-lg" aria-hidden="true"></i></span>
-                        </button>
-                        <button type="button" role="menuitem" data-fab-target="openScoresModalBtn" class="fab-dup fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
-                            <span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">Record Scores</span>
-                            <span class="w-11 h-11 rounded-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid fa-pen-to-square text-lg" aria-hidden="true"></i></span>
-                        </button>
-                        <button type="button" role="menuitem" data-fab-target="openAddStudentModalBtn" class="fab-item flex items-center gap-2 group focus:outline-none" tabindex="-1">
-                            <span class="px-2.5 py-1 rounded-md bg-gray-900 text-white text-xs font-bold shadow-md whitespace-nowrap">Enroll Student</span>
-                            <span class="w-11 h-11 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center justify-center group-focus-visible:ring-4 ring-white/70 transition"><i class="fa-solid fa-user-plus text-lg" aria-hidden="true"></i></span>
-                        </button>
-                    </div>
-                    <button type="button" id="fabMainBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="fabMenu" aria-label="Quick actions" title="Quick actions" class="w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 flex justify-center items-center focus:outline-none focus-visible:ring-4 ring-purple-300 transition-colors">
-                        <i id="fabMainIcon" class="fa-solid fa-plus text-2xl transition-transform duration-200" aria-hidden="true"></i>
+<div id="classFab" class="fixed bottom-6 right-6 z-50" style="transition: opacity 0.3s;">
+                    <button type="button" id="openRecitationBtn" aria-label="Student Caller" title="Student Caller" class="w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center focus:outline-none focus-visible:ring-4 ring-purple-300 transition">
+                        <i class="fa-solid fa-bullhorn text-2xl" aria-hidden="true"></i>
                     </button>
                 </div>
 
