@@ -3,14 +3,14 @@
 // Logic lives in course-scanner.js. Element IDs here are used by that file, so keep them in sync.
 
 const LABEL = 'block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1';
-const FIELD = 'w-full px-3 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50';
+const FIELD = 'w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50';
 
 export const ScannerUI = {
     renderScannerModal: () => `
         <div id="scannerModal" class="hidden fixed inset-0 z-[76] flex items-center justify-center fade-in p-0 sm:p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeScannerBg"></div>
             <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-4xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[95vh] flex flex-col">
-                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                <div class="flex items-center gap-3 mb-2 sm:mb-4 border-b pb-2 sm:pb-3 app-page-header">
                     <div class="flex-1 min-w-0">
                         <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-camera text-rose-600 mr-2"></i>Scan Answer Sheets</h3>
                         <p class="text-xs text-gray-500">Print the answer sheet, let students shade it, then photograph the sheets to record scores.</p>
@@ -20,11 +20,11 @@ export const ScannerUI = {
                     </button>
                 </div>
 
-                <div class="flex gap-1 mb-3 border-b border-gray-200" role="tablist" aria-label="Scanner sections">
-                    <button type="button" id="scnTabScan" role="tab" aria-selected="true" class="px-4 py-2 text-sm font-bold border-b-2 border-rose-600 text-rose-700 -mb-px">
+                <div class="flex gap-1 mb-3 border-b border-gray-200" role="tablist" aria-label="Scanner sections" style="margin-bottom:.5rem">
+                    <button type="button" id="scnTabScan" role="tab" aria-selected="true" class="px-3 py-1.5 text-sm font-bold border-b-2 border-rose-600 text-rose-700 -mb-px">
                         <i class="fa-solid fa-camera mr-1"></i> Scan
                     </button>
-                    <button type="button" id="scnTabSaved" role="tab" aria-selected="false" class="px-4 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 -mb-px">
+                    <button type="button" id="scnTabSaved" role="tab" aria-selected="false" class="px-3 py-1.5 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 -mb-px">
                         <i class="fa-solid fa-clipboard-check mr-1"></i> Saved Scans
                     </button>
                 </div>
@@ -32,40 +32,40 @@ export const ScannerUI = {
                 <div id="scnAlert" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
 
                 <!-- Step 1: Setup -->
-                <div id="scnSetupView" class="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Answer key source">
-                        <label class="flex items-start gap-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-50">
+                <div id="scnSetupView" class="flex-1 overflow-y-auto min-h-0 space-y-2.5 sm:space-y-4 pr-1">
+                    <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Answer key source">
+                        <label class="flex items-start gap-2 p-2 sm:p-3 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-50">
                             <input type="radio" name="scnMode" value="exam" class="mt-1" checked>
-                            <span><span class="block text-sm font-bold text-gray-800">Use an exam from Manage Exams</span>
-                            <span class="block text-xs text-gray-500">The answer key comes from the exam's CSV.</span></span>
+                            <span><span class="block text-sm font-bold text-gray-800 leading-tight">Use a saved exam<span class="hidden sm:inline"> from Manage Exams</span></span>
+                            <span class="hidden sm:block text-xs text-gray-500">The answer key comes from the exam's CSV.</span></span>
                         </label>
-                        <label class="flex items-start gap-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-50">
+                        <label class="flex items-start gap-2 p-2 sm:p-3 border rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-rose-500 has-[:checked]:bg-rose-50">
                             <input type="radio" name="scnMode" value="typed" class="mt-1">
-                            <span><span class="block text-sm font-bold text-gray-800">Type the answer key</span>
-                            <span class="block text-xs text-gray-500">Creates a new assessment and saves the exam in Manage Exams.</span></span>
+                            <span><span class="block text-sm font-bold text-gray-800 leading-tight">Type the answer key</span>
+                            <span class="hidden sm:block text-xs text-gray-500">Creates a new assessment and saves the exam in Manage Exams.</span></span>
                         </label>
                     </div>
 
                     <div id="scnExamPanel">
-                        <label class="${LABEL}" for="scnExamSelect">Exam</label>
-                        <select id="scnExamSelect" class="${FIELD} font-medium"></select>
-                        <div id="scnExamInfo" class="mt-2 text-xs text-gray-600"></div>
-                        <div class="mt-3 border-t pt-3">
-                            <div class="flex flex-wrap items-end gap-2">
-                                <div>
-                                    <label class="${LABEL}" for="scnSetCount">Exam sets</label>
-                                    <select id="scnSetCount" class="${FIELD}">
-                                        <option value="1">1 set (no SET circles)</option>
-                                        <option value="2">2 sets (A-B)</option>
-                                        <option value="3">3 sets (A-C)</option>
-                                        <option value="4" selected>4 sets (A-D)</option>
-                                        <option value="5">5 sets (A-E)</option>
-                                        <option value="6">6 sets (A-F)</option>
-                                    </select>
-                                </div>
+                        <div class="flex items-end gap-2">
+                            <div class="flex-1 min-w-0">
+                                <label class="${LABEL}" for="scnExamSelect">Exam</label>
+                                <select id="scnExamSelect" class="${FIELD} font-medium"></select>
                             </div>
-                            <p class="mt-2 text-[11px] text-gray-500">Printing the questions, answer keys and answer sheet is done in <b>Manage Exams &rarr; More &rarr; Print</b>. Use the same number of sets there.</p>
+                            <div class="w-[8.5rem] shrink-0">
+                                <label class="${LABEL}" for="scnSetCount">Exam sets</label>
+                                <select id="scnSetCount" class="${FIELD}" aria-describedby="scnSetHelp">
+                                    <option value="1">1 set</option>
+                                    <option value="2">2 (A-B)</option>
+                                    <option value="3">3 (A-C)</option>
+                                    <option value="4" selected>4 (A-D)</option>
+                                    <option value="5">5 (A-E)</option>
+                                    <option value="6">6 (A-F)</option>
+                                </select>
+                            </div>
                         </div>
+                        <div id="scnExamInfo" class="mt-1.5 text-xs text-gray-600"></div>
+                        <p id="scnSetHelp" class="mt-1 text-[11px] text-gray-500">Print in <b>Manage Exams &rarr; More &rarr; Print</b> with the same number of sets.</p>
                     </div>
 
                     <div id="scnTypedPanel" class="hidden space-y-3">
@@ -95,9 +95,9 @@ export const ScannerUI = {
                         <div id="scnKeyGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 border border-gray-200 rounded-lg p-2 bg-gray-50 max-h-72 overflow-y-auto"></div>
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 [&>div]:min-w-0">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-2 gap-y-1.5 [&>div]:min-w-0">
                         <div>
-                            <label class="${LABEL}" for="scnTerm">Term</label>
+                            <label class="${LABEL} !mb-0.5" for="scnTerm">Term</label>
                             <select id="scnTerm" class="${FIELD}">
                                 <option value="MidTerm">Mid Term</option>
                                 <option value="FinalTerm">Final Term</option>
@@ -135,7 +135,7 @@ export const ScannerUI = {
                         </div>
                     </div>
 
-                    <div id="scnSetupSummary" class="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded p-2"></div>
+                    <div id="scnSetupSummary" class="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded px-2 py-1.5"></div>
 
                     <div class="flex flex-col sm:flex-row gap-2">
                         <button type="button" id="scnPrintBtn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
