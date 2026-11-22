@@ -835,7 +835,7 @@ export const ClassComponents = {
                             <div>
                                 <div class="font-bold text-blue-600 text-sm sm:text-base cursor-pointer view-summary-trigger hover:underline hover:text-blue-800 transition inline-block" data-name="${escapeHtml(s.Name)}" title="View Performance Summary">${escapeHtml(s.Name)}</div>
                                 <div class="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
-                                    <span class="font-medium text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> &bull; ${escapeHtml(displayProgram || 'N/A')} ${eyeConditionBadge}
+                                    <span class="font-medium text-gray-700">${escapeHtml(s.Student_Number || 'N/A')}</span> ${eyeConditionBadge}
                                 </div>
                                 ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${escapeHtml(displayProgram)}</div>` : ''}
                                 <div class="text-[10px] font-bold text-gray-500 mt-1 uppercase">
