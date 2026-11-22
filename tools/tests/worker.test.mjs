@@ -220,6 +220,13 @@ ok('signing out frees the account without a warning', devC.s === 200);
 s2b.j.token = devC.j.token;   // later tests reuse S2's token
 
 
+const setSec = (tok, id, v) => call('POST', '/api/exam-secure-setting', { token: tok, body: { classExamId: ceId, studentId: id, examSecure: v } });
+ok('lecturer sets secure mode from the exam student list', (await setSec(L1, 'S2', 'off')).s === 200 && (await call('GET', '/api/class-exams?courseId=C1', { token: L1 })).j.assignments.find(a => a.Student_ID === 'S2').Exam_Secure === 'off');
+ok('student cannot change secure mode', (await setSec(devC.j.token, 'S2', 'on')).s === 403);
+ok('other lecturer cannot change secure mode', (await setSec(l2.j.token, 'S2', 'on')).s === 403);
+ok('bad secure value rejected', (await setSec(L1, 'S2', 'maybe')).s === 400);
+await setSec(L1, 'S2', '');
+
 // ---- registration limits ----
 const reg = (sn, extra = {}, ip) => call('POST', '/api/register', { body: { username: 'new' + sn, password: 'secret12', name: 'N', email: 'n@x.com', student_number: sn, contact_number: '09', eye_condition: 'None', program_course: 'BSCS', program_year: '1', program_section: '1', ...extra } });
 const noProg = await reg('26-0090', { program_course: '' });

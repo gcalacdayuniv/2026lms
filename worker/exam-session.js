@@ -8,6 +8,7 @@
 //    an attempt that stayed away longer is submitted from its saved answers the next time anyone asks.
 //  - A lecturer can let a student continue an auto-submitted exam (POST /api/exam-continue).
 import { getRequestDate } from './shared.js';
+import { ensureExamSecurity } from './exam-photos.js';
 import { scoreExam, examMaxPoints, finalScoreOf } from './grading.js';
 
 export const AWAY_GRACE_SECONDS = 5; 
@@ -156,6 +157,17 @@ export async function handleExamSession(request, env, path, url, corsHeaders) {
             return reply(corsHeaders, 200, { success: true, submitted: true, reason: 'away' });
         }
         await env.DB.prepare('UPDATE Exam_Assignments SET Away_Since = NULL WHERE Assignment_ID = ?').bind(assignmentId).run();
+        return reply(corsHeaders, 200, { success: true });
+    }
+
+    // Lecturer: secure exam mode for one student, from the class exam's student list ('' = default, 'on', 'off').
+    if (request.method === 'POST' && path === '/api/exam-secure-setting') {
+        const { classExamId, studentId, examSecure } = await request.json();
+        if (!classExamId || !studentId || !['', 'on', 'off'].includes(examSecure ?? '')) return reply(corsHeaders, 400, { error: 'Invalid request.' });
+        await ensureExamSecurity(env);
+        const has = await env.DB.prepare('SELECT 1 AS ok FROM Exam_Assignments WHERE Class_Exam_ID = ? AND Student_ID = ?').bind(classExamId, studentId).first();
+        if (!has) return reply(corsHeaders, 404, { error: 'This student is not assigned to the exam.' });
+        await env.DB.prepare('UPDATE Users SET Exam_Secure = ? WHERE User_ID = ?').bind(examSecure || null, studentId).run();
         return reply(corsHeaders, 200, { success: true });
     }
 

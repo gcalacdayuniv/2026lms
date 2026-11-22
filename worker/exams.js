@@ -299,7 +299,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         ).bind(courseId).all();
 
         const assignments = await env.DB.prepare(
-            `SELECT ea.*
+            `SELECT ea.*, (SELECT u.Exam_Secure FROM Users u WHERE u.User_ID = ea.Student_ID) AS Exam_Secure
              FROM Exam_Assignments ea
              JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID
              JOIN Exams e ON ce.Exam_ID = e.Exam_ID

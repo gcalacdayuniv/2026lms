@@ -314,6 +314,12 @@ export const CourseExam = {
             await CourseExam.saveClassExamAssignment();
         }
 
+        const listCont = e.target.closest('.list-continue-btn');
+        if (listCont) {
+            await CourseExam.continueStudentExam(listCont.dataset.classExamId, listCont.dataset.studentId, listCont.dataset.name, true);
+            return;
+        }
+
         if (e.target.closest('.reset-student-exam-btn')) {
             const btn = e.target.closest('.reset-student-exam-btn');
             await CourseExam.resetStudentAttempt(btn.dataset.classExamId, btn.dataset.studentId, btn.dataset.name);
@@ -368,6 +374,16 @@ export const CourseExam = {
 
     handleChanges: async (e) => {
         if (e.target.id === 'printExamSets') { CourseExam.fillPrintSets(); return; }
+        if (e.target.classList && e.target.classList.contains('list-secure-sel')) {
+            const sel = e.target;
+            try {
+                await apiFetch('/api/exam-secure-setting', { method: 'POST', body: JSON.stringify({ classExamId: sel.dataset.classExamId, studentId: sel.dataset.studentId, examSecure: sel.value }) });
+                const rec = (CourseExam.classAssignments || []).find(a => a.Class_Exam_ID === sel.dataset.classExamId && a.Student_ID === sel.dataset.studentId);
+                if (rec) rec.Exam_Secure = sel.value || null;
+                UI.success('Secure exam setting saved.');
+            } catch (err) { UI.error('Could not save: ' + err.message); }
+            return;
+        }
         if (e.target.id === 'erReleaseToggle' && CourseExam.resultsData) {
             const on = e.target.checked;
             try {
@@ -821,7 +837,19 @@ export const CourseExam = {
                         <i class="fa-solid fa-folder-open mr-1"></i> Re-open Exam (Reset)
                     </button>
                 `;
+                if (record.Submit_Reason && record.Submit_Reason !== 'time') {
+                    statusHtml += `
+                    <span class="text-[10px] font-bold text-red-700">Auto-submitted</span>
+                    <button type="button" class="list-continue-btn text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded font-bold transition"
+                        data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-student-id="${esc(s.User_ID)}" data-name="${esc(s.Name)}">
+                        <i class="fa-solid fa-play mr-1"></i> Let continue
+                    </button>`;
+                }
             }
+            const secureSel = record ? `<label class="text-[10px] text-gray-500 font-bold flex items-center gap-1">Secure exam
+                    <select class="list-secure-sel border border-gray-300 rounded text-[11px] py-0.5 px-1 bg-white" data-class-exam-id="${esc(linked.Class_Exam_ID)}" data-student-id="${esc(s.User_ID)}" aria-label="Secure exam mode for ${esc(s.Name)}">
+                        ${[['', 'Default'], ['on', 'On'], ['off', 'Off']].map(([v, t]) => `<option value="${v}" ${(record.Exam_Secure || '') === v ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select></label>` : '';
 
             return `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-2.5 bg-white border ${isBlind ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200'} rounded-md gap-2">
@@ -838,8 +866,8 @@ export const CourseExam = {
                             </div>
                         </div>
                     </label>
-                    <div class="flex items-center gap-2 self-end sm:self-center">
-                        ${statusHtml}
+                    <div class="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                        ${secureSel}${statusHtml}
                     </div>
                 </div>
             `;
@@ -971,13 +999,21 @@ export const CourseExam = {
     },
 
     // Lecturer: reopen an auto-submitted exam. The answers come back and the time already used stays used.
-    continueStudentExam: async (classExamId, studentId, studentName) => {
+    continueStudentExam: async (classExamId, studentId, studentName, fromList = false) => {
         const ok = await UI.confirm({ title: 'Let student continue', message: `Re-open the exam for ${studentName}? Their saved answers come back and they continue with the time they had left. The submitted score is removed until they submit again.`, confirmText: 'Let continue' });
         if (!ok) return;
         try {
             await apiFetch('/api/exam-continue', { method: 'POST', body: JSON.stringify({ classExamId, studentId }) });
             UI.success(`${studentName} can continue the exam.`);
-            await CourseExam.openResultsView(classExamId, CourseExam.resultsData.title);
+            if (fromList) {
+                const courseId = window.location.hash.replace('#class-', '');
+                const classExamRes = await apiFetch(`/api/class-exams?courseId=${courseId}&_t=${Date.now()}`);
+                CourseExam.classExams = classExamRes.classExams || [];
+                CourseExam.classAssignments = classExamRes.assignments || [];
+                await CourseExam.openClassAssignView(CourseExam.activeConfigExamId, document.getElementById('ecaExamTitle').textContent);
+            } else {
+                await CourseExam.openResultsView(classExamId, CourseExam.resultsData.title);
+            }
         } catch (err) {
             UI.error('Could not re-open the exam: ' + err.message);
         }
