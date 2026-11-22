@@ -556,4 +556,4 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 
 - **Participation rule (`js/participation.js`):** a Present or Late student gets 2 points for the day by default; points the lecturer adds count on top, but one day is worth at most 4; Absent days give 0; and the term total is capped at 4 points for each scheduled class day (no-class days left out). The same rule feeds the class summary, the student's performance summary, the CSV, the class grade export (Participation perfect score = 4 x class days) and the per-date log. Stored points are not changed; the cap is applied when they are shown.
 
-- **Class grade Excel header:** cell BR2 shows the class course, year and section (from Create Course / Edit Class, e.g. `BSIT 3-A`) instead of the template's fixed "BSP 1-4", and BR3 no longer shows the subject code (left empty).
+- **Class grade Excel header:** cell BR2 shows the class course, year and section (from Create Course / Edit Class, e.g. `BSIT 3-A`) instead of the template's fixed "BSP 1-4", and BR3 keeps the subject code (`SUBJECTCODE: ...`).
