@@ -220,6 +220,15 @@ ok('signing out frees the account without a warning', devC.s === 200);
 s2b.j.token = devC.j.token;   // later tests reuse S2's token
 
 
+const rv = (await call('GET', '/api/exam-results?classExamId=' + ceId, { token: L1 })).j;
+const rvS2 = (rv.students || []).find(x => x.studentId === 'S2');
+ok('results count times away and give review hints', rvS2 && rvS2.awayCount >= 2 && rvS2.review.level !== 'none' && rvS2.review.reasons.length > 0 && rv.reviewCount >= 1, JSON.stringify(rvS2));
+ok('results say how many can continue', rv.continuable >= 1, String(rv.continuable));
+ok('students cannot continue everyone', (await call('POST', '/api/exam-continue-all', { token: devC.j.token, body: { classExamId: ceId } })).s === 403);
+ok('another lecturer cannot continue everyone', (await call('POST', '/api/exam-continue-all', { token: l2.j.token, body: { classExamId: ceId } })).s === 403);
+const all = await call('POST', '/api/exam-continue-all', { token: L1, body: { classExamId: ceId } });
+ok('lecturer lets all auto-submitted continue', all.s === 200 && all.j.count >= 1 && sql.prepare("select Status s from Exam_Assignments where Student_ID='S2' and Class_Exam_ID=?").get(ceId).s === 'Pending', JSON.stringify(all.j));
+ok('a normal submission is not touched', (await call('POST', '/api/exam-continue-all', { token: L1, body: { classExamId: ceId } })).j.count === 0);
 const setSec = (tok, id, v) => call('POST', '/api/exam-secure-setting', { token: tok, body: { classExamId: ceId, studentId: id, examSecure: v } });
 ok('lecturer sets secure mode from the exam student list', (await setSec(L1, 'S2', 'off')).s === 200 && (await call('GET', '/api/class-exams?courseId=C1', { token: L1 })).j.assignments.find(a => a.Student_ID === 'S2').Exam_Secure === 'off');
 ok('student cannot change secure mode', (await setSec(devC.j.token, 'S2', 'on')).s === 403);

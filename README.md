@@ -607,3 +607,7 @@ The student dashboard's **Assigned Exams** section (`buildAssignedExamsSection` 
 
 ## Profile panel details
 The Details form in the profile panel (`renderProfileDetails`, `js/components-dashboard.js`) is compact on every width: Given/Last name, Suffix/Username, Email, Contact/Student number (labelled **Faculty Number** for lecturers) and, for students, Program Course/Year/Section in one row of three. Fields use the shared `.ctl` height.
+
+## Cheating review and "Let all continue"
+- **Review hints** (Manage Exams > Results > Students, `reviewOf` in `worker/exam-session.js`): the app records how many times a student left the exam screen and for how long (`Exam_Assignments.Away_Count / Away_Seconds`), and the server counts the photos. Each student gets **Review** (red) or **Check** (amber) with the reasons: left the screen and did not return, camera turned off, no photos, signed in on another device (Check), three or more times away (Review), one or two times away (Check), fewer than 60% of the expected photos (about one per 30 s, secure students only; Check). A button above the table shows the count and filters the list to those students. The CSV export has the times away, seconds away, photos, review level and notes. These are hints, not proof: open the photos before acting.
+- **Let all continue** (`POST /api/exam-continue-all`): re-opens every auto-submitted attempt of the exam in one step (reason not "time"); same rules as Let continue (answers restored, time already used stays used, score removed). Lecturer-only, with the class-owner check.

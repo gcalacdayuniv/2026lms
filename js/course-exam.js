@@ -266,6 +266,15 @@ export const CourseExam = {
             CourseExam.exportResultsCsv();
             return;
         }
+        if (e.target.closest('#erReviewFilterBtn')) {
+            CourseExam.resultsOnlyReview = !CourseExam.resultsOnlyReview;
+            CourseExam.renderResults();
+            return;
+        }
+        if (e.target.closest('#erContinueAllBtn')) {
+            await CourseExam.continueAll();
+            return;
+        }
 
         if (e.target.closest('.grade-essays-btn')) {
             const btn = e.target.closest('.grade-essays-btn');
@@ -1019,6 +1028,21 @@ export const CourseExam = {
         }
     },
 
+    // Lecturer: let every auto-submitted attempt of this exam continue.
+    continueAll: async () => {
+        const d = CourseExam.resultsData;
+        if (!d) return;
+        const ok = await UI.confirm({ title: 'Let everyone continue', message: `Re-open the exam for all ${d.continuable} students that were submitted automatically? Their saved answers come back and each continues with the time they had left. Their submitted scores are removed until they submit again.`, confirmText: 'Let all continue' });
+        if (!ok) return;
+        try {
+            const r = await apiFetch('/api/exam-continue-all', { method: 'POST', body: JSON.stringify({ classExamId: d.classExamId }) });
+            UI.success(`${r.count} student${r.count === 1 ? '' : 's'} can continue the exam.`);
+            await CourseExam.openResultsView(d.classExamId, d.title);
+        } catch (err) {
+            UI.error('Could not re-open the exams: ' + err.message);
+        }
+    },
+
     resetStudentAttempt: async (classExamId, studentId, studentName) => {
         const ok = await UI.confirm({ title: 'Reset exam attempt', message: `Reset and re-open the exam submission for ${studentName} so they can take it again?`, confirmText: 'Reset', danger: true });
         if (!ok) return;
@@ -1043,6 +1067,7 @@ export const CourseExam = {
     // ---------- Results ----------
 
     resultsData: null,
+    resultsOnlyReview: false,
     resultsSort: 'hardest',
 
     openResultsView: async (classExamId, title) => {
@@ -1055,6 +1080,7 @@ export const CourseExam = {
             const data = await apiFetch(`/api/exam-results?classExamId=${encodeURIComponent(classExamId)}&_t=${Date.now()}`);
             CourseExam.resultsData = { classExamId, title, ...data };
             CourseExam.resultsSort = 'hardest';
+            CourseExam.resultsOnlyReview = false;
             CourseExam.renderResults();
         } catch (err) {
             body.innerHTML = `<div class="text-red-500 font-bold text-sm text-center py-4">${esc(err.message)}</div>`;
@@ -1193,14 +1219,19 @@ export const CourseExam = {
                 ${detail(q)}
             </div>`).join('');
 
-        const rows = d.students.map(s => `
+        const reviewCell = (s) => s.review && s.review.level !== 'none'
+            ? `<span class="inline-block text-[10px] font-black px-1.5 py-0.5 rounded ${s.review.level === 'high' ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">${s.review.level === 'high' ? 'Review' : 'Check'}</span><ul class="mt-0.5 text-[10px] text-gray-600 list-disc pl-3.5">${s.review.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`
+            : '<span class="text-gray-400">-</span>';
+        const shownStudents = CourseExam.resultsOnlyReview ? d.students.filter(s => s.review && s.review.level !== 'none') : d.students;
+        const rows = shownStudents.map(s => `
             <tr class="border-t border-gray-100">
                 <td class="px-2 py-1.5 font-bold text-gray-800">${esc(s.name)} <span class="font-normal text-gray-500">${esc(s.studentNumber)}</span></td>
                 <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'away' ? '<div class="text-[10px] font-bold text-red-700">Away too long: auto-submitted</div>' : s.submitReason === 'session-takeover' ? '<div class="text-[10px] font-bold text-red-700">Signed in on another device: auto-submitted</div>' : s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.submitReason && s.submitReason !== 'time' ? `<button type="button" class="er-continue-btn mt-0.5 mr-2 text-[11px] font-bold text-emerald-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}">Let continue</button>` : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>Photos (${s.photos})</button>` : ''}</td>
                 <td class="px-2 py-1.5 text-right">${s.score === null ? '-' : `${s.score} / ${s.max}`}</td>
                 <td class="px-2 py-1.5 text-right font-bold">${fmt(s.percent, '%')}</td>
                 <td class="px-2 py-1.5 text-right">${s.minutes === null ? '-' : s.minutes + ' min'}</td>
-            </tr>`).join('');
+                <td class="px-2 py-1.5 min-w-[9rem]">${reviewCell(s)}</td>
+            </tr>`).join('') || '<tr><td colspan="6" class="px-2 py-4 text-center text-gray-500">No student needs review.</td></tr>';
 
         body.innerHTML = `
             ${releaseRow}
@@ -1216,11 +1247,15 @@ export const CourseExam = {
             <div>
                 <div class="flex items-center justify-between mb-2">
                     <h5 class="text-xs font-black text-gray-700 uppercase tracking-wider">Students</h5>
+                    <span class="flex flex-wrap gap-1.5 justify-end">
+                    ${d.reviewCount ? `<button type="button" id="erReviewFilterBtn" aria-pressed="${CourseExam.resultsOnlyReview ? 'true' : 'false'}" class="px-2.5 py-1.5 text-xs font-bold rounded-md border ${CourseExam.resultsOnlyReview ? 'bg-red-600 text-white border-red-600' : 'border-red-300 text-red-700 hover:bg-red-50'} transition"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>${d.reviewCount} to review${CourseExam.resultsOnlyReview ? ' (showing)' : ''}</button>` : ''}
+                    ${d.continuable ? `<button type="button" id="erContinueAllBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition"><i class="fa-solid fa-play mr-1" aria-hidden="true"></i>Let all ${d.continuable} continue</button>` : ''}
                     <button type="button" id="erExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
+                    </span>
                 </div>
                 <div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
                     <table class="w-full text-xs text-left">
-                        <thead class="bg-gray-50 text-gray-600"><tr><th class="px-2 py-1.5">Student</th><th class="px-2 py-1.5">Status</th><th class="px-2 py-1.5 text-right">Score</th><th class="px-2 py-1.5 text-right">%</th><th class="px-2 py-1.5 text-right">Time</th></tr></thead>
+                        <thead class="bg-gray-50 text-gray-600"><tr><th class="px-2 py-1.5">Student</th><th class="px-2 py-1.5">Status</th><th class="px-2 py-1.5 text-right">Score</th><th class="px-2 py-1.5 text-right">%</th><th class="px-2 py-1.5 text-right">Time</th><th class="px-2 py-1.5">Review</th></tr></thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>
@@ -1231,8 +1266,8 @@ export const CourseExam = {
         const d = CourseExam.resultsData;
         if (!d) return;
         const cell = csvCell;
-        const lines = [['Student', 'Student number', 'Status', 'Score', 'Max', 'Percent', 'Minutes'].join(',')]
-            .concat(d.students.map(s => [s.name, s.studentNumber, s.status, s.score ?? '', s.max ?? '', s.percent ?? '', s.minutes ?? ''].map(cell).join(',')));
+        const lines = [['Student', 'Student number', 'Status', 'Score', 'Max', 'Percent', 'Minutes', 'Times away', 'Seconds away', 'Photos', 'Review', 'Review notes'].join(',')]
+            .concat(d.students.map(s => [s.name, s.studentNumber, s.status, s.score ?? '', s.max ?? '', s.percent ?? '', s.minutes ?? '', s.awayCount ?? '', s.awaySeconds ?? '', s.photos ?? '', (s.review && s.review.level) || '', ((s.review && s.review.reasons) || []).join('; ')].map(cell).join(',')));
         const name = (d.title || 'exam').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'exam';
         downloadCsv(`${name}_results.csv`, lines.join('\r\n'));
     },

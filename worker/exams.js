@@ -7,7 +7,7 @@ import { ensureAccessibleExamTables, ensureManualMarksColumn, ensureExamShares }
 import { ASSESSMENT_TERMS, ASSESSMENT_CATEGORIES } from './constants.js';
 import { DATE_RE } from './attendance.js';
 import { ensureExamSecurity, secureApplies } from './exam-photos.js';
-import { ensureSessions, finishAttempt, sweepAway } from './exam-session.js';
+import { ensureSessions, finishAttempt, sweepAway, reviewOf } from './exam-session.js';
 import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
 
 const GRACE_SECONDS = 120;   // a submission this long after the time limit is still accepted
@@ -597,12 +597,13 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         const questions = safeJson(ce.ExamData) || [];
 
         await ensureExamSecurity(env);
+        await ensureSessions(env);
         await sweepAway(env, { classExamId });
         const photoCounts = {};
         ((await env.DB.prepare("SELECT Student_ID, COUNT(*) AS n FROM Exam_Photos WHERE Class_Exam_ID = ? GROUP BY Student_ID").bind(classExamId).all()).results || [])
             .forEach(r => { photoCounts[r.Student_ID] = r.n; });
         const rows = await env.DB.prepare(
-            `SELECT ea.Student_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ea.Started_At, ea.Submitted_At, ea.Submit_Reason, u.Name, u.Student_Number
+            `SELECT ea.Student_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ea.Started_At, ea.Submitted_At, ea.Submit_Reason, ea.Away_Count, ea.Away_Seconds, u.Name, u.Student_Number, u.Exam_Secure, u.eye_condition
              FROM Exam_Assignments ea LEFT JOIN Users u ON u.User_ID = ea.Student_ID
              WHERE ea.Class_Exam_ID = ? AND ea.Is_Enabled = 1
              ORDER BY u.Name`
@@ -626,8 +627,16 @@ export async function handleExams(request, env, path, url, corsHeaders) {
             const began = parseTime(r.Started_At);
             const ended = parseTime(r.Submitted_At);
             const completed = r.Status === "Completed";
+            const minutes = completed && began !== null && ended !== null && ended >= began ? Math.round(((ended - began) / 60000) * 10) / 10 : null;
+            const review = reviewOf({
+                submitReason: r.Submit_Reason, awayCount: r.Away_Count, awaySeconds: r.Away_Seconds, photos: photoCounts[r.Student_ID] || 0,
+                secure: secureApplies(r), minutes, completed
+            });
             return {
                 studentId: r.Student_ID,
+                awayCount: Number(r.Away_Count) || 0,
+                awaySeconds: Math.round(Number(r.Away_Seconds) || 0),
+                review,
                 name: r.Name || r.Student_ID,
                 studentNumber: r.Student_Number || "",
                 status: completed ? "Completed" : (r.Started_At ? "In progress" : "Not started"),
@@ -653,6 +662,8 @@ export async function handleExams(request, env, path, url, corsHeaders) {
             avgMinutes: times.length ? Math.round((times.reduce((a, b) => a + b, 0) / times.length) * 10) / 10 : null,
             questions: stats,
             release: ce.Release === 1,
+            reviewCount: students.filter(s => s.review.level !== 'none').length,
+            continuable: students.filter(s => s.status === 'Completed' && s.submitReason && s.submitReason !== 'time').length,
             students
         }), { status: 200, headers: corsHeaders });
     }

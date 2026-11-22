@@ -22,7 +22,8 @@ export async function ensureSessions(env) {
     try {
         for (const [table, column, type] of [
             ['Users', 'Sessions_Valid_From', 'INTEGER'], ['Users', 'Last_Seen_At', 'INTEGER'], ['Users', 'Session_Device', 'TEXT'],
-            ['Exam_Assignments', 'Draft_JSON', 'TEXT'], ['Exam_Assignments', 'Draft_At', 'TEXT'], ['Exam_Assignments', 'Away_Since', 'INTEGER']
+            ['Exam_Assignments', 'Draft_JSON', 'TEXT'], ['Exam_Assignments', 'Draft_At', 'TEXT'], ['Exam_Assignments', 'Away_Since', 'INTEGER'],
+            ['Exam_Assignments', 'Away_Count', 'INTEGER'], ['Exam_Assignments', 'Away_Seconds', 'INTEGER']
         ]) {
             const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all();
             if (!(info.results || []).some(c => c.name === column)) {
@@ -43,6 +44,7 @@ export const ATTEMPT_SQL = `SELECT ea.*, ce.Course_ID, ce.Exam_ID, ce.Assessment
 
 // Grades the answers and records the attempt as Completed. record = one row of ATTEMPT_SQL.
 export async function finishAttempt(env, request, record, answers, reason) {
+    await ensureSessions(env);
     const quizData = (() => { const q = safeParse(record.ExamData || '[]', []); return Array.isArray(q) ? q : []; })();
     const given = Array.isArray(answers) ? answers : [];
     // keep stored answers small: one entry per question, essays up to 10,000 characters
@@ -74,9 +76,10 @@ export async function finishAttempt(env, request, record, answers, reason) {
     await env.DB.batch([
         env.DB.prepare(
             `UPDATE Exam_Assignments
-             SET Status = 'Completed', Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Max_Score = ?, Answers_JSON = ?, Submitted_At = CURRENT_TIMESTAMP, Submit_Reason = ?, Away_Since = NULL
+             SET Status = 'Completed', Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Max_Score = ?, Answers_JSON = ?, Submitted_At = CURRENT_TIMESTAMP, Submit_Reason = ?,
+                 Away_Seconds = COALESCE(Away_Seconds, 0) + CASE WHEN Away_Since IS NOT NULL THEN (? - Away_Since) / 1000 ELSE 0 END, Away_Since = NULL
              WHERE Assignment_ID = ?`
-        ).bind(scored.raw, scored.bonus, finalScore, maxScore, JSON.stringify(cleanAnswers), reason, record.Assignment_ID),
+        ).bind(scored.raw, scored.bonus, finalScore, maxScore, JSON.stringify(cleanAnswers), reason, Date.now(), record.Assignment_ID),
         env.DB.prepare('DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?').bind(targetAssessmentId, record.Student_ID),
         env.DB.prepare('INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)')
             .bind(crypto.randomUUID(), targetAssessmentId, record.Student_ID, finalScore)
@@ -119,6 +122,41 @@ export async function sweepAway(env, { studentId, classExamId } = {}) {
     return rows.length;
 }
 
+// Review hints for one student's attempt, from what the app recorded: auto-submit reason, times away, photos taken.
+// level: 'high' | 'check' | 'none'. Photos are expected about every 30 seconds while the attempt ran.
+export function reviewOf({ submitReason, awayCount, awaySeconds, photos, secure, minutes, completed }) {
+    const reasons = [];
+    let level = 'none';
+    const raise = (l) => { if (l === 'high' || (l === 'check' && level === 'none')) level = l; };
+    if (submitReason === 'away' || submitReason === 'focus-lost') { reasons.push('Left the exam screen and did not come back in time'); raise('high'); }
+    if (submitReason === 'camera-off') { reasons.push('Camera was turned off'); raise('high'); }
+    if (submitReason === 'session-takeover') { reasons.push('Account signed in on another device'); raise('check'); }
+    const n = Number(awayCount) || 0;
+    if (n >= 3) { reasons.push(`Left the screen ${n} times (${Math.round(Number(awaySeconds) || 0)} s away)`); raise('high'); }
+    else if (n > 0) { reasons.push(`Left the screen ${n} time${n === 1 ? '' : 's'} (${Math.round(Number(awaySeconds) || 0)} s away)`); raise('check'); }
+    if (secure && completed && minutes !== null && minutes >= 2) {
+        const expected = Math.floor(minutes * 2) + 1;
+        if (!photos) { reasons.push('No photos were taken'); raise('high'); }
+        else if (photos < expected * 0.6) { reasons.push(`Few photos (${photos} of about ${expected})`); raise('check'); }
+    }
+    return { level, reasons };
+}
+
+// Re-opens one submitted attempt: answers come back, the score goes, the time already used stays used.
+async function continueAttempt(env, rec) {
+    const parseMs = (t) => { if (!t) return null; const s = String(t); const ms = Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(' ', 'T') + 'Z'); return Number.isFinite(ms) ? ms : null; };
+    const began = parseMs(rec.Started_At), ended = parseMs(rec.Submitted_At);
+    const used = began !== null && ended !== null ? Math.max(0, ended - began) : 0;
+    const newStart = new Date(Date.now() - used).toISOString();
+    const stmts = [env.DB.prepare(
+        `UPDATE Exam_Assignments SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Manual_Marks = NULL,
+                Draft_JSON = COALESCE(Answers_JSON, Draft_JSON), Answers_JSON = NULL, Started_At = ?, Submitted_At = NULL, Submit_Reason = NULL, Away_Since = NULL
+         WHERE Assignment_ID = ?`
+    ).bind(rec.Time_Limit ? newStart : (rec.Started_At || newStart), rec.Assignment_ID)];
+    if (rec.Assessment_ID) stmts.push(env.DB.prepare('DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?').bind(rec.Assessment_ID, rec.Student_ID));
+    await env.DB.batch(stmts);
+}
+
 const reply = (corsHeaders, status, obj) => new Response(JSON.stringify(obj), { status, headers: corsHeaders });
 
 export async function handleExamSession(request, env, path, url, corsHeaders) {
@@ -149,14 +187,14 @@ export async function handleExamSession(request, env, path, url, corsHeaders) {
                 await env.DB.prepare('UPDATE Exam_Assignments SET Draft_JSON = ?, Draft_At = CURRENT_TIMESTAMP WHERE Assignment_ID = ?').bind(JSON.stringify(answers), assignmentId).run();
             }
             const since = rec.Away_Since || Date.now();
-            if (!rec.Away_Since) await env.DB.prepare('UPDATE Exam_Assignments SET Away_Since = ? WHERE Assignment_ID = ?').bind(since, assignmentId).run();
+            if (!rec.Away_Since) await env.DB.prepare('UPDATE Exam_Assignments SET Away_Since = ?, Away_Count = COALESCE(Away_Count, 0) + 1 WHERE Assignment_ID = ?').bind(since, assignmentId).run();
             return reply(corsHeaders, 200, { success: true, graceSeconds: AWAY_GRACE_SECONDS, secondsLeft: Math.max(0, Math.round((since + AWAY_GRACE_SECONDS * 1000 - Date.now()) / 1000)) });
         }
         if (rec.Away_Since && Date.now() - rec.Away_Since > AWAY_GRACE_SECONDS * 1000) {
             await submitFromDraft(env, rec, 'away');
             return reply(corsHeaders, 200, { success: true, submitted: true, reason: 'away' });
         }
-        await env.DB.prepare('UPDATE Exam_Assignments SET Away_Since = NULL WHERE Assignment_ID = ?').bind(assignmentId).run();
+        await env.DB.prepare('UPDATE Exam_Assignments SET Away_Seconds = COALESCE(Away_Seconds, 0) + CASE WHEN Away_Since IS NOT NULL THEN (? - Away_Since) / 1000 ELSE 0 END, Away_Since = NULL WHERE Assignment_ID = ?').bind(Date.now(), assignmentId).run();
         return reply(corsHeaders, 200, { success: true });
     }
 
@@ -180,18 +218,18 @@ export async function handleExamSession(request, env, path, url, corsHeaders) {
         const rec = await env.DB.prepare(`${ATTEMPT_SQL} WHERE ea.Class_Exam_ID = ? AND ea.Student_ID = ?`).bind(classExamId, studentId).first();
         if (!rec) return reply(corsHeaders, 404, { error: 'Exam assignment not found.' });
         if (rec.Status !== 'Completed') return reply(corsHeaders, 400, { error: 'This exam is not submitted.' });
-        const parseMs = (t) => { if (!t) return null; const s = String(t); const ms = Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(' ', 'T') + 'Z'); return Number.isFinite(ms) ? ms : null; };
-        const began = parseMs(rec.Started_At), ended = parseMs(rec.Submitted_At);
-        const used = began !== null && ended !== null ? Math.max(0, ended - began) : 0;
-        const newStart = new Date(Date.now() - used).toISOString();
-        const stmts = [env.DB.prepare(
-            `UPDATE Exam_Assignments SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Manual_Marks = NULL,
-                    Draft_JSON = COALESCE(Answers_JSON, Draft_JSON), Answers_JSON = NULL, Started_At = ?, Submitted_At = NULL, Submit_Reason = NULL, Away_Since = NULL
-             WHERE Assignment_ID = ?`
-        ).bind(rec.Time_Limit ? newStart : (rec.Started_At || newStart), rec.Assignment_ID)];
-        if (rec.Assessment_ID) stmts.push(env.DB.prepare('DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?').bind(rec.Assessment_ID, studentId));
-        await env.DB.batch(stmts);
+        await continueAttempt(env, rec);
         return reply(corsHeaders, 200, { success: true });
+    }
+
+    // Lecturer: let every auto-submitted attempt of an exam continue (an outage, a class-wide problem).
+    if (request.method === 'POST' && path === '/api/exam-continue-all') {
+        const { classExamId } = await request.json();
+        if (!classExamId) return reply(corsHeaders, 400, { error: 'Missing classExamId.' });
+        await ensureSessions(env);
+        const rows = ((await env.DB.prepare(`${ATTEMPT_SQL} WHERE ea.Class_Exam_ID = ? AND ea.Is_Enabled = 1 AND ea.Status = 'Completed' AND ea.Submit_Reason IS NOT NULL AND ea.Submit_Reason != 'time'`).bind(classExamId).all()).results || []);
+        for (const r of rows) await continueAttempt(env, r);
+        return reply(corsHeaders, 200, { success: true, count: rows.length });
     }
     return null;
 }
