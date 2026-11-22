@@ -614,7 +614,7 @@ const DashboardUI = {
     `,
 
     renderDetailsModal: () => `
-        <div id="detailsModal" class="hidden fixed inset-0 flex flex-col bg-gray-50 fade-in details-page" style="z-index:96">
+        <div id="detailsModal" class="hidden fixed inset-0 flex flex-col bg-gray-50 fade-in details-page" style="z-index:90">
             <div id="closeDetailsModalBg" class="hidden"></div>
             <div class="details-top sticky top-0">
                 <div class="max-w-4xl mx-auto px-2 sm:px-6 py-2 flex items-center gap-1">
