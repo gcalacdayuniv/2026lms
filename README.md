@@ -559,3 +559,5 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - **Class grade Excel header:** cell BR2 shows the class course, year and section (from Create Course / Edit Class, e.g. `BSIT 3-A`) instead of the template's fixed "BSP 1-4", and BR3 keeps the subject code (`SUBJECTCODE: ...`).
 
 - **Class grade file name:** `Course code_class course year-section_term_Class Grade.xlsx`, for example `FINMAN 7_FM 3-7_2026-2027 1st Sem_Class Grade.xlsx`. Parts that are not set are left out.
+
+- **Share / Save prompt (phones):** after an export (Class Grade, CSVs) a centered dialog says "Your file is ready" with the file name and a large **Share / Save** button, because the share sheet only opens from a fresh tap (`js/download-utils.js`). Desktop browsers still download straight away.
