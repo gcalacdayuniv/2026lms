@@ -372,7 +372,7 @@ export const CourseModule = {
         if (e.target.closest('#closeStudentSummaryModalBtn') || e.target.id === 'closeStudentSummaryModalBg') {
             document.getElementById('studentSummaryModal').classList.add('hidden');
             // The details page opened from the summary closes with it.
-            document.getElementById('detailsModal')?.classList.add('hidden');
+            ['detailsModal', 'submissionHistoryModal', 'submitDocModal'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
         }
 
         if (e.target.closest('#openCourseMenuBtn')) {

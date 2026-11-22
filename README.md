@@ -547,4 +547,4 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 
 - **Front-end lint:** `sh tools/tests/run-tests.sh` now also checks `js/` for undefined names (the check that would have caught the `displayCourse` crash on the class screen).
 
-- **Student summary layout:** the score details page has a white header with an amber top line (it used to be the same blue as the summary header, so the two blended). On phones the History and Upload pages start below the summary header and cover the History / Upload bar (Back returns to it), so they get the full height (`js/student-summary-ui.js`).
+- **Student summary layout:** the score details page has a white header with an amber top line (it used to be the same blue as the summary header, so the two blended). The score details, History and Upload pages all start below the summary header and cover the History / Upload bar (Back returns to it), so they get the full height; the summary header's back arrow (and term tabs) stay tappable while they are open (`js/student-summary-ui.js`).

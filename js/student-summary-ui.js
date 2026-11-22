@@ -103,12 +103,11 @@ export const StudentSummaryUI = {
                 else $('ssActionBar')?.classList.add('hidden');
             }).observe(content, { attributes: true, attributeFilter: ['class'] });
         }
-        // The score details page stops above the History / Upload bar so the bar stays in reach.
+        // The score details page starts below the summary header and covers the History / Upload bar.
         const details = $('detailsModal');
         const fit = () => {
-            const bar = $('ssActionBar');
-            const open = details && !details.classList.contains('hidden') && !modal.classList.contains('hidden') && bar && !bar.classList.contains('hidden');
-            details.style.bottom = open ? `${Math.ceil(bar.getBoundingClientRect().height)}px` : '';
+            const open = details && !details.classList.contains('hidden') && !modal.classList.contains('hidden');
+            details.style.bottom = '';
             // Also stay below the summary header (course, seat/group/topic, term tabs).
             const head = modal.querySelector('.ss-top');
             details.style.top = open && head ? `${Math.ceil(head.getBoundingClientRect().bottom)}px` : '';
