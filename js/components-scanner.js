@@ -47,23 +47,8 @@ export const ScannerUI = {
                     </div>
 
                     <div id="scnExamPanel">
-                        <div class="flex items-end gap-2">
-                            <div class="flex-1 min-w-0">
-                                <label class="${LABEL}" for="scnExamSelect">Exam</label>
-                                <select id="scnExamSelect" class="${FIELD} font-medium"></select>
-                            </div>
-                            <div class="w-[8.5rem] shrink-0">
-                                <label class="${LABEL}" for="scnSetCount">Exam sets</label>
-                                <select id="scnSetCount" class="${FIELD}" aria-describedby="scnSetHelp">
-                                    <option value="1">1 set</option>
-                                    <option value="2">2 (A-B)</option>
-                                    <option value="3">3 (A-C)</option>
-                                    <option value="4" selected>4 (A-D)</option>
-                                    <option value="5">5 (A-E)</option>
-                                    <option value="6">6 (A-F)</option>
-                                </select>
-                            </div>
-                        </div>
+                        <label class="${LABEL}" for="scnExamSelect">Exam</label>
+                        <select id="scnExamSelect" class="${FIELD} font-medium"></select>
                         <div id="scnExamInfo" class="mt-1.5 text-xs text-gray-600"></div>
                         <p id="scnSetHelp" class="mt-1 text-[11px] text-gray-500">Print in <b>Manage Exams &rarr; More &rarr; Print</b> with the same number of sets.</p>
                     </div>
@@ -118,6 +103,17 @@ export const ScannerUI = {
                             <label class="${LABEL}" for="scnDate">Date</label>
                             <input type="date" id="scnDate" class="${FIELD} min-w-0 max-w-full appearance-none h-[42px] text-left">
                         </div>
+                        <div id="scnSetsWrap">
+                            <label class="${LABEL}" for="scnSetCount">Exam sets</label>
+                            <select id="scnSetCount" class="${FIELD}" aria-describedby="scnSetHelp">
+                                <option value="1">1 set</option>
+                                <option value="2">2 (A-B)</option>
+                                <option value="3">3 (A-C)</option>
+                                <option value="4" selected>4 (A-D)</option>
+                                <option value="5">5 (A-E)</option>
+                                <option value="6">6 (A-F)</option>
+                            </select>
+                        </div>
                         <div id="scnPaperWrap">
                             <label class="${LABEL}" for="scnPaper">Paper</label>
                             <select id="scnPaper" class="${FIELD}">
@@ -141,7 +137,7 @@ export const ScannerUI = {
                         <button type="button" id="scnPrintBtn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                             <i class="fa-solid fa-print mr-2"></i> Print Answer Sheet
                         </button>
-                        <button type="button" id="scnStartBtn" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <button type="button" id="scnStartBtn" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-md text-sm font-bold appearance-none border-0 flex items-center justify-center">
                             <i class="fa-solid fa-camera mr-2"></i> Start Scanning
                         </button>
                     </div>

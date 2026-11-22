@@ -387,7 +387,9 @@ export const CourseScanner = {
         const isExam = CourseScanner.mode === 'exam';
         $('scnExamPanel')?.classList.toggle('hidden', !isExam);
         $('scnTypedPanel')?.classList.toggle('hidden', isExam);
-        $('scnPrintBtn')?.classList.toggle('hidden', isExam);   // exam sheets are printed from Manage Exams
+        const printBtn = $('scnPrintBtn');   // exam sheets are printed from Manage Exams
+        if (printBtn) { printBtn.classList.toggle('hidden', isExam); printBtn.style.display = isExam ? 'none' : ''; }
+        $('scnSetsWrap')?.classList.toggle('hidden', !isExam);
         // Paper size and sheets per paper only shape the printed blank sheet; scanning does not use them.
         $('scnPaperWrap')?.classList.toggle('hidden', isExam);
         $('scnCopiesWrap')?.classList.toggle('hidden', isExam);
