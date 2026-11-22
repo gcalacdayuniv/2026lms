@@ -225,7 +225,7 @@ const loadWithSavedCopy = async ({ container, key, mode, paint, fetchFresh }) =>
 
 // Search box (and day chips for lecturers). Filtering is done by dash-nav.js.
 const searchBarHtml = (days = [], extra = '', showSearch = true) => `
-                    <div class="sticky top-16 z-30 bg-gray-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-2 pb-2 mb-3" data-course-filter>
+                    <div class="sticky top-16 z-30 bg-gray-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-2 pb-3 mb-4" data-course-filter>
                         <div class="flex items-center gap-2">
                             ${showSearch ? `<div class="relative flex-1 min-w-0">
                                 <label for="courseSearch" class="sr-only">Search courses</label>
@@ -234,8 +234,8 @@ const searchBarHtml = (days = [], extra = '', showSearch = true) => `
                             </div>` : ''}
                             ${extra}
                         </div>
-                        ${days.length ? `<div class="flex gap-2 overflow-x-auto mt-2 pb-1 -mx-1 px-1" role="group" aria-label="Filter by day">
-                            ${['All', 'Today', ...days].map((d, i) => `<button type="button" data-day-chip="${escapeHtml(d)}" aria-pressed="${i === 0}" class="day-chip flex-shrink-0${i === 0 ? ' is-on' : ''}">${escapeHtml(d)}</button>`).join('')}
+                        ${days.length ? `<div class="flex gap-2.5 overflow-x-auto mt-3 pb-2 -mx-4 px-4 scroll-px-4" role="group" aria-label="Filter by day">
+                            ${['All', 'Today', ...days].map((d, i) => `<button type="button" data-day-chip="${escapeHtml(d)}" aria-pressed="${i === 0}" class="day-chip flex-shrink-0${i === 0 ? ' is-on' : ''}">${escapeHtml(d)}</button>`).join('')}<span class="flex-shrink-0 w-4" aria-hidden="true"></span>
                         </div>` : ''}
                         <p id="courseNoMatch" class="hidden text-center text-sm text-gray-500 font-medium py-6" role="status">No courses match.</p>
                     </div>`;
@@ -271,7 +271,7 @@ const CHIP_TONES = {
     blue: 'bg-blue-50 text-blue-700 border-blue-200'
 };
 const chip = (icon, text, tone = 'gray') =>
-    `<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${CHIP_TONES[tone]}"><i class="fa-solid ${icon}" aria-hidden="true"></i>${escapeHtml(text)}</span>`;
+    `<span class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${CHIP_TONES[tone]}"><i class="fa-solid ${icon}" aria-hidden="true"></i>${escapeHtml(text)}</span>`;
 
 // Info chips: student count, today's attendance (only on the class day), nearest exam period.
 const courseChipsHtml = (c) => {
@@ -291,27 +291,27 @@ const courseChipsHtml = (c) => {
     }
     const exam = examBadge(c, today);
     if (exam) chips.push(chip('fa-file-pen', exam.text, exam.tone));
-    return chips.length ? `<div class="flex flex-wrap gap-1.5 mt-2">${chips.join('')}</div>` : '';
+    return chips.length ? `<div class="flex flex-wrap gap-2 mt-3">${chips.join('')}</div>` : '';
 };
 
 // Card = link to the class plus a row of shortcuts (Invite code, Scan, Summary, More = the class's Course Actions menu). A shortcut opens the class and then that page (data-intent).
 const lecturerCourseCardHtml = (c) => `
                 <div data-course-card data-day="${escapeHtml(c.ScheduleDay)}" data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.ScheduleDay, c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ').toLowerCase())}" class="border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300 overflow-hidden">
-                    <a href="#class-${c.Course_ID}" class="block px-4 pt-3 pb-2">
+                    <a href="#class-${c.Course_ID}" class="block px-5 pt-4 pb-3">
                         <div class="flex justify-between items-center gap-2">
-                            <div class="font-bold text-lg text-blue-700 truncate">${escapeHtml(c.CourseCode)}</div>
+                            <div class="font-bold text-xl text-blue-700 truncate">${escapeHtml(c.CourseCode)}</div>
                             ${(c.Target_Course || c.Target_Year || c.Target_Section) ?
-                                `<span class="shrink-0 bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded border uppercase">${escapeHtml([c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' '))}</span>` : ''}
+                                `<span class="shrink-0 bg-blue-50 text-blue-700 text-sm font-extrabold px-3 py-1 rounded-lg border border-blue-200 uppercase">${escapeHtml([c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' '))}</span>` : ''}
                         </div>
-                        <div class="text-gray-800 font-semibold text-sm leading-snug truncate">${escapeHtml(c.CourseTitle)}</div>
-                        <div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <div class="text-gray-800 font-semibold text-base leading-snug truncate mt-0.5">${escapeHtml(c.CourseTitle)}</div>
+                        <div class="mt-2 text-sm text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1">
                             <span><i class="fa-regular fa-calendar mr-1" aria-hidden="true"></i>${escapeHtml(String(c.ScheduleDay || '').slice(0, 3))}</span>
                             <span><i class="fa-regular fa-clock mr-1" aria-hidden="true"></i>${escapeHtml(c.TimePeriod)}</span>
                             ${c.Room ? `<span><i class="fa-solid fa-door-open mr-1" aria-hidden="true"></i>${escapeHtml(c.Room)}</span>` : ''}
                         </div>
                         ${courseChipsHtml(c)}
                     </a>
-                    <div class="grid grid-cols-4 border-t border-gray-100 text-[11px] font-bold text-gray-600">
+                    <div class="grid grid-cols-4 border-t border-gray-100 text-xs font-bold text-gray-600">
                         <button type="button" class="card-action stacked open-invite-btn" data-course-id="${c.Course_ID}" aria-label="Invite code: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-key" aria-hidden="true"></i>Invite code</button>
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openClassSummaryBtn"><i class="fa-solid fa-table-list" aria-hidden="true"></i>Summary</a>
@@ -761,9 +761,8 @@ export const CourseDashboard = {
 
             container.innerHTML = `
                 <div class="fade-in max-w-5xl mx-auto">
-                    <h2 class="text-lg font-bold text-gray-800 mb-1">My Classes</h2>
                     ${filterBar}
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${coursesHtml}
                     </div>
                     ${archivedHtml}

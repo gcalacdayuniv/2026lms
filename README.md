@@ -561,3 +561,5 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - **Class grade file name:** `Course code_class course year-section_term_Class Grade.xlsx`, for example `FINMAN 7_FM 3-7_2026-2027 1st Sem_Class Grade.xlsx`. Parts that are not set are left out.
 
 - **Share / Save prompt (phones):** after an export (Class Grade, CSVs) a centered dialog says "Your file is ready" with the file name and a large **Share / Save** button, because the share sheet only opens from a fresh tap (`js/download-utils.js`). Desktop browsers still download straight away.
+
+- **Lecturer dashboard look:** the header reads "My Classes" (students still see "Dashboard"), so the page has no separate heading. Day chips have room at both ends when scrolled sideways, the class badge (course year-section) is larger, and class cards are roomier (bigger code, title, schedule, chips and a taller button row).
