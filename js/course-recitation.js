@@ -296,6 +296,33 @@ export const CourseRecitation = {
         CourseRecitation.drawWheel();
     },
 
+    // The called student's photo grows out of their slice into the result card.
+    zoomIn: (from, src) => {
+        const target = document.querySelector('#recitationResultAvatar img');
+        if (!target || !src || !target.animate || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+        target.style.visibility = 'hidden';
+        requestAnimationFrame(() => {
+            const end = target.getBoundingClientRect();
+            if (!end.width) { target.style.visibility = ''; return; }
+            const fly = document.createElement('img');
+            fly.src = target.src;
+            fly.alt = '';
+            fly.setAttribute('aria-hidden', 'true');
+            fly.style.cssText = 'position:fixed;z-index:130;border-radius:9999px;object-fit:cover;border:4px solid #a855f7;box-shadow:0 10px 30px rgba(88,28,135,.35);pointer-events:none;margin:0';
+            document.body.appendChild(fly);
+            const box = (cx, cy, size) => ({ left: `${cx - size / 2}px`, top: `${cy - size / 2}px`, width: `${size}px`, height: `${size}px` });
+            const anim = fly.animate([
+                box(from.cx, from.cy, from.size),
+                { ...box(end.left + end.width / 2, end.top + end.height / 2, end.width * 1.12), offset: 0.75 },
+                box(end.left + end.width / 2, end.top + end.height / 2, end.width)
+            ], { duration: 800, easing: 'cubic-bezier(.4,.1,.2,1)', fill: 'forwards' });
+            const done = () => { target.style.visibility = ''; fly.remove(); };
+            anim.onfinish = done;
+            anim.oncancel = done;
+            setTimeout(done, 1500);   // never leave the photo hidden
+        });
+    },
+
     drawWheel: () => {
         const wheel = document.getElementById('recitationWheel');
 
@@ -448,9 +475,16 @@ export const CourseRecitation = {
             document.getElementById('recitationResultAvatar').innerHTML = avatarImg;
             document.getElementById('recitationResultName').textContent = selectedStudent.Name;
 
+            // Where the winning slice is (under the pointer, at the top of the wheel), measured before the wheel is hidden.
+            const dial = wheel.parentElement.getBoundingClientRect();
+            const half = (sliceAngle / 2) * Math.PI / 180;
+            const startSize = totalSlices <= 2 ? 120 : Math.max(36, Math.min(110, 2 * 0.68 * (dial.width / 2) * Math.sin(half)));
+            const from = { cx: dial.left + dial.width / 2, cy: dial.top + dial.height / 2 - 0.68 * (dial.height / 2), size: startSize };
+
             document.getElementById('wheelContainer').classList.add('hidden');
             document.getElementById('spinWheelBtn').classList.add('hidden');
             document.getElementById('recitationResult').classList.remove('hidden');
+            CourseRecitation.zoomIn(from, avatarSrc);
 
             wheel.style.transition = 'none';
             wheel.style.transform = `rotate(${finalRotation % 360}deg)`;
