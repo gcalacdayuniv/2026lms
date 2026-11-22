@@ -224,14 +224,17 @@ const loadWithSavedCopy = async ({ container, key, mode, paint, fetchFresh }) =>
 };
 
 // Search box (and day chips for lecturers). Filtering is done by dash-nav.js.
-const searchBarHtml = (days = []) => `
-                    <div class="mb-5" data-course-filter>
-                        <label for="courseSearch" class="sr-only">Search courses</label>
-                        <div class="relative">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" aria-hidden="true"></i>
-                            <input id="courseSearch" type="search" autocomplete="off" placeholder="Search courses" class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-full bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+const searchBarHtml = (days = [], extra = '', showSearch = true) => `
+                    <div class="sticky top-16 z-30 bg-gray-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-2 pb-2 mb-3" data-course-filter>
+                        <div class="flex items-center gap-2">
+                            ${showSearch ? `<div class="relative flex-1 min-w-0">
+                                <label for="courseSearch" class="sr-only">Search courses</label>
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" aria-hidden="true"></i>
+                                <input id="courseSearch" type="search" autocomplete="off" placeholder="Search courses" class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-full bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>` : ''}
+                            ${extra}
                         </div>
-                        ${days.length ? `<div class="flex gap-2 overflow-x-auto mt-3 pb-1 -mx-1 px-1" role="group" aria-label="Filter by day">
+                        ${days.length ? `<div class="flex gap-2 overflow-x-auto mt-2 pb-1 -mx-1 px-1" role="group" aria-label="Filter by day">
                             ${['All', 'Today', ...days].map((d, i) => `<button type="button" data-day-chip="${escapeHtml(d)}" aria-pressed="${i === 0}" class="day-chip flex-shrink-0${i === 0 ? ' is-on' : ''}">${escapeHtml(d)}</button>`).join('')}
                         </div>` : ''}
                         <p id="courseNoMatch" class="hidden text-center text-sm text-gray-500 font-medium py-6" role="status">No courses match.</p>
@@ -291,7 +294,7 @@ const courseChipsHtml = (c) => {
     return chips.length ? `<div class="flex flex-wrap gap-1.5 mt-2">${chips.join('')}</div>` : '';
 };
 
-// Card = link to the class plus a row of shortcuts (Attendance, Scan, Summary, More = the class's Course Actions menu). A shortcut opens the class and then that page (data-intent).
+// Card = link to the class plus a row of shortcuts (Invite code, Scan, Summary, More = the class's Course Actions menu). A shortcut opens the class and then that page (data-intent).
 const lecturerCourseCardHtml = (c) => `
                 <div data-course-card data-day="${escapeHtml(c.ScheduleDay)}" data-search="${escapeHtml([c.CourseCode, c.CourseTitle, c.ScheduleDay, c.Target_Course, c.Target_Year, c.Target_Section].filter(Boolean).join(' ').toLowerCase())}" class="border rounded-xl shadow-sm bg-white transition hover:shadow-md hover:border-blue-300 overflow-hidden">
                     <a href="#class-${c.Course_ID}" class="block px-4 pt-3 pb-2">
@@ -309,7 +312,7 @@ const lecturerCourseCardHtml = (c) => `
                         ${courseChipsHtml(c)}
                     </a>
                     <div class="grid grid-cols-4 border-t border-gray-100 text-[11px] font-bold text-gray-600">
-                        <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="top"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i>Attendance</a>
+                        <button type="button" class="card-action stacked open-invite-btn" data-course-id="${c.Course_ID}" aria-label="Invite code: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-key" aria-hidden="true"></i>Invite code</button>
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openScannerBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i>Scan</a>
                         <a href="#class-${c.Course_ID}" class="card-action stacked" data-intent="openClassSummaryBtn"><i class="fa-solid fa-table-list" aria-hidden="true"></i>Summary</a>
                         <button type="button" class="card-action stacked card-more" data-course-id="${c.Course_ID}" data-code="${escapeHtml(c.CourseCode)}" data-term="${escapeHtml([c.AcademicYear, c.Semester].filter(Boolean).join('|'))}" data-archived="${Number(c.Archived) === 1 ? '1' : '0'}" aria-label="More actions: ${escapeHtml(c.CourseCode)}"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i>More</button>
@@ -737,12 +740,13 @@ export const CourseDashboard = {
             if (!coursesHtml && activeCourses.length) {
                 coursesHtml = '<div class="col-span-full p-6 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No classes in this term. Choose another term or All terms.</div>';
             }
-            const termFilterHtml = terms.length ? `<div class="mb-4 flex items-center gap-2"><label for="courseTermFilter" class="text-xs font-bold text-gray-500 uppercase tracking-wider">Term</label>
-                <select id="courseTermFilter" class="px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="current"${filter === 'current' ? ' selected' : ''}>Current term (${escapeHtml(currentTerm().ay)} ${escapeHtml(currentTerm().sem)})</option>
+            const termFilterHtml = terms.length ? `<select id="courseTermFilter" aria-label="Term" class="shrink-0 max-w-[9rem] sm:max-w-none px-3 py-2.5 border border-gray-300 rounded-full text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="current"${filter === 'current' ? ' selected' : ''}>Current term</option>
                     <option value="all"${filter === 'all' ? ' selected' : ''}>All terms</option>
                     ${terms.map(k => `<option value="${escapeHtml(k)}"${filter === k ? ' selected' : ''}>${escapeHtml(termLabel(activeCourses.find(c => termKey(c) === k)))}</option>`).join('')}
-                </select></div>` : '';
+                </select>` : '';
+            const days7 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const filterBar = data.courses.length >= 3 ? searchBarHtml(days7, termFilterHtml) : (termFilterHtml ? searchBarHtml([], termFilterHtml, false) : '');
             const archivedHtml = archivedCourses.length ? `
                     <div class="mt-8">
                         <button type="button" id="toggleArchivedCoursesBtn" class="inline-flex items-center text-sm font-bold text-gray-600 hover:text-indigo-700" aria-expanded="${CourseDashboard.showArchivedCourses ? 'true' : 'false'}"><i class="fa-solid fa-box-archive mr-2" aria-hidden="true"></i>${CourseDashboard.showArchivedCourses ? 'Hide' : 'Show'} archived classes (${archivedCourses.length})</button>
@@ -757,12 +761,8 @@ export const CourseDashboard = {
 
             container.innerHTML = `
                 <div class="fade-in max-w-5xl mx-auto">
-                    <div class="flex items-center justify-between gap-3 mb-6">
-                        <h2 class="text-xl font-bold text-gray-800 flex items-center"><div class="bg-gray-200 p-2 rounded-lg mr-3"><i class="fa-solid fa-chalkboard-user text-gray-600"></i></div>My Created Courses</h2>
-                        <button type="button" id="headerNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button>
-                    </div>
-                    ${termFilterHtml}
-                    ${data.courses.length >= 3 ? searchBarHtml(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) : ''}
+                    <h2 class="text-lg font-bold text-gray-800 mb-1">My Classes</h2>
+                    ${filterBar}
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         ${coursesHtml}
                     </div>

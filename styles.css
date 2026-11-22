@@ -404,3 +404,7 @@ html[data-theme="dark"] .scrv-banner.is-warn { background: #3a2a10; color: #fcd3
     #accExamQuestionText { font-size: 1.25rem; padding: .75rem; margin-bottom: .75rem; }
     #accExamLiveFeedback { padding: .375rem; font-size: .875rem; margin-bottom: 0; }
 }
+
+/* Dashboard shortcut: the class opens only to run one action, so its roster stays out of sight. */
+body.intent-mode main, body.intent-mode #classTabBar { visibility: hidden; }
+@media print { body.intent-mode main { visibility: visible; } }

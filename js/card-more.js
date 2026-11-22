@@ -31,7 +31,7 @@ const open = (d) => {
             <div class="space-y-4">
                 ${section('Students', [
                     go('fa-solid fa-user-plus', 'bg-green-100 text-green-700', 'Enroll Student', 'openAddStudentModalBtn'),
-                    go('fa-solid fa-key', 'bg-amber-100 text-amber-700', 'Invite Code', 'openInviteBtn'),
+                    tile('fa-solid fa-key', 'bg-amber-100 text-amber-700', 'Invite Code', { cls: 'open-invite-btn', data: `data-course-id="${escapeHtml(d.courseId)}"` }),
                     go('fa-regular fa-copy', 'bg-blue-100 text-blue-700', 'Copy Emails', 'copyEmailsBtn'),
                     go('fa-solid fa-print', 'bg-gray-200 text-gray-800', 'Print Roster', 'exportRosterBtn')])}
                 ${section('Grades & Exams', [

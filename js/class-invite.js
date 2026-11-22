@@ -188,6 +188,8 @@ const confirmJoin = async () => {
 };
 
 document.addEventListener('click', (e) => {
+    const direct = e.target.closest('.open-invite-btn');
+    if (direct) { openDialog(direct.dataset.courseId); return; }
     const open = e.target.closest('#openInviteBtn');
     if (open) { openDialog(window.location.hash.replace('#class-', '')); return; }
     if (e.target.closest('#invCloseBtn') || e.target.id === 'invBg') { closeDlg(); return; }

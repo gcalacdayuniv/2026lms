@@ -57,10 +57,27 @@ export const CourseFab = {
     goWith: (target) => {
         if (!target || target === 'top') return;
         const until = Date.now() + 8000;
+        // The class opens only to run this action: its roster stays hidden, and closing the action goes back to the dashboard.
+        document.body.classList.add('intent-mode');
+        const exempt = new Set(['toastHost', 'fabBackdrop', 'profilePanelOverlay', 'classTabBar']);
+        const overlayOpen = () => [...document.querySelectorAll('.fixed.inset-0[id]:not(.hidden)')].some(el => !exempt.has(el.id));
+        const finish = () => {
+            document.body.classList.remove('intent-mode');
+            if (window.location.hash.startsWith('#class-')) window.location.hash = 'dashboard';
+        };
+        const watch = () => {
+            const t0 = Date.now();
+            let seen = false;
+            const poll = setInterval(() => {
+                if (!window.location.hash.startsWith('#class-')) { clearInterval(poll); document.body.classList.remove('intent-mode'); return; }
+                if (overlayOpen()) { seen = true; return; }
+                if (seen || Date.now() - t0 > 2500) { clearInterval(poll); finish(); }
+            }, 300);
+        };
         const tick = () => {
-            if (Date.now() > until) return;
+            if (Date.now() > until) { document.body.classList.remove('intent-mode'); return; }
             const bar = $('classTabBar');
-            if (bar && $(target)) { setTimeout(() => CourseFab.openTab(target), 120); return; }
+            if (bar && $(target)) { setTimeout(() => { CourseFab.openTab(target); watch(); }, 120); return; }
             setTimeout(tick, 100);
         };
         setTimeout(tick, 150);

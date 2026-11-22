@@ -116,7 +116,8 @@ const initHeader = () => {
             const y = window.scrollY;
             const typing = document.activeElement && document.activeElement.id === 'courseSearch';
             const phone = window.matchMedia('(max-width: 639px)').matches;
-            const hide = phone && !typing && y > 80 && y > lastY + 4;
+            const pinned = !!document.querySelector('[data-course-filter]');   // search / day filter stay in view with the header
+            const hide = phone && !pinned && !typing && y > 80 && y > lastY + 4;
             const show = y < lastY - 4 || y <= 80;
             if (hide) header.classList.add('dash-header-hidden');
             else if (show) header.classList.remove('dash-header-hidden');
