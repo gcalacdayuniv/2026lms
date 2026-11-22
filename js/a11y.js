@@ -162,7 +162,7 @@ export const A11y = {
                     if (sib.id === 'classTabBar' && TAB_PAGES.has(top.id)) continue;
                     if (sib.id === 'dashTabBar' && DASH_PAGES.has(top.id)) continue;
                     if (sib.id === 'studentSummaryModal' && SS_PAGES.has(top.id)) continue;
-                    if (sib.id === 'ssActionBar' && top.id === 'detailsModal') continue;   // History / Upload stay tappable under the details page
+                    if (sib.id === 'ssActionBar' && (top.id === 'detailsModal' || top.id === 'studentSummaryModal')) continue;   // History / Upload stay tappable under the details page
                     if (EXEMPT_IDS.has(sib.id)) {
                         if (sib.id === 'profilePanelOverlay') sib.setAttribute('aria-hidden', 'true');
                         continue;
