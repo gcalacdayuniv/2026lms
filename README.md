@@ -594,3 +594,4 @@ On phones the Scan setup (`js/components-scanner.js`) is compact: the two answer
 
 ## Student Caller called list
 The called list is its own dialog (`#calledListModal`, `js/components-class.js`), opened by **Called List** in Mode 2. It shows who was called today with Remove per student, **Copy list** (numbered, in calling order; clipboard API with an iOS fallback, `CourseRecitation.copyCalledList`) and **Reset all**. The list is kept in `localStorage` per class and day.
+- **Next student:** "Call Next Student" in the result view saves the points, redraws the wheel and spins straight away (no extra tap on Call Student).

@@ -750,7 +750,9 @@ export const CourseModule = {
         }
 
         if (e.target.closest('#nextStudentBtn')) {
+            // Straight to the next spin: points are saved first, the wheel is redrawn without the called student, then it spins.
             CourseRecitation.resetToWheel();
+            CourseRecitation.spin();
         }
 
         if (e.target.closest('.view-summary-trigger')) {

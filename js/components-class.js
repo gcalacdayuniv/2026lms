@@ -718,7 +718,7 @@ const ClassUI = {
                     </div>
 
                     <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
-                        Next Student
+                        Call Next Student
                     </button>
                 </div>
             </div>
