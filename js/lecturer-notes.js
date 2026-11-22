@@ -1,6 +1,6 @@
 // js/lecturer-notes.js
 // Lecturer's private notes per student per class (behaviour, participation, other written observations).
-// Shown only in the lecturer's student summary; the notes are never part of any student-facing response.
+// Opened in their own dialog from the class roster (note button beside the gear); the notes are never part of any student-facing response.
 import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
@@ -23,8 +23,31 @@ export const LecturerNotes = {
         if (LecturerNotes.bound) return;
         LecturerNotes.bound = true;
         document.addEventListener('click', LecturerNotes.onClick);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') LecturerNotes.closeModal(); });
         document.addEventListener('input', (e) => { if (e.target && e.target.id === 'lnText') LecturerNotes.syncCount(); });
     },
+
+    // Own dialog (separate from the performance summary), opened from the note button beside a student's gear.
+    openModal: (courseId, studentId, name) => {
+        LecturerNotes.closeModal();
+        const m = document.createElement('div');
+        m.id = 'lnModal';
+        m.className = 'fixed inset-0 z-[70] flex items-end sm:items-center justify-center fade-in';
+        m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', `Lecturer notes for ${name || 'student'}`);
+        m.innerHTML = `<div id="lnBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
+            <div class="relative z-10 bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-lg shadow-xl p-4 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center gap-3 mb-3 border-b pb-3">
+                    <div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-note-sticky text-amber-600 mr-2" aria-hidden="true"></i>Lecturer's notes</h3><p class="text-xs text-gray-500 truncate">${escapeHtml(name || '')} &middot; private, never shown to the student</p></div>
+                    <button type="button" id="lnClose" class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
+                </div>
+                <div id="lnPanel"></div>
+            </div>`;
+        document.body.appendChild(m);
+        LecturerNotes.open(courseId, studentId);
+        m.querySelector('#lnClose').focus();
+    },
+
+    closeModal: () => { const m = $('lnModal'); if (m) m.remove(); },
 
     open: async (courseId, studentId) => {
         LecturerNotes.init();
@@ -113,6 +136,9 @@ export const LecturerNotes = {
     onClick: (e) => {
         const t = e.target.closest ? e.target : null;
         if (!t) return;
+        const nb = t.closest('.student-notes-btn');
+        if (nb) { LecturerNotes.openModal(window.location.hash.replace('#class-', ''), nb.dataset.studentId, nb.dataset.name); return; }
+        if (t.closest('#lnClose') || t.id === 'lnBg') { LecturerNotes.closeModal(); return; }
         if (t.closest('#lnSave')) { LecturerNotes.save(); return; }
         if (t.closest('#lnCancel')) { LecturerNotes.editingId = null; LecturerNotes.paint(); return; }
         const ed = t.closest('.ln-edit');
@@ -121,3 +147,5 @@ export const LecturerNotes = {
         if (del) LecturerNotes.remove(del.dataset.id);
     }
 };
+
+LecturerNotes.init();

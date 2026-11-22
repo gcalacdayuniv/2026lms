@@ -8,7 +8,7 @@ import { CourseExam } from './course-exam.js';
 import { getLoadableAvatarSrc } from './components.js';
 import { UI } from './ui-feedback.js';
 import { StudentSummaryUI } from './student-summary-ui.js';
-import { LecturerNotes } from './lecturer-notes.js';
+import './lecturer-notes.js';
 import './year-advance.js';
 import './current-term.js';
 import './edit-student.js';
@@ -776,7 +776,6 @@ export const CourseModule = {
 
             CourseClass.currentSummaryData = null;
             CourseClass.currentSummaryStudentId = studentId;
-            LecturerNotes.open(courseId, studentId);
 
             try {
                 const ts = new Date().getTime();

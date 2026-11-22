@@ -561,7 +561,6 @@ const ClassUI = {
                             <i class="fa-solid fa-file-lines mr-2"></i> View Submission History
                         </button>
                     </div>
-                    <div id="lnPanel" class="mt-4"></div>
                 </div>
             </div>
         </div>
@@ -847,7 +846,8 @@ export const ClassComponents = {
                             </div>
                         </div>
 
-                        <div class="lg:hidden">
+                        <div class="lg:hidden flex items-center gap-1.5">
+                            <button type="button" aria-label="Notes for ${escapeHtml(s.Name)}" class="student-notes-btn min-w-[44px] min-h-[40px] px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded text-xs font-bold border border-amber-200 transition" data-student-id="${s.User_ID}" data-name="${escapeHtml(s.Name)}"><i class="fa-solid fa-note-sticky" aria-hidden="true"></i></button>
                             <button type="button" aria-label="Manage ${escapeHtml(s.Name)}" class="manage-student-btn min-w-[44px] min-h-[40px] px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition shadow-sm"
                                 data-student-id="${s.User_ID}"
                                 data-name="${escapeHtml(s.Name)}"
@@ -861,7 +861,8 @@ export const ClassComponents = {
                         </div>
                     </div>
 
-                    <div class="hidden lg:flex items-center justify-center w-auto px-2">
+                    <div class="hidden lg:flex items-center justify-center gap-2 w-auto px-2">
+                        <button type="button" aria-label="Notes for ${escapeHtml(s.Name)}" class="student-notes-btn px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded text-xs font-bold border border-amber-200 transition flex items-center" data-student-id="${s.User_ID}" data-name="${escapeHtml(s.Name)}"><i class="fa-solid fa-note-sticky mr-1" aria-hidden="true"></i> Notes</button>
                         <button type="button" aria-label="Manage ${escapeHtml(s.Name)}" class="manage-student-btn px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded text-xs font-bold border border-blue-200 transition flex items-center shadow-sm"
                             data-student-id="${s.User_ID}"
                             data-name="${escapeHtml(s.Name)}"
