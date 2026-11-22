@@ -300,6 +300,7 @@ When asked to add features, debug, or refactor, you must strictly adhere to the 
 9. **Targeted Full Output:** While you must provide the complete, unabbreviated code for any file you modify, **only** output the specific files that require changes. Do not output unchanged files just to provide context.
 10. **Dialog Conventions:** New or changed dialogs must follow the Dialog Layout Conventions above, keep their IDs, and include a `close...Btn` button so `a11y.js` (Escape, Back, swipe) can close them.
 11. **Escape User Text:** Any user-supplied value inserted into HTML must be escaped. Do not add new unescaped `innerHTML` interpolation.
+12. **Aligned form controls:** Every input, dropdown and date field uses the shared `.ctl` class (`styles.css`: fixed 2.5rem height, date fields left-aligned) so mixed controls in a row have the same height and alignment on iOS. Put labels above controls, keep controls in a row the same width class, and check new forms on a phone-width screenshot. Boxes in a row also share padding and border radius.
 
 
 ## Exam question types and essay grading

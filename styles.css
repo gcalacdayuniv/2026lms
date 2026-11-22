@@ -408,3 +408,9 @@ html[data-theme="dark"] .scrv-banner.is-warn { background: #3a2a10; color: #fcd3
 /* Dashboard shortcut: the class opens only to run one action, so its roster stays out of sight. */
 body.intent-mode main, body.intent-mode #classTabBar { visibility: hidden; }
 @media print { body.intent-mode main { visibility: visible; } }
+
+/* Form controls: one height for every input, dropdown and date field, so a row of mixed controls lines up.
+   iOS draws native selects and date fields at different heights unless the height is set. Add class "ctl". */
+.ctl { height: 2.5rem; min-height: 2.5rem; box-sizing: border-box; padding-top: 0; padding-bottom: 0; line-height: 1.25rem; }
+input[type="date"].ctl, input[type="time"].ctl, input[type="datetime-local"].ctl { display: block; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; text-align: left; }
+input[type="date"].ctl::-webkit-date-and-time-value, input[type="time"].ctl::-webkit-date-and-time-value, input[type="datetime-local"].ctl::-webkit-date-and-time-value { text-align: left; min-height: 1.25rem; }

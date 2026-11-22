@@ -3,7 +3,7 @@
 // Logic lives in course-scanner.js. Element IDs here are used by that file, so keep them in sync.
 
 const LABEL = 'block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1';
-const FIELD = 'w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50';
+const FIELD = 'ctl w-full px-2.5 border border-gray-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50';
 
 export const ScannerUI = {
     renderScannerModal: () => `
@@ -82,7 +82,7 @@ export const ScannerUI = {
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-x-2 gap-y-1.5 [&>div]:min-w-0">
                         <div>
-                            <label class="${LABEL} !mb-0.5" for="scnTerm">Term</label>
+                            <label class="${LABEL}" for="scnTerm">Term</label>
                             <select id="scnTerm" class="${FIELD}">
                                 <option value="MidTerm">Mid Term</option>
                                 <option value="FinalTerm">Final Term</option>
@@ -101,7 +101,7 @@ export const ScannerUI = {
                         </div>
                         <div>
                             <label class="${LABEL}" for="scnDate">Date</label>
-                            <input type="date" id="scnDate" class="${FIELD} min-w-0 max-w-full appearance-none h-[42px] text-left">
+                            <input type="date" id="scnDate" class="${FIELD}">
                         </div>
                         <div id="scnSetsWrap">
                             <label class="${LABEL}" for="scnSetCount">Exam sets</label>
