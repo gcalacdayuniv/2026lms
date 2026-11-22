@@ -2035,7 +2035,7 @@ export const CourseExam = {
         const callback = CourseExam.accOnComplete;
         CourseExam.accExam = null;
         CourseExam.accSubmitting = false;
-        alert(reason === 'away' ? 'You were away from the exam longer than allowed, so your answers were submitted automatically. Your lecturer can let you continue if this was a mistake.' : 'Your exam was already submitted.');
+        alert(reason === 'away' ? 'You were away from the exam for too long, so your exam was submitted automatically. Your lecturer can let you continue if this was a mistake.' : 'Your exam was already submitted.');
         if (typeof callback === 'function') callback();
     },
 
@@ -2340,7 +2340,7 @@ export const CourseExam = {
             `;
             CourseExam.speak(resultSpeech);
 
-            alert((reason === 'focus-lost' ? 'You left the exam screen, so your answers were submitted automatically.\n\n' : reason === 'camera-off' ? 'The camera was turned off, so your answers were submitted automatically.\n\n' : force ? 'Time is up. Your answers were submitted automatically.\n\n' : '') + resultSpeech);
+            alert((reason === 'focus-lost' ? 'You were away from the exam for too long, so your exam was submitted automatically.\n\n' : reason === 'camera-off' ? 'The camera was turned off, so your answers were submitted automatically.\n\n' : force ? 'Time is up. Your answers were submitted automatically.\n\n' : '') + resultSpeech);
 
             document.getElementById('accessibleExamOverlay').classList.add('hidden');
             const callback = CourseExam.accOnComplete;

@@ -10,7 +10,7 @@
 import { getRequestDate } from './shared.js';
 import { scoreExam, examMaxPoints, finalScoreOf } from './grading.js';
 
-export const AWAY_GRACE_SECONDS = 60;
+export const AWAY_GRACE_SECONDS = 5; 
 export const ONLINE_WINDOW_MS = 30 * 60 * 1000;   // a student seen this recently counts as signed in
 const DRAFT_MAX_CHARS = 300000;
 export const SUBMIT_REASONS = ['focus-lost', 'time', 'camera-off', 'away', 'session-takeover'];
