@@ -356,48 +356,48 @@ const buildAssignedExamsSection = (assignedExams, isBlind) => {
                     ? assignedExams.map(ex => {
                         const isDone = ex.status === 'Completed';
                         return `
-                            <div class="dash-exam-card p-5 rounded-xl border-2 ${isDone ? 'bg-indigo-900/70 border-indigo-700' : 'bg-indigo-900 border-yellow-400'} flex flex-col justify-between gap-4 shadow-md transition hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-yellow-400 cursor-pointer" tabindex="0">
+                            <div class="dash-exam-card p-5 rounded-xl border-2 ${isDone ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-300'} flex flex-col justify-between gap-4 shadow-md transition hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 cursor-pointer" tabindex="0">
                                 <div>
                                     <div class="flex justify-between items-start gap-2">
-                                        <span class="px-2.5 py-0.5 bg-yellow-400 text-gray-950 font-black text-[10px] rounded uppercase tracking-wider">${escapeHtml(ex.courseCode)} &bull; ${escapeHtml(ex.term)}</span>
-                                        ${ex.toDate ? `<span class="text-[10px] text-indigo-200 font-mono">Open until: ${escapeHtml(formatSchedule(ex.toDate, true))} (GMT+8)</span>` : ''}
+                                        <span class="px-2.5 py-0.5 bg-blue-600 text-white font-black text-[10px] rounded uppercase tracking-wider">${escapeHtml(ex.courseCode)} &bull; ${escapeHtml(ex.term)}</span>
+                                        ${ex.toDate ? `<span class="text-[10px] text-gray-500 font-mono">Open until: ${escapeHtml(formatSchedule(ex.toDate, true))} (GMT+8)</span>` : ''}
                                     </div>
-                                    <h3 class="text-lg sm:text-xl font-black text-white mt-2">${escapeHtml(ex.examTitle)}</h3>
-                                    <p class="text-xs text-indigo-200 font-medium mt-0.5">${escapeHtml(ex.courseTitle)}</p>
-                                    <div class="text-xs text-yellow-300 font-bold mt-2">
+                                    <h3 class="text-lg sm:text-xl font-black text-gray-900 mt-2">${escapeHtml(ex.examTitle)}</h3>
+                                    <p class="text-xs text-gray-600 font-medium mt-0.5">${escapeHtml(ex.courseTitle)}</p>
+                                    <div class="text-xs text-blue-800 font-bold mt-2">
                                         Questions: ${ex.regularCount}${ex.bonusCount > 0 ? ` + ${ex.bonusCount} Bonus` : ''} &nbsp;|&nbsp; Max Score: ${ex.maxScore}${ex.timeLimit ? ` &nbsp;|&nbsp; <i class="fa-regular fa-clock" aria-hidden="true"></i> ${ex.timeLimit} min${ex.startedAt && !isDone ? ' (started)' : ''}` : ''}
                                     </div>
                                 </div>
                                 ${isDone ? `
-                                    <div class="w-full py-3 px-4 bg-green-700 text-white font-black text-sm rounded-lg text-center border border-green-400">
-                                        <i class="fa-solid fa-circle-check mr-1.5"></i> Completed - Score: ${ex.finalScore} /${ex.maxScore}${ex.essayPending ? '<div class="text-xs font-bold text-yellow-200 mt-1">Essay answers are waiting for your lecturer. Your score may go up.</div>' : ''}
+                                    <div class="w-full py-3 px-4 bg-green-100 text-green-800 font-black text-sm rounded-lg text-center border border-green-300">
+                                        <i class="fa-solid fa-circle-check mr-1.5"></i> Completed - Score: ${ex.finalScore} /${ex.maxScore}${ex.essayPending ? '<div class="text-xs font-bold text-green-700 mt-1">Essay answers are waiting for your lecturer. Your score may go up.</div>' : ''}
                                     </div>
-                                    ${ex.release ? `<button type="button" class="review-exam-btn w-full py-2.5 px-4 bg-white hover:bg-indigo-50 text-indigo-900 font-black text-sm rounded-lg border border-indigo-300 transition focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}"><i class="fa-solid fa-magnifying-glass mr-1.5" aria-hidden="true"></i> Review my answers</button>` : ''}
+                                    ${ex.release ? `<button type="button" class="review-exam-btn w-full py-2.5 px-4 bg-white hover:bg-blue-50 text-blue-800 font-black text-sm rounded-lg border border-blue-300 transition focus:outline-none focus:ring-4 focus:ring-blue-300" data-assignment-id="${ex.assignmentId}"><i class="fa-solid fa-magnifying-glass mr-1.5" aria-hidden="true"></i> Review my answers</button>` : ''}
                                 ` : `
-                                    <button type="button" class="start-accessible-exam-btn w-full py-3.5 px-4 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-sm sm:text-base rounded-lg shadow-md transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white" data-assignment-id="${ex.assignmentId}">
+                                    <button type="button" class="start-accessible-exam-btn w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm sm:text-base rounded-lg shadow-md transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-blue-300" data-assignment-id="${ex.assignmentId}">
                                         <i class="fa-solid ${isBlind ? 'fa-headphones' : 'fa-pen-to-square'} mr-2 text-lg"></i> Enter Exam: ${escapeHtml(ex.examTitle)}
                                     </button>
                                 `}
                             </div>
                         `;
                     }).join('')
-                    : `<div class="col-span-full p-6 text-center text-indigo-200 border-2 border-dashed border-indigo-700 rounded-xl font-bold text-sm">You have no active assigned exams at this moment.</div>`;
+                    : `<div class="col-span-full p-6 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-xl font-bold text-sm">You have no active assigned exams at this moment.</div>`;
 
                 const readAloudBtnHtml = isBlind ? `
-                            <button type="button" id="readDashboardExamsBtn" class="w-full sm:w-auto px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black text-xs sm:text-sm rounded-lg shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-white">
+                            <button type="button" id="readDashboardExamsBtn" class="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm rounded-lg shadow transition flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-blue-300">
                                 <i class="fa-solid fa-volume-high mr-2"></i> Read Aloud Assigned Exams
                             </button>` : '';
 
                 assignedExamsSectionHtml = `
-                    <section id="studentExamsSection" class="bg-indigo-950 text-white p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-yellow-400 scroll-mt-20">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-indigo-800">
+                    <section id="studentExamsSection" class="bg-white text-gray-900 p-5 sm:p-6 rounded-2xl shadow-sm border-2 border-blue-200 scroll-mt-20">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-gray-200">
                             <div class="flex items-center">
-                                <div class="bg-yellow-400 text-gray-950 p-2.5 rounded-xl mr-3">
+                                <div class="bg-blue-600 text-white p-2.5 rounded-xl mr-3">
                                     <i class="fa-solid ${isBlind ? 'fa-universal-access' : 'fa-file-pen'} text-xl"></i>
                                 </div>
                                 <div>
-                                    <h2 class="text-xl sm:text-2xl font-black text-white">${isBlind ? 'Assigned Accessible Exams' : 'Assigned Exams'}</h2>
-                                    <p class="text-xs text-indigo-200">${isBlind ? 'Full-screen exam mode with voice read-aloud and automatic score recording' : 'Full-screen exam mode with automatic score recording'}</p>
+                                    <h2 class="text-xl sm:text-2xl font-black text-gray-900">${isBlind ? 'Assigned Accessible Exams' : 'Assigned Exams'}</h2>
+                                    <p class="text-xs text-gray-500">${isBlind ? 'Full-screen exam mode with voice read-aloud and automatic score recording' : 'Full-screen exam mode with automatic score recording'}</p>
                                 </div>
                             </div>
                             ${readAloudBtnHtml}
