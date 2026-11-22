@@ -19,6 +19,10 @@ import { getSetCount, saveSetCount, printExamAnswerSheet } from './sheet-print.j
 import { MAX_CHOICES } from './omr-sheet.js';
 import { ExamSecure } from './exam-secure.js';
 
+window.addEventListener('app:session-ended', () => {
+    if (CourseExam.accExam) { ExamSecure.end(); CourseExam.stopDraftSync(); CourseExam.stopTimer(); document.getElementById('accessibleExamOverlay')?.classList.add('hidden'); CourseExam.accExam = null; CourseExam.accSubmitting = false; }
+});
+
 export const CourseExam = {
     exams: [],
     classExams: [],
@@ -157,6 +161,12 @@ export const CourseExam = {
             return;
         }
         if (e.target.closest('#closeExamReviewBtn') || e.target.id === 'closeExamReviewBg') ExamReview.close();
+
+        const contBtn = e.target.closest('.er-continue-btn');
+        if (contBtn) {
+            await CourseExam.continueStudentExam(CourseExam.resultsData.classExamId, contBtn.dataset.studentId, contBtn.dataset.name);
+            return;
+        }
 
         const photosBtn = e.target.closest('.er-photos-btn');
         if (photosBtn) {
@@ -960,6 +970,19 @@ export const CourseExam = {
         }
     },
 
+    // Lecturer: reopen an auto-submitted exam. The answers come back and the time already used stays used.
+    continueStudentExam: async (classExamId, studentId, studentName) => {
+        const ok = await UI.confirm({ title: 'Let student continue', message: `Re-open the exam for ${studentName}? Their saved answers come back and they continue with the time they had left. The submitted score is removed until they submit again.`, confirmText: 'Let continue' });
+        if (!ok) return;
+        try {
+            await apiFetch('/api/exam-continue', { method: 'POST', body: JSON.stringify({ classExamId, studentId }) });
+            UI.success(`${studentName} can continue the exam.`);
+            await CourseExam.openResultsView(classExamId, CourseExam.resultsData.title);
+        } catch (err) {
+            UI.error('Could not re-open the exam: ' + err.message);
+        }
+    },
+
     resetStudentAttempt: async (classExamId, studentId, studentName) => {
         const ok = await UI.confirm({ title: 'Reset exam attempt', message: `Reset and re-open the exam submission for ${studentName} so they can take it again?`, confirmText: 'Reset', danger: true });
         if (!ok) return;
@@ -1137,7 +1160,7 @@ export const CourseExam = {
         const rows = d.students.map(s => `
             <tr class="border-t border-gray-100">
                 <td class="px-2 py-1.5 font-bold text-gray-800">${esc(s.name)} <span class="font-normal text-gray-500">${esc(s.studentNumber)}</span></td>
-                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>Photos (${s.photos})</button>` : ''}</td>
+                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'away' ? '<div class="text-[10px] font-bold text-red-700">Away too long: auto-submitted</div>' : s.submitReason === 'session-takeover' ? '<div class="text-[10px] font-bold text-red-700">Signed in on another device: auto-submitted</div>' : s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.submitReason && s.submitReason !== 'time' ? `<button type="button" class="er-continue-btn mt-0.5 mr-2 text-[11px] font-bold text-emerald-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}">Let continue</button>` : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>Photos (${s.photos})</button>` : ''}</td>
                 <td class="px-2 py-1.5 text-right">${s.score === null ? '-' : `${s.score} / ${s.max}`}</td>
                 <td class="px-2 py-1.5 text-right font-bold">${fmt(s.percent, '%')}</td>
                 <td class="px-2 py-1.5 text-right">${s.minutes === null ? '-' : s.minutes + ' min'}</td>
@@ -1911,6 +1934,7 @@ export const CourseExam = {
                 });
                 remaining = res.remainingSeconds;
                 examObj.startedAt = res.startedAt;
+                examObj.serverDraft = Array.isArray(res.draft) ? res.draft : null;
             } catch (err) {
                 UI.error('Could not start the exam: ' + err.message);
                 ExamSecure.release();
@@ -1923,7 +1947,9 @@ export const CourseExam = {
         CourseExam.accSubmitting = false;
         CourseExam.accOnComplete = onComplete || null;
 
-        const cachedDraft = localStorage.getItem('acc_exam_draft_' + examObj.assignmentId);
+        let cachedDraft = null;
+        try { cachedDraft = localStorage.getItem('acc_exam_draft_' + examObj.assignmentId); } catch (e) { /* storage blocked */ }
+        if (!cachedDraft && examObj.serverDraft) cachedDraft = JSON.stringify(examObj.serverDraft);   // continued by the lecturer, or opened on this device after a reload
         if (cachedDraft) {
             try {
                 CourseExam.accAnswers = JSON.parse(cachedDraft);
@@ -1955,7 +1981,12 @@ export const CourseExam = {
         CourseExam.renderAccessibleQuestion(true);
         if (remaining !== null) CourseExam.startTimer(remaining);
         else CourseExam.stopTimer();
-        if (secure) ExamSecure.begin(examObj, student, (reason) => CourseExam.submitAccessibleExam(true, reason));
+        if (secure) ExamSecure.begin(examObj, student, {
+            getAnswers: () => CourseExam.accAnswers,
+            onLeave: (reason) => CourseExam.submitAccessibleExam(true, reason),
+            onSubmitted: (reason) => CourseExam.submittedByServer(reason)
+        });
+        CourseExam.startDraftSync();
     },
 
     closeAccessibleExam: () => {
@@ -1967,10 +1998,45 @@ export const CourseExam = {
             if (!confirmExit) return;
         }
         ExamSecure.end();
+        CourseExam.stopDraftSync();
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         CourseExam.stopTimer();
         document.getElementById('accessibleExamOverlay')?.classList.add('hidden');
         CourseExam.accExam = null;
+    },
+
+    // The answers go to the server every 30 seconds when something changed, so an exam that has to be submitted
+    // for the student (stayed away too long, signed in on another device) is graded from what they had answered.
+    startDraftSync: () => {
+        CourseExam.stopDraftSync();
+        CourseExam.lastDraftSent = JSON.stringify(CourseExam.accAnswers || []);
+        CourseExam.draftTimer = setInterval(async () => {
+            if (!CourseExam.accExam || !CourseExam.accStudent || CourseExam.accSubmitting) return;
+            const now = JSON.stringify(CourseExam.accAnswers || []);
+            if (now === CourseExam.lastDraftSent) return;
+            try {
+                const r = await apiFetch('/api/exam-draft', { method: 'POST', timeoutMs: 10000, body: JSON.stringify({ assignmentId: CourseExam.accExam.assignmentId, studentId: CourseExam.accStudent.User_ID, answers: CourseExam.accAnswers }) });
+                CourseExam.lastDraftSent = now;
+                if (r && r.closed) CourseExam.submittedByServer(null);   // already submitted (for example by the other device)
+            } catch (e) { /* offline for a moment: try again in 30 seconds */ }
+        }, 30000);
+    },
+    stopDraftSync: () => { clearInterval(CourseExam.draftTimer); CourseExam.draftTimer = null; },
+
+    // The server already submitted this attempt (away too long, or another device signed in).
+    submittedByServer: (reason) => {
+        if (!CourseExam.accExam) return;
+        ExamSecure.end();
+        CourseExam.stopDraftSync();
+        CourseExam.stopTimer();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        try { localStorage.removeItem('acc_exam_draft_' + CourseExam.accExam.assignmentId); } catch (e) { /* storage blocked */ }
+        document.getElementById('accessibleExamOverlay')?.classList.add('hidden');
+        const callback = CourseExam.accOnComplete;
+        CourseExam.accExam = null;
+        CourseExam.accSubmitting = false;
+        alert(reason === 'away' ? 'You were away from the exam longer than allowed, so your answers were submitted automatically. Your lecturer can let you continue if this was a mistake.' : 'Your exam was already submitted.');
+        if (typeof callback === 'function') callback();
     },
 
     updateAccessibleAnsweredBadge: () => {
@@ -2260,6 +2326,7 @@ export const CourseExam = {
                 })
             });
             ExamSecure.end();
+            CourseExam.stopDraftSync();
 
             localStorage.removeItem('acc_exam_draft_' + CourseExam.accExam.assignmentId);
             CourseExam.stopTimer();

@@ -1,6 +1,6 @@
 // js/auth.js
 import { clearClassCache } from './course-class.js';
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, getDeviceId } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
@@ -36,6 +36,8 @@ export const AuthModule = {
     currentImageIndex: 0,
 
     init: () => {
+        // Another device signed in (or the session ended): tell the student why they were sent to the sign-in screen.
+        window.addEventListener('app:session-ended', (ev) => { const m = ev.detail && ev.detail.message; if (m) UI.error(m); });
         document.addEventListener('submit', AuthModule.handleForms);
         document.addEventListener('click', AuthModule.handleClicks);
         document.addEventListener('input', AuthModule.handleInputs);
@@ -52,15 +54,30 @@ export const AuthModule = {
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
 
             try {
-                const data = await apiFetch('/api/login', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        identifier: document.getElementById('loginId')?.value.trim() || document.getElementById('loginIdentifier')?.value.trim(),
-                        password: document.getElementById('loginPassword').value,
-                        requestReactivation: e.submitter && e.submitter.id === 'requestReactivationBtn' ? true : undefined,
-                        inviteCode: (document.getElementById('loginInviteCode') || {}).value || undefined
-                    })
-                });
+                const loginBody = {
+                    identifier: document.getElementById('loginId')?.value.trim() || document.getElementById('loginIdentifier')?.value.trim(),
+                    password: document.getElementById('loginPassword').value,
+                    requestReactivation: e.submitter && e.submitter.id === 'requestReactivationBtn' ? true : undefined,
+                    inviteCode: (document.getElementById('loginInviteCode') || {}).value || undefined,
+                    deviceId: getDeviceId()
+                };
+                let data;
+                try {
+                    data = await apiFetch('/api/login', { method: 'POST', body: JSON.stringify(loginBody) });
+                } catch (first) {
+                    // Signed in on another device: ask before signing that one out.
+                    if (!(first.data && first.data.code === 'already-logged-in')) throw first;
+                    const examNote = first.data.examInProgress ? ' An exam in progress there will be submitted with the answers saved so far.' : '';
+                    const go = await UI.confirm({
+                        title: 'Already signed in',
+                        message: `This account is currently signed in on another device. If you continue, that device will be signed out.${examNote}`,
+                        confirmText: 'Sign out the other device and continue',
+                        cancelText: 'Cancel',
+                        danger: true
+                    });
+                    if (!go) { btn.disabled = false; btn.innerHTML = 'Sign In'; return; }
+                    data = await apiFetch('/api/login', { method: 'POST', body: JSON.stringify({ ...loginBody, takeover: true }) });
+                }
                 
                 AppState.setUser(data.user);
                 AppState.setToken(data.token);
@@ -437,6 +454,8 @@ export const AuthModule = {
         }
 
         if (e.target.closest('#logoutBtn')) {
+            // Tell the server so the account can be used on another device without a warning.
+            if (AppState.user && AppState.token) apiFetch('/api/logout', { method: 'POST', body: JSON.stringify({ userId: AppState.user.User_ID }), timeoutMs: 5000 }).catch(() => {});
             AppState.setUser(null);
             localStorage.removeItem('user');
             clearClassCache();   // saved class rosters and dashboards must not outlive the sign-in

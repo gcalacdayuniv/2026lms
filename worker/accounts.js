@@ -8,6 +8,7 @@ import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCle
 import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings, ensurePasswordResetRequests, clearStudentClassFields } from './schema.js';
 import { gasUrl } from './gas.js';
 import { ensureExamSecurity } from './exam-photos.js';
+import { ensureSessions, submitOpenAttempts, hasOpenAttempt, ONLINE_WINDOW_MS } from './exam-session.js';
 
 const MAX_AVATAR_B64 = 8000000;   // about 6 MB of photo; the app shrinks pictures to about 150 KB before sending
 
@@ -227,8 +228,41 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             }), { status: 403, headers: corsHeaders });
         }
 
-        const token = authEnabled(env) ? await signToken(env, user.User_ID) : undefined;
+        // One device at a time for students: warn first, and on confirmation sign the other device out.
+        let tokenNow = Date.now();
+        const deviceId = typeof body.deviceId === 'string' ? body.deviceId.slice(0, 64) : '';
+        if (authEnabled(env) && deviceId && String(user.role || '').toLowerCase() !== 'lecturer') {
+            await ensureSessions(env);
+            const s = await env.DB.prepare('SELECT Session_Device, Last_Seen_At FROM Users WHERE User_ID = ?').bind(user.User_ID).first();
+            const otherDevice = !!(s && s.Session_Device && s.Session_Device !== deviceId);
+            if (otherDevice) {
+                const online = !!s.Last_Seen_At && Date.now() - s.Last_Seen_At < ONLINE_WINDOW_MS;
+                if (online && !body.takeover) {
+                    const exam = await hasOpenAttempt(env, user.User_ID);
+                    return new Response(JSON.stringify({
+                        error: 'This account is currently signed in on another device.',
+                        code: 'already-logged-in', examInProgress: exam
+                    }), { status: 409, headers: corsHeaders });
+                }
+                await submitOpenAttempts(env, user.User_ID, 'session-takeover');
+                await env.DB.prepare('UPDATE Users SET Sessions_Valid_From = ? WHERE User_ID = ?').bind(Math.floor(Date.now() / 1000) + 1, user.User_ID).run();
+                tokenNow = Date.now() + 1000;   // the new token is stamped one second ahead so every older token is rejected
+            }
+            await env.DB.prepare('UPDATE Users SET Session_Device = ?, Last_Seen_At = ? WHERE User_ID = ?').bind(deviceId, Date.now(), user.User_ID).run();
+        }
+
+        const token = authEnabled(env) ? await signToken(env, user.User_ID, tokenNow) : undefined;
         return new Response(JSON.stringify({ success: true, user, token, joined }), { status: 200, headers: corsHeaders });
+    }
+
+    // Signing out frees the account for another device without a warning.
+    if (request.method === "POST" && path === "/api/logout") {
+        const body = await request.json().catch(() => ({}));
+        if (body.userId) {
+            await ensureSessions(env);
+            await env.DB.prepare('UPDATE Users SET Last_Seen_At = NULL WHERE User_ID = ?').bind(body.userId).run();
+        }
+        return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/change-password") {

@@ -2,18 +2,20 @@
 // Secure exam mode for students sitting an online exam:
 //  - before the exam: a notice and the camera permission (the exam does not start without the camera);
 //  - during the exam: a small photo when it starts and every 30 seconds, sent to the lecturer's private Drive folder;
-//  - leaving the exam (switching tab, app or window, locking the screen) submits the answers at once.
+//  - leaving the exam screen (switching tab, app or window, locking the screen) starts a 60 second grace period;
+//    staying away longer submits the answers (the server enforces it too, because phones freeze the page in the background).
 // Students flagged Legally Blind are exempt unless their lecturer turns it on (the server decides: student.secure).
 // Lecturers see the photos from Manage Exams > Results > Photos.
 import { apiFetch } from './globals.js';
 import { escapeHtml } from './html-utils.js';
 
 const PHOTO_EVERY_MS = 30000;
+const AWAY_GRACE_SECONDS = 60;   // the server uses the same number (worker/exam-session.js)
 const PHOTO_WIDTH = 320;
 const $ = (id) => document.getElementById(id);
 
 export const ExamSecure = {
-    stream: null, video: null, timer: null, active: false, paused: 0, leaving: false,
+    stream: null, video: null, timer: null, active: false, paused: 0, leaving: false, away: null, awayTimer: null, grace: AWAY_GRACE_SECONDS,
     ctx: null, handlers: null,
 
     // Notice + camera permission. Resolves true when the student agreed and the camera works.
@@ -29,8 +31,8 @@ export const ExamSecure = {
                 <h3 id="examSecureTitle" class="text-xl font-black text-gray-900 text-center mb-3">Secure exam</h3>
                 <ul class="text-sm text-gray-700 space-y-2 mb-3 list-disc pl-5">
                     <li>Your camera takes a photo when the exam starts and every 30 seconds. Only your lecturer can see them.</li>
-                    <li><b>If you leave the exam screen</b> (switch tab, app or window, or lock the phone) <b>your exam is submitted immediately.</b></li>
-                    <li>Put your phone on Do Not Disturb so a call or notification does not end your exam.</li>
+                    <li><b>If you leave the exam screen</b> (switch tab, app or window, or lock the phone) you have <b>60 seconds to come back</b>. After that your exam is submitted automatically.</li>
+                    <li>Signing in to your account on another device also submits your exam. Put your phone on Do Not Disturb so calls and notifications do not pull you away.</li>
                 </ul>
                 <p id="examSecureErr" class="hidden text-sm font-bold text-red-700 mb-2" role="alert"></p>
                 <button type="button" id="examSecureGo" class="w-full min-h-[3.25rem] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-black">Allow camera and continue</button>
@@ -68,11 +70,15 @@ export const ExamSecure = {
     }),
 
     // The exam is on screen: start photos and watch for the student leaving.
-    // onLeave(reason) is called once when the student leaves; the caller submits the exam.
-    begin: (examObj, student, onLeave) => {
+    // hooks.getAnswers() returns the answers so far; hooks.onLeave(reason) submits the exam from this device;
+    // hooks.onSubmitted(reason) is called when the server already submitted it (the student stayed away too long).
+    // Leaving starts a grace period (a call, a pulled notification, a screen that turned off); the banner counts it down.
+    begin: (examObj, student, hooks) => {
         ExamSecure.end(false);
         ExamSecure.active = true;
         ExamSecure.leaving = false;
+        ExamSecure.away = null;
+        ExamSecure.grace = AWAY_GRACE_SECONDS;
         ExamSecure.ctx = { assignmentId: examObj.assignmentId, studentId: student.User_ID };
 
         const badge = document.createElement('div');
@@ -81,25 +87,89 @@ export const ExamSecure = {
         badge.innerHTML = '<i class="fa-solid fa-circle text-[7px] mr-1" aria-hidden="true"></i>CAMERA ON';
         document.body.appendChild(badge);
 
-        const leave = (reason) => {
-            if (!ExamSecure.active || ExamSecure.paused > 0 || ExamSecure.leaving) return;
+        const submitNow = (reason) => {
+            if (!ExamSecure.active || ExamSecure.leaving) return;
             ExamSecure.leaving = true;
-            onLeave(reason);
+            ExamSecure.hideBanner();
+            hooks.onLeave(reason);
         };
-        const onVis = () => { if (document.hidden) leave('focus-lost'); };
-        const onBlur = () => leave('focus-lost');
-        const onHide = () => leave('focus-lost');
+        const tellServer = (away) => apiFetch('/api/exam-away', {
+            method: 'POST', keepalive: true, timeoutMs: 8000,
+            body: JSON.stringify({ ...ExamSecure.ctx, away, answers: away && hooks.getAnswers ? hooks.getAnswers() : undefined })
+        });
+
+        const startAway = () => {
+            if (!ExamSecure.active || ExamSecure.paused > 0 || ExamSecure.leaving || ExamSecure.away) return;
+            ExamSecure.away = { since: Date.now() };
+            tellServer(true).then(r => { if (r && r.graceSeconds) ExamSecure.grace = r.graceSeconds; }).catch(() => {});
+            ExamSecure.showBanner();
+            ExamSecure.awayTimer = setInterval(() => {
+                const left = ExamSecure.grace - Math.floor((Date.now() - ExamSecure.away.since) / 1000);
+                ExamSecure.showBanner(left);
+                if (left <= 0) submitNow('focus-lost');
+            }, 1000);
+        };
+        const endAway = async () => {
+            if (!ExamSecure.active || ExamSecure.leaving || !ExamSecure.away || document.hidden) return;
+            const since = ExamSecure.away.since;
+            if (Date.now() - since > ExamSecure.grace * 1000) { submitNow('focus-lost'); return; }
+            ExamSecure.away = null;
+            clearInterval(ExamSecure.awayTimer);
+            ExamSecure.hideBanner();
+            try {
+                const r = await tellServer(false);
+                if (r && r.submitted && ExamSecure.active && !ExamSecure.leaving) { ExamSecure.leaving = true; hooks.onSubmitted(r.reason); return; }
+            } catch (e) { /* offline for a moment: the server decides when it hears from us again */ }
+            // iOS and Android may stop the camera while the app is in the background: start it again.
+            const t = ExamSecure.stream && ExamSecure.stream.getVideoTracks()[0];
+            if (!t || t.readyState === 'ended') {
+                if (!(await ExamSecure.restartCamera())) submitNow('camera-off');
+            }
+        };
+        const onVis = () => { if (document.hidden) startAway(); else endAway(); };
+        const onBlur = () => startAway();
+        const onFocus = () => endAway();
+        const onHide = () => startAway();
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('blur', onBlur);
+        window.addEventListener('focus', onFocus);
         window.addEventListener('pagehide', onHide);
+        window.addEventListener('pageshow', onFocus);
         const track = ExamSecure.stream && ExamSecure.stream.getVideoTracks()[0];
-        const onEnded = () => leave('camera-off');
+        // The camera stopping while the exam is on screen ends it; while the app is away it is restarted on return.
+        const onEnded = () => { if (!ExamSecure.away && !document.hidden) submitNow('camera-off'); };
         if (track) track.addEventListener('ended', onEnded);
-        ExamSecure.handlers = { onVis, onBlur, onHide, track, onEnded };
+        ExamSecure.handlers = { onVis, onBlur, onFocus, onHide, track, onEnded };
 
         const snap = (kind) => ExamSecure.capture(kind);
         setTimeout(() => snap('start'), 800);
         ExamSecure.timer = setInterval(() => snap('check'), PHOTO_EVERY_MS);
+    },
+
+    showBanner: (left) => {
+        let b = $('examAwayBanner');
+        if (!b) {
+            b = document.createElement('div');
+            b.id = 'examAwayBanner';
+            b.setAttribute('role', 'alert');
+            b.className = 'fixed top-0 inset-x-0 z-[140] px-4 py-3 bg-red-700 text-white text-center text-sm font-black shadow-lg';
+            document.body.appendChild(b);
+        }
+        const n = left === undefined ? ExamSecure.grace : Math.max(0, left);
+        b.textContent = `You left the exam screen. Come back within ${n} second${n === 1 ? '' : 's'} or your exam will be submitted.`;
+    },
+    hideBanner: () => { clearInterval(ExamSecure.awayTimer); ExamSecure.awayTimer = null; $('examAwayBanner')?.remove(); },
+
+    restartCamera: async () => {
+        try {
+            if (ExamSecure.stream) ExamSecure.stream.getTracks().forEach(t => t.stop());
+            ExamSecure.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+            if (ExamSecure.video) { ExamSecure.video.srcObject = ExamSecure.stream; await ExamSecure.video.play().catch(() => {}); }
+            const h = ExamSecure.handlers;
+            const t = ExamSecure.stream.getVideoTracks()[0];
+            if (h && t) { h.track = t; t.addEventListener('ended', h.onEnded); }
+            return true;
+        } catch (e) { return false; }
     },
 
     // Dialogs the app itself opens (confirm / alert) take focus away, so they must not count as leaving.
@@ -135,10 +205,14 @@ export const ExamSecure = {
         if (h) {
             document.removeEventListener('visibilitychange', h.onVis);
             window.removeEventListener('blur', h.onBlur);
+            window.removeEventListener('focus', h.onFocus);
+            window.removeEventListener('pageshow', h.onFocus);
             window.removeEventListener('pagehide', h.onHide);
             if (h.track) h.track.removeEventListener('ended', h.onEnded);
         }
         ExamSecure.handlers = null;
+        ExamSecure.away = null;
+        ExamSecure.hideBanner();
         $('examSecureBadge')?.remove();
         if (releaseCamera) ExamSecure.release();
     },

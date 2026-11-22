@@ -8,6 +8,7 @@
 //  - Routes are listed in RULES. A route that is not listed is lecturer-only.
 
 import { ensureExamShares, ensureCourseRoom } from './schema.js';
+import { ensureSessions } from './exam-session.js';
 
 const TOKEN_DAYS = 7;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;   // larger bodies (photos) are checked by role and query only
@@ -116,6 +117,9 @@ export const RULES = {
     'GET /api/student-accessible-exams': { who: 'any', self: ['studentId'] },
     'POST /api/submit-accessible-exam': { who: 'any', self: ['studentId'] },
     'POST /api/start-accessible-exam': { who: 'any', self: ['studentId'] },
+    'POST /api/exam-draft': { who: 'any', self: ['studentId'] },
+    'POST /api/exam-away': { who: 'any', self: ['studentId'] },
+    'POST /api/logout': { who: 'any', mine: ['userId'] },
     'POST /api/exam-photo': { who: 'any', self: ['studentId'] },   // GET /api/exam-photos is lecturer-only (owner checked by classExamId / photoId)
     'GET /api/student-exam-review': { who: 'any', self: ['studentId'] },
     'GET /api/student-sheet-photo': { who: 'any', self: ['studentId'] },
@@ -210,13 +214,19 @@ export async function authorize(request, env, path, url) {
     const userId = info.id;
 
     await ensurePasswordColumn(env);
-    const row = await env.DB.prepare('SELECT User_ID, role, account_status, Password_Changed_At FROM Users WHERE User_ID = ?').bind(userId).first();
+    await ensureSessions(env);
+    const row = await env.DB.prepare('SELECT User_ID, role, account_status, Password_Changed_At, Sessions_Valid_From, Last_Seen_At FROM Users WHERE User_ID = ?').bind(userId).first();
     if (!row) return deny(401, 'Your session has expired. Please sign in again.');
+    if (row.Sessions_Valid_From && info.iat < row.Sessions_Valid_From) return deny(401, 'You were signed out because your account was signed in on another device. Any exam in progress was submitted with your saved answers.');
     if (row.Password_Changed_At && info.iat < row.Password_Changed_At) return deny(401, 'Your password was changed. Please sign in again.');
     if (String(row.account_status || '').toLowerCase() !== 'active') return deny(403, 'This account is not active.');
 
     const role = String(row.role || '').toLowerCase() === 'lecturer' ? 'lecturer' : 'student';
     const user = { id: row.User_ID, role };
+    // "Last seen" backs the one-device-at-a-time warning; written at most once a minute.
+    if (role === 'student' && (!row.Last_Seen_At || Date.now() - row.Last_Seen_At > 60000)) {
+        await env.DB.prepare('UPDATE Users SET Last_Seen_At = ? WHERE User_ID = ?').bind(Date.now(), row.User_ID).run();
+    }
 
     if (rule.who === 'lecturer' && role !== 'lecturer') return deny(403, 'Only a lecturer can do this.');
 

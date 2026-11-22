@@ -43,10 +43,22 @@ export const AppState = {
 const PUBLIC_ENDPOINTS = ['/api/login', '/api/register', '/api/student-accessible-exams'];
 
 // Called when the server says the session is missing or expired: go back to the login screen.
-export const handleSessionExpired = () => {
+export const handleSessionExpired = (message) => {
     if (!AppState.user) return;
     AppState.setUser(null);
+    AppState.setToken(null);
     window.location.hash = '#login';
+    // Screens that need to stop (an exam on screen) and the message for the student listen for this.
+    try { window.dispatchEvent(new CustomEvent('app:session-ended', { detail: { message: message || '' } })); } catch (e) { /* old browser */ }
+};
+
+// A stable id for this browser, so the server can tell "another device" from "this device signing in again".
+export const getDeviceId = () => {
+    try {
+        let id = localStorage.getItem('device_id');
+        if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)); localStorage.setItem('device_id', id); }
+        return id;
+    } catch (e) { return 'tab-' + (window.__tabDeviceId = window.__tabDeviceId || Math.random().toString(16).slice(2)); }
 };
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -89,7 +101,7 @@ export const apiFetch = async (endpoint, options = {}) => {
         }
 
         if (response.status === 401 && !PUBLIC_ENDPOINTS.some(p => endpoint.startsWith(p))) {
-            handleSessionExpired();
+            handleSessionExpired(data && data.error);
         }
         if (!response.ok) {
             const failure = new Error((data && data.error) || 'An error occurred during the request.');

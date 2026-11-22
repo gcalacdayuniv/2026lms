@@ -4,6 +4,7 @@ import { handleAttendance } from './attendance.js';
 import { handleScores } from './scores.js';
 import { handleExams } from './exams.js';
 import { handleExamPhotos } from './exam-photos.js';
+import { handleExamSession } from './exam-session.js';
 import { ensureCoreIndexes, ensureCourseRoom } from './schema.js';
 import { handleUploads } from './uploads.js';
 import { handleAccounts } from './accounts.js';
@@ -67,6 +68,9 @@ export default {
 
             const photosResponse = await handleExamPhotos(request, env, path, url, corsHeaders);
             if (photosResponse) return photosResponse;
+
+            const sessionResponse = await handleExamSession(request, env, path, url, corsHeaders);
+            if (sessionResponse) return sessionResponse;
 
             const examsResponse = await handleExams(request, env, path, url, corsHeaders);
             if (examsResponse) return examsResponse;

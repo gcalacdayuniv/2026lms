@@ -172,6 +172,54 @@ ok('students cannot list exam photos', photoListStu.s === 403, JSON.stringify(ph
 const res2 = await call('GET', '/api/exam-results?classExamId=' + (ce.j && ce.j.classExamId), { token: L1 });
 ok('results carry submit reason and photo count', res2.s === 200 && res2.j.students.every(x => 'submitReason' in x && x.photos === 0), JSON.stringify(res2.j.students));
 
+// ---- one device at a time, saved answers, away grace, lecturer continue ----
+const devLogin = (device, takeover) => call('POST', '/api/login', { body: { identifier: 'stu2', password: rs.j.tempPassword, deviceId: device, takeover } });
+const dA = await devLogin('devA');
+ok('first device signs in', dA.s === 200 && !!dA.j.token, JSON.stringify(dA.j));
+const dSame = await devLogin('devA');
+ok('same device signs in again without a warning', dSame.s === 200, JSON.stringify(dSame.j));
+const ceId = ce.j && ce.j.classExamId;
+sql.prepare("update Exam_Assignments set Is_Enabled = 1 where Student_ID = 'S2' and Class_Exam_ID = ?").run(ceId);
+const avail2 = await call('GET', '/api/student-accessible-exams?studentId=S2', { token: dSame.j.token });
+const mine2 = (avail2.j.exams || avail2.j.availableExams || [])[0];
+await call('POST', '/api/start-accessible-exam', { token: dSame.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S2' } });
+const draftSave = await call('POST', '/api/exam-draft', { token: dSame.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S2', answers: ['Paris'] } });
+ok('answers are saved to the server', draftSave.s === 200 && !draftSave.j.closed, JSON.stringify(draftSave));
+const otherDraft = await call('POST', '/api/exam-draft', { token: dSame.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S1', answers: ['x'] } });
+ok("a student cannot save into another student's attempt", otherDraft.s === 403, JSON.stringify(otherDraft));
+const warn = await devLogin('devB');
+ok('second device is warned, with the exam flag', warn.s === 409 && warn.j.code === 'already-logged-in' && warn.j.examInProgress === true && !warn.j.token, JSON.stringify(warn));
+ok('first device still works after a cancelled attempt', (await call('GET', '/api/student-accessible-exams?studentId=S2', { token: dA.j.token })).s === 200);
+const take = await devLogin('devB', true);
+ok('confirming signs in on the new device', take.s === 200 && !!take.j.token, JSON.stringify(take.j));
+const oldDev = await call('GET', '/api/student-accessible-exams?studentId=S2', { token: dA.j.token });
+ok('the old device is signed out with a clear message', oldDev.s === 401 && /another device/i.test(oldDev.j.error), JSON.stringify(oldDev));
+const rs3 = await call('GET', '/api/exam-results?classExamId=' + ceId, { token: L1 });
+const row3 = (rs3.j.students || []).find(x => x.studentId === 'S2' || x.Student_ID === 'S2' || x.id === 'S2');
+ok('the exam in progress was submitted from the saved answers', sql.prepare("select Status s, Submit_Reason r, Answers_JSON a from Exam_Assignments where Student_ID='S2' and Class_Exam_ID=?").get(ceId).r === 'session-takeover' && /Paris/.test(sql.prepare("select Answers_JSON a from Exam_Assignments where Student_ID='S2' and Class_Exam_ID=?").get(ceId).a), JSON.stringify(row3));
+const cont = await call('POST', '/api/exam-continue', { token: L1, body: { classExamId: ceId, studentId: 'S2' } });
+const a2 = sql.prepare("select Status s, Draft_JSON d, Submit_Reason r from Exam_Assignments where Student_ID='S2' and Class_Exam_ID=?").get(ceId);
+ok('lecturer can let the student continue, answers restored', cont.s === 200 && a2.s === 'Pending' && /Paris/.test(a2.d) && a2.r === null, JSON.stringify({ cont, a2 }));
+ok('students cannot use exam-continue', (await call('POST', '/api/exam-continue', { token: take.j.token, body: { classExamId: ceId, studentId: 'S2' } })).s === 403);
+const away = await call('POST', '/api/exam-away', { token: take.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S2', away: true, answers: ['Paris', 'x'] } });
+ok('leaving starts the grace period', away.s === 200 && away.j.graceSeconds > 0 && away.j.secondsLeft > 0, JSON.stringify(away));
+const back = await call('POST', '/api/exam-away', { token: take.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S2', away: false } });
+ok('coming back in time keeps the exam going', back.s === 200 && !back.j.submitted, JSON.stringify(back));
+await call('POST', '/api/exam-away', { token: take.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S2', away: true } });
+sql.prepare("update Exam_Assignments set Away_Since = ? where Assignment_ID = ?").run(Date.now() - 120000, mine2.assignmentId);
+const late = await call('POST', '/api/exam-away', { token: take.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S2', away: false } });
+ok('coming back after the grace period finds it submitted', late.s === 200 && late.j.submitted === true && late.j.reason === 'away', JSON.stringify(late));
+await call('POST', '/api/exam-continue', { token: L1, body: { classExamId: ceId, studentId: 'S2' } });
+await call('POST', '/api/exam-away', { token: take.j.token, body: { assignmentId: mine2.assignmentId, studentId: 'S2', away: true } });
+sql.prepare("update Exam_Assignments set Away_Since = ? where Assignment_ID = ?").run(Date.now() - 120000, mine2.assignmentId);
+await call('GET', '/api/exam-results?classExamId=' + ceId, { token: L1 });
+ok('a lecturer opening results submits the ones away too long', sql.prepare("select Status s from Exam_Assignments where Assignment_ID = ?").get(mine2.assignmentId).s === 'Completed');
+await call('POST', '/api/logout', { token: take.j.token, body: { userId: 'S2' } });
+const devC = await devLogin('devC');
+ok('signing out frees the account without a warning', devC.s === 200);
+s2b.j.token = devC.j.token;   // later tests reuse S2's token
+
+
 // ---- registration limits ----
 const reg = (sn, extra = {}, ip) => call('POST', '/api/register', { body: { username: 'new' + sn, password: 'secret12', name: 'N', email: 'n@x.com', student_number: sn, contact_number: '09', eye_condition: 'None', program_course: 'BSCS', program_year: '1', program_section: '1', ...extra } });
 const noProg = await reg('26-0090', { program_course: '' });

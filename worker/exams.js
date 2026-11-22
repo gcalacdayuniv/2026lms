@@ -7,6 +7,7 @@ import { ensureAccessibleExamTables, ensureManualMarksColumn, ensureExamShares }
 import { ASSESSMENT_TERMS, ASSESSMENT_CATEGORIES } from './constants.js';
 import { DATE_RE } from './attendance.js';
 import { ensureExamSecurity, secureApplies } from './exam-photos.js';
+import { ensureSessions, finishAttempt, sweepAway } from './exam-session.js';
 import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
 
 const GRACE_SECONDS = 120;   // a submission this long after the time limit is still accepted
@@ -462,10 +463,11 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         }
 
         await ensureAccessibleExamTables(env);
+        await ensureSessions(env);
 
         await env.DB.prepare(
             `UPDATE Exam_Assignments
-             SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Manual_Marks = NULL, Started_At = NULL, Submitted_At = NULL, Submit_Reason = NULL
+             SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Manual_Marks = NULL, Started_At = NULL, Submitted_At = NULL, Submit_Reason = NULL, Draft_JSON = NULL, Away_Since = NULL
              WHERE Class_Exam_ID = ? AND Student_ID = ?`
         ).bind(classExamId, studentId).run();
 
@@ -544,9 +546,11 @@ export async function handleExams(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: "Invalid request." }), { status: 400, headers: corsHeaders });
         }
         await ensureAccessibleExamTables(env);
+        await ensureSessions(env);
+        await sweepAway(env, { studentId });
 
         const record = await env.DB.prepare(
-            `SELECT ea.Assignment_ID, ea.Status, ea.Is_Enabled, ea.Started_At, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit
+            `SELECT ea.Assignment_ID, ea.Status, ea.Is_Enabled, ea.Started_At, ea.Draft_JSON, ce.Is_Active, ce.From_Date, ce.To_Date, ce.Time_Limit
              FROM Exam_Assignments ea JOIN Class_Exams ce ON ea.Class_Exam_ID = ce.Class_Exam_ID JOIN Exams e ON ce.Exam_ID = e.Exam_ID
              WHERE ea.Assignment_ID = ? AND ea.Student_ID = ? AND ${EXAM_FITS_CLASS_SQL} AND ${NOT_ARCHIVED_SQL}`
         ).bind(assignmentId, studentId).first();
@@ -571,7 +575,8 @@ export async function handleExams(request, env, path, url, corsHeaders) {
             const began = parseTime(startedAt) ?? Date.now();
             remainingSeconds = Math.max(0, Math.round((began + limit * 60 * 1000 - Date.now()) / 1000));
         }
-        return new Response(JSON.stringify({ success: true, startedAt, timeLimit: limit, remainingSeconds }), { status: 200, headers: corsHeaders });
+        const draft = safeJson(record.Draft_JSON);
+        return new Response(JSON.stringify({ success: true, startedAt, timeLimit: limit, remainingSeconds, draft: Array.isArray(draft) ? draft : null }), { status: 200, headers: corsHeaders });
     }
 
     // Results of one class exam: class summary, score spread and an analysis of every question.
@@ -592,6 +597,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         const questions = safeJson(ce.ExamData) || [];
 
         await ensureExamSecurity(env);
+        await sweepAway(env, { classExamId });
         const photoCounts = {};
         ((await env.DB.prepare("SELECT Student_ID, COUNT(*) AS n FROM Exam_Photos WHERE Class_Exam_ID = ? GROUP BY Student_ID").bind(classExamId).all()).results || [])
             .forEach(r => { photoCounts[r.Student_ID] = r.n; });
@@ -860,7 +866,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
     if (request.method === "POST" && path === "/api/submit-accessible-exam") {
         const body = await request.json();
         const { assignmentId, studentId, answers } = body;
-        const reason = body.reason === 'focus-lost' ? 'focus-lost' : (body.reason === 'time' ? 'time' : (body.reason === 'camera-off' ? 'camera-off' : null));
+        const reason = ['focus-lost', 'time', 'camera-off'].includes(body.reason) ? body.reason : null;
 
         if (!assignmentId || !studentId || !Array.isArray(answers)) {
             return new Response(JSON.stringify({ error: "Invalid submission payload." }), { status: 400, headers: corsHeaders });
@@ -900,82 +906,8 @@ export async function handleExams(request, env, path, url, corsHeaders) {
             }
         }
 
-        let quizData = [];
-        try {
-            quizData = JSON.parse(record.ExamData || "[]");
-        } catch (e) {
-            quizData = [];
-        }
-
-        // keep stored answers small: one entry per question, essays up to 10,000 characters
-        const cleanAnswers = quizData.map((q, idx) => {
-            const a = answers[idx];
-            if (Array.isArray(a)) return a.slice(0, 40).map(x => String(x ?? "").slice(0, 500));
-            return String(a ?? "").slice(0, 10000);
-        });
-        const scored = scoreExam(quizData, cleanAnswers, null, safeJson(record.Adjustments));
-        const rawScore = scored.raw;
-        const bonusScore = scored.bonus;
-
-        let maxScore = examMaxPoints(quizData);
-
-        let assessment = null;
-        if (record.Assessment_ID) {
-            assessment = await env.DB.prepare(
-                "SELECT * FROM Assessments WHERE Assessment_ID = ?"
-            ).bind(record.Assessment_ID).first();
-        }
-
-        const today = getRequestDate(request);
-        let targetAssessmentId = record.Assessment_ID;
-
-        if (!assessment) {
-            targetAssessmentId = crypto.randomUUID();
-            await env.DB.prepare(
-                `INSERT INTO Assessments (Assessment_ID, Course_ID, Term, Category, Title, Max_Score, Date)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`
-            ).bind(
-                targetAssessmentId,
-                record.Course_ID,
-                record.Term || 'MidTerm',
-                record.Category || 'MajorExam',
-                record.Exam_Title.trim(),
-                maxScore,
-                today
-            ).run();
-
-            await env.DB.prepare(
-                "UPDATE Class_Exams SET Assessment_ID = ? WHERE Class_Exam_ID = ?"
-            ).bind(targetAssessmentId, record.Class_Exam_ID).run();
-        } else {
-            maxScore = assessment.Max_Score > 0 ? assessment.Max_Score : maxScore;
-        }
-
-        const finalScore = finalScoreOf(scored, maxScore);
-
-        await env.DB.batch([
-            env.DB.prepare(
-                `UPDATE Exam_Assignments
-                 SET Status = 'Completed', Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Max_Score = ?, Answers_JSON = ?, Submitted_At = CURRENT_TIMESTAMP, Submit_Reason = ?
-                 WHERE Assignment_ID = ?`
-            ).bind(rawScore, bonusScore, finalScore, maxScore, JSON.stringify(cleanAnswers), reason, assignmentId),
-            env.DB.prepare(
-                "DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?"
-            ).bind(targetAssessmentId, studentId),
-            env.DB.prepare(
-                "INSERT INTO Assessment_Scores (Score_ID, Assessment_ID, Student_ID, Score) VALUES (?, ?, ?, ?)"
-            ).bind(crypto.randomUUID(), targetAssessmentId, studentId, finalScore)
-        ]);
-
-        return new Response(JSON.stringify({
-            success: true,
-            rawScore,
-            bonusScore,
-            finalScore,
-            maxScore,
-            essayPending: scored.pending,
-            examTitle: record.Exam_Title
-        }), { status: 200, headers: corsHeaders });
+        const result = await finishAttempt(env, request, record, answers, reason);
+        return new Response(JSON.stringify(result), { status: 200, headers: corsHeaders });
     }
 
     return null;
