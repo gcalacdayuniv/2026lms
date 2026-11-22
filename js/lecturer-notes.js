@@ -32,11 +32,11 @@ export const LecturerNotes = {
         LecturerNotes.closeModal();
         const m = document.createElement('div');
         m.id = 'lnModal';
-        m.className = 'fixed inset-0 z-[70] flex items-end sm:items-center justify-center fade-in';
+        m.className = 'fixed inset-0 z-[70] flex items-start sm:items-center justify-center fade-in';
         m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', `Lecturer notes for ${name || 'student'}`);
         m.innerHTML = `<div id="lnBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-            <div class="relative z-10 bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-lg shadow-xl p-4 max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center gap-3 mb-3 border-b pb-3">
+            <div class="relative z-10 bg-white w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-lg shadow-xl p-4 flex flex-col" style="padding-top:max(1rem, env(safe-area-inset-top))">
+                <div class="shrink-0 flex items-center gap-3 mb-3 border-b pb-3">
                     <div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-note-sticky text-amber-600 mr-2" aria-hidden="true"></i>Lecturer's notes</h3><p class="text-xs text-gray-500 truncate">${escapeHtml(name || '')} &middot; private, never shown to the student</p></div>
                     <button type="button" id="lnClose" class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
                 </div>
@@ -90,21 +90,23 @@ export const LecturerNotes = {
                     </span>
                 </div>
             </div>`).join('');
-        panel.innerHTML = `
-            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <h4 class="text-sm font-bold text-gray-800 mb-1"><i class="fa-solid fa-lock text-amber-600 mr-2" aria-hidden="true"></i>Lecturer's Notes <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider ml-1">Private</span></h4>
-                <p class="text-[11px] text-gray-500 mb-2">Only you can see these. Use them for behaviour, participation and other observations that help you give a score.</p>
-                ${message || `
-                <textarea id="lnText" rows="3" maxlength="4000" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="Write a note about this student...">${editing ? escapeHtml(editing.Body) : ''}</textarea>
-                <div class="flex items-center justify-between mt-1 mb-2">
+        const compose = `<textarea id="lnText" rows="3" maxlength="4000" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="Write a note about this student...">${editing ? escapeHtml(editing.Body) : ''}</textarea>
+                <div class="flex items-center justify-between mt-1">
                     <span id="lnCount" class="text-[10px] text-gray-400">${editing ? editing.Body.length : 0}/4000</span>
                     <span class="flex gap-2">
                         ${editing ? '<button type="button" id="lnCancel" class="px-3 py-1.5 text-xs font-bold text-gray-600 bg-white border border-gray-300 rounded-lg">Cancel</button>' : ''}
                         <button type="button" id="lnSave" ${editing ? '' : 'disabled'} class="px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg">${editing ? 'Update note' : 'Add note'}</button>
                     </span>
-                </div>
-                <div class="space-y-2">${list || '<div class="text-xs text-gray-400 italic">No notes yet.</div>'}</div>`}
-            </div>`;
+                </div>`;
+        // The note box stays at the top; only the earlier notes scroll underneath it.
+        panel.className = 'flex flex-col flex-1 min-h-0';
+        panel.innerHTML = `
+            <div class="shrink-0 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p class="text-[11px] text-gray-500 mb-2">Only you can see these. Use them for behaviour, participation and other observations that help you give a score.</p>
+                ${message || compose}
+            </div>
+            ${message ? '' : `<h4 class="shrink-0 mt-3 mb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Previous notes (${LecturerNotes.notes.length})</h4>
+            <div class="flex-1 min-h-0 overflow-y-auto space-y-2 pb-2">${list || '<div class="text-xs text-gray-400 italic">No notes yet.</div>'}</div>`}`;
     },
 
     save: async () => {
