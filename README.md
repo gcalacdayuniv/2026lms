@@ -590,3 +590,4 @@ The **View** button on uploaded files (`js/course-class.js`) opens Drive's previ
 
 ## Scan setup screen layout
 On phones the Scan setup (`js/components-scanner.js`) is compact: the two answer-key choices sit side by side with short labels, the Exam select takes the full width, and Date and Exam sets share a row. Descriptions show from the `sm` width up. The Start Scanning button has no shadow or transition (iOS drew a seam line across it) and the hidden Print button is removed with `display:none`.
+- iOS fix: buttons in a `flex-col` row must not use `flex-1` (WebKit collapses their height and draws a seam line); use `w-full sm:w-auto sm:flex-1`. Date fields use `display:flex; align-items:center` in `.ctl` so the value is vertically centered.

@@ -134,10 +134,10 @@ export const ScannerUI = {
                     <div id="scnSetupSummary" class="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded px-2 py-1.5"></div>
 
                     <div class="flex flex-col sm:flex-row gap-2">
-                        <button type="button" id="scnPrintBtn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
+                        <button type="button" id="scnPrintBtn" class="w-full sm:w-auto sm:flex-1 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center">
                             <i class="fa-solid fa-print mr-2"></i> Print Answer Sheet
                         </button>
-                        <button type="button" id="scnStartBtn" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-md text-sm font-bold appearance-none border-0 flex items-center justify-center">
+                        <button type="button" id="scnStartBtn" class="w-full sm:w-auto sm:flex-1 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-md text-sm font-bold appearance-none border-0 flex items-center justify-center">
                             <i class="fa-solid fa-camera mr-2"></i> Start Scanning
                         </button>
                     </div>
