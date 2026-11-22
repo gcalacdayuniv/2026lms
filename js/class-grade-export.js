@@ -76,7 +76,7 @@ export function courseLabels(course) {
     return {
         sheetName: safeName(`${title} - ${yearSection}`).slice(0, 31) || 'Class Grade',
         fileName: `${title}_${yearSection}_${ayEs}_CLASS GRADE.xlsx`.replace(/\s+/g, ' '),
-        subject: `SUBJECTCODE: ${safeName(c.CourseCode || '')}`
+        classId: [c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' ')   // e.g. BSIT 3-A
     };
 }
 
@@ -89,7 +89,9 @@ export async function buildClassGrade(ExcelJS, { course, rows, templateBytes }) 
     const labels = courseLabels(course);
 
     ws.name = labels.sheetName;
-    ws.getCell('BR3').value = labels.subject;
+    // BR2 carries the class course, year and section (the template's fixed "BSP 1-4" is replaced); BR3 no longer shows the subject code.
+    ws.getCell('BR2').value = labels.classId || null;
+    ws.getCell('BR3').value = null;
 
     const students = [...rows].sort((a, b) => String(a.student.Name || '').localeCompare(String(b.student.Name || '')));
     const n = students.length;
