@@ -3,6 +3,7 @@
 
 import { findClassByCode, enrollStudent } from './join.js';
 import { sweepEndedAccounts } from './term-sweep.js';
+import { ensureExamSecurity } from './exam-photos.js';
 import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode, ensureCourseRoom } from './schema.js';
 import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
 
@@ -351,8 +352,9 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
         }
 
+        await ensureExamSecurity(env);
         const students = await env.DB.prepare(
-            `SELECT u.User_ID, u.Name, u.Avatar, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, u.Reactivation_Requested, e.Seat_Number, e.Group_Name, e.Assigned_Topic
+            `SELECT u.User_ID, u.Name, u.Avatar, u.Exam_Secure, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, u.Reactivation_Requested, e.Seat_Number, e.Group_Name, e.Assigned_Topic
              FROM Enrollments e
              JOIN Users u ON e.Student_ID = u.User_ID
              WHERE e.Course_ID = ?`

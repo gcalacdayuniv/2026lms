@@ -7,6 +7,7 @@ import { hashPassword, verifyPassword } from './password.js';
 import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL, getCurrentTerm, validTerm, getTermEnds, termKey } from './shared.js';
 import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings, ensurePasswordResetRequests, clearStudentClassFields } from './schema.js';
 import { gasUrl } from './gas.js';
+import { ensureExamSecurity } from './exam-photos.js';
 
 const MAX_AVATAR_B64 = 8000000;   // about 6 MB of photo; the app shrinks pictures to about 150 KB before sending
 
@@ -384,6 +385,13 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             if (f.Contact_Number && clash.Contact_Number === f.Contact_Number) c.push("Contact Number");
             return new Response(JSON.stringify({ error: `Already used by another account: ${c.join(", ")}.` }), { status: 400, headers: corsHeaders });
         }
+        if (body.examSecure !== undefined) {
+            if (!["", "on", "off"].includes(String(body.examSecure))) {
+                return new Response(JSON.stringify({ error: "Unknown exam secure setting." }), { status: 400, headers: corsHeaders });
+            }
+            await ensureExamSecurity(env);
+            await env.DB.prepare("UPDATE Users SET Exam_Secure = ? WHERE User_ID = ?").bind(body.examSecure === "" ? null : String(body.examSecure), stu.User_ID).run();
+        }
         await env.DB.prepare(
             `UPDATE Users SET Name = ?, Email = ?, Contact_Number = ?, Student_Number = ?, Program_Course = ?, Program_Year = ?, Program_Section = ?, eye_condition = ? WHERE User_ID = ?`
         ).bind(f.Name, f.Email, f.Contact_Number, f.Student_Number, f.Program_Course, f.Program_Year, f.Program_Section, eye, stu.User_ID).run();
@@ -574,8 +582,9 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
 
     if (request.method === "GET" && path === "/api/users") {
         await ensureReactivationColumns(env);
+        await ensureExamSecurity(env);
         const users = await env.DB.prepare(
-            `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, role, registration_timestamp, Reactivation_Requested
+            `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, Exam_Secure, role, registration_timestamp, Reactivation_Requested
              FROM Users ORDER BY Name ASC`
         ).all();
         return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });

@@ -17,6 +17,7 @@ import { buildScanSets } from './scan-items.js';
 import { buildScanPaperHtml } from './scan-paper.js';
 import { getSetCount, saveSetCount, printExamAnswerSheet } from './sheet-print.js';
 import { MAX_CHOICES } from './omr-sheet.js';
+import { ExamSecure } from './exam-secure.js';
 
 export const CourseExam = {
     exams: [],
@@ -156,6 +157,12 @@ export const CourseExam = {
             return;
         }
         if (e.target.closest('#closeExamReviewBtn') || e.target.id === 'closeExamReviewBg') ExamReview.close();
+
+        const photosBtn = e.target.closest('.er-photos-btn');
+        if (photosBtn) {
+            await ExamSecure.openPhotos(CourseExam.resultsData.classExamId, photosBtn.dataset.studentId, photosBtn.dataset.name);
+            return;
+        }
 
         if (e.target.closest('.er-adjust-btn')) {
             await CourseExam.adjustQuestion(e.target.closest('.er-adjust-btn'));
@@ -1130,7 +1137,7 @@ export const CourseExam = {
         const rows = d.students.map(s => `
             <tr class="border-t border-gray-100">
                 <td class="px-2 py-1.5 font-bold text-gray-800">${esc(s.name)} <span class="font-normal text-gray-500">${esc(s.studentNumber)}</span></td>
-                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}</td>
+                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>Photos (${s.photos})</button>` : ''}</td>
                 <td class="px-2 py-1.5 text-right">${s.score === null ? '-' : `${s.score} / ${s.max}`}</td>
                 <td class="px-2 py-1.5 text-right font-bold">${fmt(s.percent, '%')}</td>
                 <td class="px-2 py-1.5 text-right">${s.minutes === null ? '-' : s.minutes + ' min'}</td>
@@ -1879,7 +1886,7 @@ export const CourseExam = {
             if (left <= 0) {
                 CourseExam.stopTimer();
                 CourseExam.speak('Time is up. Submitting your answers now.');
-                CourseExam.submitAccessibleExam(true);
+                CourseExam.submitAccessibleExam(true, 'time');
             }
         };
         tick();
@@ -1888,11 +1895,14 @@ export const CourseExam = {
 
     startAccessibleExam: async (examObj, student, onComplete) => {
         let remaining = null;
+        // Secure mode (every exam, except students the lecturer exempted): notice and camera first.
+        const secure = !!student.secure;
+        if (secure && !(await ExamSecure.prepare())) return;
         if (examObj.timeLimit) {
             if (!examObj.startedAt) {
                 const msg = `This exam has a time limit of ${examObj.timeLimit} minute${examObj.timeLimit === 1 ? '' : 's'}. The clock starts now and keeps running even if you leave. Start the exam?`;
                 CourseExam.speak(msg);
-                if (!window.confirm(msg)) return;
+                if (!window.confirm(msg)) { ExamSecure.release(); return; }
             }
             try {
                 const res = await apiFetch('/api/start-accessible-exam', {
@@ -1903,6 +1913,7 @@ export const CourseExam = {
                 examObj.startedAt = res.startedAt;
             } catch (err) {
                 UI.error('Could not start the exam: ' + err.message);
+                ExamSecure.release();
                 return;
             }
         }
@@ -1944,14 +1955,18 @@ export const CourseExam = {
         CourseExam.renderAccessibleQuestion(true);
         if (remaining !== null) CourseExam.startTimer(remaining);
         else CourseExam.stopTimer();
+        if (secure) ExamSecure.begin(examObj, student, (reason) => CourseExam.submitAccessibleExam(true, reason));
     },
 
     closeAccessibleExam: () => {
         if (CourseExam.accExam && !CourseExam.accSubmitting) {
             const timed = CourseExam.timer ? ' The clock keeps running while you are away.' : '';
+            ExamSecure.pause();
             const confirmExit = window.confirm("Are you sure you want to exit the exam without submitting?" + timed);
+            ExamSecure.resume();
             if (!confirmExit) return;
         }
+        ExamSecure.end();
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         CourseExam.stopTimer();
         document.getElementById('accessibleExamOverlay')?.classList.add('hidden');
@@ -2205,7 +2220,7 @@ export const CourseExam = {
         CourseExam.renderAccessibleQuestion(true);
     },
 
-    submitAccessibleExam: async (force = false) => {
+    submitAccessibleExam: async (force = false, reason = null) => {
         if (!CourseExam.accExam || !CourseExam.accStudent || CourseExam.accSubmitting) return;
 
         const unanswered = CourseExam.accAnswers
@@ -2219,7 +2234,9 @@ export const CourseExam = {
         }
 
         if (!force) CourseExam.speak(promptMsg);
+        if (!force) ExamSecure.pause();
         const confirmed = force ? true : window.confirm(promptMsg);
+        if (!force) ExamSecure.resume();
         if (!confirmed) {
             CourseExam.speak("Submission cancelled. You may continue reviewing your answers.");
             return;
@@ -2238,9 +2255,11 @@ export const CourseExam = {
                 body: JSON.stringify({
                     assignmentId: CourseExam.accExam.assignmentId,
                     studentId: CourseExam.accStudent.User_ID,
-                    answers: CourseExam.accAnswers
+                    answers: CourseExam.accAnswers,
+                    reason: reason || (force ? 'time' : null)
                 })
             });
+            ExamSecure.end();
 
             localStorage.removeItem('acc_exam_draft_' + CourseExam.accExam.assignmentId);
             CourseExam.stopTimer();
@@ -2254,7 +2273,7 @@ export const CourseExam = {
             `;
             CourseExam.speak(resultSpeech);
 
-            alert((force ? 'Time is up. Your answers were submitted automatically.\n\n' : '') + resultSpeech);
+            alert((reason === 'focus-lost' ? 'You left the exam screen, so your answers were submitted automatically.\n\n' : reason === 'camera-off' ? 'The camera was turned off, so your answers were submitted automatically.\n\n' : force ? 'Time is up. Your answers were submitted automatically.\n\n' : '') + resultSpeech);
 
             document.getElementById('accessibleExamOverlay').classList.add('hidden');
             const callback = CourseExam.accOnComplete;
@@ -2266,6 +2285,12 @@ export const CourseExam = {
             }
         } catch (err) {
             CourseExam.accSubmitting = false;
+            // Leaving the exam must still reach the server: try again until it does (the student may be offline for a moment).
+            if ((reason === 'focus-lost' || reason === 'camera-off') && CourseExam.accExam && (CourseExam.leaveRetries = (CourseExam.leaveRetries || 0) + 1) <= 20) {
+                setTimeout(() => CourseExam.submitAccessibleExam(true, reason), 2000);
+                return;
+            }
+            CourseExam.leaveRetries = 0;
             const errMsg = "Failed to submit exam: " + err.message;
             document.getElementById('accExamLiveFeedback').textContent = errMsg;
             CourseExam.speak(errMsg);

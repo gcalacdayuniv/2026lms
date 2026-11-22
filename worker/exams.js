@@ -6,6 +6,7 @@ import { safeJson, getRequestDate, findUserByCredentials, loginKeys, loginLocked
 import { ensureAccessibleExamTables, ensureManualMarksColumn, ensureExamShares } from './schema.js';
 import { ASSESSMENT_TERMS, ASSESSMENT_CATEGORIES } from './constants.js';
 import { DATE_RE } from './attendance.js';
+import { ensureExamSecurity, secureApplies } from './exam-photos.js';
 import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
 
 const GRACE_SECONDS = 120;   // a submission this long after the time limit is still accepted
@@ -464,7 +465,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
 
         await env.DB.prepare(
             `UPDATE Exam_Assignments
-             SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Manual_Marks = NULL, Started_At = NULL, Submitted_At = NULL
+             SET Status = 'Pending', Raw_Score = NULL, Bonus_Score = NULL, Final_Score = NULL, Answers_JSON = NULL, Manual_Marks = NULL, Started_At = NULL, Submitted_At = NULL, Submit_Reason = NULL
              WHERE Class_Exam_ID = ? AND Student_ID = ?`
         ).bind(classExamId, studentId).run();
 
@@ -487,6 +488,9 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         }
 
         const availableExams = await getStudentAccessibleExamsList(env, user.User_ID, request);
+        await ensureExamSecurity(env);
+        const flag = await env.DB.prepare("SELECT Exam_Secure FROM Users WHERE User_ID = ?").bind(user.User_ID).first();
+        user.secure = secureApplies({ eye_condition: user.eye_condition, Exam_Secure: flag && flag.Exam_Secure });
 
         return new Response(JSON.stringify({
             success: true,
@@ -521,6 +525,9 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         }
 
         const availableExams = await getStudentAccessibleExamsList(env, user.User_ID, request);
+        await ensureExamSecurity(env);
+        const flag = await env.DB.prepare("SELECT Exam_Secure FROM Users WHERE User_ID = ?").bind(user.User_ID).first();
+        user.secure = secureApplies({ eye_condition: user.eye_condition, Exam_Secure: flag && flag.Exam_Secure });
 
         return new Response(JSON.stringify({
             success: true,
@@ -584,8 +591,12 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         }
         const questions = safeJson(ce.ExamData) || [];
 
+        await ensureExamSecurity(env);
+        const photoCounts = {};
+        ((await env.DB.prepare("SELECT Student_ID, COUNT(*) AS n FROM Exam_Photos WHERE Class_Exam_ID = ? GROUP BY Student_ID").bind(classExamId).all()).results || [])
+            .forEach(r => { photoCounts[r.Student_ID] = r.n; });
         const rows = await env.DB.prepare(
-            `SELECT ea.Student_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ea.Started_At, ea.Submitted_At, u.Name, u.Student_Number
+            `SELECT ea.Student_ID, ea.Is_Enabled, ea.Status, ea.Final_Score, ea.Max_Score, ea.Answers_JSON, ea.Manual_Marks, ea.Started_At, ea.Submitted_At, ea.Submit_Reason, u.Name, u.Student_Number
              FROM Exam_Assignments ea LEFT JOIN Users u ON u.User_ID = ea.Student_ID
              WHERE ea.Class_Exam_ID = ? AND ea.Is_Enabled = 1
              ORDER BY u.Name`
@@ -616,6 +627,8 @@ export async function handleExams(request, env, path, url, corsHeaders) {
                 status: completed ? "Completed" : (r.Started_At ? "In progress" : "Not started"),
                 score: completed ? r.Final_Score : null,
                 max: completed ? r.Max_Score : null,
+                submitReason: r.Submit_Reason || null,
+                photos: photoCounts[r.Student_ID] || 0,
                 percent: completed && r.Max_Score > 0 ? Math.round((r.Final_Score / r.Max_Score) * 1000) / 10 : null,
                 minutes: completed && began !== null && ended !== null && ended >= began ? Math.round(((ended - began) / 60000) * 10) / 10 : null
             };
@@ -847,6 +860,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
     if (request.method === "POST" && path === "/api/submit-accessible-exam") {
         const body = await request.json();
         const { assignmentId, studentId, answers } = body;
+        const reason = body.reason === 'focus-lost' ? 'focus-lost' : (body.reason === 'time' ? 'time' : (body.reason === 'camera-off' ? 'camera-off' : null));
 
         if (!assignmentId || !studentId || !Array.isArray(answers)) {
             return new Response(JSON.stringify({ error: "Invalid submission payload." }), { status: 400, headers: corsHeaders });
@@ -942,9 +956,9 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         await env.DB.batch([
             env.DB.prepare(
                 `UPDATE Exam_Assignments
-                 SET Status = 'Completed', Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Max_Score = ?, Answers_JSON = ?, Submitted_At = CURRENT_TIMESTAMP
+                 SET Status = 'Completed', Raw_Score = ?, Bonus_Score = ?, Final_Score = ?, Max_Score = ?, Answers_JSON = ?, Submitted_At = CURRENT_TIMESTAMP, Submit_Reason = ?
                  WHERE Assignment_ID = ?`
-            ).bind(rawScore, bonusScore, finalScore, maxScore, JSON.stringify(cleanAnswers), assignmentId),
+            ).bind(rawScore, bonusScore, finalScore, maxScore, JSON.stringify(cleanAnswers), reason, assignmentId),
             env.DB.prepare(
                 "DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?"
             ).bind(targetAssessmentId, studentId),

@@ -149,6 +149,29 @@ ok('lecturer sees the result', res.s === 200 && JSON.stringify(res.j).includes('
 const again = await call('POST', '/api/start-accessible-exam', { token: sOwn, body: { assignmentId: mine && mine.assignmentId, studentId: 'S1' } });
 ok('completed exam cannot be started again', again.s === 403, JSON.stringify(again));
 
+// ---- secure exam mode: who it applies to, photos, results ----
+const secureOf = async () => (await call('GET', '/api/student-accessible-exams?studentId=S1', { token: sOwn })).j.student.secure;
+ok('secure mode is on by default', (await secureOf()) === true);
+sql.prepare("update Users set eye_condition='Legally Blind' where User_ID='S1'").run();
+ok('legally blind students are exempt by default', (await secureOf()) === false);
+sql.prepare("update Users set Exam_Secure='on' where User_ID='S1'").run();
+ok('lecturer can turn it on for a legally blind student', (await secureOf()) === true);
+sql.prepare("update Users set eye_condition='No Eye Condition', Exam_Secure='off' where User_ID='S1'").run();
+ok('lecturer can turn it off for anyone', (await secureOf()) === false);
+sql.prepare("update Users set Exam_Secure=NULL where User_ID='S1'").run();
+const badPhoto = await call('POST', '/api/exam-photo', { token: sOwn, body: { assignmentId: mine && mine.assignmentId, studentId: 'S1', kind: 'check', base64: 'x' } });
+ok('exam photo without a picture is refused', badPhoto.s === 400, JSON.stringify(badPhoto));
+const lateShot = await call('POST', '/api/exam-photo', { token: sOwn, body: { assignmentId: mine && mine.assignmentId, studentId: 'S1', kind: 'check', base64: 'A'.repeat(400) } });
+ok('no photos are accepted after the exam is submitted', lateShot.s === 200 && lateShot.j.code === 'closed', JSON.stringify(lateShot));
+const otherShot = await call('POST', '/api/exam-photo', { token: sOwn, body: { assignmentId: mine && mine.assignmentId, studentId: 'S2', kind: 'check', base64: 'A'.repeat(400) } });
+ok('a student cannot send photos as someone else', otherShot.s === 403, JSON.stringify(otherShot));
+const photoList = await call('GET', '/api/exam-photos?classExamId=' + (ce.j && ce.j.classExamId), { token: L1 });
+ok('lecturer can list exam photos', photoList.s === 200 && Array.isArray(photoList.j.photos), JSON.stringify(photoList));
+const photoListStu = await call('GET', '/api/exam-photos?classExamId=' + (ce.j && ce.j.classExamId), { token: sOwn });
+ok('students cannot list exam photos', photoListStu.s === 403, JSON.stringify(photoListStu));
+const res2 = await call('GET', '/api/exam-results?classExamId=' + (ce.j && ce.j.classExamId), { token: L1 });
+ok('results carry submit reason and photo count', res2.s === 200 && res2.j.students.every(x => 'submitReason' in x && x.photos === 0), JSON.stringify(res2.j.students));
+
 // ---- registration limits ----
 const reg = (sn, extra = {}, ip) => call('POST', '/api/register', { body: { username: 'new' + sn, password: 'secret12', name: 'N', email: 'n@x.com', student_number: sn, contact_number: '09', eye_condition: 'None', program_course: 'BSCS', program_year: '1', program_section: '1', ...extra } });
 const noProg = await reg('26-0090', { program_course: '' });

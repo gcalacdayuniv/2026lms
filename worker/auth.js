@@ -116,6 +116,7 @@ export const RULES = {
     'GET /api/student-accessible-exams': { who: 'any', self: ['studentId'] },
     'POST /api/submit-accessible-exam': { who: 'any', self: ['studentId'] },
     'POST /api/start-accessible-exam': { who: 'any', self: ['studentId'] },
+    'POST /api/exam-photo': { who: 'any', self: ['studentId'] },   // GET /api/exam-photos is lecturer-only (owner checked by classExamId / photoId)
     'GET /api/student-exam-review': { who: 'any', self: ['studentId'] },
     'GET /api/student-sheet-photo': { who: 'any', self: ['studentId'] },
     'POST /api/upload-submission': { who: 'any' },
@@ -141,6 +142,7 @@ const OWNER_SQL = {
     courseId: 'SELECT Lecturer_ID AS owner FROM Courses WHERE Course_ID = ?',
     assessmentId: 'SELECT c.Lecturer_ID AS owner FROM Assessments a JOIN Courses c ON c.Course_ID = a.Course_ID WHERE a.Assessment_ID = ?',
     examId: 'SELECT Lecturer_ID AS owner FROM Exams WHERE Exam_ID = ?',
+    photoId: 'SELECT c.Lecturer_ID AS owner FROM Exam_Photos p JOIN Class_Exams ce ON ce.Class_Exam_ID = p.Class_Exam_ID JOIN Courses c ON c.Course_ID = ce.Course_ID WHERE p.Photo_ID = ?',
     classExamId: 'SELECT c.Lecturer_ID AS owner FROM Class_Exams ce JOIN Courses c ON c.Course_ID = ce.Course_ID WHERE ce.Class_Exam_ID = ?',
     submissionId: 'SELECT c.Lecturer_ID AS owner FROM Submissions s JOIN Courses c ON c.Course_ID = s.Course_ID WHERE s.Submission_ID = ?',
     sessionId: 'SELECT c.Lecturer_ID AS owner FROM Scan_Sessions s JOIN Courses c ON c.Course_ID = s.Course_ID WHERE s.Session_ID = ?',

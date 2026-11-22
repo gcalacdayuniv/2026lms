@@ -41,6 +41,8 @@ const open = (userId) => {
                 <div class="grid grid-cols-3 gap-3">${input('esPCourse', 'Course', u.Program_Course)}${input('esPYear', 'Year', u.Program_Year)}${input('esPSection', 'Section', u.Program_Section)}</div>
                 <div><label for="esEye" class="${LABEL}">Eye condition / disability tag</label>
                     <select id="esEye" class="${FIELD}">${EYE.map(e => `<option value="${e}"${(u.eye_condition || 'No Eye Condition') === e ? ' selected' : ''}>${e === 'Legally Blind' ? 'Legally Blind (Accessible Read-Aloud)' : e}</option>`).join('')}</select></div>
+                <div><label for="esSecure" class="${LABEL}">Secure exam mode (camera and focus check)</label>
+                    <select id="esSecure" class="${FIELD}">${[['', 'Default (on, except Legally Blind students)'], ['on', 'Always on'], ['off', 'Always off']].map(([v, t]) => `<option value="${v}"${(u.Exam_Secure || '') === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
             </div>
             <div class="flex justify-end gap-2 mt-5">
                 <button type="button" id="esCancelBtn" class="px-4 min-h-[44px] text-sm font-bold text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
@@ -63,7 +65,7 @@ const save = async () => {
             body: JSON.stringify({
                 studentId: m.dataset.userId, name: $('esName').value, studentNumber: $('esNo').value, contact: $('esContact').value, email: $('esEmail').value,
                 
-                programCourse: $('esPCourse').value, programYear: $('esPYear').value, programSection: $('esPSection').value, eyeCondition: $('esEye').value
+                programCourse: $('esPCourse').value, programYear: $('esPYear').value, programSection: $('esPSection').value, eyeCondition: $('esEye').value, examSecure: $('esSecure').value
             })
         });
         const u = AuthModule.usersList.find(x => x.User_ID === m.dataset.userId);

@@ -3,6 +3,7 @@ import { authorize } from './auth.js';
 import { handleAttendance } from './attendance.js';
 import { handleScores } from './scores.js';
 import { handleExams } from './exams.js';
+import { handleExamPhotos } from './exam-photos.js';
 import { ensureCoreIndexes, ensureCourseRoom } from './schema.js';
 import { handleUploads } from './uploads.js';
 import { handleAccounts } from './accounts.js';
@@ -63,6 +64,9 @@ export default {
             if (path === "/api/courses" || path === "/api/my-courses" || path === "/api/course-details" || path === "/api/update-course-room" || path === "/api/update-course" || path === "/api/archive-course" || path === "/api/duplicate-course") {
                 await ensureCourseRoom(env);
             }
+
+            const photosResponse = await handleExamPhotos(request, env, path, url, corsHeaders);
+            if (photosResponse) return photosResponse;
 
             const examsResponse = await handleExams(request, env, path, url, corsHeaders);
             if (examsResponse) return examsResponse;

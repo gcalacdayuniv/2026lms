@@ -563,3 +563,14 @@ Class card > "Archive class" moves it out of the main list ("Show archived class
 - **Share / Save prompt (phones):** after an export (Class Grade, CSVs) a centered dialog says "Your file is ready" with the file name and a large **Share / Save** button, because the share sheet only opens from a fresh tap (`js/download-utils.js`). Desktop browsers still download straight away.
 
 - **Lecturer dashboard look:** the header reads "My Classes" (students still see "Dashboard"), so the page has no separate heading. Day chips have room at both ends when scrolled sideways, the class badge (course year-section) is larger, and class cards are roomier (bigger code, title, schedule, chips and a taller button row).
+
+## Secure exam mode (camera photos and leave-to-submit)
+
+Applies to **every online exam** a student takes (`js/exam-secure.js`, `worker/exam-photos.js`).
+- **Before starting:** a notice explains the rules and asks for the camera. Without the camera the exam does not start.
+- **Photos:** one when the exam starts and one every 30 seconds (320 px JPEG, `POST /api/exam-photo`). They are stored in Google Drive through the Apps Script (`Exam Photos / <classExamId> / <studentId>`); only a reference is kept in D1 (`Exam_Photos`, created automatically). No Apps Script change is needed. A red "CAMERA ON" badge shows while it runs.
+- **Leaving the exam:** switching tab, app or window, locking the screen, or turning the camera off submits the answers immediately (about 0 seconds). The app's own confirm / alert dialogs do not count. If the phone is offline at that moment the submission is retried every 2 seconds. The result is marked `Submit_Reason` = `focus-lost` / `camera-off` / `time` (column added automatically).
+- **Who is exempt:** students tagged **Legally Blind** (screen readers and read-aloud use trigger focus changes). Admin tools > Manage Users > Edit details > **Secure exam mode** can set Default / Always on / Always off per student (`Users.Exam_Secure`, added automatically). The server tells the app per student (`student.secure`), and refuses photos for exempt students.
+- **Lecturer view:** Manage Exams > Results > Students shows "Left the exam screen: auto-submitted" and a **Photos (n)** button that opens that student's photos (loaded one at a time from Drive). Only the lecturer who owns the class can read them (`GET /api/exam-photos`, checked by `classExamId` / `photoId`).
+- **Privacy:** photos are used only to check an exam attempt. Delete the Drive folder `Exam Photos / <classExamId>` when the exam is no longer in dispute. Tell students about the camera in the course orientation.
+- **Limits:** the browser cannot stop a student using a second device, and a phone call or system alert can end an exam, so tell students to use Do Not Disturb. The photo check is client-side; the server only accepts photos for secure students while the exam is in progress (max 400 per attempt).

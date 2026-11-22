@@ -1,3 +1,4 @@
+import { ensureExamSecurity } from './exam-photos.js';
 // worker/schema.js
 // Every table, column and index the Worker creates for itself, in one place. Each function runs its SQL once per
 // Worker start (a flag remembers it) and is called from worker.js before the routes that need that table.
@@ -161,6 +162,7 @@ export async function ensureAccessibleExamTables(env) {
         `)
     ]);
     await ensureManualMarksColumn(env);
+    await ensureExamSecurity(env);   // Exam_Photos, Users.Exam_Secure, Exam_Assignments.Submit_Reason
 }
 
 // Columns added after the first release. Each is added once to an existing database.
