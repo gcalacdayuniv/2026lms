@@ -604,3 +604,6 @@ The called list is its own dialog (`#calledListModal`, `js/components-class.js`)
 ## Online exam colors
 The student dashboard's **Assigned Exams** section (`buildAssignedExamsSection` in `js/course-dashboard.js`) is white with blue accents (blue-50 cards, blue Enter Exam button, green Completed box) and the exam taker (`#accessibleExamOverlay` in `js/components-exam.js`, answer rendering in `js/course-exam.js`) uses the portal palette: blue-700 header, white cards on gray-50, blue-600 progress, selected choices and Next button, green Submit. Dark text on white keeps the contrast high for low-vision students. Timer: white, then amber under 5 minutes, then red and pulsing under 1 minute.
 - **Zoom to the result:** when the wheel stops, the called student's photo grows from their slice (under the pointer) into the result card (`CourseRecitation.zoomIn`, 0.8 s, Web Animations). Skipped when the device asks for reduced motion or the student has no photo.
+
+## Profile panel details
+The Details form in the profile panel (`renderProfileDetails`, `js/components-dashboard.js`) is compact on every width: Given/Last name, Suffix/Username, Email, Contact/Student number (labelled **Faculty Number** for lecturers) and, for students, Program Course/Year/Section in one row of three. Fields use the shared `.ctl` height.

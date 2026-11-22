@@ -293,66 +293,65 @@ const DashboardUI = {
 
         return `
             <section class="mt-6" aria-label="Details">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-2">
                     <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Details</h3>
                     <button type="button" id="udEditBtn" class="px-3 py-1 rounded-full border border-blue-300 text-blue-700 bg-blue-50 text-xs font-bold hover:bg-blue-100 focus:outline-none"><i class="fa-solid fa-pen mr-1" aria-hidden="true"></i>Edit</button>
                 </div>
-                <form id="updateDetailsForm" class="space-y-4" autocomplete="off">
+                <form id="updateDetailsForm" class="space-y-2" autocomplete="off">
                         <div id="udError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                         <div id="udSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Given Name</label>
-                                <input type="text" id="udGivenName" readonly required value="${escapeHtml(givenName)}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Given Name</label>
+                                <input type="text" id="udGivenName" readonly required value="${escapeHtml(givenName)}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Last Name</label>
-                                <input type="text" id="udLastName" readonly required value="${escapeHtml(lastName)}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Suffix</label>
-                                <input type="text" id="udSuffix" readonly value="${escapeHtml(suffix)}" placeholder="e.g. Jr. (Optional)" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Last Name</label>
+                                <input type="text" id="udLastName" readonly required value="${escapeHtml(lastName)}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                         </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Username</label>
-                                <input type="text" id="udUsername" readonly required value="${escapeHtml(user.Username || '')}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Suffix</label>
+                                <input type="text" id="udSuffix" readonly value="${escapeHtml(suffix)}" placeholder="e.g. Jr. (Optional)" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
-                                <input type="email" id="udEmail" readonly required value="${escapeHtml(user.Email || '')}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Username</label>
+                                <input type="text" id="udUsername" readonly required value="${escapeHtml(user.Username || '')}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                         </div>
+                        <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Email</label>
+                                <input type="email" id="udEmail" readonly required value="${escapeHtml(user.Email || '')}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                        </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Number</label>
-                                <input type="text" id="udContact" readonly value="${escapeHtml(user.Contact_Number || '')}" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Contact Number</label>
+                                <input type="text" id="udContact" readonly value="${escapeHtml(user.Contact_Number || '')}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Student Number</label>
-                                <input type="text" id="udStudentNumber" readonly required value="${escapeHtml(user.Student_Number || '')}" maxlength="7" placeholder="00-0000" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">${(user.role || '').toLowerCase() === 'lecturer' ? 'Faculty Number' : 'Student Number'}</label>
+                                <input type="text" id="udStudentNumber" readonly required value="${escapeHtml(user.Student_Number || '')}" maxlength="7" placeholder="00-0000" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50 font-mono">
                             </div>
                         </div>
 
                         ${(user.role || '').toLowerCase() === 'student' ? `
                         <div>
-                            <div class="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2"><i class="fa-solid fa-graduation-cap mr-1"></i>Program</div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program</div>
+                            <div class="grid grid-cols-3 gap-2">
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Course</label>
-                                <input type="text" id="udProgramCourse" readonly value="${escapeHtml(user.Program_Course || '')}" placeholder="e.g. BSCS" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Course</label>
+                                <input type="text" id="udProgramCourse" readonly value="${escapeHtml(user.Program_Course || '')}" placeholder="e.g. BSCS" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Year</label>
-                                <input type="text" id="udProgramYear" readonly value="${escapeHtml(user.Program_Year || '')}" placeholder="e.g. 2" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Year</label>
+                                <input type="text" id="udProgramYear" readonly value="${escapeHtml(user.Program_Year || '')}" placeholder="e.g. 2" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Program Section</label>
-                                <input type="text" id="udProgramSection" readonly value="${escapeHtml(user.Program_Section || '')}" placeholder="e.g. A" class="ud-field block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Section</label>
+                                <input type="text" id="udProgramSection" readonly value="${escapeHtml(user.Program_Section || '')}" placeholder="e.g. A" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                             </div>
                         </div>
