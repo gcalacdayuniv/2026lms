@@ -121,10 +121,9 @@ export async function buildClassGrade(ExcelJS, { course, rows, templateBytes }) 
         t.extras = [];
         if (attMax > 0) t.extras.push({ label: 'Attendance', max: attMax, col: t.perf + t.extras.length, value: (r) => (r.attendance && r.attendance[term] ? r.attendance[term].score : null) });
         else warnings.push(`${termName}: no class days found (check the term dates in course settings), so Attendance was left out.`);
-        // Participation is worth at least 1 point per class day; a student who earned more than that raises the perfect score.
-        const partMax = Math.max(attMax, topPoints);
+        // Participation: up to 4 points per class day (2 by default for Present / Late), so that is the perfect score.
+        const partMax = attMax > 0 ? attMax * 4 : topPoints;
         if (partMax > 0) t.extras.push({ label: 'Participation', max: partMax, col: t.perf + t.extras.length, value: (r) => (r.attendance && r.attendance[term] ? r.attendance[term].points : null) });
-        if (topPoints > attMax && attMax > 0) warnings.push(`${termName} Participation: perfect score raised to ${topPoints} because a student earned more than 1 point per class day (${attMax}).`);
         const perfSlots = SLOTS - t.extras.length;
 
         const blocks = [

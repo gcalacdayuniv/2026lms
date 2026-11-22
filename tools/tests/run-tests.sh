@@ -11,6 +11,7 @@ echo "== 2/4 Worker + front-end lint (undefined names)"
 npx --yes eslint@9 -c tools/tests/eslint.config.mjs worker js
 echo "== 3/4 Worker tests"
 node tools/tests/worker.test.mjs
+node tools/tests/participation.test.mjs
 echo "== 4/4 tailwind.css up to date"
 sh tools/build-css.sh --check
 if [ "$1" = "--phone" ]; then echo "== phone check"; node tools/tests/phone-check.cjs; fi

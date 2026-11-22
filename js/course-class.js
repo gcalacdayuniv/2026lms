@@ -7,6 +7,7 @@ import { CoursePending } from './course-pending.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
+import { dayPoints } from './participation.js';
 import { showPrintPreview } from './print-preview.js';
 import { classIdentityBlock, fillClassCourseOptions } from './class-identity.js';
 
@@ -236,7 +237,7 @@ export const CourseClass = {
             else if (r.Status === 'Excused') { statusColor = 'text-purple-600 font-bold'; attScore = 0; }
             else if (r.Status === 'Absent') { statusColor = 'text-red-600 font-bold'; attScore = 0; }
 
-            const displayScore = metric === 'attendance' ? attScore : (r.Performance_Points || 0);
+            const displayScore = metric === 'attendance' ? attScore : dayPoints(r.Status, r.Performance_Points);
 
             return `
                 <tr class="hover:bg-gray-50 transition">

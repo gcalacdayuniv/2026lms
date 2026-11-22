@@ -5,6 +5,7 @@ import { UI } from './ui-feedback.js';
 import { parseLocalDate, getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { csvCell, downloadCsv } from './download-utils.js';
+import { dayPoints, termPoints } from './participation.js';
 
 const STATUS_BADGE = {
     'Active': 'text-green-600 border-green-200 bg-green-50',
@@ -211,10 +212,10 @@ export const CourseSummary = {
             else if (r.Status === 'Late') stats.late++;
             else if (r.Status === 'Excused') stats.excused++;
             else if (r.Status === 'Absent') stats.absent++;
-            stats.points += (r.Performance_Points || 0);
         });
 
         stats.records = termRecords;
+        stats.points = termPoints(termRecords, theoreticalDays - noClassCount);
         stats.classDays = Math.max(0, theoreticalDays - noClassCount - stats.excused);
         return stats;
     },
@@ -314,7 +315,7 @@ export const CourseSummary = {
 
             const logItems = st.records.length === 0
                 ? '<div class="text-gray-400 italic">No records.</div>'
-                : st.records.map(rec => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(rec.Date)}</span><span class="text-gray-600">${esc(rec.Status || 'N/A')}</span><span class="font-mono font-bold text-blue-600">${esc(rec.Performance_Points || 0)}</span></div>`).join('');
+                : st.records.map(rec => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(rec.Date)}</span><span class="text-gray-600">${esc(rec.Status || 'N/A')}</span><span class="font-mono font-bold text-blue-600">${esc(dayPoints(rec.Status, rec.Performance_Points))}</span></div>`).join('');
 
             return `
                 <tr class="group hover:bg-gray-50 align-top">
@@ -415,7 +416,7 @@ export const CourseSummary = {
             const s = r.student;
             const st = r.stats;
                         const prog = `${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim();
-            const log = st.records.map(rec => `${rec.Date}: ${rec.Status || 'N/A'} (${rec.Performance_Points || 0} pts)`).join('; ');
+            const log = st.records.map(rec => `${rec.Date}: ${rec.Status || 'N/A'} (${dayPoints(rec.Status, rec.Performance_Points)} pts)`).join('; ');
             const sc = r.scores;
             const blank = (c) => c.count ? [Number(c.score.toFixed(2)), Number(c.max.toFixed(2))] : ['', ''];
             const scoreLog = sc.items.map(a => `${a.Title} [${a.Category}, ${a.Term === 'MidTerm' ? 'Mid' : 'Final'}]: ${Number(a.Score.toFixed(2))}/${Number(a.Max_Score.toFixed(2))}`).join('; ');

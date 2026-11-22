@@ -3,6 +3,7 @@ import { escapeHtml } from './html-utils.js';
 import { apiFetch } from './globals.js';
 import { CourseScores } from './course-scores.js';
 import { UI } from './ui-feedback.js';
+import { termPoints } from './participation.js';
 import { parseLocalDate, getWeekdayName, matchesScheduleDay } from './date-utils.js';
 
 const getCourseId = () => window.location.hash.replace('#class-', '');
@@ -757,8 +758,8 @@ export const CourseAttendance = {
                 else if (r.Status === 'Excused') excused++;
                 else if (r.Status === 'Absent') absent++;
 
-                totalParticipationPts += (r.Performance_Points || 0);
             });
+            totalParticipationPts = termPoints(termRecords, baseClassDays);
 
             classDays = baseClassDays - excused;
             if (classDays < 0) classDays = 0;

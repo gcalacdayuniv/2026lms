@@ -1,0 +1,15 @@
+import { dayPoints, termPoints } from '../../js/participation.js';
+let bad = 0;
+const eq = (name, got, want) => { if (got !== want) { bad++; console.log('FAIL', name, 'got', got, 'want', want); } };
+eq('present default', dayPoints('Present', 0), 2);
+eq('late default', dayPoints('Late', null), 2);
+eq('present + 1', dayPoints('Present', 1), 3);
+eq('day capped at 4', dayPoints('Present', 9), 4);
+eq('excused keeps recorded only', dayPoints('Excused', 3), 3);
+eq('absent nothing', dayPoints('Absent', 5), 0);
+const recs = [{ Status: 'Present', Performance_Points: 9 }, { Status: 'Present', Performance_Points: 9 }, { Status: 'Late', Performance_Points: 0 }];
+eq('sum of days', termPoints(recs, 10), 10);
+eq('total capped at 4 x days', termPoints(recs, 2), 8);
+eq('unknown days no cap', termPoints(recs, 0), 10);
+if (bad) process.exit(1);
+console.log('participation tests ok');
