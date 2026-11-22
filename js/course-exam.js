@@ -1928,7 +1928,7 @@ export const CourseExam = {
             const left = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
             text.textContent = CourseExam.formatClock(left);
             const low = left <= 60, mid = left <= 300;
-            box.className = `px-4 py-2 rounded-lg border-2 font-black text-lg sm:text-2xl tabular-nums ${low ? 'border-red-400 bg-red-900 text-red-100 animate-pulse' : mid ? 'border-amber-400 bg-amber-900 text-amber-100' : 'border-yellow-400 bg-gray-800 text-yellow-300'}`;
+            box.className = `px-4 py-2 rounded-lg border-2 font-black text-lg sm:text-2xl tabular-nums ${low ? 'border-red-500 bg-red-600 text-white animate-pulse' : mid ? 'border-amber-400 bg-amber-100 text-amber-900' : 'border-white bg-white text-blue-800'}`;
             box.setAttribute('aria-label', `Time left: ${CourseExam.spokenTime(left)}`);
 
             // spoken and screen reader warnings
@@ -2085,10 +2085,10 @@ export const CourseExam = {
         if (CourseExam.isAnswered(currentAns)) {
             const shown = CourseExam.answerText(currentAns);
             statusEl.textContent = `${shown.length > 60 ? 'Answered' : `Selected: ${shown}`} (${answeredCount}/${total} Answered)`;
-            statusEl.className = "text-sm sm:text-base font-black px-4 py-1 rounded-full bg-green-900 text-green-200 border-2 border-green-400";
+            statusEl.className = "text-sm sm:text-base font-black px-4 py-1 rounded-full bg-green-100 text-green-800 border-2 border-green-500";
         } else {
             statusEl.textContent = `Not Answered Yet (${answeredCount}/${total} Answered)`;
-            statusEl.className = "text-sm sm:text-base font-bold px-4 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700";
+            statusEl.className = "text-sm sm:text-base font-bold px-4 py-1 rounded-full bg-white text-gray-600 border border-gray-300";
         }
     },
 
@@ -2103,9 +2103,9 @@ export const CourseExam = {
         document.getElementById('accExamProgressBar').style.width = `${pct}%`;
 
         const bonusBadge = q.isBonus
-            ? ` <span class="ml-2 px-3 py-0.5 bg-amber-400 text-gray-950 rounded-full text-sm sm:text-lg font-black uppercase">Bonus Question</span>`
+            ? ` <span class="ml-2 px-3 py-0.5 bg-amber-300 text-amber-950 rounded-full text-sm sm:text-lg font-black uppercase">Bonus Question</span>`
             : '';
-        const pointsBadge = q.points ? ` <span class="ml-2 px-3 py-0.5 bg-gray-800 text-yellow-300 border border-yellow-400 rounded-full text-sm sm:text-lg font-black">${q.points} point${q.points === 1 ? '' : 's'}</span>` : '';
+        const pointsBadge = q.points ? ` <span class="ml-2 px-3 py-0.5 bg-blue-50 text-blue-800 border border-blue-300 rounded-full text-sm sm:text-lg font-black">${q.points} point${q.points === 1 ? '' : 's'}</span>` : '';
         document.getElementById('accExamQuestionCounter').innerHTML = `Question ${CourseExam.accIndex + 1} of ${total}${bonusBadge}${pointsBadge}`;
 
         // Add tabindex="0" so the question text itself can receive focus naturally.
@@ -2117,34 +2117,34 @@ export const CourseExam = {
         const choicesContainer = document.getElementById('accExamChoicesContainer');
         const currentAnswer = CourseExam.accAnswers[CourseExam.accIndex];
 
-        const SEL = 'acc-exam-sel w-full min-w-0 px-4 py-3 text-lg sm:text-xl font-bold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400';
+        const SEL = 'acc-exam-sel w-full min-w-0 px-4 py-3 text-lg sm:text-xl font-bold bg-white text-gray-900 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-600';
         const options = (list, chosen) => `<option value="">- choose -</option>` + list.map(o => `<option value="${esc(o)}" ${o === chosen ? 'selected' : ''}>${esc(o)}</option>`).join('');
-        const panel = (hint, inner) => `<div class="bg-gray-900 p-5 sm:p-6 rounded-2xl border-2 border-yellow-400 space-y-3"><p class="text-lg font-bold text-yellow-300">${hint}</p>${inner}</div>`;
+        const panel = (hint, inner) => `<div class="bg-white p-5 sm:p-6 rounded-2xl border-2 border-blue-300 shadow-sm space-y-3"><p class="text-lg font-bold text-blue-800">${hint}</p>${inner}</div>`;
 
         if (q.choices && q.choices.length > 0) {
             const multi = q.type === 'multi';
             const picked = multi && Array.isArray(currentAnswer) ? currentAnswer : [];
             const hint = multi
-                ? `<p class="text-lg font-bold text-yellow-300 px-1">Select all the correct answers${q.mode === 'all' ? ' (all or nothing)' : ''}. Tap a choice again to remove it.</p>`
+                ? `<p class="text-lg font-bold text-blue-800 px-1">Select all the correct answers${q.mode === 'all' ? ' (all or nothing)' : ''}. Tap a choice again to remove it.</p>`
                 : '';
             choicesContainer.innerHTML = hint + q.choices.map((choiceText, idx) => {
                 const letter = String.fromCharCode(65 + idx);
                 const isSelected = multi ? picked.includes(choiceText) : currentAnswer === choiceText;
                 return `
                     <button type="button"
-                        class="acc-exam-choice-btn w-full text-left p-5 sm:p-6 rounded-2xl border-4 transition flex items-center justify-between gap-4 focus:outline-none focus:ring-4 focus:ring-yellow-300 ${
+                        class="acc-exam-choice-btn w-full text-left p-5 sm:p-6 rounded-2xl border-4 transition flex items-center justify-between gap-4 focus:outline-none focus:ring-4 focus:ring-blue-300 ${
                             isSelected
-                                ? 'bg-yellow-400 text-gray-950 border-white font-black shadow-xl'
-                                : 'bg-gray-900 hover:bg-gray-800 text-white border-gray-700 font-bold'
+                                ? 'bg-blue-600 text-white border-blue-800 font-black shadow-xl'
+                                : 'bg-white hover:bg-blue-50 text-gray-900 border-gray-300 font-bold'
                         }"
                         data-choice-index="${idx}"
                         role="${multi ? 'checkbox' : 'option'}"
                         ${multi ? `aria-checked="${isSelected}"` : `aria-selected="${isSelected}"`}>
                         <span class="text-xl sm:text-2xl leading-snug">
-                            <span class="inline-block w-10 font-black ${isSelected ? 'text-gray-950' : 'text-yellow-400'}">${idx + 1} (${letter}).</span>
+                            <span class="inline-block w-10 font-black ${isSelected ? 'text-white' : 'text-blue-700'}">${idx + 1} (${letter}).</span>
                             ${esc(choiceText)}
                         </span>
-                        ${isSelected ? '<i class="fa-solid fa-circle-check text-2xl sm:text-3xl text-gray-950 flex-shrink-0"></i>' : ''}
+                        ${isSelected ? '<i class="fa-solid fa-circle-check text-2xl sm:text-3xl text-white flex-shrink-0"></i>' : ''}
                     </button>
                 `;
             }).join('');
@@ -2152,18 +2152,18 @@ export const CourseExam = {
             const saved = Array.isArray(currentAnswer) ? currentAnswer : [];
             const boxes = Array.from({ length: q.itemCount }, (_, i) => `
                 <div class="flex items-center gap-3">
-                    <label for="accExamEnumInput${i}" class="w-10 shrink-0 text-right text-xl font-black text-yellow-400">${i + 1}.</label>
+                    <label for="accExamEnumInput${i}" class="w-10 shrink-0 text-right text-xl font-black text-blue-700">${i + 1}.</label>
                     <input type="text" id="accExamEnumInput${i}" data-i="${i}" value="${esc(saved[i] || '')}" autocomplete="off"
-                        class="acc-exam-enum-input flex-1 min-w-0 px-4 py-3 text-xl sm:text-2xl font-bold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400"
+                        class="acc-exam-enum-input flex-1 min-w-0 px-4 py-3 text-xl sm:text-2xl font-bold bg-white text-gray-900 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-600"
                         placeholder="Item ${i + 1}">
                 </div>`).join('');
             choicesContainer.innerHTML = panel(`List ${q.itemCount} item${q.itemCount === 1 ? '' : 's'}${q.ordered ? ', in the correct order' : ', in any order'}. Press Enter to go to the next box.`, boxes);
         } else if (q.type === 'order') {
             const saved = Array.isArray(currentAnswer) ? currentAnswer : [];
-            const items = (q.items || []).map(it => `<li class="text-lg sm:text-xl font-bold text-white">${esc(it)}</li>`).join('');
+            const items = (q.items || []).map(it => `<li class="text-lg sm:text-xl font-bold text-gray-900">${esc(it)}</li>`).join('');
             const rows = Array.from({ length: (q.items || []).length }, (_, i) => `
                 <div class="flex items-center gap-3">
-                    <label for="accExamOrderSel${i}" class="w-24 shrink-0 text-right text-lg font-black text-yellow-400">Position ${i + 1}</label>
+                    <label for="accExamOrderSel${i}" class="w-24 shrink-0 text-right text-lg font-black text-blue-700">Position ${i + 1}</label>
                     <select id="accExamOrderSel${i}" data-i="${i}" aria-label="Position ${i + 1} of ${q.items.length}" class="${SEL}">${options(q.items, saved[i] || '')}</select>
                 </div>`).join('');
             choicesContainer.innerHTML = panel(`Put these in the correct order${q.mode === 'all' ? ' (all or nothing)' : ''}:`, `<ul class="list-disc pl-8 space-y-1">${items}</ul>${rows}`);
@@ -2171,25 +2171,25 @@ export const CourseExam = {
             const saved = Array.isArray(currentAnswer) ? currentAnswer : [];
             const rows = (q.lefts || []).map((left, i) => `
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                    <label for="accExamMatchSel${i}" class="sm:w-2/5 text-lg sm:text-xl font-black text-white">${i + 1}. ${esc(left)}</label>
+                    <label for="accExamMatchSel${i}" class="sm:w-2/5 text-lg sm:text-xl font-black text-gray-900">${i + 1}. ${esc(left)}</label>
                     <select id="accExamMatchSel${i}" data-i="${i}" aria-label="Match for ${esc(left)}" class="${SEL}">${options(q.rights || [], saved[i] || '')}</select>
                 </div>`).join('');
             choicesContainer.innerHTML = panel('Match each item on the left with its partner.', rows);
         } else if (q.type === 'essay') {
             choicesContainer.innerHTML = `
-                <div class="bg-gray-900 p-5 sm:p-6 rounded-2xl border-2 border-yellow-400">
-                    <label for="accExamEssayInput" class="block text-lg font-bold text-yellow-300 mb-2">Write your answer. Your lecturer will score it.</label>
+                <div class="bg-white p-5 sm:p-6 rounded-2xl border-2 border-blue-300 shadow-sm">
+                    <label for="accExamEssayInput" class="block text-lg font-bold text-blue-800 mb-2">Write your answer. Your lecturer will score it.</label>
                     <textarea id="accExamEssayInput" rows="8" maxlength="10000" autocomplete="off"
-                        class="w-full px-4 py-4 text-xl font-semibold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400"
+                        class="w-full px-4 py-4 text-xl font-semibold bg-white text-gray-900 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-600"
                         placeholder="Type your answer here...">${esc(currentAnswer)}</textarea>
                 </div>`;
         } else {
             const isNum = q.type === 'num';
             choicesContainer.innerHTML = `
-                <div class="bg-gray-900 p-6 rounded-2xl border-2 border-yellow-400">
-                    <label for="accExamTextAnswerInput" class="block text-lg font-bold text-yellow-300 mb-2">${isNum ? 'Type the number and press Tab or Enter:' : 'Type your answer below and press Tab or Enter:'}</label>
+                <div class="bg-white p-6 rounded-2xl border-2 border-blue-300 shadow-sm">
+                    <label for="accExamTextAnswerInput" class="block text-lg font-bold text-blue-800 mb-2">${isNum ? 'Type the number and press Tab or Enter:' : 'Type your answer below and press Tab or Enter:'}</label>
                     <input type="text" id="accExamTextAnswerInput" ${isNum ? 'inputmode="decimal"' : ''} value="${esc(currentAnswer)}" autocomplete="off"
-                        class="w-full px-4 py-4 text-2xl font-bold bg-gray-950 text-white border-2 border-gray-600 rounded-xl focus:outline-none focus:border-yellow-400"
+                        class="w-full px-4 py-4 text-2xl font-bold bg-white text-gray-900 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-600"
                         placeholder="${isNum ? 'Type a number...' : 'Type your answer here...'}">
                 </div>
             `;
@@ -2371,8 +2371,8 @@ export const CourseExam = {
             const resultSpeech = `Exam submitted successfully! Your regular score is ${res.rawScore}, plus ${res.bonusScore} bonus points. Your final recorded score is ${res.finalScore} out of ${res.maxScore}. This score has been automatically recorded in your class assessment.${essayNote}`;
 
             document.getElementById('accExamLiveFeedback').innerHTML = `
-                <div class="text-green-300 font-black text-2xl mb-1">Exam Submitted! Final Score: ${res.finalScore} / ${res.maxScore}</div>
-                <div class="text-sm text-white">Regular Score: ${res.rawScore} | Bonus Points: +${res.bonusScore} (Capped at ${res.maxScore})${essayNote ? `<br>${esc(essayNote.trim())}` : ''}</div>
+                <div class="text-green-700 font-black text-2xl mb-1">Exam Submitted! Final Score: ${res.finalScore} / ${res.maxScore}</div>
+                <div class="text-sm text-gray-700">Regular Score: ${res.rawScore} | Bonus Points: +${res.bonusScore} (Capped at ${res.maxScore})${essayNote ? `<br>${esc(essayNote.trim())}` : ''}</div>
             `;
             CourseExam.speak(resultSpeech);
 

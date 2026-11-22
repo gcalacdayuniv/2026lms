@@ -275,64 +275,64 @@ export const ExamUI = {
     `,
 
     renderAccessibleExamOverlay: () => `
-        <div id="accessibleExamOverlay" class="hidden fixed inset-0 z-[150] bg-gray-950 text-white flex flex-col w-full h-full select-none" role="dialog" aria-modal="true" aria-labelledby="accExamHeaderTitle">
+        <div id="accessibleExamOverlay" class="hidden fixed inset-0 z-[150] bg-gray-50 text-gray-900 flex flex-col w-full h-full select-none" role="dialog" aria-modal="true" aria-labelledby="accExamHeaderTitle">
             <!-- Top Bar -->
-            <header class="bg-gray-900 border-b-2 border-yellow-400 px-4 sm:px-8 py-3 flex flex-wrap justify-between items-center gap-3 flex-shrink-0">
+            <header class="bg-blue-700 text-white shadow-md px-4 sm:px-8 py-3 flex flex-wrap justify-between items-center gap-3 flex-shrink-0">
                 <div>
                     <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 bg-yellow-400 text-gray-950 font-black text-xs rounded uppercase">Accessible Exam Mode</span>
-                        <span id="accExamCourseBadge" class="text-xs font-bold text-yellow-200"></span>
+                        <span class="px-2 py-0.5 bg-white/20 text-white font-black text-xs rounded uppercase">Accessible Exam Mode</span>
+                        <span id="accExamCourseBadge" class="text-xs font-bold text-blue-100"></span>
                     </div>
                     <h1 id="accExamHeaderTitle" class="text-lg sm:text-2xl font-black text-white mt-0.5">Exam</h1>
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3">
-                    <div id="accExamTimer" class="hidden px-4 py-2 rounded-lg border-2 border-yellow-400 bg-gray-800 text-yellow-300 font-black text-lg sm:text-2xl tabular-nums" role="timer" aria-label="Time left"><i class="fa-regular fa-clock mr-2" aria-hidden="true"></i><span id="accExamTimerText">0:00</span></div>
+                    <div id="accExamTimer" class="hidden px-4 py-2 rounded-lg border-2 border-white bg-white text-blue-800 font-black text-lg sm:text-2xl tabular-nums" role="timer" aria-label="Time left"><i class="fa-regular fa-clock mr-2" aria-hidden="true"></i><span id="accExamTimerText">0:00</span></div>
                     <div id="accExamTimerAnnounce" class="sr-only" role="status" aria-live="polite"></div>
-                    <button type="button" id="accExamRepeatAudioBtn" class="px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black rounded-lg text-xs sm:text-sm transition focus:outline-none focus:ring-4 focus:ring-white">
+                    <button type="button" id="accExamRepeatAudioBtn" class="px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-800 font-black rounded-lg text-xs sm:text-sm transition focus:outline-none focus:ring-4 focus:ring-blue-300">
                         <i class="fa-solid fa-volume-high mr-1.5"></i> Read Question Again (R)
                     </button>
-                    <button type="button" id="accExamExitBtn" class="px-4 py-2.5 bg-gray-800 hover:bg-red-700 text-white border border-gray-600 font-bold rounded-lg text-xs sm:text-sm transition focus:outline-none focus:ring-4 focus:ring-white">
+                    <button type="button" id="accExamExitBtn" class="px-4 py-2.5 bg-blue-800 hover:bg-red-600 text-white border border-blue-400 font-bold rounded-lg text-xs sm:text-sm transition focus:outline-none focus:ring-4 focus:ring-blue-300">
                         <i class="fa-solid fa-xmark mr-1"></i> Exit
                     </button>
                 </div>
             </header>
 
             <!-- Progress Bar -->
-            <div class="w-full h-3 bg-gray-800 flex-shrink-0">
-                <div id="accExamProgressBar" class="h-full bg-yellow-400 transition-all duration-300" style="width: 0%;"></div>
+            <div class="w-full h-3 bg-blue-100 flex-shrink-0">
+                <div id="accExamProgressBar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%;"></div>
             </div>
 
             <!-- Main Question & Choices Body -->
             <main id="accExamBody" class="flex-1 overflow-y-auto px-4 sm:px-10 py-6 max-w-5xl w-full mx-auto flex flex-col justify-between">
                 <div>
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-                        <div id="accExamQuestionCounter" class="text-xl sm:text-3xl font-black text-yellow-400" aria-live="polite"></div>
-                        <div id="accExamAnsweredStatus" class="text-sm sm:text-base font-bold px-3 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700"></div>
+                        <div id="accExamQuestionCounter" class="text-xl sm:text-3xl font-black text-blue-700" aria-live="polite"></div>
+                        <div id="accExamAnsweredStatus" class="text-sm sm:text-base font-bold px-3 py-1 rounded-full bg-white text-gray-600 border border-gray-300"></div>
                     </div>
 
-                    <div id="accExamQuestionText" class="text-2xl sm:text-4xl font-bold text-white leading-snug mb-8 bg-gray-900 p-5 sm:p-7 rounded-2xl border-2 border-gray-700 whitespace-pre-wrap" aria-live="polite"></div>
+                    <div id="accExamQuestionText" class="text-2xl sm:text-4xl font-bold text-gray-900 leading-snug mb-8 bg-white p-5 sm:p-7 rounded-2xl border-2 border-gray-200 shadow-sm whitespace-pre-wrap" aria-live="polite"></div>
 
                     <div id="accExamChoicesContainer" class="grid grid-cols-1 gap-4 mb-6" role="listbox" aria-label="Answer Choices"></div>
                 </div>
 
                 <!-- Spoken Status Feedback Box -->
-                <div id="accExamLiveFeedback" class="p-4 rounded-xl bg-indigo-950 border-2 border-indigo-400 text-yellow-300 font-bold text-base sm:text-xl text-center mb-4" aria-live="assertive">
+                <div id="accExamLiveFeedback" class="p-4 rounded-xl bg-blue-50 border-2 border-blue-300 text-blue-800 font-bold text-base sm:text-xl text-center mb-4" aria-live="assertive">
                     Select an answer choice below or press number keys 1 to 4.
                 </div>
             </main>
 
             <!-- Bottom Navigation Controls -->
-            <footer class="bg-gray-900 border-t-2 border-gray-800 px-4 sm:px-10 py-4 flex-shrink-0">
+            <footer class="bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,.06)] px-4 sm:px-10 py-4 flex-shrink-0">
                 <div class="max-w-5xl mx-auto flex flex-wrap sm:flex-nowrap justify-between items-center gap-3">
-                    <button type="button" id="accExamPrevBtn" class="flex-1 py-4 px-6 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-lg sm:text-xl rounded-xl border-2 border-gray-600 transition focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                    <button type="button" id="accExamPrevBtn" class="flex-1 py-4 px-6 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-800 font-black text-lg sm:text-xl rounded-xl border-2 border-gray-300 transition focus:outline-none focus:ring-4 focus:ring-blue-300">
                         <i class="fa-solid fa-arrow-left mr-2"></i> Previous
                     </button>
 
-                    <button type="button" id="accExamNextBtn" class="flex-1 py-4 px-6 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-lg sm:text-xl rounded-xl border-2 border-blue-400 transition focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                    <button type="button" id="accExamNextBtn" class="flex-1 py-4 px-6 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-lg sm:text-xl rounded-xl border-2 border-blue-700 transition focus:outline-none focus:ring-4 focus:ring-blue-300">
                         Next <i class="fa-solid fa-arrow-right ml-2"></i>
                     </button>
 
-                    <button type="button" id="accExamSubmitBtn" class="hidden flex-1 py-4 px-8 bg-green-600 hover:bg-green-500 text-white font-black text-lg sm:text-xl rounded-xl border-2 border-yellow-300 shadow-lg transition focus:outline-none focus:ring-4 focus:ring-yellow-400">
+                    <button type="button" id="accExamSubmitBtn" class="hidden flex-1 py-4 px-8 bg-green-600 hover:bg-green-500 text-white font-black text-lg sm:text-xl rounded-xl border-2 border-green-700 shadow-lg transition focus:outline-none focus:ring-4 focus:ring-blue-300">
                         <i class="fa-solid fa-paper-plane mr-2"></i> Submit Exam
                     </button>
                 </div>
