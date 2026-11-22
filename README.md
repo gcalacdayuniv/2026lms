@@ -599,7 +599,7 @@ The called list is its own dialog (`#calledListModal`, `js/components-class.js`)
 ## Student photos
 - `getLoadableAvatarSrc(src, width)` (`js/components-utils.js`) asks Drive for a thumbnail of `width` px (default 1000). The roster list uses 128 with `loading="lazy"`; the tap-to-enlarge view (`data-src`) keeps the large one; the Student Caller wheel uses 96.
 - Images with class `avatar-img` are retried once if they fail, then replaced by a placeholder (a user icon, or the initials on the wheel), so no broken image is shown.
-- **Student Caller wheel:** each slice shows the student's photo (initials when there is none) on top of the slice color, turned so it stands upright when it reaches the pointer. Photo size shrinks with the number of slices (14 to 56 px).
+- **Student Caller wheel:** each slice is the student's photo cropped to the slice (wedge) shape, top of the photo toward the rim, with white lines between slices. A student without a photo, or whose photo fails, shows the slice color and initials. Slices are turned so the winner's photo is upright at the pointer. Drawn in `CourseRecitation.drawWheel` (`js/course-recitation.js`); the photo is a 256 px Drive thumbnail.
 
 ## Online exam colors
 The exam taker (`#accessibleExamOverlay` in `js/components-exam.js`, answer rendering in `js/course-exam.js`) uses the portal palette: blue-700 header, white cards on gray-50, blue-600 progress, selected choices and Next button, green Submit. Dark text on white keeps the contrast high for low-vision students. Timer: white, then amber under 5 minutes, then red and pulsing under 1 minute.

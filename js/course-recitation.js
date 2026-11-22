@@ -329,23 +329,34 @@ export const CourseRecitation = {
 
         wheel.style.background = `conic-gradient(${conicString})`;
 
-        // Each slice carries the student's photo (initials when there is none), turned so it stands upright
-        // when its slice reaches the pointer. The colors stay behind the photos.
-        const ring = 0.68;                                   // distance from the center, as a share of the radius
-        const slicePx = 2 * (124 * ring) * Math.sin((angle * Math.PI / 180) / 2);
-        const size = Math.max(14, Math.min(56, Math.round(slicePx * 0.9)));
-        wheel.innerHTML = availableStudents.map((s, i) => {
+        // Each slice is the student's photo cropped to the slice shape (a wedge), with the slice color and the
+        // initials behind it for a student without a photo. A slice is a box standing on the wheel center, turned to
+        // its angle, so the photo is upright when its slice reaches the pointer.
+        const R = (wheel.clientWidth || 248) / 2;
+        const half = (angle / 2) * Math.PI / 180;
+        const wide = total === 1 ? 2 * R : (total === 2 ? 2 * R : 2 * R * Math.tan(half));   // width of the box that holds the wedge
+        const clip = total <= 2 ? 'none' : `polygon(50% 100%, 0 0, 100% 0)`;
+        const fontPx = Math.max(8, Math.min(18, Math.round(2 * R * 0.68 * Math.sin(half) * 0.55)));
+        const slices = availableStudents.map((s, i) => {
             const theta = (i + 0.5) * angle;
             const rad = theta * Math.PI / 180;
-            const x = total === 1 ? 50 : 50 + ring * 50 * Math.sin(rad);
-            const y = total === 1 ? 50 : 50 - ring * 50 * Math.cos(rad);
-            const src = getLoadableAvatarSrc(s.Avatar, 96);
-            const style = `position:absolute;left:${x}%;top:${y}%;width:${size}px;height:${size}px;transform:translate(-50%,-50%) rotate(${total === 1 ? 0 : theta}deg)`;
-            const common = `class="avatar-img rounded-full border-2 border-white shadow object-cover bg-white" data-initials="${escapeHtml(initialsOf(s.Name))}" style="${style}"`;
-            return src
-                ? `<img src="${safeUrl(src)}" alt="" ${common} decoding="async">`
-                : `<span class="rounded-full border-2 border-white shadow bg-white text-gray-600 font-black flex items-center justify-center" style="${style};font-size:${Math.max(8, Math.round(size * 0.4))}px">${escapeHtml(initialsOf(s.Name))}</span>`;
+            const lx = total === 1 ? 50 : 50 + 0.68 * 50 * Math.sin(rad);
+            const ly = total === 1 ? 50 : 50 - 0.68 * 50 * Math.cos(rad);
+            const src = getLoadableAvatarSrc(s.Avatar, 256);
+            const label = `<span style="position:absolute;left:${lx}%;top:${ly}%;transform:translate(-50%,-50%) rotate(${total === 1 ? 0 : theta}deg);font-size:${fontPx}px" class="font-black text-white drop-shadow">${escapeHtml(initialsOf(s.Name))}</span>`;
+            const box = total === 1 || total === 2
+                ? `left:calc(50% - ${R}px);top:${total === 1 ? 0 : `calc(50% - ${R}px)`};width:${2 * R}px;height:${total === 1 ? 2 * R : R}px`
+                : `left:calc(50% - ${wide / 2}px);top:calc(50% - ${R}px);width:${wide}px;height:${R}px`;
+            const rot = total === 1 ? 0 : (total === 2 ? i * 180 : theta);
+            const photo = src ? `<div style="position:absolute;${box};transform-origin:50% ${total === 1 ? '50%' : '100%'};transform:rotate(${rot}deg);clip-path:${clip};overflow:hidden"><img class="wheel-photo" src="${safeUrl(src)}" alt="" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:50% 25%;display:block"></div>` : '';
+            return label + photo;
         }).join('');
+        const lines = total > 1 ? availableStudents.map((_, i) => `<div style="position:absolute;left:calc(50% - 1px);top:calc(50% - ${R}px);width:2px;height:${R}px;background:#fff;transform-origin:50% 100%;transform:rotate(${i * angle}deg);opacity:.9"></div>`).join('') : '';
+        wheel.innerHTML = slices + lines;
+        wheel.querySelectorAll('img.wheel-photo').forEach(img => img.addEventListener('error', () => {
+            if (!img.dataset.retried) { img.dataset.retried = '1'; setTimeout(() => { img.src = img.src + (img.src.includes('?') ? '&' : '?') + 'r=' + Date.now(); }, 1500); }
+            else img.remove();   // the slice color and initials behind it stay
+        }));
     },
 
     spin: () => {
