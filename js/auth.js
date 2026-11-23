@@ -1,4 +1,5 @@
 // js/auth.js
+import './terms-consent.js';
 import { clearClassCache } from './course-class.js';
 import { apiFetch, AppState, getDeviceId } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';

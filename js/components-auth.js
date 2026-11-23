@@ -1,4 +1,8 @@
 // js/components-auth.js
+import { TERMS_KEY } from './terms-consent.js';
+
+// Ticked again on a device where the person already agreed to this version of the terms.
+const termsChecked = () => { try { return localStorage.getItem(TERMS_KEY) === '1' ? 'checked' : ''; } catch (e) { return ''; } };
 
 export const AuthUI = {
     renderLogin: () => `
@@ -29,6 +33,10 @@ export const AuthUI = {
                         <p class="text-xs text-gray-600 mb-2">Enter the code from your lecturer to activate your account and join that class, then sign in.</p>
                         <input type="text" id="loginInviteCode" maxlength="10" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABC234" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md uppercase tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
+                    <label class="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer min-h-[44px] py-1">
+                        <input type="checkbox" id="loginTerms" required ${termsChecked()} class="mt-0.5 w-5 h-5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span>I have read and agree to the <a href="terms.html" target="_blank" rel="noopener" class="font-bold text-blue-600 hover:text-blue-800 underline">Terms and Conditions</a>, including the use of the camera for exam integrity.</span>
+                    </label>
                     <button type="submit" id="loginBtn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         Sign In
                     </button>
@@ -158,6 +166,10 @@ export const AuthUI = {
                         <p class="text-xs text-gray-600 mb-2">Got a code from your lecturer? Enter it to activate your account now and join that class right away.</p>
                         <input type="text" id="regInviteCode" maxlength="10" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABC234" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md uppercase tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-green-500">
                     </div>
+                    <label class="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer min-h-[44px] py-1">
+                        <input type="checkbox" id="regTerms" required ${termsChecked()} class="mt-0.5 w-5 h-5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span>I have read and agree to the <a href="terms.html" target="_blank" rel="noopener" class="font-bold text-blue-600 hover:text-blue-800 underline">Terms and Conditions</a>, including the use of the camera for exam integrity.</span>
+                    </label>
                     <button type="submit" id="regSubmitBtn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mt-4">
                         Create Account
                     </button>

@@ -4,6 +4,7 @@
 //  - during the exam: a small photo when it starts and every 30 seconds, sent to the lecturer's private Drive folder;
 //  - leaving the exam screen (switching tab, app or window, locking the screen) starts a 5 second grace period;
 //    staying away longer submits the answers (the server enforces it too, because phones freeze the page in the background).
+// The browser asks for the camera once; after that the notice only needs a Continue.
 // Students flagged Legally Blind are exempt unless their lecturer turns it on (the server decides: student.secure).
 // Lecturers review the photos in js/exam-photo-review.js (Manage Exams > Results > Photos, or Manage Student > Exam photos).
 import { apiFetch } from './globals.js';
@@ -12,14 +13,44 @@ import { escapeHtml } from './html-utils.js';
 const PHOTO_EVERY_MS = 30000;
 const AWAY_GRACE_SECONDS = 5;    // the server uses the same number (worker/exam-session.js)
 const PHOTO_WIDTH = 320;
+const CAMERA_OK_KEY = 'exam_camera_ok';
 const $ = (id) => document.getElementById(id);
 
 export const ExamSecure = {
     stream: null, video: null, timer: null, active: false, paused: 0, leaving: false, away: null, awayTimer: null, grace: AWAY_GRACE_SECONDS,
     ctx: null, handlers: null,
 
-    // Notice + camera permission. Resolves true when the student agreed and the camera works.
-    prepare: () => new Promise((resolve) => {
+    // Opens the front camera and keeps it running (hidden) for the photos. Throws when it cannot.
+    openCamera: async () => {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('This browser cannot use the camera. Open the app in Safari or Chrome.');
+        ExamSecure.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+        const v = document.createElement('video');
+        v.setAttribute('playsinline', ''); v.muted = true; v.autoplay = true;
+        v.style.cssText = 'position:fixed;width:2px;height:2px;opacity:0;pointer-events:none;left:0;top:0';
+        v.srcObject = ExamSecure.stream;
+        document.body.appendChild(v);
+        await v.play().catch(() => {});
+        ExamSecure.video = v;
+        try { localStorage.setItem(CAMERA_OK_KEY, '1'); } catch (e) { /* storage blocked: the dialog just shows again next time */ }
+    },
+
+    // true when this device already allowed the camera (the browser says so, or it worked here before).
+    cameraAllowed: async () => {
+        try {
+            if (navigator.permissions && navigator.permissions.query) {
+                const st = await navigator.permissions.query({ name: 'camera' });
+                if (st.state === 'granted') return true;
+                if (st.state === 'denied') return false;
+            }
+        } catch (e) { /* Safari cannot query the camera permission */ }
+        try { return localStorage.getItem(CAMERA_OK_KEY) === '1'; } catch (e) { return false; }
+    },
+
+    // Notice, then the camera. Resolves true when the camera works. The browser asks for the camera only the first time:
+    // a device that already allowed it just shows the notice with a plain Continue button.
+    prepare: async () => ExamSecure.askPermission(await ExamSecure.cameraAllowed()),
+
+    askPermission: (allowed) => new Promise((resolve) => {
         $('examSecureDlg')?.remove();
         const dlg = document.createElement('div');
         dlg.id = 'examSecureDlg';
@@ -30,12 +61,11 @@ export const ExamSecure = {
                 <div class="mx-auto mb-3 w-14 h-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-2xl"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
                 <h3 id="examSecureTitle" class="text-xl font-black text-gray-900 text-center mb-3">Secure exam</h3>
                 <ul class="text-sm text-gray-700 space-y-2 mb-3 list-disc pl-5">
-                    <li>Your camera takes a photo when the exam starts and every 30 seconds. Only your lecturer can see them.</li>
                     <li><b>If you leave the exam screen</b> (switch tab, app or window, or lock the phone) you have <b>only 5 seconds to come back</b>. After that your exam is submitted automatically.</li>
                     <li>Signing in to your account on another device also submits your exam. Put your phone on Do Not Disturb so calls and notifications do not pull you away.</li>
                 </ul>
                 <p id="examSecureErr" class="hidden text-sm font-bold text-red-700 mb-2" role="alert"></p>
-                <button type="button" id="examSecureGo" class="w-full min-h-[3.25rem] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-black">Allow camera and continue</button>
+                <button type="button" id="examSecureGo" class="w-full min-h-[3.25rem] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-black">${allowed ? 'Continue' : 'Allow camera and continue'}</button>
                 <button type="button" id="examSecureNo" class="mt-2 w-full py-2 text-sm font-bold text-gray-500 hover:text-gray-800">Cancel</button>
             </div>`;
         document.body.appendChild(dlg);
@@ -47,15 +77,7 @@ export const ExamSecure = {
             go.disabled = true;
             err.classList.add('hidden');
             try {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('This browser cannot use the camera. Open the app in Safari or Chrome.');
-                ExamSecure.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
-                const v = document.createElement('video');
-                v.setAttribute('playsinline', ''); v.muted = true; v.autoplay = true;
-                v.style.cssText = 'position:fixed;width:2px;height:2px;opacity:0;pointer-events:none;left:0;top:0';
-                v.srcObject = ExamSecure.stream;
-                document.body.appendChild(v);
-                await v.play().catch(() => {});
-                ExamSecure.video = v;
+                await ExamSecure.openCamera();
                 done(true);
             } catch (e) {
                 ExamSecure.release();
