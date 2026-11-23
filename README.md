@@ -6,7 +6,6 @@ This section is the standing instruction for every task. Keep it current when a 
 1. Plan briefly, then work in batches that stay within the token limit. Give the output of each batch so progress is not lost.
 2. Commit and push finished work straight to `main` of the GitHub repo (no zip needed). Commit only after the tests pass, with a message that says what changed. If a push is refused, say so and send a zip of the changed files instead.
 3. Test before delivering: worker changes against a local SQLite D1 test, UI changes in a browser (Playwright). Say what was tested and what was not.
-4. **Audit what a change can affect.** Before delivering, list the existing functions the change touches or depends on (shared helpers, layouts, routes, roles, stored settings, printed or saved formats) and check that each still works, with a test or a browser run, not by reading. Add the check to the test suite when it protects something that cannot be fixed afterwards. Print layouts and saved data formats must stay readable by what is already printed or stored. The scanner has its own check, `node tools/tests/omr-check.cjs` (`--omr` in `run-tests.sh`): run it after any change to `omr-sheet.js`, `omr-scan.js`, `scan-items.js`, `sheet-print.js` or `course-scanner.js`. Say in the reply what was audited.
 
 **Delivery (every task)**
 - Give full replacement files, never snippets.
