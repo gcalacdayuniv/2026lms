@@ -138,7 +138,7 @@ async function eligibleLecturers(env, exam) {
     const rows = await env.DB.prepare(
         `SELECT u.User_ID AS id, u.Name AS name, GROUP_CONCAT(DISTINCT c.CourseCode) AS courses
          FROM Users u JOIN Courses c ON c.Lecturer_ID = u.User_ID
-         WHERE u.User_ID <> ? AND LOWER(COALESCE(u.role, '')) = 'lecturer' AND LOWER(COALESCE(u.account_status, '')) = 'active'
+         WHERE u.User_ID <> ? AND LOWER(COALESCE(u.role, '')) IN ('lecturer', 'admin') AND LOWER(COALESCE(u.account_status, '')) = 'active'
            AND UPPER(TRIM(c.CourseCode)) IN (${marks})
          GROUP BY u.User_ID, u.Name ORDER BY u.Name`
     ).bind(exam.Lecturer_ID, ...list).all();

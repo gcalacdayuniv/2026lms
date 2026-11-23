@@ -1,6 +1,7 @@
 // worker/accounts.js
 // Sign-up, sign-in, password changes, profile details, year-level advance and the user list.
 
+import { isAdminRole, isLecturerRole } from './roles.js';
 import { findClassByCode, ensureEnrolled } from './join.js';
 import { signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
@@ -231,7 +232,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         // One device at a time for students: warn first, and on confirmation sign the other device out.
         let tokenNow = Date.now();
         const deviceId = typeof body.deviceId === 'string' ? body.deviceId.slice(0, 64) : '';
-        if (authEnabled(env) && deviceId && String(user.role || '').toLowerCase() !== 'lecturer') {
+        if (authEnabled(env) && deviceId && !isLecturerRole(user.role)) {
             await ensureSessions(env);
             const s = await env.DB.prepare('SELECT Session_Device, Last_Seen_At FROM Users WHERE User_ID = ?').bind(user.User_ID).first();
             const otherDevice = !!(s && s.Session_Device && s.Session_Device !== deviceId);
@@ -252,7 +253,8 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         }
 
         const token = authEnabled(env) ? await signToken(env, user.User_ID, tokenNow) : undefined;
-        return new Response(JSON.stringify({ success: true, user, token, joined }), { status: 200, headers: corsHeaders });
+        const shown = isAdminRole(user.role) ? { ...user, role: 'Lecturer', isAdmin: true } : user;   // an Admin is a lecturer with extra access
+        return new Response(JSON.stringify({ success: true, user: shown, token, joined }), { status: 200, headers: corsHeaders });
     }
 
     // Signing out frees the account for another device without a warning.

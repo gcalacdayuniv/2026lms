@@ -7,6 +7,7 @@
 //    request, so a suspended account or a changed role takes effect at once.
 //  - Routes are listed in RULES. A route that is not listed is lecturer-only.
 
+import { isAdminRole, isLecturerRole } from './roles.js';
 import { ensureExamShares, ensureCourseRoom } from './schema.js';
 import { ensureSessions } from './exam-session.js';
 
@@ -221,8 +222,8 @@ export async function authorize(request, env, path, url) {
     if (row.Password_Changed_At && info.iat < row.Password_Changed_At) return deny(401, 'Your password was changed. Please sign in again.');
     if (String(row.account_status || '').toLowerCase() !== 'active') return deny(403, 'This account is not active.');
 
-    const role = String(row.role || '').toLowerCase() === 'lecturer' ? 'lecturer' : 'student';
-    const user = { id: row.User_ID, role };
+    const role = isLecturerRole(row.role) ? 'lecturer' : 'student';
+    const user = { id: row.User_ID, role, admin: isAdminRole(row.role) };
     // "Last seen" backs the one-device-at-a-time warning; written at most once a minute.
     if (role === 'student' && (!row.Last_Seen_At || Date.now() - row.Last_Seen_At > 60000)) {
         await env.DB.prepare('UPDATE Users SET Last_Seen_At = ? WHERE User_ID = ?').bind(Date.now(), row.User_ID).run();

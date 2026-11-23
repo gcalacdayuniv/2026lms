@@ -18,7 +18,7 @@ const OVAL_RX = 0.34, OVAL_RY = 0.34;   // the verification oval, as a share of 
 const $ = (id) => document.getElementById(id);
 
 export const ExamSecure = {
-    stream: null, video: null, timer: null, active: false, paused: 0, leaving: false, away: null, awayTimer: null, grace: AWAY_GRACE_SECONDS,
+    stream: null, video: null, verifyShot: null, timer: null, active: false, paused: 0, leaving: false, away: null, awayTimer: null, grace: AWAY_GRACE_SECONDS,
     ctx: null, handlers: null,
 
     // Opens the front camera and keeps it running (hidden) for the photos. Throws when it cannot.
@@ -51,6 +51,7 @@ export const ExamSecure = {
     // otherwise the student goes through the face verification screen (allow the camera, take a photo inside the oval).
     // Resolves true when the camera works and the student may start.
     prepare: () => new Promise((resolve) => {
+        ExamSecure.verifyShot = null;
         $('examSecureDlg')?.remove();
         const dlg = document.createElement('div');
         dlg.id = 'examSecureDlg';
@@ -194,6 +195,7 @@ export const ExamSecure = {
                     return;
                 }
                 state = 'ok';
+                ExamSecure.verifyShot = c.toDataURL('image/jpeg', 0.7).split(',')[1];   // becomes the exam's initial photo (the one lecturers can see)
                 msg.textContent = 'Verified. Starting your exam...';
                 scr.querySelector('#evRing').setAttribute('stroke', '#34d399');
                 go.innerHTML = '<i class="fa-solid fa-check mr-1" aria-hidden="true"></i>Verified';
@@ -276,7 +278,7 @@ export const ExamSecure = {
         ExamSecure.handlers = { onVis, onBlur, onFocus, onHide, track, onEnded };
 
         const snap = (kind) => ExamSecure.capture(kind);
-        setTimeout(() => snap('start'), 800);
+        setTimeout(() => ExamSecure.initialPhoto(), 800);
         ExamSecure.timer = setInterval(() => snap('check'), PHOTO_EVERY_MS);
     },
 
@@ -309,6 +311,15 @@ export const ExamSecure = {
     // Dialogs the app itself opens (confirm / alert) take focus away, so they must not count as leaving.
     pause: () => { ExamSecure.paused += 1; },
     resume: () => { setTimeout(() => { ExamSecure.paused = Math.max(0, ExamSecure.paused - 1); }, 400); },
+
+    // The initial photo (Kind 'start') is what a lecturer sees; the face verification photo when there was one, else a new picture.
+    initialPhoto: async () => {
+        const shot = ExamSecure.verifyShot, c = ExamSecure.ctx;
+        ExamSecure.verifyShot = null;
+        if (!shot || !c) return ExamSecure.capture('start');
+        try { await apiFetch('/api/exam-photo', { method: 'POST', body: JSON.stringify({ assignmentId: c.assignmentId, studentId: c.studentId, kind: 'start', base64: shot }) }); }
+        catch (e) { ExamSecure.capture('start'); }
+    },
 
     capture: async (kind) => {
         const v = ExamSecure.video, c = ExamSecure.ctx;

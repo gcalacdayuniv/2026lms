@@ -23,6 +23,7 @@ export const ExamPhotoReview = {
     queue: [],
     running: 0,
     mode: 'exam',
+    limited: false,
 
     // opts: { classExamId, focusStudentId? } for one exam, or { courseId, studentId, name } for one student.
     open: async (opts) => {
@@ -52,7 +53,8 @@ export const ExamPhotoReview = {
             const res = await apiFetch(`/api/exam-photos?${q}`);
             if (!$('examPhotosDlg')) return;
             const all = res.photos || [];
-            if (!all.length) { body.innerHTML = `<p class="text-sm text-gray-500">${byStudent ? 'No exam photos for this student in this class.' : 'No photos were taken for this exam.'}</p>`; return; }
+            ExamPhotoReview.limited = !!res.limited;
+            if (!all.length) { body.innerHTML = `<p class="text-sm text-gray-500">${byStudent ? 'No exam photos for this student in this class.' : 'No photos were taken for this exam.'}</p>`; ExamPhotoReview.note(); return; }
             ExamPhotoReview.render(body, all, byStudent, opts.focusStudentId);
         } catch (e) { body.innerHTML = `<p class="text-sm text-red-700">${esc(e.message || 'Could not load photos.')}</p>`; }
     },
@@ -82,10 +84,17 @@ export const ExamPhotoReview = {
                         <span class="block text-[10px] text-gray-500 mt-0.5">${esc(fmtTime(p.Taken_At, byStudent))}${p.Kind === 'start' ? ' &middot; start' : ''}</span></button>`).join('')}</div></div>
                 </section>`;
             }).join('')}</div>`;
+        ExamPhotoReview.note();
         const heads = body.querySelectorAll('[data-ep-head]');
         const focusAt = focusId ? groups.findIndex(g => g.key === focusId) : -1;
         if (focusAt >= 0) { ExamPhotoReview.toggle(heads[focusAt], true); heads[focusAt].scrollIntoView({ block: 'nearest' }); }
         else if (groups.length === 1) ExamPhotoReview.toggle(heads[0], true);
+    },
+
+    // A lecturer sees the initial face verification photo only; an Admin also sees the photos taken during the exam.
+    note: () => {
+        if (!ExamPhotoReview.limited) return;
+        $('epSub')?.insertAdjacentHTML('afterend', '<p class="text-[11px] text-amber-700 mt-0.5">Showing the initial face verification photo. Only an Admin can see the photos taken during the exam.</p>');
     },
 
     toggle: (head, force) => {

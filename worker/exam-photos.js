@@ -51,7 +51,7 @@ export async function secureFor(env, userId) {
     return secureApplies(u);
 }
 
-export async function handleExamPhotos(request, env, path, url, corsHeaders) {
+export async function handleExamPhotos(request, env, path, url, corsHeaders, caller) {
     if (path !== '/api/exam-photo' && path !== '/api/exam-photos') return null;
     await ensureExamSecurity(env);
 
@@ -85,9 +85,13 @@ export async function handleExamPhotos(request, env, path, url, corsHeaders) {
     if (request.method === 'GET' && path === '/api/exam-photos') {
         const classExamId = url.searchParams.get('classExamId');
         const photoId = url.searchParams.get('photoId');
+        // Only an Admin sees the periodic photos; a lecturer sees the initial face verification photo (Kind 'start').
+        const admin = !caller || caller.admin;
+        const only = admin ? '' : " AND p.Kind = 'start'";
         if (photoId) {
-            const row = await env.DB.prepare("SELECT File_ID FROM Exam_Photos WHERE Photo_ID = ?").bind(photoId).first();
+            const row = await env.DB.prepare("SELECT File_ID, Kind FROM Exam_Photos WHERE Photo_ID = ?").bind(photoId).first();
             if (!row || !row.File_ID) return json(corsHeaders, { error: 'No photo.' }, 404);
+            if (!admin && row.Kind !== 'start') return json(corsHeaders, { error: 'Only an Admin can see these photos.' }, 403);
             const gas = await callGas(env, JSON.stringify({ action: 'read', fileId: row.File_ID }));
             if (!gas.base64) throw new Error('Google Drive did not return the photo.');
             return json(corsHeaders, { success: true, mimeType: gas.mimeType || 'image/jpeg', base64: gas.base64 });
@@ -102,9 +106,9 @@ export async function handleExamPhotos(request, env, path, url, corsHeaders) {
                  JOIN Class_Exams ce ON ce.Class_Exam_ID = p.Class_Exam_ID
                  JOIN Exams e ON e.Exam_ID = ce.Exam_ID
                  LEFT JOIN Users u ON u.User_ID = p.Student_ID
-                 WHERE ce.Course_ID = ? AND p.Student_ID = ? ORDER BY p.Taken_At`
+                 WHERE ce.Course_ID = ? AND p.Student_ID = ?${only} ORDER BY p.Taken_At`
             ).bind(courseId, studentId).all();
-            return json(corsHeaders, { success: true, photos: rows.results || [] });
+            return json(corsHeaders, { success: true, photos: rows.results || [], limited: !admin });
         }
         // By exam: every student's photos for one class exam.
         if (!classExamId) return json(corsHeaders, { error: 'Missing classExamId' }, 400);
@@ -114,9 +118,9 @@ export async function handleExamPhotos(request, env, path, url, corsHeaders) {
              JOIN Class_Exams ce ON ce.Class_Exam_ID = p.Class_Exam_ID
              JOIN Exams e ON e.Exam_ID = ce.Exam_ID
              LEFT JOIN Users u ON u.User_ID = p.Student_ID
-             WHERE p.Class_Exam_ID = ? ORDER BY u.Name, p.Taken_At`
+             WHERE p.Class_Exam_ID = ?${only} ORDER BY u.Name, p.Taken_At`
         ).bind(classExamId).all();
-        return json(corsHeaders, { success: true, photos: rows.results || [] });
+        return json(corsHeaders, { success: true, photos: rows.results || [], limited: !admin });
     }
     return null;
 }

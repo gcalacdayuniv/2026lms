@@ -176,7 +176,25 @@ const photoByStudentOther = await call('GET', '/api/exam-photos?courseId=C1&stud
 ok('another lecturer cannot list them', photoByStudentOther.s === 403, JSON.stringify(photoByStudentOther));
 const photoByStudentStu = await call('GET', '/api/exam-photos?courseId=C1&studentId=S1', { token: sOwn });
 ok('students cannot list photos by student', photoByStudentStu.s === 403, JSON.stringify(photoByStudentStu));
-sql.prepare("delete from Exam_Photos where Photo_ID='PH1'").run();
+// Only an Admin sees the periodic photos; a lecturer sees the initial face verification photo.
+sql.prepare("insert into Exam_Photos (Photo_ID, Assignment_ID, Class_Exam_ID, Student_ID, Kind, Taken_At, File_ID) values ('PH2', 'A-x', ?, 'S1', 'check', '2026-01-01T00:00:30.000Z', 'f2')").run(ce.j.classExamId);
+const lecList = await call('GET', '/api/exam-photos?classExamId=' + ce.j.classExamId, { token: L1 });
+ok('a lecturer sees the initial photo only', lecList.s === 200 && lecList.j.limited === true && lecList.j.photos.length === 1 && lecList.j.photos[0].Photo_ID === 'PH1', JSON.stringify(lecList));
+const lecStu = await call('GET', '/api/exam-photos?courseId=C1&studentId=S1', { token: L1 });
+ok('same by student', lecStu.s === 200 && lecStu.j.photos.every(p => p.Kind === 'start'), JSON.stringify(lecStu));
+const lecOne = await call('GET', '/api/exam-photos?photoId=PH2', { token: L1 });
+ok('a lecturer cannot fetch a periodic photo directly', lecOne.s === 403, JSON.stringify(lecOne));
+sql.prepare("update Users set role='Admin' where User_ID='L1'").run();
+const admLogin = await login('lec1');
+ok('an Admin signs in as a lecturer with the admin flag', admLogin.s === 200 && admLogin.j.user.role === 'Lecturer' && admLogin.j.user.isAdmin === true, JSON.stringify(admLogin.j && admLogin.j.user));
+const admList = await call('GET', '/api/exam-photos?classExamId=' + ce.j.classExamId, { token: L1 });
+ok('an Admin sees every photo', admList.s === 200 && admList.j.limited === false && admList.j.photos.length === 2, JSON.stringify(admList));
+let admOne = { s: 0 };
+try { admOne = await call('GET', '/api/exam-photos?photoId=PH2', { token: L1 }); } catch (e) { admOne = { s: 'reached Drive' }; }   // no Drive in the test, so passing the role check ends in the Drive call
+ok('an Admin may fetch a periodic photo (past the role check)', admOne.s !== 403 && admOne.s !== 0, JSON.stringify(admOne));
+ok('an Admin has the lecturer tools', (await call('GET', '/api/class-summary?courseId=C1', { token: L1 })).s === 200);
+sql.prepare("update Users set role='lecturer' where User_ID='L1'").run();
+sql.prepare("delete from Exam_Photos where Photo_ID in ('PH1','PH2')").run();
 const res2 = await call('GET', '/api/exam-results?classExamId=' + (ce.j && ce.j.classExamId), { token: L1 });
 ok('results carry submit reason and photo count', res2.s === 200 && res2.j.students.every(x => 'submitReason' in x && x.photos === 0), JSON.stringify(res2.j.students));
 

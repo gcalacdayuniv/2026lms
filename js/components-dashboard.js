@@ -170,7 +170,7 @@ const DashboardUI = {
                 <div class="mt-6 px-2">
                     <div class="flex justify-between items-start border-b border-gray-200 pb-4">
                         <div class="flex-1 pr-1">
-                            <span class="block text-xs sm:text-sm font-bold text-blue-600">${escapeHtml(user.role || 'N/A')}</span>
+                            <span class="block text-xs sm:text-sm font-bold text-blue-600">${escapeHtml(user.isAdmin ? 'Admin' : (user.role || 'N/A'))}</span>
                         </div>
                         <div class="flex-1 text-center border-x border-gray-200 px-1">
                             <span class="block text-xs sm:text-sm font-medium text-gray-800 break-all">${escapeHtml(user.Student_Number || 'N/A')}</span>

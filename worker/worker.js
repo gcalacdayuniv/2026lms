@@ -66,7 +66,7 @@ export default {
                 await ensureCourseRoom(env);
             }
 
-            const photosResponse = await handleExamPhotos(request, env, path, url, corsHeaders);
+            const photosResponse = await handleExamPhotos(request, env, path, url, corsHeaders, gate.user);
             if (photosResponse) return photosResponse;
 
             const sessionResponse = await handleExamSession(request, env, path, url, corsHeaders);
