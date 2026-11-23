@@ -83,6 +83,7 @@ export async function markPasswordChanged(env, userId) {
 // who:      'public' | 'any' (any signed-in user) | 'lecturer'
 // self:     body/query fields that a student may only set to their own id (lecturers are not limited)
 // mine:     body/query fields that must be the caller's own id, whoever the caller is
+// adminAny: an Admin may use the route on any lecturer's class (ownership is not checked for them)
 // enrolled: a student must be enrolled in the course named by courseId
 
 const PUBLIC = { who: 'public' };
@@ -121,6 +122,8 @@ export const RULES = {
     'POST /api/exam-draft': { who: 'any', self: ['studentId'] },
     'POST /api/exam-away': { who: 'any', self: ['studentId'] },
     'POST /api/logout': { who: 'any', mine: ['userId'] },
+    'GET /api/exam-photos': { who: 'lecturer', adminAny: true },   // an Admin may read any class's photos (the handler limits a lecturer to the initial photo)
+    'GET /api/admin-exam-photos': { who: 'lecturer', adminAny: true },   // Admin tools > Exam Photos (the handler refuses a lecturer)
     'POST /api/exam-photo': { who: 'any', self: ['studentId'] },   // GET /api/exam-photos is lecturer-only (owner checked by classExamId / photoId)
     'GET /api/student-exam-review': { who: 'any', self: ['studentId'] },
     'GET /api/student-sheet-photo': { who: 'any', self: ['studentId'] },
@@ -250,6 +253,7 @@ export async function authorize(request, env, path, url) {
     } else {
         for (const key of Object.keys(OWNER_SQL)) {
             if (!fields[key]) continue;
+            if (user.admin && rule.adminAny) continue;
             const owner = await ownerOf(env, key, fields[key]);
             if (owner !== null && owner !== user.id) {
                 // Some exam routes are open to a lecturer the owner shared the exam with.

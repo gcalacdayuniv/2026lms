@@ -176,7 +176,7 @@ export const CourseExam = {
 
         const photosBtn = e.target.closest('.er-photos-btn');
         if (photosBtn) {
-            await ExamPhotoReview.open({ classExamId: CourseExam.resultsData.classExamId, focusStudentId: photosBtn.dataset.studentId });
+            await ExamPhotoReview.open({ classExamId: CourseExam.resultsData.classExamId, focusStudentId: photosBtn.dataset.studentId, name: photosBtn.dataset.name });
             return;
         }
 
@@ -1232,7 +1232,7 @@ export const CourseExam = {
         const rows = shownStudents.map(s => `
             <tr class="border-t border-gray-100">
                 <td class="px-2 py-1.5 font-bold text-gray-800">${esc(s.name)} <span class="font-normal text-gray-500">${esc(s.studentNumber)}</span></td>
-                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'away' ? '<div class="text-[10px] font-bold text-red-700">Away too long: auto-submitted</div>' : s.submitReason === 'session-takeover' ? '<div class="text-[10px] font-bold text-red-700">Signed in on another device: auto-submitted</div>' : s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.submitReason && s.submitReason !== 'time' ? `<button type="button" class="er-continue-btn mt-0.5 mr-2 text-[11px] font-bold text-emerald-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}">Let continue</button>` : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>Photos (${s.photos})</button>` : ''}</td>
+                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'away' ? '<div class="text-[10px] font-bold text-red-700">Away too long: auto-submitted</div>' : s.submitReason === 'session-takeover' ? '<div class="text-[10px] font-bold text-red-700">Signed in on another device: auto-submitted</div>' : s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.submitReason && s.submitReason !== 'time' ? `<button type="button" class="er-continue-btn mt-0.5 mr-2 text-[11px] font-bold text-emerald-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}">Let continue</button>` : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>${AppState.user.isAdmin ? `Photos (${s.photos})` : 'Face photo'}</button>` : ''}</td>
                 <td class="px-2 py-1.5 text-right">${s.score === null ? '-' : `${s.score} / ${s.max}`}</td>
                 <td class="px-2 py-1.5 text-right font-bold">${fmt(s.percent, '%')}</td>
                 <td class="px-2 py-1.5 text-right">${s.minutes === null ? '-' : s.minutes + ' min'}</td>
@@ -1256,7 +1256,7 @@ export const CourseExam = {
                     <span class="flex flex-wrap gap-1.5 justify-end">
                     ${d.reviewCount ? `<button type="button" id="erReviewFilterBtn" aria-pressed="${CourseExam.resultsOnlyReview ? 'true' : 'false'}" class="px-2.5 py-1.5 text-xs font-bold rounded-md border ${CourseExam.resultsOnlyReview ? 'bg-red-600 text-white border-red-600' : 'border-red-300 text-red-700 hover:bg-red-50'} transition"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>${d.reviewCount} to review${CourseExam.resultsOnlyReview ? ' (showing)' : ''}</button>` : ''}
                     ${d.continuable ? `<button type="button" id="erContinueAllBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition"><i class="fa-solid fa-play mr-1" aria-hidden="true"></i>Let all ${d.continuable} continue</button>` : ''}
-                    ${d.students.some(x => x.photos > 0) ? `<button type="button" id="erPhotosBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 transition"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>All photos</button>` : ''}
+                    ${AppState.user.isAdmin && d.students.some(x => x.photos > 0) ? `<button type="button" id="erPhotosBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 transition"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>All photos</button>` : ''}
                     <button type="button" id="erExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
                     </span>
                 </div>

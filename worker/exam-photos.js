@@ -52,8 +52,28 @@ export async function secureFor(env, userId) {
 }
 
 export async function handleExamPhotos(request, env, path, url, corsHeaders, caller) {
-    if (path !== '/api/exam-photo' && path !== '/api/exam-photos') return null;
+    if (path !== '/api/exam-photo' && path !== '/api/exam-photos' && path !== '/api/admin-exam-photos') return null;
     await ensureExamSecurity(env);
+
+    // Admin tools > Exam Photos: every class with photos, then that class's exams (the photos themselves come from /api/exam-photos).
+    if (request.method === 'GET' && path === '/api/admin-exam-photos') {
+        if (caller && !caller.admin) return json(corsHeaders, { error: 'Only an Admin can do this.' }, 403);
+        const courseId = url.searchParams.get('courseId');
+        if (courseId) {
+            const rows = await env.DB.prepare(
+                `SELECT ce.Class_Exam_ID, e.Title AS Exam_Title, ce.Term, COUNT(*) AS Photos, COUNT(DISTINCT p.Student_ID) AS Students, MAX(p.Taken_At) AS Last_At
+                 FROM Exam_Photos p JOIN Class_Exams ce ON ce.Class_Exam_ID = p.Class_Exam_ID JOIN Exams e ON e.Exam_ID = ce.Exam_ID
+                 WHERE ce.Course_ID = ? GROUP BY ce.Class_Exam_ID, e.Title, ce.Term ORDER BY Last_At DESC`
+            ).bind(courseId).all();
+            return json(corsHeaders, { success: true, exams: rows.results || [] });
+        }
+        const rows = await env.DB.prepare(
+            `SELECT c.Course_ID, c.CourseCode, c.CourseTitle, u.Name AS Lecturer, COUNT(*) AS Photos, COUNT(DISTINCT p.Student_ID) AS Students, COUNT(DISTINCT p.Class_Exam_ID) AS Exams, MAX(p.Taken_At) AS Last_At
+             FROM Exam_Photos p JOIN Class_Exams ce ON ce.Class_Exam_ID = p.Class_Exam_ID JOIN Courses c ON c.Course_ID = ce.Course_ID LEFT JOIN Users u ON u.User_ID = c.Lecturer_ID
+             GROUP BY c.Course_ID, c.CourseCode, c.CourseTitle, u.Name ORDER BY c.CourseCode`
+        ).all();
+        return json(corsHeaders, { success: true, classes: rows.results || [] });
+    }
 
     // A student's photo while the exam is in progress.
     if (request.method === 'POST' && path === '/api/exam-photo') {

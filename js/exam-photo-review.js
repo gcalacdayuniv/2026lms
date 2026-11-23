@@ -1,9 +1,10 @@
 // js/exam-photo-review.js
-// Lecturer: review the photos taken during online exams, by exam (grouped by student) or by student (grouped by exam).
-//  - By exam: Manage Exams > Results > Photos.   By student: Manage Student > Exam photos.
+// Admin: review the photos taken during online exams, by exam (grouped by student) or by student (grouped by exam).
+// A lecturer only gets the initial face verification photo (no gallery); the server decides (res.limited).
+//  - By exam: Manage Exams > Results > Photos.   By student: Manage Student > Exam photos.   Every class: Admin tools > Exam Photos (admins only).
 //  - Pictures are fetched from Drive one at a time (3 at most in parallel) and only for the group that is open.
 //  - Tap a picture to enlarge it; Previous / Next (or the arrow keys) move through every photo in the list.
-import { apiFetch } from './globals.js';
+import { apiFetch, AppState } from './globals.js';
 import { escapeHtml as esc } from './html-utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -16,6 +17,8 @@ const fmtTime = (iso, withDate) => {
     return d.toLocaleString('en-PH', opt);
 };
 
+const opts_name = (all) => (all[0] && all[0].Name) || '';
+
 export const ExamPhotoReview = {
     cache: new Map(),      // photoId -> data: URL
     photos: [],            // every photo in display order
@@ -23,7 +26,6 @@ export const ExamPhotoReview = {
     queue: [],
     running: 0,
     mode: 'exam',
-    limited: false,
 
     // opts: { classExamId, focusStudentId? } for one exam, or { courseId, studentId, name } for one student.
     open: async (opts) => {
@@ -52,11 +54,22 @@ export const ExamPhotoReview = {
             const q = byStudent ? `courseId=${encodeURIComponent(opts.courseId)}&studentId=${encodeURIComponent(opts.studentId)}` : `classExamId=${encodeURIComponent(opts.classExamId)}`;
             const res = await apiFetch(`/api/exam-photos?${q}`);
             if (!$('examPhotosDlg')) return;
-            const all = res.photos || [];
-            ExamPhotoReview.limited = !!res.limited;
-            if (!all.length) { body.innerHTML = `<p class="text-sm text-gray-500">${byStudent ? 'No exam photos for this student in this class.' : 'No photos were taken for this exam.'}</p>`; ExamPhotoReview.note(); return; }
+            let all = res.photos || [];
+            if (res.limited && opts.focusStudentId) all = all.filter(p => p.Student_ID === opts.focusStudentId);
+            if (!all.length) { body.innerHTML = `<p class="text-sm text-gray-500">${byStudent ? 'No exam photos for this student in this class.' : 'No photos were taken for this exam.'}</p>`; return; }
+            if (res.limited) { ExamPhotoReview.renderInitial(body, all, byStudent); return; }
             ExamPhotoReview.render(body, all, byStudent, opts.focusStudentId);
         } catch (e) { body.innerHTML = `<p class="text-sm text-red-700">${esc(e.message || 'Could not load photos.')}</p>`; }
+    },
+
+    // A lecturer gets the initial face verification photo only: one picture per student (per exam), no gallery.
+    renderInitial: (body, all, byStudent) => {
+        $('epSub') && ($('epSub').textContent = (byStudent ? `${opts_name(all)} · ` : '') + 'Initial face verification photo');
+        body.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">${all.map(p => `
+            <figure class="m-0"><div class="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden"><img data-photo-id="${esc(p.Photo_ID)}" alt="Face verification photo of ${esc(p.Name || 'student')}" class="w-full h-full object-cover"></div>
+            <figcaption class="mt-1"><span class="block text-xs font-bold text-gray-800 truncate">${esc(byStudent ? (p.Exam_Title || 'Exam') : (p.Name || 'Student'))}</span>
+            <span class="block text-[11px] text-gray-500">${esc(fmtTime(p.Taken_At, true))}</span></figcaption></figure>`).join('')}</div>`;
+        body.querySelectorAll('img[data-photo-id]').forEach(img => ExamPhotoReview.want(img.dataset.photoId, (src) => { if (src) img.src = src; else img.alt = 'Could not load'; }));
     },
 
     // Groups: students (by exam) or exams (by student). Each group is a collapsible section; its pictures load when it opens.
@@ -84,17 +97,10 @@ export const ExamPhotoReview = {
                         <span class="block text-[10px] text-gray-500 mt-0.5">${esc(fmtTime(p.Taken_At, byStudent))}${p.Kind === 'start' ? ' &middot; start' : ''}</span></button>`).join('')}</div></div>
                 </section>`;
             }).join('')}</div>`;
-        ExamPhotoReview.note();
         const heads = body.querySelectorAll('[data-ep-head]');
         const focusAt = focusId ? groups.findIndex(g => g.key === focusId) : -1;
         if (focusAt >= 0) { ExamPhotoReview.toggle(heads[focusAt], true); heads[focusAt].scrollIntoView({ block: 'nearest' }); }
         else if (groups.length === 1) ExamPhotoReview.toggle(heads[0], true);
-    },
-
-    // A lecturer sees the initial face verification photo only; an Admin also sees the photos taken during the exam.
-    note: () => {
-        if (!ExamPhotoReview.limited) return;
-        $('epSub')?.insertAdjacentHTML('afterend', '<p class="text-[11px] text-amber-700 mt-0.5">Showing the initial face verification photo. Only an Admin can see the photos taken during the exam.</p>');
     },
 
     toggle: (head, force) => {
@@ -191,6 +197,72 @@ export const ExamPhotoReview = {
     closeLightbox: () => { $('examPhotoLightbox')?.remove(); },
     close: () => { ExamPhotoReview.closeLightbox(); $('examPhotosDlg')?.remove(); ExamPhotoReview.queue = []; }
 };
+
+// Admin tools > Exam Photos: every class that has photos, then its exams, then the gallery of the exam.
+const adminDlg = {
+    open: () => {
+        $('adminPhotosDlg')?.remove();
+        const dlg = document.createElement('div');
+        dlg.id = 'adminPhotosDlg';
+        dlg.className = 'fixed inset-0 z-[115] flex items-start sm:items-center justify-center fade-in';
+        dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-label', 'Exam photos of all classes');
+        dlg.innerHTML = `<div class="absolute inset-0 bg-gray-900 bg-opacity-60" data-ap-close></div>
+            <div class="relative z-10 bg-white w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[90vh] sm:rounded-lg shadow-xl p-4 flex flex-col" style="padding-top:max(1rem, env(safe-area-inset-top))">
+                <div class="shrink-0 flex items-center gap-2 mb-3 border-b pb-3">
+                    <button type="button" id="apBack" data-ap-back class="hidden p-2 text-gray-500 hover:text-gray-800" aria-label="Back"><i class="fa-solid fa-arrow-left text-lg" aria-hidden="true"></i></button>
+                    <div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-camera text-rose-600 mr-2" aria-hidden="true"></i>Exam Photos</h3><p id="apSub" class="text-xs text-gray-500 truncate">All classes &middot; Admin only</p></div>
+                    <button type="button" data-ap-close class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
+                </div>
+                <div id="apBody" class="flex-1 min-h-0 overflow-y-auto"></div>
+            </div>`;
+        document.body.appendChild(dlg);
+        dlg.addEventListener('click', (e) => {
+            if (e.target.closest('[data-ap-close]')) { dlg.remove(); return; }
+            if (e.target.closest('[data-ap-back]')) { adminDlg.classes(); return; }
+            const cls = e.target.closest('[data-ap-class]');
+            if (cls) { adminDlg.exams(cls.dataset.apClass, cls.dataset.apTitle); return; }
+            const ex = e.target.closest('[data-ap-exam]');
+            if (ex) ExamPhotoReview.open({ classExamId: ex.dataset.apExam });
+        });
+        dlg.addEventListener('input', (e) => {
+            if (e.target.id !== 'apFind') return;
+            const q = e.target.value.trim().toLowerCase();
+            dlg.querySelectorAll('[data-ap-class]').forEach(b => { b.style.display = !q || b.dataset.apSearch.includes(q) ? '' : 'none'; });
+        });
+        adminDlg.classes();
+    },
+    show: (html, sub, back) => {
+        const dlg = $('adminPhotosDlg'); if (!dlg) return false;
+        dlg.querySelector('#apBody').innerHTML = html;
+        dlg.querySelector('#apSub').textContent = sub;
+        dlg.querySelector('#apBack').classList.toggle('hidden', !back);
+        return true;
+    },
+    classes: async () => {
+        adminDlg.show('<p class="text-sm text-gray-500">Loading...</p>', 'All classes · Admin only', false);
+        try {
+            const res = await apiFetch('/api/admin-exam-photos');
+            const list = res.classes || [];
+            adminDlg.show(list.length ? `<input id="apFind" type="search" placeholder="Find a class or lecturer" class="ctl w-full mb-3 px-3 text-sm border border-gray-300 rounded-md bg-gray-50">
+                <div class="space-y-2">${list.map(c => `<button type="button" data-ap-class="${esc(c.Course_ID)}" data-ap-title="${esc(c.CourseCode)}" data-ap-search="${esc((c.CourseCode + ' ' + c.CourseTitle + ' ' + (c.Lecturer || '')).toLowerCase())}" class="w-full text-left border border-gray-200 rounded-lg px-3 py-2.5 hover:bg-gray-50">
+                    <span class="block text-sm font-bold text-gray-800 truncate">${esc(c.CourseCode)} <span class="font-normal text-gray-600">${esc(c.CourseTitle || '')}</span></span>
+                    <span class="block text-[11px] text-gray-500 truncate">${esc(c.Lecturer || '')} &middot; ${c.Exams} exam${c.Exams === 1 ? '' : 's'} &middot; ${c.Students} student${c.Students === 1 ? '' : 's'} &middot; ${c.Photos} photos</span></button>`).join('')}</div>`
+                : '<p class="text-sm text-gray-500">No exam photos have been taken yet.</p>', 'All classes · Admin only', false);
+        } catch (e) { adminDlg.show(`<p class="text-sm text-red-700">${esc(e.message || 'Could not load.')}</p>`, 'All classes', false); }
+    },
+    exams: async (courseId, title) => {
+        adminDlg.show('<p class="text-sm text-gray-500">Loading...</p>', title, true);
+        try {
+            const res = await apiFetch(`/api/admin-exam-photos?courseId=${encodeURIComponent(courseId)}`);
+            const list = res.exams || [];
+            adminDlg.show(list.length ? `<div class="space-y-2">${list.map(x => `<button type="button" data-ap-exam="${esc(x.Class_Exam_ID)}" class="w-full text-left border border-gray-200 rounded-lg px-3 py-2.5 hover:bg-gray-50">
+                    <span class="block text-sm font-bold text-gray-800 truncate">${esc(x.Exam_Title || 'Exam')}</span>
+                    <span class="block text-[11px] text-gray-500">${esc(x.Term || '')} &middot; ${x.Students} student${x.Students === 1 ? '' : 's'} &middot; ${x.Photos} photos &middot; ${esc(fmtTime(x.Last_At, true))}</span></button>`).join('')}</div>`
+                : '<p class="text-sm text-gray-500">No photos for this class.</p>', title, true);
+        } catch (e) { adminDlg.show(`<p class="text-sm text-red-700">${esc(e.message || 'Could not load.')}</p>`, title, true); }
+    }
+};
+document.addEventListener('click', (e) => { if (e.target.closest('#openAdminPhotosBtn') && AppState.user && AppState.user.isAdmin) adminDlg.open(); });
 
 document.addEventListener('keydown', (e) => {
     if (!$('examPhotoLightbox')) { if (e.key === 'Escape') ExamPhotoReview.close(); return; }

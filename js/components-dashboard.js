@@ -108,7 +108,7 @@ const DashboardUI = {
         </nav>
     `,
 
-    renderAdminPage: () => `
+    renderAdminPage: (user) => `
         <div id="adminPage" class="hidden fixed inset-0 z-[55] flex items-center justify-center fade-in p-0 sm:p-4" role="dialog" aria-modal="true" aria-label="Admin tools">
             <div id="closeAdminPageBg" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
             <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-sm h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[90vh] overflow-y-auto">
@@ -149,6 +149,15 @@ const DashboardUI = {
                         </button>
                     </div>
                 </section>
+                ${user && user.isAdmin ? `<section aria-label="Admin only" class="mt-4">
+                    <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Exam integrity</h4>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" id="openAdminPhotosBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-rose-100 text-rose-700"><i class="fa-solid fa-camera" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Exam Photos</span>
+                        </button>
+                    </div>
+                </section>` : ''}
             </div>
         </div>
     `,
@@ -686,7 +695,7 @@ export const DashboardComponents = {
 
             ${DashboardUI.renderTabBar(user.role.toLowerCase() === 'lecturer')}
             ${DashboardUI.renderProfilePanel(user, panelAvatar, displayCourse, lecturerBtns)}
-            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAdminPage() : ''}
+            ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderAdminPage(user) : ''}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderManageUsersModal() : ''}
             ${DashboardUI.renderChangePasswordModal()}
             ${user.role.toLowerCase() === 'lecturer' ? DashboardUI.renderCreateCourseModal() : ''}
