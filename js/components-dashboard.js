@@ -88,9 +88,12 @@ const DashboardUI = {
                     <div class="flex items-center">
                         <h1 class="text-lg sm:text-xl font-bold text-gray-800 tracking-tight">${user.role.toLowerCase() === 'lecturer' ? '<i class="fa-solid fa-chalkboard-user mr-2 text-blue-600"></i>My Classes' : '<i class="fa-solid fa-house mr-2 text-blue-600"></i>Dashboard'}</h1>
                     </div>
+                    <div class="flex items-center">
+                    ${user.role.toLowerCase() === 'lecturer' ? `<button type="button" id="adminToolsBtn" data-dash-tab="admin" class="hidden sm:inline-flex relative items-center gap-2 mr-2 px-3 min-h-[40px] rounded-md border border-gray-300 text-sm font-bold text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>Admin tools<span id="adminToolsBadge" class="hidden min-w-[20px] h-5 px-1 rounded-full bg-red-600 text-white text-[11px] font-bold items-center justify-center" aria-hidden="true">0</span></button>` : ''}
                     <button type="button" id="profileToggleBtn" aria-haspopup="dialog" aria-label="Open profile menu for ${escapeHtml(user.Name)}" class="flex items-center cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-full transition-colors duration-200 border border-transparent hover:border-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                         <span class="mr-3 text-sm font-bold text-gray-700 hidden sm:block">${escapeHtml(user.Name)}</span>${headerAvatar}
                     </button>
+                    </div>
                 </div>
             </div>
         </header>

@@ -22,6 +22,8 @@ export const refreshResetBadge = async () => {
     const n = String(requests.length);
     const b = $('muReqBadge');
     if (b) { b.textContent = n; b.classList.toggle('hidden', !requests.length); }
+    const d = $('adminToolsBadge');
+    if (d) { d.textContent = n; d.classList.toggle('hidden', !requests.length); d.classList.toggle('inline-flex', !!requests.length); }
     const t = $('adminTabBadge');
     if (t) {
         t.textContent = n; t.classList.toggle('hidden', !requests.length); t.classList.toggle('flex', !!requests.length);
