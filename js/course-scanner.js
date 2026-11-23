@@ -550,6 +550,16 @@ export const CourseScanner = {
             result.canvas.width = 0;
             return row;
         }
+        // The sheet's own SET circles tell how many sets it was printed with. When that is more than the scanner is set to, the
+        // set keys are missing, so the sheet is not graded with a wrong key: the lecturer is told what to change.
+        const cfg0 = CourseScanner.cfg;
+        const have = cfg0 && cfg0.sets ? cfg0.sets.length : 1;
+        if (cfg0 && cfg0.mode === 'exam' && result.setsPrinted > have) {
+            row.ok = false;
+            row.error = `This sheet has ${result.setsPrinted} exam sets (A-${String.fromCharCode(64 + result.setsPrinted)}) but Exam sets is set to ${have}. Choose ${result.setsPrinted} in Exam sets (Scan setup) and scan it again.`;
+            result.canvas.width = 0;
+            return row;
+        }
         row.answers = result.answers.slice();
         row.original = result.answers.slice();
         row.studentText = result.studentNo;

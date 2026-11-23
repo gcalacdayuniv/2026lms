@@ -6,7 +6,7 @@
 //   3. build a perspective map from sheet millimetres to photo pixels
 //   4. measure how dark each circle's centre is and pick the shaded one per question
 import { MULTI_BASE } from './scan-codes.js';
-import { FRAME, BUBBLE_D, STU_BUBBLE_D, answerRows, studentCols, setBubbles } from './omr-sheet.js';
+import { FRAME, BUBBLE_D, STU_BUBBLE_D, BUBBLE_BORDER, MAX_SETS, answerRows, studentCols, setBubbles, normGeo } from './omr-sheet.js';
 
 const MAX_SIDE = 1600;     // the photo is shrunk to this size before reading
 const MARK_MIN = 0.40;     // share of dark pixels in a circle that counts as shaded
@@ -183,6 +183,55 @@ const bubbleFill = (bin, w, h, H, u, v) => {
     return best;
 };
 
+// How much of the printed ring of a circle is found at (u, v): share of 12 points around the ring with a dark pixel next to them.
+// Shading does not matter (a filled circle is dark at the ring too); an empty place on the sheet scores low.
+const ringScore = (bin, w, h, H, u, v, d) => {
+    const r = d / 2 - BUBBLE_BORDER / 2;
+    let best = 0;
+    for (const [du, dv] of [[0, 0], [SHIFT, 0], [-SHIFT, 0], [0, SHIFT], [0, -SHIFT]]) {
+        let hit = 0;
+        for (let a = 0; a < 12; a++) {
+            const t = a * Math.PI / 6;
+            const [x, y] = applyH(H, u + du + r * Math.cos(t), v + dv + r * Math.sin(t));
+            const px = Math.round(x), py = Math.round(y);
+            let dark = false;
+            for (let oy = -1; oy <= 1 && !dark; oy++) for (let ox = -1; ox <= 1; ox++) {
+                const X = px + ox, Y = py + oy;
+                if (X >= 0 && Y >= 0 && X < w && Y < h && bin[Y * w + X]) { dark = true; break; }
+            }
+            if (dark) hit++;
+        }
+        best = Math.max(best, hit / 12);
+    }
+    return best;
+};
+
+const gridScore = (bin, w, h, H, geo, mixed) => {
+    let sum = 0, n = 0;
+    studentCols(geo, mixed).forEach(col => col.bubbles.forEach(b => { sum += ringScore(bin, w, h, H, b.u, b.v, STU_BUBBLE_D); n++; }));
+    return sum / n;
+};
+
+// The printed sheet may have been made with another number of sets than the scanner was told (the set count is saved per device),
+// which moves the student number grid, the SET row and the first answer column. The student number grid is printed as 60 rings:
+// the layout (with or without the SET row) whose positions match the rings in the photo is the one that is read.
+export const detectGeo = (bin, w, h, H, geo, mixed) => {
+    const g0 = normGeo(geo);
+    const s0 = gridScore(bin, w, h, H, g0, mixed);
+    if (s0 >= 0.85) return { geo: g0, changed: false, score: s0 };
+    const alt = { ...g0, sets: g0.sets > 1 ? 0 : 2 };
+    const s1 = gridScore(bin, w, h, H, alt, mixed);
+    if (s1 > s0 + 0.15 && s1 >= 0.6) return { geo: alt, changed: true, score: s1 };
+    return { geo: g0, changed: false, score: s0 };
+};
+
+// Number of SET circles printed in the SET row (0 when the sheet has no SET row).
+export const countSetCircles = (bin, w, h, H) => {
+    let n = 0;
+    for (const b of setBubbles(MAX_SETS)) { if (ringScore(bin, w, h, H, b.u, b.v, BUBBLE_D) >= 0.8) n++; else break; }
+    return n;
+};
+
 // Index of the shaded circle, BLANK (-1) or MULTIPLE (-2).
 export const pickMark = (fills) => {
     const over = fills.map((f, i) => ({ f, i })).filter(o => o.f >= MARK_MIN).sort((a, b) => b.f - a.f);
@@ -213,7 +262,11 @@ export const decodeGray = (gray, w, h, n, c, geo = 0) => {
     const H = solveHomography(frame, markers);
     if (!H) return { ok: false, error: 'The sheet position could not be worked out. Take the photo again.' };
 
-    const studentFills = studentCols(geo, Array.isArray(n)).map(col => col.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
+    const mixed = Array.isArray(n);
+    const found = detectGeo(bin, w, h, H, geo, mixed);
+    geo = found.geo;
+    const setsPrinted = geo.sets > 1 ? countSetCircles(bin, w, h, H) : 0;
+    const studentFills = studentCols(geo, mixed).map(col => col.bubbles.map(b => bubbleFill(bin, w, h, H, b.u, b.v)));
     const digits = studentFills.map(pickMark);
     const d = digits.map(x => (x >= 0 ? String(x) : '?'));
     const studentNo = `${d[0]}${d[1]}-${d[2]}${d[3]}${d[4]}${d[5]}`;
@@ -227,7 +280,7 @@ export const decodeGray = (gray, w, h, n, c, geo = 0) => {
     const setFills = setBubbles().map(b => bubbleFill(bin, w, h, H, b.u, b.v));
     const setPick = pickMark(setFills);
 
-    return { ok: true, w, h, H, markers, studentFills, studentDigits: digits, studentNo, fills, answers, setFills, setPick, cells, geo };
+    return { ok: true, w, h, H, markers, studentFills, studentDigits: digits, studentNo, fills, answers, setFills, setPick, cells, geo, layoutChanged: found.changed, setsPrinted };
 };
 
 // Quick check used by the live camera: the 4 marker centres, or null. Cheap enough to run on a small frame.

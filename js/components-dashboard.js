@@ -153,11 +153,15 @@ const DashboardUI = {
                     </div>
                 </section>
                 ${user && user.isAdmin ? `<section aria-label="Admin only" class="mt-4">
-                    <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Exam integrity</h4>
+                    <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Admin only</h4>
                     <div class="grid grid-cols-3 gap-2">
                         <button type="button" id="openAdminPhotosBtn" class="menu-tile">
                             <span class="menu-tile-icon bg-rose-100 text-rose-700"><i class="fa-solid fa-camera" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Exam Photos</span>
+                        </button>
+                        <button type="button" id="openSiteIconBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-rose-100 text-rose-700"><i class="fa-solid fa-image" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Site icon</span>
                         </button>
                     </div>
                 </section>` : ''}

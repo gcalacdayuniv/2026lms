@@ -212,6 +212,17 @@ sql.prepare("update Users set role='Admin' where User_ID='L1'").run();
 const meAdm = await call('GET', '/api/me', { token: L1 });
 ok('/api/me returns Lecturer with isAdmin for an Admin', meAdm.s === 200 && meAdm.j.role === 'Lecturer' && meAdm.j.isAdmin === true, JSON.stringify(meAdm));
 sql.prepare("update Users set role='lecturer' where User_ID='L1'").run();
+// ---- site icon ----
+const png1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const iconPub = await call('GET', '/api/site-icon', {});
+ok('the site icon is public and empty at first', iconPub.s === 200 && iconPub.j.icon === null, JSON.stringify(iconPub));
+ok('a lecturer cannot change the site icon', (await call('POST', '/api/site-icon', { token: L1, body: { icon: png1 } })).s === 403);
+sql.prepare("update Users set role='Admin' where User_ID='L1'").run();
+ok('an Admin cannot save something that is not a PNG', (await call('POST', '/api/site-icon', { token: L1, body: { icon: 'data:text/html;base64,PGI+' } })).s === 400);
+ok('an Admin saves the site icon', (await call('POST', '/api/site-icon', { token: L1, body: { icon: png1 } })).s === 200);
+ok('everyone gets it', (await call('GET', '/api/site-icon', {})).j.icon === png1);
+ok('an Admin goes back to the default', (await call('POST', '/api/site-icon', { token: L1, body: { icon: null } })).s === 200 && (await call('GET', '/api/site-icon', {})).j.icon === null);
+sql.prepare("update Users set role='lecturer' where User_ID='L1'").run();
 // ---- an Admin changes roles ----
 const roleOf = (id) => sql.prepare('select role from Users where User_ID=?').get(id).role;
 const lecRole = await call('POST', '/api/update-user-role', { token: L1, body: { userId: 'S2', role: 'lecturer' } });

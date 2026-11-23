@@ -1,6 +1,7 @@
 #!/bin/sh
 # One command that checks the project before you upload:
 #   sh tools/tests/run-tests.sh          syntax + Worker lint + Worker tests + tailwind.css up to date
+#   sh tools/tests/run-tests.sh --omr    also reads simulated phone photos of the answer sheet (needs playwright)
 #   sh tools/tests/run-tests.sh --phone  also opens the app in a phone-sized browser (needs: npm i playwright, then npx playwright install chromium)
 # Needs Node 22 or newer. Stops at the first failure.
 set -e
@@ -14,5 +15,8 @@ node tools/tests/worker.test.mjs
 node tools/tests/participation.test.mjs
 echo "== 4/4 tailwind.css up to date"
 sh tools/build-css.sh --check
+for a in "$@"; do
+  if [ "$a" = "--omr" ]; then echo "== scanner check"; node tools/tests/omr-check.cjs; fi
+done
 if [ "$1" = "--phone" ]; then echo "== phone check"; node tools/tests/phone-check.cjs; fi
 echo "ALL CHECKS PASSED"

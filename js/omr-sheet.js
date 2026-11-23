@@ -55,7 +55,7 @@ export const bandFor = (written) => (written || []).filter(w => w.essay).reduce(
 // higher; an essay band at the bottom shortens the columns.
 // written = [{ no, lines, part }]: identification / enumeration items, which get numbered lines in the answer columns
 // between the bubble rows, in the order of the exam.
-const normGeo = (g) => (g && typeof g === 'object' ? { sets: Number(g.sets) || 0, band: Number(g.band) || 0, written: Array.isArray(g.written) ? g.written : [] } : { sets: Number(g) || 0, band: 0, written: [] });
+export const normGeo = (g) => (g && typeof g === 'object' ? { sets: Number(g.sets) || 0, band: Number(g.band) || 0, written: Array.isArray(g.written) ? g.written : [] } : { sets: Number(g) || 0, band: 0, written: [] });
 export const shortWritten = (written) => (written || []).filter(w => !w.essay).map(w => ({ no: w.no, lines: w.lines, part: Number(w.part) || 0 }));
 const geoOf = (g, mixed = false) => {
     const { sets, band, written } = normGeo(g);

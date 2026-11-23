@@ -25,6 +25,7 @@ import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
 import { refreshSessionRole } from './session-role.js';
+import { SiteIcon } from './site-icon.js';
 import { A11y } from './a11y.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -56,4 +57,5 @@ document.addEventListener('DOMContentLoaded', () => {
     AppRouter.init();
     A11y.init();
     refreshSessionRole();
+    SiteIcon.init();
 });

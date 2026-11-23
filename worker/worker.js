@@ -5,6 +5,7 @@ import { handleScores } from './scores.js';
 import { handleExams } from './exams.js';
 import { handleExamPhotos } from './exam-photos.js';
 import { handleRoles } from './roles.js';
+import { handleSiteSettings } from './site-settings.js';
 import { handleExamSession } from './exam-session.js';
 import { ensureCoreIndexes, ensureCourseRoom } from './schema.js';
 import { handleUploads } from './uploads.js';
@@ -69,6 +70,9 @@ export default {
 
             const photosResponse = await handleExamPhotos(request, env, path, url, corsHeaders, gate.user);
             if (photosResponse) return photosResponse;
+
+            const siteResponse = await handleSiteSettings(request, env, path, url, corsHeaders, gate.user);
+            if (siteResponse) return siteResponse;
 
             const rolesResponse = await handleRoles(request, env, path, url, corsHeaders, gate.user);
             if (rolesResponse) return rolesResponse;

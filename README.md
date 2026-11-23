@@ -6,6 +6,7 @@ This section is the standing instruction for every task. Keep it current when a 
 1. Plan briefly, then work in batches that stay within the token limit. Give the output of each batch so progress is not lost.
 2. Commit and push finished work straight to `main` of the GitHub repo (no zip needed). Commit only after the tests pass, with a message that says what changed. If a push is refused, say so and send a zip of the changed files instead.
 3. Test before delivering: worker changes against a local SQLite D1 test, UI changes in a browser (Playwright). Say what was tested and what was not.
+4. **Audit what a change can affect.** Before delivering, list the existing functions the change touches or depends on (shared helpers, layouts, routes, roles, stored settings, printed or saved formats) and check that each still works, with a test or a browser run, not by reading. Add the check to the test suite when it protects something that cannot be fixed afterwards. Print layouts and saved data formats must stay readable by what is already printed or stored. The scanner has its own check, `node tools/tests/omr-check.cjs` (`--omr` in `run-tests.sh`): run it after any change to `omr-sheet.js`, `omr-scan.js`, `scan-items.js`, `sheet-print.js` or `course-scanner.js`. Say in the reply what was audited.
 
 **Delivery (every task)**
 - Give full replacement files, never snippets.
@@ -216,6 +217,15 @@ We use the following environment variables strictly within the API (`worker/wran
 * **Phone dialog layouts:** Large panels are full screen and short actions are bottom sheets on phones (see Dialog Layout Conventions). Back closes the top dialog, swipe down closes a sheet, page scroll is locked behind dialogs, and sheets respect the iPhone safe area.
 * **Attendance Dates & Save All:** Lecturers can change, delete or merge attendance dates. The roster uses one **Save All** button with an unsaved-changes indicator and local drafts; per-student saving was removed.
 * **UI feedback & loading states:** Toasts and a confirm modal replace browser alerts, and skeleton placeholders replace spinners on major screens.
+
+## Scanner: layout is read from the photo, regression check
+- **Cause of "exam set and student number are not read":** the student number grid, the SET row and the first answer column sit lower on a sheet printed with sets than on one printed without (`omr-sheet.js` `geoOf`). The set count the scanner assumed is saved per device (`getSetCount`), so a sheet printed on one device and scanned on another, or printed with a different number of sets, was read at the wrong place: the student number came out wrong or with `?`, the SET circle blank, while most other answers still looked fine.
+- **Fix (`js/omr-scan.js`):** `detectGeo` checks the 60 printed rings of the student grid at the assumed layout; when they are not there (score under 0.85) and the other layout fits clearly better, it reads that layout instead (`result.layoutChanged`, `result.geo`). `countSetCircles` counts the SET circles actually printed (`result.setsPrinted`). The review and the overlay use the layout that was read. A matching sheet is read as before.
+- **Sets guard (`js/course-scanner.js` `rowFromResult`):** a sheet with more SET circles than Exam sets in the Scan setup is not graded (it would use a missing key); the row says to choose that number in Exam sets and scan again.
+- **Check:** `node tools/tests/omr-check.cjs` prints real sheets (`buildSheetHtml`), shades 12-3456, a SET circle and answers, makes a perspective "photo" with uneven light and noise, and reads it with the real scanner, for matched and mismatched set counts (plain and mixed sheets, two tilts). `sh tools/tests/run-tests.sh --omr` runs it with the other checks.
+
+## Site icon
+- Admin tools > **Site icon** (Admins only): choose a picture, it is cut to the centre square and saved as a 192 x 192 PNG (`js/site-icon.js`, `POST /api/site-icon`, table `Site_Settings`, created by the worker). `GET /api/site-icon` is public; every device applies it to the tab icon and the home-screen (apple-touch) icon at start and keeps a copy in `localStorage` (`site_icon_v1`). "Use default" returns to the Drive icon in `index.html`. An app already installed to a home screen keeps the icon it had when it was installed.
 
 ## Terms and Conditions, and the camera notice
 - **`terms.html`:** plain static page (light and dark) with the terms of use. Clause 4 covers the camera during examinations: photographs for exam integrity, who sees them, how long they are kept. It deliberately does not state how often photos are taken, so the interval can change per exam or per risk without changing the terms. Cached by `sw.js` (`SHELL`).
