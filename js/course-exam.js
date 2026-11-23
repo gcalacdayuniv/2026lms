@@ -18,6 +18,7 @@ import { buildScanPaperHtml } from './scan-paper.js';
 import { getSetCount, saveSetCount, printExamAnswerSheet } from './sheet-print.js';
 import { MAX_CHOICES } from './omr-sheet.js';
 import { ExamSecure } from './exam-secure.js';
+import { ExamPhotoReview } from './exam-photo-review.js';
 
 window.addEventListener('app:session-ended', () => {
     if (CourseExam.accExam) { ExamSecure.end(); CourseExam.stopDraftSync(); CourseExam.stopTimer(); document.getElementById('accessibleExamOverlay')?.classList.add('hidden'); CourseExam.accExam = null; CourseExam.accSubmitting = false; }
@@ -168,9 +169,14 @@ export const CourseExam = {
             return;
         }
 
+        if (e.target.closest('#erPhotosBtn')) {
+            await ExamPhotoReview.open({ classExamId: CourseExam.resultsData.classExamId });
+            return;
+        }
+
         const photosBtn = e.target.closest('.er-photos-btn');
         if (photosBtn) {
-            await ExamSecure.openPhotos(CourseExam.resultsData.classExamId, photosBtn.dataset.studentId, photosBtn.dataset.name);
+            await ExamPhotoReview.open({ classExamId: CourseExam.resultsData.classExamId, focusStudentId: photosBtn.dataset.studentId });
             return;
         }
 
@@ -1250,6 +1256,7 @@ export const CourseExam = {
                     <span class="flex flex-wrap gap-1.5 justify-end">
                     ${d.reviewCount ? `<button type="button" id="erReviewFilterBtn" aria-pressed="${CourseExam.resultsOnlyReview ? 'true' : 'false'}" class="px-2.5 py-1.5 text-xs font-bold rounded-md border ${CourseExam.resultsOnlyReview ? 'bg-red-600 text-white border-red-600' : 'border-red-300 text-red-700 hover:bg-red-50'} transition"><i class="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true"></i>${d.reviewCount} to review${CourseExam.resultsOnlyReview ? ' (showing)' : ''}</button>` : ''}
                     ${d.continuable ? `<button type="button" id="erContinueAllBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition"><i class="fa-solid fa-play mr-1" aria-hidden="true"></i>Let all ${d.continuable} continue</button>` : ''}
+                    ${d.students.some(x => x.photos > 0) ? `<button type="button" id="erPhotosBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 transition"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>All photos</button>` : ''}
                     <button type="button" id="erExportBtn" class="px-2.5 py-1.5 text-xs font-bold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-file-export mr-1" aria-hidden="true"></i>Export CSV</button>
                     </span>
                 </div>

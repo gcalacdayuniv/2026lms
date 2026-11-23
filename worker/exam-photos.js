@@ -81,7 +81,7 @@ export async function handleExamPhotos(request, env, path, url, corsHeaders) {
         return json(corsHeaders, { success: true }, 201);
     }
 
-    // Lecturer: the list of photos for one class exam (no pictures), or one picture.
+    // Lecturer: the list of photos for one class exam or for one student in a class (no pictures), or one picture.
     if (request.method === 'GET' && path === '/api/exam-photos') {
         const classExamId = url.searchParams.get('classExamId');
         const photoId = url.searchParams.get('photoId');
@@ -92,10 +92,28 @@ export async function handleExamPhotos(request, env, path, url, corsHeaders) {
             if (!gas.base64) throw new Error('Google Drive did not return the photo.');
             return json(corsHeaders, { success: true, mimeType: gas.mimeType || 'image/jpeg', base64: gas.base64 });
         }
+        const courseId = url.searchParams.get('courseId');
+        const studentId = url.searchParams.get('studentId');
+        // By student: one student's photos across the exams of one class (the class owner is checked by courseId).
+        if (courseId && studentId) {
+            const rows = await env.DB.prepare(
+                `SELECT p.Photo_ID, p.Student_ID, p.Kind, p.Taken_At, p.Class_Exam_ID, e.Title AS Exam_Title, u.Name
+                 FROM Exam_Photos p
+                 JOIN Class_Exams ce ON ce.Class_Exam_ID = p.Class_Exam_ID
+                 JOIN Exams e ON e.Exam_ID = ce.Exam_ID
+                 LEFT JOIN Users u ON u.User_ID = p.Student_ID
+                 WHERE ce.Course_ID = ? AND p.Student_ID = ? ORDER BY p.Taken_At`
+            ).bind(courseId, studentId).all();
+            return json(corsHeaders, { success: true, photos: rows.results || [] });
+        }
+        // By exam: every student's photos for one class exam.
         if (!classExamId) return json(corsHeaders, { error: 'Missing classExamId' }, 400);
         const rows = await env.DB.prepare(
-            `SELECT p.Photo_ID, p.Student_ID, p.Kind, p.Taken_At, u.Name
-             FROM Exam_Photos p LEFT JOIN Users u ON u.User_ID = p.Student_ID
+            `SELECT p.Photo_ID, p.Student_ID, p.Kind, p.Taken_At, p.Class_Exam_ID, e.Title AS Exam_Title, u.Name
+             FROM Exam_Photos p
+             JOIN Class_Exams ce ON ce.Class_Exam_ID = p.Class_Exam_ID
+             JOIN Exams e ON e.Exam_ID = ce.Exam_ID
+             LEFT JOIN Users u ON u.User_ID = p.Student_ID
              WHERE p.Class_Exam_ID = ? ORDER BY u.Name, p.Taken_At`
         ).bind(classExamId).all();
         return json(corsHeaders, { success: true, photos: rows.results || [] });

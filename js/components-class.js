@@ -424,6 +424,8 @@ const ClassUI = {
                         </select>
                     </div>
 
+                    <button type="button" id="manageExamPhotosBtn" class="w-full py-2 border border-blue-300 text-blue-700 hover:bg-blue-50 rounded text-sm font-bold transition"><i class="fa-solid fa-camera mr-1.5" aria-hidden="true"></i>Review exam photos</button>
+
                     <details class="border border-gray-200 rounded-lg p-3 bg-gray-50/50" id="manageDetailsBox">
                         <summary class="text-xs font-bold text-gray-700 cursor-pointer select-none"><i class="fa-solid fa-id-card text-blue-600 mr-1"></i>Edit Student Details</summary>
                         <div class="space-y-3 mt-3">

@@ -5,7 +5,7 @@
 //  - leaving the exam screen (switching tab, app or window, locking the screen) starts a 5 second grace period;
 //    staying away longer submits the answers (the server enforces it too, because phones freeze the page in the background).
 // Students flagged Legally Blind are exempt unless their lecturer turns it on (the server decides: student.secure).
-// Lecturers see the photos from Manage Exams > Results > Photos.
+// Lecturers review the photos in js/exam-photo-review.js (Manage Exams > Results > Photos, or Manage Student > Exam photos).
 import { apiFetch } from './globals.js';
 import { escapeHtml } from './html-utils.js';
 
@@ -217,39 +217,4 @@ export const ExamSecure = {
         if (releaseCamera) ExamSecure.release();
     },
 
-    // ---- Lecturer: photos of one class exam, per student ----
-    openPhotos: async (classExamId, studentId, name) => {
-        $('examPhotosDlg')?.remove();
-        const dlg = document.createElement('div');
-        dlg.id = 'examPhotosDlg';
-        dlg.className = 'fixed inset-0 z-[120] flex items-start sm:items-center justify-center fade-in';
-        dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-label', `Exam photos of ${name}`);
-        dlg.innerHTML = `<div class="absolute inset-0 bg-gray-900 bg-opacity-60" data-ep-close></div>
-            <div class="relative z-10 bg-white w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[90vh] sm:rounded-lg shadow-xl p-4 flex flex-col" style="padding-top:max(1rem, env(safe-area-inset-top))">
-                <div class="shrink-0 flex items-center gap-3 mb-3 border-b pb-3">
-                    <div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-gray-800">Exam photos</h3><p class="text-xs text-gray-500 truncate">${escapeHtml(name)} &middot; taken at the start and every 30 seconds</p></div>
-                    <button type="button" data-ep-close class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
-                </div>
-                <div id="epBody" class="flex-1 min-h-0 overflow-y-auto"><p class="text-sm text-gray-500">Loading...</p></div>
-            </div>`;
-        document.body.appendChild(dlg);
-        dlg.addEventListener('click', (e) => { if (e.target.closest('[data-ep-close]')) dlg.remove(); });
-        const body = dlg.querySelector('#epBody');
-        try {
-            const res = await apiFetch(`/api/exam-photos?classExamId=${encodeURIComponent(classExamId)}`);
-            const mine = (res.photos || []).filter(p => p.Student_ID === studentId);
-            if (!mine.length) { body.innerHTML = '<p class="text-sm text-gray-500">No photos for this student.</p>'; return; }
-            body.innerHTML = `<div class="grid grid-cols-3 gap-2">${mine.map(p => `
-                <figure class="m-0"><div class="aspect-[4/3] bg-gray-100 rounded overflow-hidden"><img data-photo-id="${escapeHtml(p.Photo_ID)}" alt="" class="w-full h-full object-cover"></div>
-                <figcaption class="text-[10px] text-gray-500 mt-0.5">${escapeHtml(new Date(p.Taken_At).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' }))}${p.Kind === 'start' ? ' (start)' : ''}</figcaption></figure>`).join('')}</div>`;
-            // One picture at a time, so a long exam does not flood the connection.
-            for (const img of body.querySelectorAll('img[data-photo-id]')) {
-                if (!document.body.contains(dlg)) return;
-                try {
-                    const r = await apiFetch(`/api/exam-photos?photoId=${encodeURIComponent(img.dataset.photoId)}`);
-                    img.src = `data:${r.mimeType || 'image/jpeg'};base64,${r.base64}`;
-                } catch (e) { img.alt = 'Could not load'; }
-            }
-        } catch (e) { body.innerHTML = `<p class="text-sm text-red-700">${escapeHtml(e.message || 'Could not load photos.')}</p>`; }
-    }
 };

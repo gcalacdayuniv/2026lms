@@ -169,6 +169,14 @@ const photoList = await call('GET', '/api/exam-photos?classExamId=' + (ce.j && c
 ok('lecturer can list exam photos', photoList.s === 200 && Array.isArray(photoList.j.photos), JSON.stringify(photoList));
 const photoListStu = await call('GET', '/api/exam-photos?classExamId=' + (ce.j && ce.j.classExamId), { token: sOwn });
 ok('students cannot list exam photos', photoListStu.s === 403, JSON.stringify(photoListStu));
+sql.prepare("insert into Exam_Photos (Photo_ID, Assignment_ID, Class_Exam_ID, Student_ID, Kind, Taken_At, File_ID) values ('PH1', 'A-x', ?, 'S1', 'start', '2026-01-01T00:00:00.000Z', 'f1')").run(ce.j.classExamId);
+const photoByStudent = await call('GET', '/api/exam-photos?courseId=C1&studentId=S1', { token: L1 });
+ok('lecturer can list one student\'s photos across the class exams', photoByStudent.s === 200 && photoByStudent.j.photos.some(p => p.Photo_ID === 'PH1' && p.Exam_Title), JSON.stringify(photoByStudent));
+const photoByStudentOther = await call('GET', '/api/exam-photos?courseId=C1&studentId=S1', { token: l2.j.token });
+ok('another lecturer cannot list them', photoByStudentOther.s === 403, JSON.stringify(photoByStudentOther));
+const photoByStudentStu = await call('GET', '/api/exam-photos?courseId=C1&studentId=S1', { token: sOwn });
+ok('students cannot list photos by student', photoByStudentStu.s === 403, JSON.stringify(photoByStudentStu));
+sql.prepare("delete from Exam_Photos where Photo_ID='PH1'").run();
 const res2 = await call('GET', '/api/exam-results?classExamId=' + (ce.j && ce.j.classExamId), { token: L1 });
 ok('results carry submit reason and photo count', res2.s === 200 && res2.j.students.every(x => 'submitReason' in x && x.photos === 0), JSON.stringify(res2.j.students));
 
