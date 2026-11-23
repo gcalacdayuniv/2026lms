@@ -6,6 +6,7 @@ import { AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { Theme } from './theme.js';
 
+export const SITE_ICON_KEY = 'site_icon_v1';   // the Admin's site icon (js/site-icon.js), shared so the installed app uses it too
 const THEME = '#2563eb';
 const DISMISS_KEY = 'pwa_install_dismissed';
 
@@ -44,6 +45,24 @@ const drawIcon = (size, maskable) => {
     return c.toDataURL('image/png');
 };
 
+// The Admin's picture as an app icon: the whole square for a normal icon, on white with a safe margin for a maskable one.
+const pictureIcon = (src, size, maskable) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const x = c.getContext('2d');
+        x.imageSmoothingQuality = 'high';
+        if (maskable) {
+            x.fillStyle = '#ffffff'; x.fillRect(0, 0, size, size);
+            const s = size * 0.8; x.drawImage(img, (size - s) / 2, (size - s) / 2, s, s);
+        } else x.drawImage(img, 0, 0, size, size);
+        resolve(c.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+});
+
 // iPhone launch image: Safari matches it by exact screen size, so it is made for this device only
 // (it takes effect the next time the app is added to the Home Screen).
 const addSplash = (icon) => {
@@ -58,7 +77,9 @@ const addSplash = (icon) => {
     img.onload = () => {
         const size = Math.round(Math.min(c.width, c.height) * 0.28);
         x.drawImage(img, (c.width - size) / 2, (c.height - size) / 2 - size * 0.1, size, size);
+        document.getElementById('pwaSplash')?.remove();
         addHead('link', {
+            id: 'pwaSplash',
             rel: 'apple-touch-startup-image',
             href: c.toDataURL('image/png'),
             media: `(device-width: ${Math.min(w, h)}px) and (device-height: ${Math.max(w, h)}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`
@@ -77,36 +98,56 @@ const addHead = (tag, attrs) => {
 export const PWA = {
     deferred: null,
 
+    // (Re)writes the manifest and the Home Screen icon. The manifest is a blob made here because the site only serves static files.
+    applyIcons: (icon192, icon512, maskable) => {
+        const base = new URL('./', window.location.href).href;
+        const manifest = {
+            name: document.title || 'Online Portal',
+            short_name: 'Portal',
+            start_url: base,
+            scope: base,
+            display: 'standalone',
+            orientation: 'portrait',
+            background_color: Theme.isDark() ? '#0b1220' : '#ffffff',
+            theme_color: THEME,
+            icons: [
+                { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+                { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+                { src: maskable, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+            ]
+        };
+        const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+        let link = document.getElementById('pwaManifest');
+        const old = link ? link.getAttribute('href') : null;
+        if (!link) link = addHead('link', { id: 'pwaManifest', rel: 'manifest', href: url });
+        else link.setAttribute('href', url);
+        if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
+        let apple = document.getElementById('appleIcon');
+        if (apple) apple.setAttribute('href', icon192);
+        else addHead('link', { id: 'appleIcon', rel: 'apple-touch-icon', href: icon192 });
+        addSplash(icon512);
+    },
+
+    // The installed app uses the Admin's site icon (a null src goes back to the built-in icon).
+    useSiteIcon: async (src) => {
+        try {
+            if (!src) { PWA.applyIcons(drawIcon(192, false), drawIcon(512, false), drawIcon(512, true)); return; }
+            const [i192, i512, mask] = await Promise.all([pictureIcon(src, 192, false), pictureIcon(src, 512, false), pictureIcon(src, 512, true)]);
+            if (i192 && i512 && mask) PWA.applyIcons(i192, i512, mask);
+        } catch (err) { console.warn('Site icon not applied to the app icon:', err); }
+    },
+
     init: () => {
         try {
-            const icon192 = drawIcon(192, false);
-            const icon512 = drawIcon(512, false);
-            const maskable = drawIcon(512, true);
-            const base = new URL('./', window.location.href).href;
-            const manifest = {
-                name: document.title || 'Online Portal',
-                short_name: 'Portal',
-                start_url: base,
-                scope: base,
-                display: 'standalone',
-                orientation: 'portrait',
-                background_color: Theme.isDark() ? '#0b1220' : '#ffffff',
-                theme_color: THEME,
-                icons: [
-                    { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
-                    { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
-                    { src: maskable, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
-                ]
-            };
-            const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
-            addHead('link', { rel: 'manifest', href: url });
-            addHead('link', { rel: 'apple-touch-icon', href: icon192 });
-            addSplash(icon512);
+            PWA.applyIcons(drawIcon(192, false), drawIcon(512, false), drawIcon(512, true));
             addHead('meta', { name: 'theme-color', content: THEME });
             addHead('meta', { name: 'mobile-web-app-capable', content: 'yes' });
             addHead('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
             addHead('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'default' });
             addHead('meta', { name: 'apple-mobile-web-app-title', content: 'Portal' });
+            let saved = null;
+            try { saved = localStorage.getItem(SITE_ICON_KEY); } catch (e) { /* storage blocked */ }
+            if (saved) PWA.useSiteIcon(saved);
         } catch (err) {
             console.warn('App icons could not be prepared:', err);
         }

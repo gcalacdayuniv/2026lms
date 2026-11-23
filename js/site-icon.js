@@ -3,8 +3,9 @@
 // shows it at once; the Admin changes it in Admin tools > Site icon (a picture is cut to a 192 x 192 PNG here, then saved).
 import { apiFetch, AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
+import { PWA, SITE_ICON_KEY } from './pwa.js';
 
-const KEY = 'site_icon_v1';
+const KEY = SITE_ICON_KEY;
 const SIZE = 192;
 const $ = (id) => document.getElementById(id);
 const defaults = {};
@@ -44,6 +45,7 @@ export const SiteIcon = {
         try {
             const res = await apiFetch('/api/site-icon');
             setLinks(res.icon || null);
+            PWA.useSiteIcon(res.icon || null);
             try { if (res.icon) localStorage.setItem(KEY, res.icon); else localStorage.removeItem(KEY); } catch (e) { /* storage blocked */ }
         } catch (e) { /* offline: keep what is shown */ }
     },
@@ -97,6 +99,7 @@ export const SiteIcon = {
         try {
             await apiFetch('/api/site-icon', { method: 'POST', body: JSON.stringify({ icon }) });
             setLinks(icon);
+            PWA.useSiteIcon(icon);
             try { if (icon) localStorage.setItem(KEY, icon); else localStorage.removeItem(KEY); } catch (e) { /* storage blocked */ }
             $('siteIconDlg')?.remove();
             UI.success(icon ? 'Site icon saved. Other devices pick it up the next time they open the app.' : 'Back to the default site icon.');
