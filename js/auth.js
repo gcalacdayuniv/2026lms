@@ -321,8 +321,36 @@ export const AuthModule = {
              }
         }
         
+        if (e.target.classList.contains('mu-role-select')) {
+            await AuthModule.setUserRole(e.target.dataset.userId, e.target.value, e.target);
+            return;
+        }
+
         if (e.target.classList.contains('mu-status-select')) {
             await AuthModule.setUserStatus(e.target.dataset.userId, e.target.value);
+        }
+    },
+
+    // Admins only: change a user's role (student / lecturer / Admin).
+    setUserRole: async (userId, role, select) => {
+        const user = AuthModule.usersList.find(u => u.User_ID === userId);
+        if (!user) return;
+        const before = String(user.role || '').toLowerCase();
+        const label = { student: 'Student', lecturer: 'Lecturer', admin: 'Admin' }[role];
+        const ok = await UI.confirm({
+            title: 'Change role?',
+            message: `${user.Name} will become ${label === 'Admin' ? 'an Admin (a lecturer who can also see exam photos and change roles)' : 'a ' + label.toLowerCase()}. They see the change after they sign in again.`,
+            confirmText: 'Change role', danger: role === 'student'
+        });
+        if (!ok) { if (select) select.value = before; return; }
+        try {
+            await apiFetch('/api/update-user-role', { method: 'POST', body: JSON.stringify({ userId, role }) });
+            user.role = role === 'admin' ? 'Admin' : role;
+            AuthModule.renderManageUsers();
+            UI.success(`${user.Name.split(',')[0]}: ${label}`);
+        } catch (err) {
+            if (select) select.value = before;
+            UI.error('Failed to change role: ' + err.message);
         }
     },
 
@@ -651,7 +679,7 @@ export const AuthModule = {
                         ${avatarImg}
                     </div>
                     <div class="overflow-hidden min-w-0">
-                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${escapeHtml(u.Name)}${u.Reactivation_Requested ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black uppercase" title="Asked to be reactivated at the login screen">Reactivation requested</span>' : ''} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${escapeHtml(u.role)}</span>${disabilityBadge}</div>
+                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${escapeHtml(u.Name)}${['lecturer', 'admin'].includes(String(u.role || '').toLowerCase()) ? `<span class="ml-1 text-[9px] ${String(u.role).toLowerCase() === 'admin' ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-indigo-100 text-indigo-800 border-indigo-300'} px-1.5 py-0.5 rounded border font-black uppercase align-middle">${String(u.role).toLowerCase() === 'admin' ? 'Admin' : 'Lecturer'}</span>` : ''}${u.Reactivation_Requested ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black uppercase" title="Asked to be reactivated at the login screen">Reactivation requested</span>' : ''} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${escapeHtml(u.role)}</span>${disabilityBadge}</div>
                         
                         <div class="text-[11px] sm:text-xs text-gray-600 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span class="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">${escapeHtml(u.Student_Number || 'N/A')}</span>
@@ -663,6 +691,10 @@ export const AuthModule = {
                 </div>
                 <div class="w-full sm:w-auto flex-shrink-0 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                     ${String(u.role).toLowerCase() === 'student' ? `<button type="button" class="mu-edit-btn w-full sm:w-36 mb-2 px-3 min-h-[44px] text-xs sm:text-sm font-bold border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md" data-user-id="${escapeHtml(u.User_ID)}"><i class="fa-solid fa-pen mr-1.5" aria-hidden="true"></i>Edit details</button>` : ''}
+                    ${AppState.user && AppState.user.isAdmin && u.User_ID !== AppState.user.User_ID ? `<label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Role</label>
+                    <select class="mu-role-select ctl w-full sm:w-36 px-3 mb-2 text-xs sm:text-sm font-bold border border-gray-300 rounded-md bg-gray-50 cursor-pointer" data-user-id="${u.User_ID}" aria-label="Role of ${escapeHtml(u.Name)}">
+                        ${[['student', 'Student'], ['lecturer', 'Lecturer'], ['admin', 'Admin']].map(([v, t]) => `<option value="${v}" ${String(u.role || '').toLowerCase() === v ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>` : ''}
                     <label class="block sm:hidden text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Account Status</label>
                     <select class="mu-status-select w-full sm:w-36 px-3 py-2 text-xs sm:text-sm font-bold border rounded-md outline-none cursor-pointer transition shadow-sm ${
                         u.account_status === 'Active' ? 'text-green-700 border-green-300 bg-green-50 focus:ring-green-500' : 
