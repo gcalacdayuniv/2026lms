@@ -9,6 +9,12 @@ export const isLecturerRole = (role) => { const r = String(role || '').toLowerCa
 const ROLE_VALUE = { student: 'student', lecturer: 'lecturer', admin: 'Admin' };
 
 export async function handleRoles(request, env, path, url, corsHeaders, caller) {
+    // The signed-in user's current role, so a screen opened before a role change can catch up without signing in again.
+    if (path === '/api/me' && request.method === 'GET') {
+        if (!caller) return json(corsHeaders, { success: true, role: null, isAdmin: false });
+        const me = await env.DB.prepare('SELECT role FROM Users WHERE User_ID = ?').bind(caller.id).first();
+        return json(corsHeaders, { success: true, role: isAdminRole(me && me.role) ? 'Lecturer' : (me && me.role) || null, isAdmin: isAdminRole(me && me.role) });
+    }
     if (path !== '/api/update-user-role' || request.method !== 'POST') return null;
     if (caller && !caller.admin) return json(corsHeaders, { error: 'Only an Admin can change a role.' }, 403);
     const body = await request.json();

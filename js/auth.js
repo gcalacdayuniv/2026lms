@@ -303,6 +303,10 @@ export const AuthModule = {
     },
 
     handleChanges: async (e) => {
+        if (['muFilterRole', 'muFilterCourse', 'muFilterYear', 'muFilterSection'].includes(e.target.id)) {
+            AuthModule.muLimit = AuthModule.MU_PAGE;
+            AuthModule.renderManageUsers();
+        }
         if (e.target.id === 'muFilterStatus') {
             AuthModule.muLimit = AuthModule.MU_PAGE;
             AuthModule.renderManageUsers();
@@ -546,6 +550,7 @@ export const AuthModule = {
             document.getElementById('muModal').classList.add('hidden');
             document.getElementById('muSearchInput').value = '';
             document.getElementById('muFilterStatus').value = '';
+            ['muFilterRole', 'muFilterCourse', 'muFilterYear', 'muFilterSection'].forEach(id => { const s = document.getElementById(id); if (s) s.value = ''; });
         }
         
         if (e.target.closest('.view-avatar-btn')) {
@@ -633,6 +638,29 @@ export const AuthModule = {
         }
     },
 
+    // Fills the four filter dropdowns (keeping what is chosen) and returns the chosen values.
+    fillUserFilters: () => {
+        const val = (id) => document.getElementById(id)?.value || '';
+        const keep = { role: val('muFilterRole'), course: val('muFilterCourse'), year: val('muFilterYear'), section: val('muFilterSection') };
+        const uniq = (key) => [...new Set(AuthModule.usersList.map(u => String(u[key] || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+        const roles = [['', 'All roles'], ['student', 'Students'], ['lecturer', 'Lecturers']];
+        if (AppState.user && AppState.user.isAdmin) roles.push(['admin', 'Admins']);
+        const fill = (id, rows, chosen) => {
+            const el = document.getElementById(id);
+            if (!el) return '';
+            const html = rows.map(([v, t]) => `<option value="${escapeHtml(v)}">${escapeHtml(t)}</option>`).join('');
+            if (el.dataset.sig !== html) { el.innerHTML = html; el.dataset.sig = html; }
+            el.value = rows.some(([v]) => v === chosen) ? chosen : '';
+            return el.value;
+        };
+        return {
+            role: fill('muFilterRole', roles, keep.role),
+            course: fill('muFilterCourse', [['', 'All courses'], ...uniq('Program_Course').map(v => [v, v])], keep.course),
+            year: fill('muFilterYear', [['', 'All years'], ...uniq('Program_Year').map(v => [v, /^\d+$/.test(v) ? 'Year ' + v : v])], keep.year),
+            section: fill('muFilterSection', [['', 'All sections'], ...uniq('Program_Section').map(v => [v, v.length <= 3 ? 'Section ' + v : v])], keep.section)
+        };
+    },
+
     renderManageUsers: () => {
         const list = document.getElementById('manageUsersList');
         const keepScroll = list ? list.scrollTop : 0;
@@ -648,10 +676,17 @@ export const AuthModule = {
                 `<button type="button" class="mu-chip flex-shrink-0${val === filter ? ' is-on' : ''}" data-status="${val}" aria-pressed="${val === filter}">${label} ${n}</button>`).join('');
         }
 
+        // Role / program course / year / section filters. Their choices come from the users on the list; Admin is offered to Admins only.
+        const fv = AuthModule.fillUserFilters();
+        const roleOf = (u) => String(u.role || '').toLowerCase();
         const filtered = AuthModule.usersList.filter(u => {
             const matchSearch = u.Name.toLowerCase().includes(search) || (u.Student_Number && u.Student_Number.toLowerCase().includes(search));
             const matchFilter = filter === '' || u.account_status === filter;
-            return matchSearch && matchFilter;
+            const matchRole = !fv.role || roleOf(u) === fv.role;
+            const matchCourse = !fv.course || (u.Program_Course || '') === fv.course;
+            const matchYear = !fv.year || String(u.Program_Year || '') === fv.year;
+            const matchSection = !fv.section || (u.Program_Section || '') === fv.section;
+            return matchSearch && matchFilter && matchRole && matchCourse && matchYear && matchSection;
         });
         
         if(filtered.length === 0) {
@@ -679,7 +714,7 @@ export const AuthModule = {
                         ${avatarImg}
                     </div>
                     <div class="overflow-hidden min-w-0">
-                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${escapeHtml(u.Name)}${['lecturer', 'admin'].includes(String(u.role || '').toLowerCase()) ? `<span class="ml-1 text-[9px] ${String(u.role).toLowerCase() === 'admin' ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-indigo-100 text-indigo-800 border-indigo-300'} px-1.5 py-0.5 rounded border font-black uppercase align-middle">${String(u.role).toLowerCase() === 'admin' ? 'Admin' : 'Lecturer'}</span>` : ''}${u.Reactivation_Requested ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black uppercase" title="Asked to be reactivated at the login screen">Reactivation requested</span>' : ''} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${escapeHtml(u.role)}</span>${disabilityBadge}</div>
+                        <div class="font-black text-gray-800 text-sm sm:text-base truncate">${escapeHtml(u.Name)}${u.Reactivation_Requested ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black uppercase" title="Asked to be reactivated at the login screen">Reactivation requested</span>' : ''} <span class="ml-2 text-[9px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-widest align-middle">${escapeHtml(u.role)}</span>${disabilityBadge}</div>
                         
                         <div class="text-[11px] sm:text-xs text-gray-600 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span class="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">${escapeHtml(u.Student_Number || 'N/A')}</span>

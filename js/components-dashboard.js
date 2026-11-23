@@ -225,6 +225,12 @@ const DashboardUI = {
 
                 <div class="mb-3">
                     <input type="search" id="muSearchInput" autocomplete="off" placeholder="Search by Name or Student No..." class="w-full px-4 py-2.5 border border-gray-300 rounded-full text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <div id="muFilters" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                        <select id="muFilterRole" class="ctl w-full px-2 text-xs sm:text-sm font-bold border border-gray-300 rounded-md bg-white" aria-label="Filter by role"></select>
+                        <select id="muFilterCourse" class="ctl w-full px-2 text-xs sm:text-sm font-bold border border-gray-300 rounded-md bg-white" aria-label="Filter by program course"></select>
+                        <select id="muFilterYear" class="ctl w-full px-2 text-xs sm:text-sm font-bold border border-gray-300 rounded-md bg-white" aria-label="Filter by year"></select>
+                        <select id="muFilterSection" class="ctl w-full px-2 text-xs sm:text-sm font-bold border border-gray-300 rounded-md bg-white" aria-label="Filter by section"></select>
+                    </div>
                     <div id="muChips" class="flex gap-2 overflow-x-auto mt-3 pb-1 -mx-1 px-1" role="group" aria-label="Filter by status"></div>
                     <select id="muFilterStatus" class="hidden" aria-hidden="true" tabindex="-1">
                         <option value="">All Statuses</option>

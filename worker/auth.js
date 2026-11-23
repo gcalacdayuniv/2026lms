@@ -122,6 +122,7 @@ export const RULES = {
     'POST /api/exam-draft': { who: 'any', self: ['studentId'] },
     'POST /api/exam-away': { who: 'any', self: ['studentId'] },
     'POST /api/logout': { who: 'any', mine: ['userId'] },
+    'GET /api/me': { who: 'any' },
     'GET /api/exam-photos': { who: 'lecturer', adminAny: true },   // an Admin may read any class's photos (the handler limits a lecturer to the initial photo)
     'GET /api/admin-exam-photos': { who: 'lecturer', adminAny: true },   // Admin tools > Exam Photos (the handler refuses a lecturer)
     'POST /api/exam-photo': { who: 'any', self: ['studentId'] },   // GET /api/exam-photos is lecturer-only (owner checked by classExamId / photoId)

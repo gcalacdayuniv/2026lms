@@ -206,6 +206,12 @@ const lecAdm = await call('GET', '/api/admin-exam-photos', { token: L1 });
 ok('a lecturer cannot open the admin photo lists', lecAdm.s === 403, JSON.stringify(lecAdm));
 const lecOther = await call('GET', '/api/exam-photos?classExamId=' + ce.j.classExamId, { token: l2.j.token });
 ok('a lecturer still cannot read another lecturer\'s class', lecOther.s === 403, JSON.stringify(lecOther));
+const meLec = await call('GET', '/api/me', { token: L1 });
+ok('/api/me returns a lecturer role without the admin flag', meLec.s === 200 && String(meLec.j.role).toLowerCase() === 'lecturer' && meLec.j.isAdmin === false, JSON.stringify(meLec));
+sql.prepare("update Users set role='Admin' where User_ID='L1'").run();
+const meAdm = await call('GET', '/api/me', { token: L1 });
+ok('/api/me returns Lecturer with isAdmin for an Admin', meAdm.s === 200 && meAdm.j.role === 'Lecturer' && meAdm.j.isAdmin === true, JSON.stringify(meAdm));
+sql.prepare("update Users set role='lecturer' where User_ID='L1'").run();
 // ---- an Admin changes roles ----
 const roleOf = (id) => sql.prepare('select role from Users where User_ID=?').get(id).role;
 const lecRole = await call('POST', '/api/update-user-role', { token: L1, body: { userId: 'S2', role: 'lecturer' } });

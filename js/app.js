@@ -24,6 +24,7 @@ import { CoursePending } from './course-pending.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { AppState } from './globals.js';
+import { refreshSessionRole } from './session-role.js';
 import { A11y } from './a11y.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -54,4 +55,5 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseAttendanceDates.init();
     AppRouter.init();
     A11y.init();
+    refreshSessionRole();
 });
