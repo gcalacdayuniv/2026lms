@@ -43,7 +43,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 - Auth/profile: auth.js, components-auth.js, forgot-password.js, password-requests.js, profile-edit.js, edit-student.js, terms-consent.js.
 - Dashboard / class list: course-dashboard.js (course cards, **upload form logic**), components-dashboard.js (dashboard + student summary + submit/history/My Groups modals), dash-nav.js, card-more.js (menu shortcuts), duplicate-course.js, year-advance.js, current-term.js.
 - Class screen (lecturer): course.js (main click handlers, student summary open), course-class.js (roster, **submission history cards**), components-class.js (class template, Course Actions menu tiles, Record Scores/Groups/Edit-upload modals), course-attendance*.js, course-recitation.js, course-roster-tools.js, lecturer-notes.js, class-invite.js.
-- Scores/grades: course-scores.js (Record Scores, group fill), course-summary.js (Class Summary), grade-base.js (`onBase`), class-grade-export.js + class-grade-template.js (ExcelJS), participation.js.
+- Scores/grades: course-scores.js (Record Scores, group fill), course-summary.js (Class Summary), grade-base.js (`onBase`, used only by the export), class-grade-export.js + class-grade-template.js (ExcelJS), participation.js.
 - Groups/uploads: course-groups.js (lecturer Groups screen), my-groups.js (student screen), submission-edit.js (lecturer edits an upload).
 - Exams: exam-builder*.js, course-exam.js, components-exam.js, exam-secure.js, exam-sets.js, exam-share.js, exam-print.js, exam-review.js, exam-photo-review.js.
 - Scanner/OMR: course-scanner*.js, course-scan-*.js, omr-*.js, scan-*.js, sheet-print.js, student-sheet-viewer.js, components-scanner.js.
@@ -59,7 +59,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 - `phone-check.cjs`: Playwright at phone width, checks CSP, missing Tailwind classes, sideways scroll, script errors. `omr-check.cjs` for the scanner (`--omr`).
 
 ## Recent changes (newest last; details in docs/FEATURES.md)
-Lecturer uploads for a student + group members; scanned sheets in Exam Results; extra credit; student review of scanned paper; grade base 100 + no-activity full credit; group sets (Reporting set = Enrollments.Group_Name, others in Group_Sets/Group_Members) with topics, random split, sortable list, per-set uploads, group score fill, student My Groups screen; password reset emails temp password through GAS; upload term default by date, Upload as Individual/Group, lecturer edits any student upload (lecturer uploads are not marked).
+Lecturer uploads for a student + group members; scanned sheets in Exam Results; extra credit; student review of scanned paper; grade base 100 (Class Grade .xlsx export only; dashboards show raw scores) + no-activity full credit; group sets (Reporting set = Enrollments.Group_Name, others in Group_Sets/Group_Members) with topics, random split, sortable list, per-set uploads, group score fill, student My Groups screen; password reset emails temp password through GAS; upload term default by date, Upload as Individual/Group, lecturer edits any student upload (lecturer uploads are not marked).
 
 ## Keeping this file useful
 Update this map in the same commit when a file is added, renamed or changes responsibility, or when a standing rule changes. Keep it under ~120 lines: it is an index, not documentation.

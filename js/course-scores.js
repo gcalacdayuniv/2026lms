@@ -5,7 +5,6 @@ import { CourseSummary } from './course-summary.js';
 import { UI } from './ui-feedback.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
-import { onBase, GRADE_BASE } from './grade-base.js';
 
 const fmt = (n) => Number(Number(n).toFixed(2));
 
@@ -172,8 +171,8 @@ export const CourseScores = {
                 if (!SUBMISSION_FALLBACK.includes(category)) el.textContent = '—';
                 return;
             }
-            const total = scored.reduce((sum, a) => sum + onBase(a.Score, a.Max_Score), 0);   // every assessment counts out of 100
-            const max = scored.length * GRADE_BASE;
+            const total = scored.reduce((sum, a) => sum + a.Score, 0);
+            const max = scored.reduce((sum, a) => sum + a.Max_Score, 0);
             el.textContent = `${fmt(total)}/${fmt(max)}`;
         });
     },
@@ -193,7 +192,7 @@ export const CourseScores = {
             tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500 italic">No scores recorded for this period.</td></tr>';
         } else {
             tbody.innerHTML = items.map(a => {
-                const scoreText = (a.Score === null || a.Score === undefined) ? '—' : `${fmt(a.Score)}/${fmt(a.Max_Score)}${a.Max_Score === GRADE_BASE ? '' : ` (${fmt(onBase(a.Score, a.Max_Score))}/${GRADE_BASE})`}`;
+                const scoreText = (a.Score === null || a.Score === undefined) ? '—' : `${fmt(a.Score)}/${fmt(a.Max_Score)}`;
                 return `
                     <tr class="hover:bg-gray-50 transition">
                         <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">${esc(a.Date || '')}</td>
