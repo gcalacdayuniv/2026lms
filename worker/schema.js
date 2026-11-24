@@ -308,3 +308,16 @@ export async function ensureCourseRoom(env) {
     }
     courseRoomReady = true;
 }
+
+// Group sets: several named sets of groups per class (for different activities). The "Reporting" set is not stored here;
+// it is the existing Enrollments.Group_Name / Assigned_Topic. Every other set keeps one row per student in Group_Members.
+let groupTablesReady = false;
+export async function ensureGroupTables(env) {
+    if (groupTablesReady) return;
+    await env.DB.batch([
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS Group_Sets (Set_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Name TEXT NOT NULL, Created_At DATETIME DEFAULT CURRENT_TIMESTAMP)"),
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_group_sets_course ON Group_Sets (Course_ID)"),
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS Group_Members (Set_ID TEXT NOT NULL, Student_ID TEXT NOT NULL, Group_Name TEXT NOT NULL, Topic TEXT, PRIMARY KEY (Set_ID, Student_ID))")
+    ]);
+    groupTablesReady = true;
+}

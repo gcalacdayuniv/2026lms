@@ -537,6 +537,7 @@ const DashboardUI = {
                             <input type="checkbox" id="isGroupUpload" class="rounded text-purple-600 focus:ring-purple-500">
                             <span id="groupUploadLabel">Submit as Group Upload</span>
                         </label>
+                        <select id="groupUploadSet" aria-label="Group set" class="w-full mb-2 px-2 py-1.5 border border-purple-200 rounded text-xs bg-white"></select>
                         <div id="groupMembersList" class="hidden space-y-1.5 mt-2 pt-2 border-t border-purple-200 max-h-32 overflow-y-auto">
                         </div>
                     </div>
@@ -605,6 +606,7 @@ const DashboardUI = {
                     <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-user-group" aria-hidden="true"></i> Group</div><div class="ss-info-val ss-marq"><span id="ssGroup">-</span></div></div>
                     <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Topic</div><div class="ss-info-val ss-marq"><span id="ssTopic">-</span></div></div>
                 </div>
+                <div id="ssOtherGroups" class="hidden max-w-4xl mx-auto px-4 sm:px-6 pb-3 text-xs text-gray-700"></div>
                 <div id="ssTermTabs" class="ss-tabs max-w-4xl mx-auto" role="tablist" aria-label="Term">
                     <button type="button" role="tab" class="ss-term-tab is-active" data-term="midterm" aria-selected="true">Mid Term</button>
                     <button type="button" role="tab" class="ss-term-tab" data-term="finalterm" aria-selected="false">Final Term</button>

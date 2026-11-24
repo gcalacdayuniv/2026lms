@@ -357,6 +357,19 @@ export const CourseModule = {
                     StudentSummaryUI.marquee('ssTopic');
                 }
 
+                // Groups from the other sets (lab teams, quiz teams ...), with teammates and topic.
+                const otherBox = document.getElementById('ssOtherGroups');
+                if (otherBox) {
+                    otherBox.classList.add('hidden');
+                    apiFetch(`/api/student-groups?courseId=${courseId}&studentId=${AppState.user.User_ID}`).then(r => {
+                        const rows = (r.groups || []).filter(g => g.setId !== 'reporting');
+                        if (!rows.length) return;
+                        otherBox.innerHTML = '<div class="font-bold text-gray-500 uppercase tracking-wider text-[10px] mb-1">My other groups</div>' + rows.map(g =>
+                            `<div class="mb-1"><span class="font-bold">${escapeHtml(g.setName)}:</span> ${escapeHtml(g.groupName)}${g.topic ? ` (${escapeHtml(g.topic)})` : ''}${g.mates.length ? ` &middot; with ${g.mates.map(escapeHtml).join(', ')}` : ''}</div>`).join('');
+                        otherBox.classList.remove('hidden');
+                    }).catch(() => {});
+                }
+
                 const submitBtn = document.getElementById('openSubmitDocModalBtn');
                 if (submitBtn) submitBtn.dataset.courseId = courseId;
 

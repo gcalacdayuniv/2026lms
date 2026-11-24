@@ -70,13 +70,60 @@ export const CourseScores = {
     },
 
     handleChanges: async (e) => {
+        if (e.target.id === 'scGroupSet') {
+            await CourseScores.chooseGroupSet(e.target.value);
+            return;
+        }
         if (e.target.id === 'scAssessmentSelect') {
             await CourseScores.selectAssessment(e.target.value);
         }
     },
 
     handleInput: (e) => {
+        CourseScores.fillGroup(e);
         if (e.target.id === 'scMax' || (e.target.classList && e.target.classList.contains('score-input'))) CourseScores.markExtraCredit();
+    },
+
+    // One score for the group: loads a set's groups; typing a score for one member then fills the other members.
+    groupOf: {},
+    chooseGroupSet: async (setId) => {
+        CourseScores.groupOf = {};
+        if (setId) {
+            try {
+                const r = await apiFetch(`/api/group-set?courseId=${CourseScores.courseId}&setId=${encodeURIComponent(setId)}&_t=${Date.now()}`);
+                r.groups.forEach(g => g.members.forEach(m => { CourseScores.groupOf[m.User_ID] = g.name; }));
+            } catch (err) {
+                CourseScores.setAlert(err.message || 'Could not load the groups.', false);
+            }
+        }
+        CourseScores.showGroupNames();
+    },
+
+    showGroupNames: () => {
+        document.querySelectorAll('#scGridBody .sc-group-tag').forEach(el => {
+            el.textContent = CourseScores.groupOf[el.dataset.studentId] || '';
+        });
+    },
+
+    fillGroup: (e) => {
+        const input = e.target;
+        if (!input.classList || !input.classList.contains('score-input')) return;
+        const group = CourseScores.groupOf[input.dataset.studentId];
+        if (!group) return;
+        document.querySelectorAll('.score-input').forEach(other => {
+            if (other !== input && CourseScores.groupOf[other.dataset.studentId] === group) other.value = input.value;
+        });
+    },
+
+    loadGroupSets: async () => {
+        const select = document.getElementById('scGroupSet');
+        if (!select) return;
+        try {
+            const r = await apiFetch(`/api/group-sets?courseId=${CourseScores.courseId}`);
+            select.innerHTML = '<option value="">Off</option>' + (r.sets || []).map(s => `<option value="${esc(s.Set_ID)}">${esc(s.Name)}</option>`).join('');
+        } catch (err) { /* the tool stays Off */ }
+        select.value = '';
+        CourseScores.groupOf = {};
     },
 
     // A score above the max is extra credit: kept as typed here, counted as the max in the class grade.
@@ -204,6 +251,7 @@ export const CourseScores = {
             CourseScores.students = CourseSummary.sortStudents(details.students || []);
             CourseScores.assessments = list.assessments || [];
             CourseScores.currentId = '';
+            await CourseScores.loadGroupSets();
             CourseScores.renderSelect();
             await CourseScores.selectAssessment('');
         } catch (err) {
@@ -280,7 +328,7 @@ export const CourseScores = {
                     <td class="px-3 py-2 text-center font-bold">${esc(s.Seat_Number || '')}</td>
                     <td class="px-3 py-2">
                         <div class="font-bold text-gray-800">${esc(s.Name)}</div>
-                        <div class="text-[10px] text-gray-500">${esc(s.Student_Number || 'N/A')}</div>
+                        <div class="text-[10px] text-gray-500">${esc(s.Student_Number || 'N/A')} <span class="sc-group-tag font-bold text-violet-600" data-student-id="${esc(s.User_ID)}">${esc(CourseScores.groupOf[s.User_ID] || '')}</span></div>
                     </td>
                     <td class="px-3 py-2 text-center">
                         <input type="number" step="any" min="0" data-student-id="${esc(s.User_ID)}" data-name="${esc(s.Name)}" class="score-input w-24 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-center bg-gray-50 focus:bg-white font-mono" value="${val !== undefined && val !== null ? val : ''}" placeholder="—">

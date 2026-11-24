@@ -704,5 +704,40 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('extra credit stops at 100', onBase(23, 20) === 100 && onBase(150, 100) === 100);
   ok('plain conversion', onBase(15, 20) === 75 && onBase(0, 20) === 0 && onBase(5, 0) === 0 && onBase(-3, 20) === 0);
 }
+// ---- Group sets: several sets of groups per class; Reporting stays on the roster; uploads and students use them
+{
+  const t1 = await signToken(env, 'S1'), t2 = await signToken(env, 'S2');
+  const sets0 = await call('GET', '/api/group-sets?courseId=C1', { token: L1 });
+  ok('Reporting set always exists', sets0.j.sets[0].Set_ID === 'reporting');
+  const mk = await call('POST', '/api/group-set-create', { token: L1, body: { courseId: 'C1', name: 'Lab 1' } });
+  ok('create a set', mk.s === 201 && !!mk.j.setId);
+  ok('duplicate set name refused', (await call('POST', '/api/group-set-create', { token: L1, body: { courseId: 'C1', name: 'lab 1' } })).s === 400);
+  ok('the name Reporting is reserved', (await call('POST', '/api/group-set-create', { token: L1, body: { courseId: 'C1', name: 'Reporting' } })).s === 400);
+  const sv = (setId, groups) => call('POST', '/api/group-set-save', { token: L1, body: { courseId: 'C1', setId, groups } });
+  ok('save a set with topic', (await sv(mk.j.setId, [{ name: 'Team A', topic: 'Circuits', memberIds: ['S1', 'S2'] }])).s === 200);
+  const g = await call('GET', `/api/group-set?courseId=C1&setId=${mk.j.setId}`, { token: L1 });
+  ok('set returns groups with topic and members', g.j.groups.length === 1 && g.j.groups[0].topic === 'Circuits' && g.j.groups[0].members.length === 2, JSON.stringify(g.j));
+  ok('a student in two groups of one set is refused', (await sv(mk.j.setId, [{ name: 'A', memberIds: ['S1'] }, { name: 'B', memberIds: ['S1'] }])).s === 400);
+  ok('a non-enrolled student is refused', (await sv(mk.j.setId, [{ name: 'A', memberIds: ['NOPE'] }])).s === 400);
+  ok('two groups with the same name are refused', (await sv(mk.j.setId, [{ name: 'A', memberIds: ['S1'] }, { name: 'a', memberIds: ['S2'] }])).s === 400);
+  await sv(mk.j.setId, [{ name: 'Team A', topic: 'Circuits', memberIds: ['S1', 'S2'] }]);
+  // Reporting is separate from Lab 1
+  ok('save the Reporting set writes the roster fields', (await sv('reporting', [{ name: 'R1', topic: 'Topic X', memberIds: ['S1'] }, { name: 'R2', memberIds: ['S2'] }])).s === 200
+    && sql.prepare("select Group_Name, Assigned_Topic from Enrollments where Student_ID='S1' and Course_ID='C1'").get().Assigned_Topic === 'Topic X');
+  ok('Lab 1 unchanged by Reporting save', (await call('GET', `/api/group-set?courseId=C1&setId=${mk.j.setId}`, { token: L1 })).j.groups[0].members.length === 2);
+  const sg = await call('GET', '/api/student-groups?courseId=C1&studentId=S1', { token: t1 });
+  ok('student sees groups of every set with teammates', sg.s === 200 && sg.j.groups.length === 2 && sg.j.groups.find(x => x.setName === 'Lab 1').mates[0] !== undefined, JSON.stringify(sg.j));
+  ok('a student cannot read another student\'s groups', (await call('GET', '/api/student-groups?courseId=C1&studentId=S1', { token: t2 })).s === 403);
+  ok('a student cannot edit sets', (await call('POST', '/api/group-set-save', { token: t1, body: { courseId: 'C1', setId: 'reporting', groups: [] } })).s === 403);
+  const gm = await call('GET', `/api/group-members?courseId=C1&studentId=S1&setId=${mk.j.setId}`, { token: t1 });
+  ok('group-members honours the set', gm.j.groupName === 'Team A' && gm.j.members.length === 1);
+  const gr = await call('GET', '/api/group-members?courseId=C1&studentId=S1', { token: t1 });
+  ok('group-members defaults to Reporting', gr.j.groupName === 'R1' && gr.j.members.length === 0);
+  ok('rename a set', (await call('POST', '/api/group-set-rename', { token: L1, body: { courseId: 'C1', setId: mk.j.setId, name: 'Lab 2' } })).s === 200);
+  ok('Reporting cannot be deleted', (await call('POST', '/api/group-set-delete', { token: L1, body: { courseId: 'C1', setId: 'reporting' } })).s === 400);
+  ok('delete a set', (await call('POST', '/api/group-set-delete', { token: L1, body: { courseId: 'C1', setId: mk.j.setId } })).s === 200
+    && (await call('GET', '/api/group-sets?courseId=C1', { token: L1 })).j.sets.length === 1);
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

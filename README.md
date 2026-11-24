@@ -673,3 +673,13 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Tests:** `worker.test.mjs` checks `onBase` (cap, zero max, the 20/20 + 50/100 example).
 - **Deploy:** site files only (`js/grade-base.js` is new; `js/course-summary.js`, `js/course-scores.js`, `js/class-grade-export.js`, `sw.js` cache `portal-shell-v76`). No Worker, table or secret change.
 
+
+## Group sets (groups for different activities)
+- **What:** a class can hold several named *sets* of groups (Reporting, Lab 1, Quiz teams ...). A student is in one group per set. The existing group (Enrollments.Group_Name / Assigned_Topic) is the built-in **Reporting** set (id `reporting`, cannot be renamed or deleted), so the roster, Class Summary CSV and old uploads are unchanged. Other sets live in `Group_Sets` and `Group_Members` (created lazily by `ensureGroupTables` in `worker/schema.js`).
+- **Lecturer:** Course Actions > Students > **Groups** (`js/course-groups.js`): pick/create/rename/delete a set, add groups with an optional **topic**, assign students, or **Random split** into N groups (shuffled, dealt round-robin so sizes differ by at most one), then Save (`POST /api/group-set-save` replaces the set; Reporting save writes the roster fields).
+- **Group uploads:** the upload form shows a set picker (Reporting first); members come from `GET /api/group-members?...&setId=`; the Worker checks the chosen set (`groupSetId` in the upload meta, `worker/uploads.js` via `groupNameIn`).
+- **One score for the group:** Record Scores > "One score per group": choose a set and a score typed for one member fills the rest of that group (still editable per student; saved as normal scores).
+- **Students:** the student summary shows "My other groups" (set, group, topic, teammates) from `GET /api/student-groups` (own records only).
+- **Routes:** `worker/groups.js` (`/api/group-sets`, `group-set`, `group-set-create|rename|delete|save`, `student-groups`); rules in `worker/auth.js` (lecturer-only except `group-sets`, `student-groups`).
+- **Tests:** `worker.test.mjs` "Group sets" block (create/duplicate/reserved name, save, one-group-per-set, other-student refusal, set-aware group-members, delete).
+- **Deploy:** Worker (`worker/groups.js` new, `schema.js`, `worker.js`, `auth.js`, `courses.js`, `uploads.js`) and site files (`js/course-groups.js` new, `app.js`, `card-more.js`, `components-class.js`, `components-dashboard.js`, `course.js`, `course-dashboard.js`, `course-scores.js`, `tailwind.css`, `sw.js` cache `portal-shell-v78`). Tables are created automatically; no secret change.

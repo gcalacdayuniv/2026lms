@@ -3,6 +3,7 @@
 // BEFORE any upload bytes are streamed to Google Drive. Uses a few small D1 queries and no heavy CPU work, so it fits the free plan.
 
 import { callGas } from './gas.js';
+import { groupNameIn, REPORTING } from './groups.js';
 
 // A 25 MB file is about 33.4 MB of base64 text. Leave a little room for the wrapper.
 const MAX_SINGLE_BODY_BYTES = 36 * 1024 * 1024;
@@ -71,6 +72,9 @@ function validateMeta(meta) {
         }
     }
 
+    if (meta.groupSetId != null && (typeof meta.groupSetId !== 'string' || meta.groupSetId.length > 64)) {
+        throw new UploadError('Invalid group set.', 400);
+    }
     if (meta.includedMembers != null) {
         if (!Array.isArray(meta.includedMembers) || meta.includedMembers.length > 20 ||
             meta.includedMembers.some(m => typeof m !== 'string')) {
@@ -115,10 +119,7 @@ async function verifyUploader(env, meta, user = null) {
     }
 
     if (ids.length > 1) {
-        const groups = await env.DB.prepare(
-            `SELECT Student_ID, Group_Name FROM Enrollments WHERE Course_ID = ? AND Student_ID IN (${placeholders})`
-        ).bind(meta.courseId, ...ids).all();
-        const byId = new Map((groups.results || []).map(r => [r.Student_ID, r.Group_Name]));
+        const byId = await groupNameIn(env, meta.courseId, meta.groupSetId || REPORTING, ids);
         const groupName = byId.get(meta.studentId);
         if (!groupName || ids.some(id => byId.get(id) !== groupName)) {
             throw new UploadError('Group members must be in the same group as the student.', 403);

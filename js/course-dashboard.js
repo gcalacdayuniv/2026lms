@@ -432,6 +432,7 @@ const compareTerms = (a, b) => {
 };
 
 document.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'groupUploadSet') CourseDashboard.loadUploadSetMembers().catch(() => {});
     if (!e.target || e.target.id !== 'courseTermFilter') return;
     CourseDashboard.termFilter = e.target.value;
     try { localStorage.setItem('course_term_filter', e.target.value); } catch (err) { /* storage unavailable */ }
@@ -503,27 +504,51 @@ export const CourseDashboard = {
         const section = document.getElementById('groupUploadSection');
         const list = document.getElementById('groupMembersList');
         const checkbox = document.getElementById('isGroupUpload');
+        const picker = document.getElementById('groupUploadSet');
 
         if (!section || !list) return;
 
         section.classList.add('hidden');
-        list.innerHTML = '<div class="text-[10px] text-purple-600"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Loading group...</div>';
         if (checkbox) checkbox.checked = false;
         list.classList.add('hidden');
+        list.innerHTML = '';
 
         try {
-            const data = await apiFetch(`/api/group-members?courseId=${courseId}&studentId=${studentId}`);
-            if (data.groupName && data.members && data.members.length > 0) {
-                section.classList.remove('hidden');
-                list.innerHTML = data.members.map(m => `
-                    <label class="flex items-center space-x-2 text-[10px] font-medium text-gray-700 cursor-pointer">
-                        <input type="checkbox" class="group-member-checkbox rounded text-purple-600 focus:ring-purple-500" value="${m.User_ID}" checked>
-                        <span>${escapeHtml(m.Name)} (${escapeHtml(m.Student_Number || 'N/A')})</span>
-                    </label>
-                `).join('');
+            // The sets this student is in; the upload picks one each time (Reporting first).
+            const mine = await apiFetch(`/api/student-groups?courseId=${courseId}&studentId=${studentId}`);
+            const groups = mine.groups || [];
+            if (!groups.length) return;
+            CourseDashboard.uploadGroupCtx = { courseId, studentId };
+            if (picker) {
+                picker.innerHTML = groups.map(g => `<option value="${escapeHtml(g.setId)}">${escapeHtml(g.setName)}: ${escapeHtml(g.groupName)}</option>`).join('');
+                picker.value = groups[0].setId;
             }
+            await CourseDashboard.loadUploadSetMembers();
         } catch (err) {
             console.error("Failed to load group members", err);
+        }
+    },
+
+    // Members of the student's group in the set chosen in the upload form.
+    loadUploadSetMembers: async () => {
+        const ctx = CourseDashboard.uploadGroupCtx;
+        const section = document.getElementById('groupUploadSection');
+        const list = document.getElementById('groupMembersList');
+        const picker = document.getElementById('groupUploadSet');
+        if (!ctx || !section || !list) return;
+        const setId = picker && picker.value ? picker.value : 'reporting';
+        const data = await apiFetch(`/api/group-members?courseId=${ctx.courseId}&studentId=${ctx.studentId}&setId=${encodeURIComponent(setId)}`);
+        list.innerHTML = '';
+        if (data.groupName && data.members && data.members.length > 0) {
+            section.classList.remove('hidden');
+            list.innerHTML = data.members.map(m => `
+                <label class="flex items-center space-x-2 text-[10px] font-medium text-gray-700 cursor-pointer">
+                    <input type="checkbox" class="group-member-checkbox rounded text-purple-600 focus:ring-purple-500" value="${m.User_ID}" checked>
+                    <span>${escapeHtml(m.Name)} (${escapeHtml(m.Student_Number || 'N/A')})</span>
+                </label>
+            `).join('');
+        } else {
+            section.classList.add('hidden');
         }
     },
 
@@ -628,6 +653,7 @@ export const CourseDashboard = {
                 mimeType: mimeType,
                 pathParts: [courseYearSection, "Submitted"],
                 isGroup: isGroup,
+                groupSetId: isGroup ? (document.getElementById('groupUploadSet')?.value || 'reporting') : undefined,
                 includedMembers: includedMembers
             };
 

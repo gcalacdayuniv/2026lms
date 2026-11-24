@@ -67,6 +67,10 @@ const ClassUI = {
                             <span class="menu-tile-icon bg-gray-200 text-gray-800"><i class="fa-solid fa-print" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Print Roster</span>
                         </button>
+                        <button type="button" id="openGroupsBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-violet-100 text-violet-700"><i class="fa-solid fa-people-group" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Groups</span>
+                        </button>
                         <button type="button" id="openClassSummaryBtn" class="menu-tile">
                             <span class="menu-tile-icon bg-purple-100 text-purple-700"><i class="fa-solid fa-table-list" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Class Summary</span>
@@ -149,6 +153,53 @@ const ClassUI = {
                         </button>
                     </div>
                 </details>
+            </div>
+        </div>
+    `,
+
+    renderGroupsModal: () => `
+        <div id="groupsModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeGroupsBg"></div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-3xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[95vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-people-group text-violet-600 mr-2"></i>Groups</h3>
+                        <p class="text-xs text-gray-500">Make sets of groups for different activities. A student is in one group per set.</p>
+                    </div>
+                    <button id="closeGroupsBtn" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div id="cgAlert" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
+                <div class="overflow-auto flex-1 min-h-[200px]">
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <select id="cgSetSelect" aria-label="Group set" class="px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 font-medium"></select>
+                        <input type="text" id="cgSetName" maxlength="80" class="flex-1 min-w-[8rem] px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50" placeholder="Set name" aria-label="Set name">
+                        <button type="button" id="cgNewSetBtn" class="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded text-xs font-bold">New set</button>
+                        <button type="button" id="cgRenameSetBtn" class="hidden px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-xs font-bold">Rename</button>
+                        <button type="button" id="cgDeleteSetBtn" class="hidden px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded text-xs font-bold"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <p id="cgSetNote" class="text-[11px] text-gray-500 mb-3"></p>
+                    <div class="flex flex-wrap items-center gap-2 mb-3 p-2 bg-gray-50 border border-gray-200 rounded">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Random split into</span>
+                        <input type="number" id="cgSplitCount" min="1" value="4" class="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm text-center" aria-label="Number of groups">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">groups</span>
+                        <button type="button" id="cgSplitBtn" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded text-xs font-bold"><i class="fa-solid fa-shuffle mr-1"></i>Split</button>
+                        <button type="button" id="cgClearBtn" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-xs font-bold">Clear all</button>
+                    </div>
+                    <div id="cgGroups" class="mb-2"></div>
+                    <button type="button" id="cgAddGroupBtn" class="mb-4 px-3 py-1.5 border border-violet-300 text-violet-700 hover:bg-violet-50 rounded text-xs font-bold"><i class="fa-solid fa-plus mr-1"></i>Add group</button>
+                    <div id="cgSummary" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
+                    <div class="border border-gray-200 rounded-lg bg-white">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-200 text-gray-700"><tr><th class="px-3 py-2">Student</th><th class="px-3 py-2">Group</th></tr></thead>
+                            <tbody id="cgStudents" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button type="button" id="cgSaveBtn" class="w-full bg-violet-700 hover:bg-violet-800 disabled:opacity-50 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition"><i class="fa-solid fa-floppy-disk mr-2"></i>Save Groups</button>
+                </div>
             </div>
         </div>
     `,
@@ -306,6 +357,11 @@ const ClassUI = {
                     </div>
                 </div>
 
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                    <label for="scGroupSet" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">One score per group</label>
+                    <select id="scGroupSet" class="px-2 py-1.5 border border-gray-300 rounded-md text-xs bg-gray-50"><option value="">Off</option></select>
+                    <span class="text-[10px] text-gray-500">A score typed for one member fills the whole group.</span>
+                </div>
                 <div id="scStudentCount" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
                 <p id="scExtraNote" class="hidden text-[11px] font-bold text-amber-700 mb-2"></p>
                 <div class="overflow-auto flex-1 border border-gray-200 rounded-lg bg-white min-h-[200px]">
@@ -1071,6 +1127,7 @@ export const ClassComponents = {
             ${ClassUI.renderClassSummaryModal()}
             ${ClassUI.renderScoresModal()}
             ${ClassUI.renderAttendanceDatesModal()}
+            ${ClassUI.renderGroupsModal()}
             ${ClassUI.renderNoClassModal()}
             ${ClassUI.renderManageStudentModal()}
             ${ClassUI.renderSummaryModal()}

@@ -6,6 +6,7 @@ import { sweepEndedAccounts } from './term-sweep.js';
 import { ensureExamSecurity } from './exam-photos.js';
 import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode, ensureCourseRoom } from './schema.js';
 import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
+import { groupNameIn, REPORTING } from './groups.js';
 
 // Academic year ("2026-2027", second year = first + 1) and semester are both optional.
 const SEMESTERS = ["1st Semester", "2nd Semester", "Summer"];
@@ -585,28 +586,35 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
         }
 
-        const enrollment = await env.DB.prepare(
-            "SELECT Group_Name FROM Enrollments WHERE Course_ID = ? AND Student_ID = ?"
-        ).bind(courseId, studentId).first();
-
-        if (!enrollment || !enrollment.Group_Name) {
+        // The group is read from the chosen set (Reporting when none is given).
+        const setId = url.searchParams.get("setId") || REPORTING;
+        const own = (await groupNameIn(env, courseId, setId, [studentId])).get(studentId);
+        if (!own) {
             return new Response(JSON.stringify({ success: true, groupName: null, members: [] }), { status: 200, headers: corsHeaders });
         }
 
-        const members = await env.DB.prepare(
-            `SELECT u.User_ID, u.Name, u.Student_Number
-             FROM Enrollments e
-             JOIN Users u ON e.Student_ID = u.User_ID
-             WHERE e.Course_ID = ? AND e.Group_Name = ? AND u.User_ID != ?`
-        ).bind(courseId, enrollment.Group_Name, studentId).all();
+        const placed = await groupNameIn(env, courseId, setId, await allStudentIds(env, courseId));
+        const mateIds = [...placed.entries()].filter(([id, g]) => g === own && id !== studentId).map(([id]) => id);
+        let members = [];
+        if (mateIds.length) {
+            const r = await env.DB.prepare(
+                `SELECT User_ID, Name, Student_Number FROM Users WHERE User_ID IN (${mateIds.map(() => '?').join(',')})`
+            ).bind(...mateIds).all();
+            members = r.results || [];
+        }
 
         return new Response(JSON.stringify({
             success: true,
-            groupName: enrollment.Group_Name,
-            members: members.results
+            groupName: own,
+            members: members
         }), { status: 200, headers: corsHeaders });
     }
 
     return null;
 }
 
+
+async function allStudentIds(env, courseId) {
+    const r = await env.DB.prepare("SELECT Student_ID FROM Enrollments WHERE Course_ID = ?").bind(courseId).all();
+    return (r.results || []).map(x => x.Student_ID);
+}
