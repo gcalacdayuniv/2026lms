@@ -582,7 +582,7 @@ export const CourseModule = {
 
         if (e.target.closest('#manageResetPwdBtn')) {
             const studentId = document.getElementById('manageStudentId').value;
-            if (await UI.confirm({ title: 'Reset password', message: "Reset this student's password? A temporary password will be shown once.", confirmText: 'Reset', danger: true })) {
+            if (await UI.confirm({ title: 'Reset password', message: "Reset this student's password? A temporary password will be emailed to the student (shown to you only if the email cannot be sent).", confirmText: 'Reset', danger: true })) {
                 const resetBtn = e.target.closest('#manageResetPwdBtn');
                 const originalHtml = resetBtn.innerHTML;
                 resetBtn.disabled = true;
@@ -593,7 +593,8 @@ export const CourseModule = {
                         body: JSON.stringify({ studentId: studentId })
                     });
                     // shown once: give it to the student, who should change it after signing in
-                    await UI.confirm({ title: 'Temporary password', message: `New password: ${res.tempPassword}\n\nGive it to the student now; it is not shown again. They should change it after signing in.`, confirmText: 'Done' });
+                    if (res.emailed) UI.success(`New password emailed to ${res.email}.`);
+                    else await UI.confirm({ title: 'Temporary password', message: `The email could not be sent (no email on file or mail not set up).\n\nNew password: ${res.tempPassword}\n\nGive it to the student now; it is not shown again. They should change it after signing in.`, confirmText: 'Done' });
                 } catch (err) {
                     UI.error("Failed to reset password: " + err.message);
                 } finally {

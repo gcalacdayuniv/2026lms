@@ -7,7 +7,7 @@ import { signToken, authEnabled, markPasswordChanged } from './auth.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { findUserByCredentials, loginKeys, loginLockedFor, loginFailed, loginCleared, tooManyTries, registerKeys, REGISTER_WINDOW_MS, CLEAR_REACTIVATION_SQL, getCurrentTerm, validTerm, getTermEnds, termKey } from './shared.js';
 import { ensureYearAdvanceTables, ensureReactivationColumns, ensureUserPrefs, ensureAppSettings, ensurePasswordResetRequests, clearStudentClassFields } from './schema.js';
-import { gasUrl } from './gas.js';
+import { gasUrl, callGas } from './gas.js';
 import { ensureExamSecurity } from './exam-photos.js';
 import { ensureSessions, submitOpenAttempts, hasOpenAttempt, ONLINE_WINDOW_MS } from './exam-session.js';
 
@@ -486,7 +486,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
 
         // Only a student's password can be reset here (never another lecturer's), to a random temporary password
         // that is shown once to the lecturer.
-        const target = await env.DB.prepare("SELECT role FROM Users WHERE User_ID = ?").bind(studentId).first();
+        const target = await env.DB.prepare("SELECT role, Name, Email FROM Users WHERE User_ID = ?").bind(studentId).first();
         if (!target || String(target.role || '').toLowerCase() !== 'student') {
             return new Response(JSON.stringify({ error: "Only a student's password can be reset." }), { status: 403, headers: corsHeaders });
         }
@@ -498,7 +498,25 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         if (authEnabled(env)) await markPasswordChanged(env, studentId);
         try { await ensurePasswordResetRequests(env); await env.DB.prepare("DELETE FROM Password_Reset_Requests WHERE User_ID = ?").bind(studentId).run(); } catch (e) { /* the request list is tidied later */ }
 
-        return new Response(JSON.stringify({ success: true, message: "Password reset successfully", tempPassword }), { status: 200, headers: corsHeaders });
+        // The new password is emailed through the Apps Script. Only when that is not possible (no email on file, Apps Script
+        // not updated or down) is it shown to the lecturer, once, to hand over.
+        let emailed = false;
+        const email = String(target.Email || '').trim();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            try {
+                await callGas(env, JSON.stringify({
+                    action: 'email',
+                    to: email,
+                    subject: 'Your new temporary password',
+                    body: `Hello ${String(target.Name || '').split(',').slice(1).join(',').trim() || 'student'},\n\nYour password was reset by your lecturer.\n\nTemporary password: ${tempPassword}\n\nSign in with it, then change it in your profile. If you did not ask for this, tell your lecturer.`
+                }));
+                emailed = true;
+            } catch (err) {
+                console.error('Password email failed', err && err.message ? err.message : err);
+            }
+        }
+        const maskedEmail = emailed ? email.replace(/^(.).*(@.*)$/, '$1***$2') : null;
+        return new Response(JSON.stringify(Object.assign({ success: true, message: "Password reset successfully", emailed, email: maskedEmail }, emailed ? {} : { tempPassword })), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/advance-year-level") {

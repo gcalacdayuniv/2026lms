@@ -4,6 +4,8 @@
 //   2. action "chunk":  stores one piece of a large upload in a temporary Drive folder.
 //   3. action "finish": joins the pieces, saves the final file, deletes the temporary pieces.
 //   4. action "read":   returns one stored picture (base64) so the app can show a saved answer sheet.
+//   5. action "email":  sends one plain-text email (used for password resets). Needs the Mail permission: after pasting
+//      this file, run any function once in the editor and accept the new permission, then deploy a new version.
 
 var ROOT_FOLDER_ID = "1GcK1G9HE1NWII0XkSXLXyPWXP5Zxuv9f";
 var TEMP_FOLDER_NAME = "_upload_tmp";
@@ -30,11 +32,23 @@ function doPost(e) {
     if (payload.action === "chunk") return jsonOut(handleChunk(payload));
     if (payload.action === "finish") return jsonOut(handleFinish(payload));
     if (payload.action === "read") return jsonOut(handleRead(payload));
+    if (payload.action === "email") return jsonOut(handleEmail(payload));
     return jsonOut(handleDirect(payload));
 
   } catch (error) {
     return jsonOut({ success: false, error: error.toString() });
   }
+}
+
+// Sends one plain-text email. The address and sizes are checked so the web app cannot be used as a mass mailer.
+function handleEmail(payload) {
+  var to = String(payload.to || "").trim();
+  if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(to)) throw new Error("Invalid email address.");
+  var subject = String(payload.subject || "").slice(0, 150);
+  var body = String(payload.body || "").slice(0, 3000);
+  if (!subject || !body) throw new Error("Missing subject or body.");
+  MailApp.sendEmail({ to: to, subject: subject, body: body, name: "Class Portal" });
+  return { success: true };
 }
 
 function jsonOut(obj) {

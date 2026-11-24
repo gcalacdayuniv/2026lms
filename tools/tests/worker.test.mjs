@@ -739,5 +739,28 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
     && (await call('GET', '/api/group-sets?courseId=C1', { token: L1 })).j.sets.length === 1);
 }
 
+// ---- Password reset emails the new password through the Apps Script; it is shown only when the email cannot be sent
+{
+  const realFetch = globalThis.fetch;
+  const sent = [];
+  globalThis.fetch = async (u, init) => { sent.push(JSON.parse(init.body)); return new Response(JSON.stringify({ success: true }), { status: 200 }); };
+  env.GAS_WEBHOOK_URL = 'https://gas.test/exec';
+  const r = await call('POST', '/api/reset-student-password', { token: L1, body: { studentId: 'S2' } });
+  ok('reset emails the password and does not return it', r.s === 200 && r.j.emailed === true && !r.j.tempPassword && /^t\*\*\*@/.test(r.j.email), JSON.stringify(r.j));
+  const mail = sent.find(x => x.action === 'email');
+  ok('the email goes to the student with the password in it', !!mail && mail.to === 'two@x.com' && /Temporary password: \S{10}/.test(mail.body), JSON.stringify(mail));
+  const login = await call('POST', '/api/login', { body: { identifier: 'stu2', password: /Temporary password: (\S{10})/.exec(mail.body)[1] } });
+  ok('the emailed password works', login.s === 200);
+  globalThis.fetch = async () => new Response(JSON.stringify({ success: false, error: 'Mail off' }), { status: 200 });
+  const r2 = await call('POST', '/api/reset-student-password', { token: L1, body: { studentId: 'S2' } });
+  ok('if the email fails the lecturer gets the password', r2.j.emailed === false && !!r2.j.tempPassword);
+  sql.exec("update Users set Email='' where User_ID='S2'");
+  const r3 = await call('POST', '/api/reset-student-password', { token: L1, body: { studentId: 'S2' } });
+  ok('no email on file: the lecturer gets the password', r3.j.emailed === false && !!r3.j.tempPassword);
+  sql.exec("update Users set Email='two@x.com' where User_ID='S2'");
+  globalThis.fetch = realFetch;
+  delete env.GAS_WEBHOOK_URL;
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);
