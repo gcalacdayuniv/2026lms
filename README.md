@@ -22,6 +22,9 @@ This section is the standing instruction for every task. Keep it current when a 
 **Privacy and data rules**
 - See "Lecturer's Notes: Privacy Rules" and "Exams Tied to a Course Title" below.
 
+**Repo map**
+- `CLAUDE.md` in the repo root maps the files, rules and tests so a task can start from it without reading everything. Keep it updated in the same commit when files or standing rules change.
+
 **Reply style**
 - Brief and direct, no recap of steps. End with: what changed, what was tested, what to deploy (worker and/or front end), and one next step if there is one.
 

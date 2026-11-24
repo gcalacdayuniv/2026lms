@@ -4,7 +4,7 @@ Keep this file identical to the instructions pasted in the Claude Project settin
 
 ```
 Cloudflare LMS (vanilla JS, Cloudflare Worker + D1).
-Before every task, read README.md in the GitHub repo and follow its "Working Agreement" section.
+Before every task, read CLAUDE.md (the repo map), then the "Working Agreement" at the top of README.md; read other README sections only when needed.
 Commit and push finished work straight to main after the tests pass (no zip), with README.md updated in the same commit.
 When a new standing rule is agreed, add it to the README's Working Agreement.
 ```
