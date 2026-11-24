@@ -191,6 +191,16 @@ async function streamToGas(env, request, prefix, suffix, maxBytes) {
     return callGas(env, readable);
 }
 
+// 'FinalTerm' once the final period has started or the midterm period is over, otherwise 'MidTerm'. Dates are YYYY-MM-DD.
+export function defaultUploadTerm(course, now = new Date()) {
+    const today = new Date(now.getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+    const day = (v) => (/^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? String(v).slice(0, 10) : '');
+    const finalStart = day(course.Final_Start), midEnd = day(course.Midterm_End);
+    if (finalStart && today >= finalStart) return 'FinalTerm';
+    if (midEnd && today > midEnd) return 'FinalTerm';
+    return 'MidTerm';
+}
+
 // Saves the Submissions row(s) after the file reached Drive.
 async function recordSubmission(env, body, fileUrl, user = null) {
     const isGroup = body.isGroup;
@@ -327,6 +337,44 @@ export async function handleUploads(request, env, path, url, corsHeaders, user =
             const status = err instanceof UploadError ? err.status : 500;
             return new Response(JSON.stringify({ error: err && err.message ? err.message : "Upload failed." }), { status, headers: corsHeaders });
         }
+    }
+
+    // Which term a new upload belongs to today (GMT+8): Final Term once the final period starts, or once the midterm period is over.
+    if (request.method === "GET" && path === "/api/default-upload-term") {
+        const courseId = url.searchParams.get("courseId");
+        if (!courseId) return new Response(JSON.stringify({ error: "Missing courseId" }), { status: 400, headers: corsHeaders });
+        const c = await env.DB.prepare("SELECT Midterm_End, Final_Start FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+        if (!c) return new Response(JSON.stringify({ error: "Course not found" }), { status: 404, headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, term: defaultUploadTerm(c) }), { status: 200, headers: corsHeaders });
+    }
+
+    // A lecturer changes the details (term, title, description) of a file they uploaded for a student. Rows of a group upload
+    // share the file, so they are all updated; the "[Group Upload ...]" / "[Uploaded by lecturer ...]" tags are kept.
+    if (request.method === "POST" && path === "/api/update-submission") {
+        const body = await request.json();
+        const title = String(body.title == null ? '' : body.title).trim();
+        const description = String(body.description == null ? '' : body.description).trim();
+        if (!body.submissionId) return new Response(JSON.stringify({ error: "Missing submissionId" }), { status: 400, headers: corsHeaders });
+        if (!TERMS.includes(body.term)) return new Response(JSON.stringify({ error: "Invalid term." }), { status: 400, headers: corsHeaders });
+        if (!title || title.length > 150) return new Response(JSON.stringify({ error: "Title is required (150 characters maximum)." }), { status: 400, headers: corsHeaders });
+        if (/[.\/\\:*?"<>|]/.test(title)) return new Response(JSON.stringify({ error: "Title cannot contain special characters like dots (.) or slashes (/)." }), { status: 400, headers: corsHeaders });
+        if (description.length > 2000) return new Response(JSON.stringify({ error: "Description is too long." }), { status: 400, headers: corsHeaders });
+
+        const row = await env.DB.prepare("SELECT Course_ID, File_URL, Description FROM Submissions WHERE Submission_ID = ?").bind(body.submissionId).first();
+        if (!row) return new Response(JSON.stringify({ error: "Submission not found" }), { status: 404, headers: corsHeaders });
+        if (!String(row.Description || '').includes('[Uploaded by lecturer:')) {
+            return new Response(JSON.stringify({ error: "Only files uploaded by the lecturer can be edited." }), { status: 403, headers: corsHeaders });
+        }
+        const rows = await env.DB.prepare("SELECT Submission_ID, Description FROM Submissions WHERE Course_ID = ? AND File_URL = ? AND Description LIKE '%[Uploaded by lecturer:%'").bind(row.Course_ID, row.File_URL).all();
+        const TAG = /\n\n\[(Group Upload by:|Uploaded by lecturer:)/;
+        const stmts = (rows.results || []).map(r => {
+            const d = String(r.Description || '');
+            const at = d.search(TAG);
+            const tags = at >= 0 ? d.slice(at) : '';
+            return env.DB.prepare("UPDATE Submissions SET Term = ?, Title = ?, Description = ? WHERE Submission_ID = ?").bind(body.term, title, description + tags, r.Submission_ID);
+        });
+        if (stmts.length) await env.DB.batch(stmts);
+        return new Response(JSON.stringify({ success: true, updated: stmts.length }), { status: 200, headers: corsHeaders });
     }
 
     if (request.method === "POST" && path === "/api/grade-submission") {

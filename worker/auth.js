@@ -139,6 +139,7 @@ export const RULES = {
     'GET /api/student-sheet-photo': { who: 'any', self: ['studentId'] },
     'GET /api/student-sheet-review': { who: 'any', self: ['studentId'] },
     'POST /api/upload-submission': { who: 'any' },
+    'GET /api/default-upload-term': { who: 'any', enrolled: true },
     'POST /api/upload-chunk': { who: 'any' },
     'POST /api/finish-chunked-upload': { who: 'any' },
 

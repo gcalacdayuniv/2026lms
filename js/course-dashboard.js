@@ -485,7 +485,7 @@ export const CourseDashboard = {
         const title = document.getElementById('submitDocTitle');
         if (title) title.textContent = 'Upload for Student';
         const label = document.getElementById('groupUploadLabel');
-        if (label) label.textContent = 'Upload for the whole group (select members)';
+        if (label) label.textContent = 'Upload for this student as';
         document.getElementById('submitDocModal').classList.remove('hidden');
         CourseDashboard.loadGroupMembersForUpload(courseId, student.User_ID);
     },
@@ -497,59 +497,61 @@ export const CourseDashboard = {
         const title = document.getElementById('submitDocTitle');
         if (title) title.textContent = 'Submit Document';
         const label = document.getElementById('groupUploadLabel');
-        if (label) label.textContent = 'Submit as Group Upload';
+        if (label) label.textContent = 'Upload as';
     },
 
+    // Fills the term (Mid/Final by today's date) and the "Upload as" choices (Individual, or one of the student's groups).
     loadGroupMembersForUpload: async (courseId, studentId = AppState.user.User_ID) => {
         const section = document.getElementById('groupUploadSection');
         const list = document.getElementById('groupMembersList');
-        const checkbox = document.getElementById('isGroupUpload');
         const picker = document.getElementById('groupUploadSet');
 
-        if (!section || !list) return;
+        // Term follows the date: the form always opens on the current term.
+        const termSel = document.getElementById('submitTerm');
+        if (termSel) {
+            termSel.value = 'MidTerm';
+            apiFetch(`/api/default-upload-term?courseId=${courseId}`).then(r => { if (r && r.term) termSel.value = r.term; }).catch(() => {});
+        }
 
+        if (!section || !list) return;
         section.classList.add('hidden');
-        if (checkbox) checkbox.checked = false;
         list.classList.add('hidden');
         list.innerHTML = '';
+        if (picker) picker.innerHTML = '<option value="">Individual</option>';
 
         try {
-            // The sets this student is in; the upload picks one each time (Reporting first).
             const mine = await apiFetch(`/api/student-groups?courseId=${courseId}&studentId=${studentId}`);
             const groups = mine.groups || [];
             if (!groups.length) return;
             CourseDashboard.uploadGroupCtx = { courseId, studentId };
-            if (picker) {
-                picker.innerHTML = groups.map(g => `<option value="${escapeHtml(g.setId)}">${escapeHtml(g.setName)}: ${escapeHtml(g.groupName)}</option>`).join('');
-                picker.value = groups[0].setId;
-            }
-            await CourseDashboard.loadUploadSetMembers();
+            picker.innerHTML = '<option value="">Individual</option>' + groups.map(g => `<option value="${escapeHtml(g.setId)}">Group - ${escapeHtml(g.setName)}: ${escapeHtml(g.groupName)}</option>`).join('');
+            picker.value = '';
+            section.classList.remove('hidden');
         } catch (err) {
-            console.error("Failed to load group members", err);
+            console.error("Failed to load groups", err);
         }
     },
 
-    // Members of the student's group in the set chosen in the upload form.
+    // Members of the student's group in the chosen set (nothing when "Individual" is chosen).
     loadUploadSetMembers: async () => {
         const ctx = CourseDashboard.uploadGroupCtx;
-        const section = document.getElementById('groupUploadSection');
         const list = document.getElementById('groupMembersList');
         const picker = document.getElementById('groupUploadSet');
-        if (!ctx || !section || !list) return;
-        const setId = picker && picker.value ? picker.value : 'reporting';
-        const data = await apiFetch(`/api/group-members?courseId=${ctx.courseId}&studentId=${ctx.studentId}&setId=${encodeURIComponent(setId)}`);
+        if (!ctx || !list || !picker) return;
         list.innerHTML = '';
+        if (!picker.value) { list.classList.add('hidden'); return; }
+        const data = await apiFetch(`/api/group-members?courseId=${ctx.courseId}&studentId=${ctx.studentId}&setId=${encodeURIComponent(picker.value)}`);
         if (data.groupName && data.members && data.members.length > 0) {
-            section.classList.remove('hidden');
-            list.innerHTML = data.members.map(m => `
+            list.innerHTML = '<div class="text-[10px] font-bold text-purple-800 uppercase tracking-wider">Also for these members</div>' + data.members.map(m => `
                 <label class="flex items-center space-x-2 text-[10px] font-medium text-gray-700 cursor-pointer">
                     <input type="checkbox" class="group-member-checkbox rounded text-purple-600 focus:ring-purple-500" value="${m.User_ID}" checked>
                     <span>${escapeHtml(m.Name)} (${escapeHtml(m.Student_Number || 'N/A')})</span>
                 </label>
             `).join('');
         } else {
-            section.classList.add('hidden');
+            list.innerHTML = '<div class="text-[10px] text-gray-500 italic">No other members in this group.</div>';
         }
+        list.classList.remove('hidden');
     },
 
     submitDocument: async () => {
@@ -581,8 +583,9 @@ export const CourseDashboard = {
             const desc = document.getElementById('submitDesc').value.trim();
             const type = document.getElementById('submissionType').value;
 
-            const isGroupCheckbox = document.getElementById('isGroupUpload');
-            const isGroup = isGroupCheckbox && !isGroupCheckbox.closest('#groupUploadSection').classList.contains('hidden') ? isGroupCheckbox.checked : false;
+            const uploadAs = document.getElementById('groupUploadSet');
+            const groupSection = document.getElementById('groupUploadSection');
+            const isGroup = !!(uploadAs && uploadAs.value && groupSection && !groupSection.classList.contains('hidden'));
 
             const includedMembers = [];
             if (isGroup) {
@@ -653,7 +656,7 @@ export const CourseDashboard = {
                 mimeType: mimeType,
                 pathParts: [courseYearSection, "Submitted"],
                 isGroup: isGroup,
-                groupSetId: isGroup ? (document.getElementById('groupUploadSet')?.value || 'reporting') : undefined,
+                groupSetId: isGroup ? uploadAs.value : undefined,
                 includedMembers: includedMembers
             };
 

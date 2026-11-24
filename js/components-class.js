@@ -667,6 +667,37 @@ const ClassUI = {
         </div>
     `,
 
+    renderEditSubmissionModal: () => `
+        <div id="editSubmissionModal" class="hidden fixed inset-0 z-[120] flex items-center justify-center fade-in p-0 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeEditSubmissionBg"></div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-pen text-blue-600 mr-2"></i>Edit uploaded file</h3>
+                    <button id="closeEditSubmissionBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline"></i>
+                    </button>
+                </div>
+                <div id="seAlert" class="hidden mb-3 p-2 rounded text-xs font-bold bg-red-100 text-red-700"></div>
+                <div class="space-y-4">
+                    <div>
+                        <label for="seTerm" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Term</label>
+                        <select id="seTerm" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"><option value="MidTerm">Mid Term</option><option value="FinalTerm">Final Term</option></select>
+                    </div>
+                    <div>
+                        <label for="seTitle" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Title</label>
+                        <input type="text" id="seTitle" maxlength="150" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm">
+                    </div>
+                    <div>
+                        <label for="seDesc" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Description</label>
+                        <textarea id="seDesc" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"></textarea>
+                    </div>
+                    <p class="text-[10px] text-gray-500">The file itself is not changed. For a group upload, every member's copy is updated.</p>
+                    <button type="button" id="seSaveBtn" class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-md text-sm font-bold shadow-sm transition">Save</button>
+                </div>
+            </div>
+        </div>
+    `,
+
     renderSubmissionHistoryModal: () => `
         <div id="submissionHistoryModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-4">
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmissionHistoryModalBg"></div>
@@ -1143,6 +1174,7 @@ export const ClassComponents = {
             ${ClassUI.renderManageStudentModal()}
             ${ClassUI.renderSummaryModal()}
             ${ClassUI.renderSubmissionHistoryModal()}
+            ${ClassUI.renderEditSubmissionModal()}
             ${ClassUI.renderDetailsModal()}
             ${ClassUI.renderAddStudentModal()}
             ${ClassUI.renderRecitationModal()}

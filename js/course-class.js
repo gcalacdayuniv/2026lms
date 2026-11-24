@@ -138,9 +138,12 @@ export const CourseClass = {
                         <div class="text-[10px] text-gray-600 mt-1">${descHtml}</div>
                         <div class="text-[9px] text-gray-400 mt-1.5 font-medium uppercase"><i class="fa-regular fa-clock"></i> ${new Date(sub.Timestamp + 'Z').toLocaleString()}</div>
                     </div>
-                    <a href="${safeUrl(fileViewUrl(sub.File_URL))}" target="_blank" rel="noopener noreferrer" class="flex-shrink-0 px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm ml-2 text-center">
+                    <div class="flex-shrink-0 flex flex-col gap-1 ml-2">
+                    <a href="${safeUrl(fileViewUrl(sub.File_URL))}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm text-center">
                         <i class="fa-solid ${sub.Type === 'url' ? 'fa-link' : 'fa-download'} block text-sm mb-0.5"></i> View
                     </a>
+                    ${isLecturer && /\[Uploaded by lecturer:/.test(sub.Description || '') ? `<button type="button" class="edit-submission-btn px-3 py-1 bg-white border border-blue-200 text-blue-700 rounded text-[10px] font-bold hover:bg-blue-50 transition" data-sub-id="${escapeHtml(sub.Submission_ID)}"><i class="fa-solid fa-pen mr-1"></i>Edit</button>` : ''}
+                    </div>
                 </div>
                 ${gradingHtml}
             </div>

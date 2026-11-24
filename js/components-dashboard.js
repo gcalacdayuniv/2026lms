@@ -533,11 +533,8 @@ const DashboardUI = {
                     </div>
 
                     <div id="groupUploadSection" class="hidden border border-purple-200 bg-purple-50 p-3 rounded-md mt-2">
-                        <label class="flex items-center space-x-2 text-xs font-bold text-purple-800 cursor-pointer mb-2">
-                            <input type="checkbox" id="isGroupUpload" class="rounded text-purple-600 focus:ring-purple-500">
-                            <span id="groupUploadLabel">Submit as Group Upload</span>
-                        </label>
-                        <select id="groupUploadSet" aria-label="Group set" class="w-full mb-2 px-2 py-1.5 border border-purple-200 rounded text-xs bg-white"></select>
+                        <label for="groupUploadSet" id="groupUploadLabel" class="block text-xs font-bold text-purple-800 mb-1">Upload as</label>
+                        <select id="groupUploadSet" class="w-full px-2 py-1.5 border border-purple-200 rounded text-xs bg-white"></select>
                         <div id="groupMembersList" class="hidden space-y-1.5 mt-2 pt-2 border-t border-purple-200 max-h-32 overflow-y-auto">
                         </div>
                     </div>
@@ -550,6 +547,22 @@ const DashboardUI = {
                         Submit
                     </button>
                 </form>
+            </div>
+        </div>
+    `,
+
+    renderMyGroupsModal: () => `
+        <div id="myGroupsModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-0 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeMyGroupsBg"></div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto flex flex-col">
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-people-group text-violet-600 mr-2"></i>My Groups</h3>
+                    <button id="closeMyGroupsBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden"></i>
+                        <i class="fa-solid fa-xmark text-xl hidden sm:inline"></i>
+                    </button>
+                </div>
+                <div id="myGroupsList" class="flex-1 overflow-y-auto space-y-3 p-1"></div>
             </div>
         </div>
     `,
@@ -606,7 +619,6 @@ const DashboardUI = {
                     <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-user-group" aria-hidden="true"></i> Group</div><div class="ss-info-val ss-marq"><span id="ssGroup">-</span></div></div>
                     <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Topic</div><div class="ss-info-val ss-marq"><span id="ssTopic">-</span></div></div>
                 </div>
-                <div id="ssOtherGroups" class="hidden max-w-4xl mx-auto px-4 sm:px-6 pb-3 text-xs text-gray-700"></div>
                 <div id="ssTermTabs" class="ss-tabs max-w-4xl mx-auto" role="tablist" aria-label="Term">
                     <button type="button" role="tab" class="ss-term-tab is-active" data-term="midterm" aria-selected="true">Mid Term</button>
                     <button type="button" role="tab" class="ss-term-tab" data-term="finalterm" aria-selected="false">Final Term</button>
@@ -631,8 +643,11 @@ const DashboardUI = {
             <button id="openHistoryModalBtn" type="button" class="ss-act ss-act-secondary">
                 <i class="fa-solid fa-clock-rotate-left mr-2" aria-hidden="true"></i> History
             </button>
+            <button id="openMyGroupsBtn" type="button" class="ss-act ss-act-secondary">
+                <i class="fa-solid fa-people-group mr-2" aria-hidden="true"></i> My Groups
+            </button>
             <button id="openSubmitDocModalBtn" type="button" class="ss-act ss-act-primary">
-                <i class="fa-solid fa-cloud-arrow-up mr-2" aria-hidden="true"></i> Upload Document
+                <i class="fa-solid fa-cloud-arrow-up mr-2" aria-hidden="true"></i> Upload
             </button>
         </div>
     `,
@@ -722,6 +737,7 @@ export const DashboardComponents = {
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderStudentSummaryModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmitDocumentModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderSubmissionHistoryModal() : ''}
+            ${user.role.toLowerCase() === 'student' ? DashboardUI.renderMyGroupsModal() : ''}
             ${user.role.toLowerCase() === 'student' ? DashboardUI.renderDetailsModal() : ''}
             ${user.role.toLowerCase() === 'student' && ExamUI.renderAccessibleExamOverlay ? ExamUI.renderAccessibleExamOverlay() : ''}
             ${DashboardUI.renderGroupMembersModal()}

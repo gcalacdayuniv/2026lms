@@ -24,6 +24,8 @@ import { CoursePending } from './course-pending.js';
 import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { CourseGroups } from './course-groups.js';
+import { SubmissionEdit } from './submission-edit.js';
+import { MyGroups } from './my-groups.js';
 import { AppState } from './globals.js';
 import { refreshSessionRole } from './session-role.js';
 import { SiteIcon } from './site-icon.js';
@@ -56,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
     CoursePending.init();
     CourseAttendanceDates.init();
     CourseGroups.init();
+    SubmissionEdit.init();
+    MyGroups.init();
     AppRouter.init();
     A11y.init();
     refreshSessionRole();

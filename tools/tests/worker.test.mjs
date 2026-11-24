@@ -621,6 +621,32 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   globalThis.fetch = realFetch;
 }
 
+// ---- Lecturer edits a file they uploaded; default upload term follows the date
+{
+  const lecRow = sql.prepare("select Submission_ID id from Submissions where Student_ID='S1' and Title='Report' and Description like '%Uploaded by lecturer%' limit 1").get();
+  const stuRow = sql.prepare("select Submission_ID id from Submissions where Student_ID='S1' and Title='Report' and Description not like '%Uploaded by lecturer%' limit 1").get();
+  const ed = (token, o) => call('POST', '/api/update-submission', { token, body: { submissionId: lecRow.id, term: 'FinalTerm', title: 'Report v2', description: 'Revised text', ...o } });
+  const r = await ed(L1, {});
+  ok('lecturer edits their uploaded file', r.s === 200 && r.j.updated >= 2, JSON.stringify(r.j));
+  const after = sql.prepare("select Student_ID s, Term t, Title ti, Description d from Submissions where Title = 'Report v2'").all();
+  ok('group copies all updated, term/title changed', after.length === 2 && after.every(x => x.t === 'FinalTerm'));
+  ok('description text changed and tags kept', after.every(x => x.d.startsWith('Revised text') && x.d.includes('[Uploaded by lecturer:')) && after.some(x => x.d.includes('[Included Members:')));
+  ok('a file the student uploaded cannot be edited', (await call('POST', '/api/update-submission', { token: L1, body: { submissionId: stuRow.id, term: 'MidTerm', title: 'X', description: '' } })).s === 403);
+  ok('another lecturer cannot edit', (await ed(l2.j.token, {})).s === 403);
+  ok('a student cannot edit', (await ed(await signToken(env, 'S1'), {})).s === 403);
+  ok('bad term refused', (await ed(L1, { term: 'Other' })).s === 400);
+  ok('title with a dot refused', (await ed(L1, { title: 'a.b' })).s === 400);
+  const { defaultUploadTerm } = await import('../../worker/uploads.js');
+  const c = { Midterm_End: '2026-10-10', Final_Start: '2026-12-01' };
+  ok('before the midterm ends: MidTerm', defaultUploadTerm(c, new Date('2026-10-01T00:00:00Z')) === 'MidTerm');
+  ok('between midterm and finals: FinalTerm', defaultUploadTerm(c, new Date('2026-10-20T00:00:00Z')) === 'FinalTerm');
+  ok('after the final starts: FinalTerm', defaultUploadTerm(c, new Date('2026-12-05T00:00:00Z')) === 'FinalTerm');
+  ok('no dates: MidTerm', defaultUploadTerm({}, new Date('2026-12-05T00:00:00Z')) === 'MidTerm');
+  ok('GMT+8 day is used', defaultUploadTerm({ Final_Start: '2026-12-01' }, new Date('2026-11-30T17:00:00Z')) === 'FinalTerm');
+  const dt = await call('GET', '/api/default-upload-term?courseId=C1', { token: await signToken(env, 'S1') });
+  ok('default-upload-term route answers', dt.s === 200 && ['MidTerm', 'FinalTerm'].includes(dt.j.term), JSON.stringify(dt));
+}
+
 // ---- Exam results include scanned answer sheets
 {
   const link = async (title, rows, scanBody) => {

@@ -294,8 +294,8 @@ html[data-theme="dark"] .ss-skel { background: linear-gradient(90deg, #1e283a 25
 .ss-term-tab:focus-visible { outline: 3px solid #fff; outline-offset: 1px; }
 .ss-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 95; display: flex; gap: .6rem; padding: .65rem 1rem calc(.65rem + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #e5e7eb; box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
 .ss-actions.hidden { display: none; }
-.ss-act { flex: 1; min-height: 2.9rem; border-radius: .8rem; font-weight: 800; font-size: .9rem; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-.ss-act-primary { background: #2563eb; color: #fff; flex: 1.6; }
+.ss-act { flex: 1; min-height: 2.9rem; padding: 0 .4rem; white-space: nowrap; border-radius: .8rem; font-weight: 800; font-size: .85rem; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.ss-act-primary { background: #2563eb; color: #fff; flex: 1.2; }
 .ss-act-secondary { background: #fff; color: #15803d; border: 2px solid #22c55e; }
 .ss-act:active { transform: scale(.98); }
 @media (min-width: 640px) { .ss-actions { justify-content: center; } .ss-act { flex: 0 1 15rem; } }
