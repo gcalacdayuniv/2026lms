@@ -6,6 +6,7 @@ import { parseLocalDate, getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { csvCell, downloadCsv } from './download-utils.js';
 import { dayPoints, termPoints } from './participation.js';
+import { onBase, GRADE_BASE } from './grade-base.js';
 
 const STATUS_BADGE = {
     'Active': 'text-green-600 border-green-200 bg-green-50',
@@ -250,8 +251,8 @@ export const CourseSummary = {
         (assessments || []).forEach(a => {
             if (!terms.includes(a.Term) || !SCORE_CATEGORIES.includes(a.Category)) return;
             if (a.Score === null || a.Score === undefined) return;
-            out[a.Category].score += a.Score;
-            out[a.Category].max += a.Max_Score;
+            out[a.Category].score += onBase(a.Score, a.Max_Score);   // every assessment counts out of 100
+            out[a.Category].max += GRADE_BASE;
             out[a.Category].count++;
             out.items.push(a);
         });
@@ -309,7 +310,7 @@ export const CourseSummary = {
             const sc = r.scores;
             const scoreBlock = sc.items.length === 0 ? '' : `
                                 <div class="flex justify-between gap-3 pt-2 mt-2 border-t border-gray-300 font-bold text-gray-500 uppercase"><span>Assessment</span><span>Score</span></div>
-                                ${sc.items.map(a => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(a.Title)} <span class="text-gray-400">(${esc(a.Category)},${esc(a.Term === 'MidTerm' ? 'Mid' : 'Final')})</span></span><span class="font-mono font-bold text-blue-600">${esc(Number(a.Score.toFixed(2)))}/${esc(Number(a.Max_Score.toFixed(2)))}</span></div>`).join('')}`;
+                                ${sc.items.map(a => `<div class="flex justify-between gap-3 py-0.5 border-b border-gray-100 last:border-0"><span class="font-medium text-gray-700">${esc(a.Title)} <span class="text-gray-400">(${esc(a.Category)},${esc(a.Term === 'MidTerm' ? 'Mid' : 'Final')})</span></span><span class="font-mono font-bold text-blue-600">${esc(Number(a.Score.toFixed(2)))}/${esc(Number(a.Max_Score.toFixed(2)))}${a.Max_Score === GRADE_BASE ? '' : ` <span class="text-gray-400">(${esc(Number(onBase(a.Score, a.Max_Score).toFixed(2)))}/${GRADE_BASE})</span>`}</span></div>`).join('')}`;
             const statusText = s.account_status || 'Inactive';
             const badge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${STATUS_BADGE[statusText] || STATUS_BADGE['Inactive']}">${esc(statusText)}</span>`;
 
@@ -419,7 +420,7 @@ export const CourseSummary = {
             const log = st.records.map(rec => `${rec.Date}: ${rec.Status || 'N/A'} (${dayPoints(rec.Status, rec.Performance_Points)} pts)`).join('; ');
             const sc = r.scores;
             const blank = (c) => c.count ? [Number(c.score.toFixed(2)), Number(c.max.toFixed(2))] : ['', ''];
-            const scoreLog = sc.items.map(a => `${a.Title} [${a.Category}, ${a.Term === 'MidTerm' ? 'Mid' : 'Final'}]: ${Number(a.Score.toFixed(2))}/${Number(a.Max_Score.toFixed(2))}`).join('; ');
+            const scoreLog = sc.items.map(a => `${a.Title} [${a.Category}, ${a.Term === 'MidTerm' ? 'Mid' : 'Final'}]: ${Number(a.Score.toFixed(2))}/${Number(a.Max_Score.toFixed(2))} (${Number(onBase(a.Score, a.Max_Score).toFixed(2))}/${GRADE_BASE})`).join('; ');
             lines.push([
                 s.Seat_Number || '', s.Student_Number || '', s.Name || '', s.Email || '', s.Contact_Number || '', s.account_status || 'Inactive', prog,
                 s.Group_Name || '', s.Assigned_Topic || '', termLabel,

@@ -5,6 +5,7 @@ import worker from '../../worker/worker.js';
 import { hashPassword } from '../../worker/password.js';
 import { signToken } from '../../worker/auth.js';
 import { buildScanSets, gradingSets } from '../../js/scan-items.js';
+import { onBase, GRADE_BASE } from '../../js/grade-base.js';
 
 const sql = new DatabaseSync(':memory:');
 const DB = {
@@ -694,6 +695,14 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('an absurd score is refused', (await put([{ studentId: 'S1', score: 1e9 }])).s === 400);
   await call('POST', '/api/assessments', { token: L1, body: { assessmentId: aid, courseId: 'C1', term: 'MidTerm', category: 'Written', title: 'Extra Quiz', maxScore: 25, date: '2026-04-01' } });
   ok('raising the max uncaps it', (await call('GET', '/api/student-summary?courseId=C1&studentId=S1', { token: L1 })).j.assessments.find(a => a.Title === 'Extra Quiz').Score === 23);
+}
+
+// ---- Class grade: every assessment counts out of 100, so a long quiz does not dilute a perfect exam
+{
+  const pct = (list) => { const s = list.reduce((t, [sc, mx]) => t + onBase(sc, mx), 0); return s / (list.length * GRADE_BASE) * 100; };
+  ok('base 100 keeps a perfect short exam perfect next to a poor long quiz', Math.round(pct([[20, 20], [50, 100]])) === 75 && Math.round((20 + 50) / (20 + 100) * 100) === 58);
+  ok('extra credit stops at 100', onBase(23, 20) === 100 && onBase(150, 100) === 100);
+  ok('plain conversion', onBase(15, 20) === 75 && onBase(0, 20) === 0 && onBase(5, 0) === 0 && onBase(-3, 20) === 0);
 }
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

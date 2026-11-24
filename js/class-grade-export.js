@@ -3,6 +3,7 @@
 // Class Summary data and downloads it as .xlsx. ExcelJS is loaded only when the button is used.
 import { CLASS_GRADE_TEMPLATE_B64 } from './class-grade-template.js';
 import { downloadBlob } from './download-utils.js';
+import { onBase, GRADE_BASE } from './grade-base.js';
 
 const EXCELJS_URLS = [
     'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',
@@ -143,7 +144,7 @@ export async function buildClassGrade(ExcelJS, { course, rows, templateBytes }) 
                 if (i < b.offset) continue;
                 const a = used[i - b.offset];
                 ws.getCell(3, col).value = a ? String(a.Title || '').slice(0, 28) : null;
-                ws.getCell(5, col).value = a ? num(a.Max_Score) : null;
+                ws.getCell(5, col).value = a ? GRADE_BASE : null;   // every output counts out of 100
                 if (a) (slotCols[a.Assessment_ID] = slotCols[a.Assessment_ID] || []).push(col);
             }
         }
@@ -151,7 +152,7 @@ export async function buildClassGrade(ExcelJS, { course, rows, templateBytes }) 
             ws.getCell(3, e.col).value = e.label;
             ws.getCell(5, e.col).value = e.max;
         }
-        ws.getCell(5, t.exam).value = plan.exams.length ? plan.exams.reduce((s, a) => s + (num(a.Max_Score) || 0), 0) : null;
+        ws.getCell(5, t.exam).value = plan.exams.length ? plan.exams.length * GRADE_BASE : null;
         t.examIds = plan.exams.map(a => a.Assessment_ID);
     }
 
@@ -162,7 +163,7 @@ export async function buildClassGrade(ExcelJS, { course, rows, templateBytes }) 
         const status = String(row.student.account_status || '');
         const remark = status && status.toLowerCase() !== 'active' ? status : null;
         const scoreOf = new Map();
-        for (const a of row.assessments || []) scoreOf.set(a.Assessment_ID, num(a.Score));
+        for (const a of row.assessments || []) scoreOf.set(a.Assessment_ID, num(a.Score) === null ? null : onBase(a.Score, a.Max_Score));
 
         ws.getCell(r, 1).value = i + 1;
         ws.getCell(r, 2).value = row.student.Name || '';
