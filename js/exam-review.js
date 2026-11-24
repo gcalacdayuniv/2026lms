@@ -33,7 +33,15 @@ const card = (q, no) => {
 export const ExamReview = {
     close: () => { const m = document.getElementById('examReviewModal'); if (m) m.remove(); },
 
-    open: async (assignmentId, studentId) => {
+    // An online exam the student took.
+    open: (assignmentId, studentId) =>
+        ExamReview.show(`/api/student-exam-review?assignmentId=${encodeURIComponent(assignmentId)}&studentId=${encodeURIComponent(studentId)}&_t=${Date.now()}`),
+
+    // The student's scanned paper (opened from the score list, next to "View answer sheet").
+    openSheet: (sheetId, studentId) =>
+        ExamReview.show(`/api/student-sheet-review?sheetId=${encodeURIComponent(sheetId)}&studentId=${encodeURIComponent(studentId)}&_t=${Date.now()}`),
+
+    show: async (endpoint) => {
         ExamReview.close();
         const m = document.createElement('div');
         m.id = 'examReviewModal';
@@ -52,7 +60,7 @@ export const ExamReview = {
         document.body.appendChild(m);
         const body = m.querySelector('#examReviewBody');
         try {
-            const d = await apiFetch(`/api/student-exam-review?assignmentId=${encodeURIComponent(assignmentId)}&studentId=${encodeURIComponent(studentId)}&_t=${Date.now()}`);
+            const d = await apiFetch(endpoint);
             m.querySelector('#examReviewTitle').textContent = `${d.examTitle} - ${d.finalScore} / ${d.maxScore}`;
             body.innerHTML = d.questions.map((q, i) => card(q, i + 1)).join('');
         } catch (err) {

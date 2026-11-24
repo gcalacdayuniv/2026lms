@@ -2,9 +2,11 @@
 // Scanned answer sheets (OMR): saving, reviewing, correcting, photos and deleting scan sessions.
 
 import { gradeScanSet } from './scan-grade.js';
+import { reviewQuestion } from './grading.js';
+import { scanContext, convertSheet } from './exam-scan-results.js';
 import { json } from './http.js';
-import { runInChunks } from './shared.js';
-import { ensureScanTables } from './schema.js';
+import { runInChunks, safeJson } from './shared.js';
+import { ensureScanTables, ensureAccessibleExamTables } from './schema.js';
 import { callGas } from './gas.js';
 
 // ---- Scanned answer sheets (OMR) ---------------------------------------------------------------
@@ -126,7 +128,7 @@ const scanScoreStatements = (env, assessmentId, studentId, score) => [
 
 // Returns a Response when the request is handled here, otherwise null.
 export async function handleScanSheets(request, env, path, url, corsHeaders) {
-    if (path !== '/api/scan-sessions' && path !== '/api/student-sheet-photo' && !path.startsWith('/api/scan-sheets')) return null;
+    if (path !== '/api/scan-sessions' && path !== '/api/student-sheet-photo' && path !== '/api/student-sheet-review' && !path.startsWith('/api/scan-sheets')) return null;
     await ensureScanTables(env);
     const method = request.method;
 
@@ -397,6 +399,43 @@ export async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (!gas.fileId) throw new Error('Google Drive did not return a file id.');
         await env.DB.prepare("UPDATE Scan_Sheets SET Photo_File_ID = ?, Photo_Layout = ? WHERE Sheet_ID = ?").bind(gas.fileId, layout, row.Sheet_ID).run();
         return json(corsHeaders, { success: true, fileId: gas.fileId }, 201);
+    }
+
+    // A student's read-only review of their own scanned paper: every question, the right answer, their answer and the
+    // points. Only after the lecturer released the answers (the same switch as for online exams).
+    if (method === 'GET' && path === '/api/student-sheet-review') {
+        const sheetId = url.searchParams.get('sheetId');
+        const studentId = url.searchParams.get('studentId');
+        if (!sheetId || !studentId) return json(corsHeaders, { error: 'Missing sheetId or studentId' }, 400);
+        const h = await env.DB.prepare(
+            `SELECT h.Student_ID, h.Answers, h.Score, h.Set_No, h.Marks, s.Course_ID, s.Assessment_ID, s.Layout, s.Set_Keys, a.Max_Score
+             FROM Scan_Sheets h JOIN Scan_Sessions s ON s.Session_ID = h.Session_ID LEFT JOIN Assessments a ON a.Assessment_ID = s.Assessment_ID
+             WHERE h.Sheet_ID = ?`
+        ).bind(sheetId).first();
+        if (!h || h.Student_ID !== studentId) return json(corsHeaders, { error: 'Answer sheet not found.' }, 404);
+        await ensureAccessibleExamTables(env);
+        const ce = await env.DB.prepare(
+            `SELECT ce.Release, ce.Adjustments, e.Title AS Exam_Title, e.ExamData FROM Class_Exams ce JOIN Exams e ON e.Exam_ID = ce.Exam_ID
+             WHERE ce.Course_ID = ? AND ce.Assessment_ID = ? ORDER BY ce.Created_At DESC LIMIT 1`
+        ).bind(h.Course_ID, h.Assessment_ID).first();
+        if (!ce) return json(corsHeaders, { error: 'This paper is not linked to an exam, so there is nothing to review.' }, 404);
+        if (ce.Release !== 1) return json(corsHeaders, { error: 'Your lecturer has not released the answers yet.' }, 403);
+
+        const questions = safeJson(ce.ExamData) || [];
+        const conv = convertSheet(scanContext(h, questions), h, questions);
+        if (!conv) return json(corsHeaders, { error: 'The review is not available for this printed set of the paper.' }, 409);
+        const adjustments = safeJson(ce.Adjustments) || {};
+        const items = conv.order.map(o => {
+            const hand = Object.prototype.hasOwnProperty.call(conv.written, o);
+            const item = reviewQuestion(questions[o], o, hand ? '' : conv.answers[o], Object.prototype.hasOwnProperty.call(conv.marks, o) ? conv.marks[o] : null);
+            if (hand || item.type === 'essay') {
+                item.answer = 'Written on your paper';   // the answer is on the paper, not in the system
+                if (hand) { item.earned = conv.written[o] === null ? 0 : conv.written[o]; item.marked = conv.written[o] !== null; }
+            }
+            item.adjustment = adjustments[o] || null;
+            return item;
+        });
+        return json(corsHeaders, { success: true, examTitle: ce.Exam_Title, finalScore: Number(h.Score) || 0, maxScore: Number(h.Max_Score) || 0, questions: items });
     }
 
     // A student's own answer sheet photo, so they can check it is their paper. Only the sheet that belongs to the

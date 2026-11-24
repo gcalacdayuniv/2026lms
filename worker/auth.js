@@ -130,6 +130,7 @@ export const RULES = {
     'POST /api/exam-photo': { who: 'any', self: ['studentId'] },   // GET /api/exam-photos is lecturer-only (owner checked by classExamId / photoId)
     'GET /api/student-exam-review': { who: 'any', self: ['studentId'] },
     'GET /api/student-sheet-photo': { who: 'any', self: ['studentId'] },
+    'GET /api/student-sheet-review': { who: 'any', self: ['studentId'] },
     'POST /api/upload-submission': { who: 'any' },
     'POST /api/upload-chunk': { who: 'any' },
     'POST /api/finish-chunked-upload': { who: 'any' },

@@ -3,7 +3,7 @@
 // whole-class summaries that the Class Summary screen and the Class Grade export read.
 // worker.js calls handleScores() after the permission check; it returns a Response for its own paths and null otherwise.
 
-import { ensureScanTables } from './schema.js';
+import { ensureScanTables, ensureAccessibleExamTables } from './schema.js';
 import { ASSESSMENT_TERMS, ASSESSMENT_CATEGORIES } from './constants.js';
 
 // Record Scores may hold more than the max (extra credit); every grade view reads the score capped at the max.
@@ -174,17 +174,22 @@ export async function handleScores(request, env, path, url, corsHeaders) {
         try {
             // Sheet_ID = this student's scanned answer sheet (with a stored photo) for the assessment, if any.
             await ensureScanTables(env);
+            await ensureAccessibleExamTables(env);
+            // Review_Sheet_ID = the student's scanned paper, once the lecturer released the answers of the linked exam.
             const assessmentRes = await env.DB.prepare(
                 `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, ${CAPPED_SCORE_SQL} AS Score,
                         (SELECT h.Sheet_ID FROM Scan_Sheets h JOIN Scan_Sessions ss ON ss.Session_ID = h.Session_ID
                           WHERE ss.Assessment_ID = a.Assessment_ID AND h.Student_ID = ? AND h.Photo_File_ID IS NOT NULL LIMIT 1) AS Sheet_ID,
                         (SELECT h.Scan_ID FROM Scan_Sheets h JOIN Scan_Sessions ss ON ss.Session_ID = h.Session_ID
-                          WHERE ss.Assessment_ID = a.Assessment_ID AND h.Student_ID = ? AND h.Photo_File_ID IS NOT NULL LIMIT 1) AS Sheet_Version
+                          WHERE ss.Assessment_ID = a.Assessment_ID AND h.Student_ID = ? AND h.Photo_File_ID IS NOT NULL LIMIT 1) AS Sheet_Version,
+                        (SELECT h.Sheet_ID FROM Scan_Sheets h JOIN Scan_Sessions ss ON ss.Session_ID = h.Session_ID
+                          WHERE ss.Assessment_ID = a.Assessment_ID AND h.Student_ID = ?
+                            AND EXISTS (SELECT 1 FROM Class_Exams ce WHERE ce.Course_ID = ss.Course_ID AND ce.Assessment_ID = a.Assessment_ID AND ce.Release = 1) LIMIT 1) AS Review_Sheet_ID
                  FROM Assessments a
                  LEFT JOIN Assessment_Scores s ON s.Assessment_ID = a.Assessment_ID AND s.Student_ID = ?
                  WHERE a.Course_ID = ?
                  ORDER BY a.Date ASC, a.Created_At ASC`
-            ).bind(studentId, studentId, studentId, courseId).all();
+            ).bind(studentId, studentId, studentId, studentId, courseId).all();
             assessments = assessmentRes.results;
         } catch (err) {
             try {

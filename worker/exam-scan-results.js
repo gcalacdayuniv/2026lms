@@ -22,6 +22,60 @@ const plainRows = (questions) => {
     return out;
 };
 
+// What is needed to read the sheets of one session (see convertSheet).
+export const scanContext = (session, questions) => {
+    const mixed = Boolean(session.Layout);
+    return { mixed, setKeys: list(session.Set_Keys), plain: mixed ? null : plainRows(questions) };
+};
+
+// One saved sheet as the answers an online student would have given. Returns
+//   { answers: [one per exam question], marks: { essay question: points }, written: { question: points | null },
+//     order: [exam question numbers in the order of the student's printed paper] }
+// or null when the sheet cannot be matched to the exam's questions (a plain sheet of another printed set).
+// `written` lists the hand-marked written answers that are not essays (points, or null while unmarked).
+export function convertSheet(ctx, h, questions) {
+    const given = list(h.Answers);
+    const setNo = Number.isInteger(h.Set_No) ? h.Set_No : 0;
+    const exam = new Array(questions.length).fill('');
+    if (ctx.mixed) {
+        const set = setNo > 0 && ctx.setKeys[setNo] ? ctx.setKeys[setNo] : ctx.setKeys[0];
+        if (!set || !Array.isArray(set.items)) return null;
+        const handMarks = safeJson(h.Marks) || {};
+        const marks = {};
+        const written = {};
+        const order = [];
+        set.items.forEach((it, idx) => {
+            const o = it.o;
+            if (!Number.isInteger(o) || o < 0 || o >= questions.length) return;
+            order.push(o);
+            const q = questions[o];
+            if (it.t === 'manual') {
+                // Written answers are marked by hand. An essay keeps its points; any other written answer counts as right
+                // only with full points (partial points are in the score but not in the question analysis).
+                const m = handMarks[idx];
+                const hasMark = !(m === undefined || m === null || m === '' || !Number.isFinite(Number(m)));
+                if (questionType(q) === 'essay') { if (hasMark) marks[o] = Number(m); }
+                else {
+                    written[o] = hasMark ? Number(m) : null;
+                    if (hasMark && Number(m) >= questionPoints(q) - 1e-9) exam[o] = q[3];
+                }
+                return;
+            }
+            exam[o] = decodeItem(it, given.slice(it.s, it.s + it.n));
+        });
+        return { answers: exam, marks, written, order };
+    }
+    const plain = ctx.plain;
+    if (plain && plain.length === questions.length && plain.length === given.length && (setNo <= 0 || !ctx.setKeys[setNo])) {
+        plain.forEach((o, j) => {
+            const choices = questions[o][2];
+            exam[o] = Number.isInteger(given[j]) && given[j] >= 0 && given[j] < choices.length ? choices[given[j]] : '';
+        });
+        return { answers: exam, marks: {}, written: {}, order: plain.slice() };
+    }
+    return null;
+}
+
 // -> [{ studentId, name, studentNumber, score, max, answers, marks }]
 // answers (one per exam question) and marks ({ question index: points }) are null when the sheet cannot be
 // matched to the exam's questions (a plain sheet of another printed set): the score still counts, the question
@@ -39,7 +93,7 @@ export async function scannedResults(env, courseId, assessmentId, questions) {
     const mixed = Boolean(session.Layout);
     let max = Number(assessment && assessment.Max_Score);
     if (!(max > 0)) max = mixed && setKeys[0] ? setMaxPoints(setKeys[0]) : Math.max(1, list(session.Bonus_Flags).filter(b => !b).length);
-    const plain = mixed ? null : plainRows(questions);
+    const ctx = scanContext(session, questions);
 
     const rows = (await env.DB.prepare(
         `SELECT h.Student_ID, h.Answers, h.Score, h.Set_No, h.Marks, u.Name, u.Student_Number
@@ -48,41 +102,8 @@ export async function scannedResults(env, courseId, assessmentId, questions) {
     ).bind(session.Session_ID).all()).results || [];
 
     return rows.map(h => {
-        const out = { studentId: h.Student_ID, name: h.Name || h.Student_ID, studentNumber: h.Student_Number || '', score: Number(h.Score) || 0, max, answers: null, marks: null };
-        const given = list(h.Answers);
-        const setNo = Number.isInteger(h.Set_No) ? h.Set_No : 0;
-        const exam = new Array(questions.length).fill('');
-
-        if (mixed) {
-            const set = setNo > 0 && setKeys[setNo] ? setKeys[setNo] : setKeys[0];
-            if (!set || !Array.isArray(set.items)) return out;
-            const handMarks = safeJson(h.Marks) || {};
-            const marks = {};
-            set.items.forEach((it, idx) => {
-                const o = it.o;
-                if (!Number.isInteger(o) || o < 0 || o >= questions.length) return;
-                const q = questions[o];
-                if (it.t === 'manual') {
-                    // Written answers are marked by hand. An essay keeps its points; any other written answer counts as right
-                    // only with full points (partial points are in the score but not in the question analysis).
-                    const m = handMarks[idx];
-                    if (m === undefined || m === null || m === '' || !Number.isFinite(Number(m))) return;
-                    if (questionType(q) === 'essay') marks[o] = Number(m);
-                    else if (Number(m) >= questionPoints(q) - 1e-9) exam[o] = q[3];
-                    return;
-                }
-                exam[o] = decodeItem(it, given.slice(it.s, it.s + it.n));
-            });
-            out.answers = exam;
-            out.marks = marks;
-        } else if (plain && plain.length === questions.length && plain.length === given.length && (setNo <= 0 || !setKeys[setNo])) {
-            plain.forEach((o, j) => {
-                const choices = questions[o][2];
-                exam[o] = Number.isInteger(given[j]) && given[j] >= 0 && given[j] < choices.length ? choices[given[j]] : '';
-            });
-            out.answers = exam;
-            out.marks = {};
-        }
-        return out;
+        const conv = convertSheet(ctx, h, questions);
+        return { studentId: h.Student_ID, name: h.Name || h.Student_ID, studentNumber: h.Student_Number || '', score: Number(h.Score) || 0, max,
+            answers: conv ? conv.answers : null, marks: conv ? conv.marks : null };
     });
 }

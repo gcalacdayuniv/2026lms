@@ -3,6 +3,7 @@
 // answer sheet, to check that it is their paper. Opened from the "View answer sheet" button in the score list of
 // a scanned assessment. One photo at a time, downloaded only when asked and kept on the device for 7 days.
 import { PhotoCache } from './course-scan-photos.js';
+import { ExamReview } from './exam-review.js';
 import { escapeHtml as esc } from './html-utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -12,11 +13,18 @@ export const StudentSheetViewer = {
     keyHandler: null,
 
     // Small button for a score row, or '' when the assessment has no stored sheet photo.
+    // Small buttons for a score row: "View answer sheet" when a photo is stored, "Review answers" once the lecturer
+    // released the answers of the linked exam. '' when there is neither.
     buttonHtml: (assessment, studentId) => {
-        if (!assessment || !assessment.Sheet_ID || !studentId) return '';
-        return `<div class="mt-1"><button type="button" class="sheet-view-btn inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold"
+        if (!assessment || !studentId || (!assessment.Sheet_ID && !assessment.Review_Sheet_ID)) return '';
+        const cls = 'inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold';
+        const photo = assessment.Sheet_ID ? `<button type="button" class="sheet-view-btn ${cls}"
             data-sheet-id="${esc(assessment.Sheet_ID)}" data-version="${esc(assessment.Sheet_Version || '')}" data-student-id="${esc(studentId)}" data-title="${esc(assessment.Title || 'Answer sheet')}">
-            <i class="fa-regular fa-image" aria-hidden="true"></i> View answer sheet</button></div>`;
+            <i class="fa-regular fa-image" aria-hidden="true"></i> View answer sheet</button>` : '';
+        const review = assessment.Review_Sheet_ID ? `<button type="button" class="sheet-review-btn ${cls}"
+            data-sheet-id="${esc(assessment.Review_Sheet_ID)}" data-student-id="${esc(studentId)}">
+            <i class="fa-solid fa-list-check" aria-hidden="true"></i> Review answers</button>` : '';
+        return `<div class="mt-1 flex flex-wrap gap-1.5">${photo}${review}</div>`;
     },
 
     open: async (sheetId, studentId, title, version = '') => {
@@ -80,6 +88,8 @@ export const StudentSheetViewer = {
         document.addEventListener('click', (e) => {
             const btn = e.target.closest && e.target.closest('.sheet-view-btn');
             if (btn) StudentSheetViewer.open(btn.dataset.sheetId, btn.dataset.studentId, btn.dataset.title, btn.dataset.version);
+            const rev = e.target.closest && e.target.closest('.sheet-review-btn');
+            if (rev) ExamReview.openSheet(rev.dataset.sheetId, rev.dataset.studentId);
         });
     }
 };

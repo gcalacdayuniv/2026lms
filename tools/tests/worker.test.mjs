@@ -628,7 +628,7 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
     const a = sql.prepare('select Assessment_ID a from Class_Exams where Class_Exam_ID = ?').get(c.j.classExamId).a;
     const sv = await call('POST', '/api/scan-sheets/save', { token: L1, body: { courseId: 'C1', assessmentId: a, title, term: 'MidTerm', category: 'Written', ...scanBody(ex.j.examId) } });
     const r = await call('GET', '/api/exam-results?classExamId=' + c.j.classExamId, { token: L1 });
-    return { sv, r };
+    return { sv, r, classExamId: c.j.classExamId, aid: a };
   };
   // all multiple choice (plain sheet): S1 right, S2 wrong on question 1, both right on question 2
   const mc = await link('Scan MC', [[1, 'Capital of France?', ['Paris', 'Rome'], 'Paris', '', false], [1, 'Pick B', ['A', 'B', 'C'], 'B', '', false]], () => ({
@@ -656,6 +656,25 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   const x = mx.r.j;
   ok('mixed scans: counted with scores 100% and 0%', x.submitted === 2 && x.summary.mean === 50 && x.students.find(t => t.studentId === 'S1').score === 2 && x.students.find(t => t.studentId === 'S2').score === 0, JSON.stringify(x.summary));
   ok('mixed scans: shaded and hand-marked questions are analysed', x.questions[0].fullPct === 50 && x.questions[1].fullPct === 50 && x.scannedNotAnalysed === 0, JSON.stringify(x.questions.map(q => q.fullPct)));
+
+  // Students review their own scanned paper (read only) once the lecturer releases the answers
+  sql.exec("update Users set account_status='Active', Password_Changed_At = NULL, Sessions_Valid_From = NULL where User_ID in ('S1','S2')");
+  const t1 = await signToken(env, 'S1'), t2 = await signToken(env, 'S2');
+  const sheetOf = (aid, sid) => sql.prepare('select h.Sheet_ID i from Scan_Sheets h join Scan_Sessions s on s.Session_ID = h.Session_ID where s.Assessment_ID = ? and h.Student_ID = ?').get(aid, sid).i;
+  const rv = (tok, aid, sid) => call('GET', `/api/student-sheet-review?sheetId=${sheetOf(aid, sid)}&studentId=${sid}`, { token: tok });
+  ok('review is closed until the answers are released', (await rv(t1, mx.aid, 'S1')).s === 403);
+  ok('summary has no review button before release', !(await call('GET', '/api/student-summary?courseId=C1&studentId=S1', { token: t1 })).j.assessments.some(r => r.Review_Sheet_ID));
+  await call('POST', '/api/exam-release', { token: L1, body: { classExamId: mx.classExamId, release: true } });
+  await call('POST', '/api/exam-release', { token: L1, body: { classExamId: mc.classExamId, release: true } });
+  const rm = await rv(t1, mx.aid, 'S1');
+  ok('mixed paper review: question, right answer, own answer and points', rm.s === 200 && rm.j.questions.length === 2 && rm.j.questions[0].answer === 'Paris' && rm.j.questions[0].correct === 'Paris' && rm.j.questions[0].earned === 1 && rm.j.finalScore === 2, JSON.stringify(rm.j).slice(0, 400));
+  ok('written answer shows the hand-marked points', rm.j.questions[1].answer === 'Written on your paper' && rm.j.questions[1].earned === 1 && rm.j.questions[1].correct === 'Madrid');
+  const rw = await rv(t2, mx.aid, 'S2');
+  ok('a wrong shaded answer is shown as such', rw.j.questions[0].answer === 'Rome' && rw.j.questions[0].earned === 0 && rw.j.questions[1].earned === 0);
+  const rp = await rv(t2, mc.aid, 'S2');
+  ok('plain paper review', rp.s === 200 && rp.j.questions[0].answer === 'Rome' && rp.j.questions[0].correct === 'Paris' && rp.j.questions[1].earned === 1, JSON.stringify(rp.j).slice(0, 300));
+  ok('a student cannot review another student\'s paper', (await call('GET', `/api/student-sheet-review?sheetId=${sheetOf(mx.aid, 'S1')}&studentId=S1`, { token: t2 })).s === 403);
+  ok('summary shows the review button after release', (await call('GET', '/api/student-summary?courseId=C1&studentId=S1', { token: t1 })).j.assessments.some(r => r.Review_Sheet_ID === sheetOf(mx.aid, 'S1')));
   ok('an exam with no scans is unchanged', (await call('GET', '/api/exam-results?classExamId=' + ce.j.classExamId, { token: L1 })).j.scanned === 0);
 }
 
