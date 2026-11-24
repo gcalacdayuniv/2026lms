@@ -351,6 +351,8 @@ export const CourseModule = {
 
                 const submitBtn = document.getElementById('openSubmitDocModalBtn');
                 if (submitBtn) submitBtn.dataset.courseId = courseId;
+                const groupsBtn = document.getElementById('openMyGroupsBtn');
+                if (groupsBtn) groupsBtn.dataset.courseId = courseId;
 
                 document.getElementById('summaryLoading').classList.add('hidden');
                 document.getElementById('summaryContent').classList.remove('hidden');

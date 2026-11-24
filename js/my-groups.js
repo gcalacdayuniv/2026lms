@@ -9,13 +9,15 @@ export const MyGroups = {
     init: () => document.addEventListener('click', MyGroups.handleClicks),
 
     handleClicks: async (e) => {
-        if (e.target.closest('#openMyGroupsBtn')) {
+        const open = e.target.closest('#openMyGroupsBtn');
+        if (open) {
             const modal = byId('myGroupsModal');
             if (!modal) return;
             modal.classList.remove('hidden');
             const list = byId('myGroupsList');
             list.innerHTML = '<div class="text-center text-sm text-gray-500 py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading...</div>';
-            const courseId = window.location.hash.replace('#class-', '');
+            // the student summary stores the class id on its buttons (the hash is not always #class-<id> on this screen)
+            const courseId = byId('openMyGroupsBtn').dataset.courseId || byId('openSubmitDocModalBtn')?.dataset.courseId || window.location.hash.replace('#class-', '');
             try {
                 const r = await apiFetch(`/api/student-groups?courseId=${courseId}&studentId=${AppState.user.User_ID}&_t=${Date.now()}`);
                 const groups = r.groups || [];
