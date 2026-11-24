@@ -1,0 +1,88 @@
+// worker/exam-scan-results.js
+// Scanned answer sheets of a class exam, for Manage Exams > Results. A scan session belongs to an assessment
+// (Scan_Sessions.Assessment_ID); the class exam is linked to the same assessment (Class_Exams.Assessment_ID).
+// Every sheet is turned back into the answers an online student would have given, so the same score summary,
+// score spread and question analysis (grading.js) count scanned and online students together.
+
+import { ensureScanTables } from './schema.js';
+import { safeJson } from './shared.js';
+import { decodeItem, setMaxPoints } from './scan-grade.js';
+import { questionPoints, questionType } from './grading.js';
+
+const norm = (s) => String(s ?? '').trim().toLowerCase();
+const list = (text) => { const v = safeJson(text); return Array.isArray(v) ? v : []; };
+
+// Exam rows an all-multiple-choice sheet holds, in sheet order (the same rule the scanner uses to build its key).
+const plainRows = (questions) => {
+    const out = [];
+    questions.forEach((q, i) => {
+        const choices = Array.isArray(q[2]) ? q[2] : [];
+        if (choices.length >= 2 && choices.length <= 5 && choices.findIndex(c => norm(c) === norm(q[3])) >= 0) out.push(i);
+    });
+    return out;
+};
+
+// -> [{ studentId, name, studentNumber, score, max, answers, marks }]
+// answers (one per exam question) and marks ({ question index: points }) are null when the sheet cannot be
+// matched to the exam's questions (a plain sheet of another printed set): the score still counts, the question
+// analysis leaves that sheet out.
+export async function scannedResults(env, courseId, assessmentId, questions) {
+    if (!courseId || !assessmentId) return [];
+    await ensureScanTables(env);
+    const session = await env.DB.prepare(
+        "SELECT Session_ID, Bonus_Flags, Set_Keys, Layout FROM Scan_Sessions WHERE Course_ID = ? AND Assessment_ID = ?"
+    ).bind(courseId, assessmentId).first();
+    if (!session) return [];
+
+    const assessment = await env.DB.prepare("SELECT Max_Score FROM Assessments WHERE Assessment_ID = ?").bind(assessmentId).first();
+    const setKeys = list(session.Set_Keys);
+    const mixed = Boolean(session.Layout);
+    let max = Number(assessment && assessment.Max_Score);
+    if (!(max > 0)) max = mixed && setKeys[0] ? setMaxPoints(setKeys[0]) : Math.max(1, list(session.Bonus_Flags).filter(b => !b).length);
+    const plain = mixed ? null : plainRows(questions);
+
+    const rows = (await env.DB.prepare(
+        `SELECT h.Student_ID, h.Answers, h.Score, h.Set_No, h.Marks, u.Name, u.Student_Number
+         FROM Scan_Sheets h LEFT JOIN Users u ON u.User_ID = h.Student_ID
+         WHERE h.Session_ID = ? ORDER BY u.Name`
+    ).bind(session.Session_ID).all()).results || [];
+
+    return rows.map(h => {
+        const out = { studentId: h.Student_ID, name: h.Name || h.Student_ID, studentNumber: h.Student_Number || '', score: Number(h.Score) || 0, max, answers: null, marks: null };
+        const given = list(h.Answers);
+        const setNo = Number.isInteger(h.Set_No) ? h.Set_No : 0;
+        const exam = new Array(questions.length).fill('');
+
+        if (mixed) {
+            const set = setNo > 0 && setKeys[setNo] ? setKeys[setNo] : setKeys[0];
+            if (!set || !Array.isArray(set.items)) return out;
+            const handMarks = safeJson(h.Marks) || {};
+            const marks = {};
+            set.items.forEach((it, idx) => {
+                const o = it.o;
+                if (!Number.isInteger(o) || o < 0 || o >= questions.length) return;
+                const q = questions[o];
+                if (it.t === 'manual') {
+                    // Written answers are marked by hand. An essay keeps its points; any other written answer counts as right
+                    // only with full points (partial points are in the score but not in the question analysis).
+                    const m = handMarks[idx];
+                    if (m === undefined || m === null || m === '' || !Number.isFinite(Number(m))) return;
+                    if (questionType(q) === 'essay') marks[o] = Number(m);
+                    else if (Number(m) >= questionPoints(q) - 1e-9) exam[o] = q[3];
+                    return;
+                }
+                exam[o] = decodeItem(it, given.slice(it.s, it.s + it.n));
+            });
+            out.answers = exam;
+            out.marks = marks;
+        } else if (plain && plain.length === questions.length && plain.length === given.length && (setNo <= 0 || !setKeys[setNo])) {
+            plain.forEach((o, j) => {
+                const choices = questions[o][2];
+                exam[o] = Number.isInteger(given[j]) && given[j] >= 0 && given[j] < choices.length ? choices[given[j]] : '';
+            });
+            out.answers = exam;
+            out.marks = {};
+        }
+        return out;
+    });
+}

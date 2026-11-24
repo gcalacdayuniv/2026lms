@@ -7,6 +7,7 @@ import { ensureAccessibleExamTables, ensureManualMarksColumn, ensureExamShares }
 import { ASSESSMENT_TERMS, ASSESSMENT_CATEGORIES } from './constants.js';
 import { DATE_RE } from './attendance.js';
 import { ensureExamSecurity, secureApplies } from './exam-photos.js';
+import { scannedResults } from './exam-scan-results.js';
 import { ensureSessions, finishAttempt, sweepAway, reviewOf } from './exam-session.js';
 import { questionPoints, examMaxPoints, essayIndexes, scoreExam, studentQuestion, questionStats, scoreSummary, itemAnalysis, finalScoreOf, reviewQuestion } from './grading.js';
 
@@ -588,7 +589,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         await ensureAccessibleExamTables(env);
 
         const ce = await env.DB.prepare(
-            `SELECT ce.Class_Exam_ID, ce.Time_Limit, ce.Adjustments, ce.Release, e.Title as Exam_Title, e.ExamData
+            `SELECT ce.Class_Exam_ID, ce.Course_ID, ce.Assessment_ID, ce.Time_Limit, ce.Adjustments, ce.Release, e.Title as Exam_Title, e.ExamData
              FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID WHERE ce.Class_Exam_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
         ).bind(classExamId).first();
         if (!ce) {
@@ -611,8 +612,16 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         const all = rows.results || [];
         const done = all.filter(r => r.Status === "Completed");
 
-        const answerSets = done.map(r => { const a = safeJson(r.Answers_JSON); return Array.isArray(a) ? a : []; });
-        const markSets = done.map(r => safeJson(r.Manual_Marks) || {});
+        // Scanned answer sheets of the same class exam count with the online submissions (a student who has both
+        // keeps the online one).
+        const doneIds = new Set(done.map(r => r.Student_ID));
+        const scanned = (await scannedResults(env, ce.Course_ID, ce.Assessment_ID, questions)).filter(s => !doneIds.has(s.studentId));
+        const scannedAnalysed = scanned.filter(s => s.answers);
+
+        const answerSets = done.map(r => { const a = safeJson(r.Answers_JSON); return Array.isArray(a) ? a : []; })
+            .concat(scannedAnalysed.map(s => s.answers));
+        const markSets = done.map(r => safeJson(r.Manual_Marks) || {})
+            .concat(scannedAnalysed.map(s => s.marks || {}));
         const stats = questions.map((q, i) => questionStats(
             q, i,
             answerSets.map(a => a[i] ?? ""),
@@ -623,7 +632,14 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         const adjustments = safeJson(ce.Adjustments) || {};
         stats.forEach((s, i) => { Object.assign(s, analysis[i]); s.adjustment = adjustments[i] || null; });
 
+        const scanRow = (s) => ({
+            studentId: s.studentId, awayCount: 0, awaySeconds: 0, review: { level: 'none', reasons: [] },
+            name: s.name, studentNumber: s.studentNumber, status: 'Scanned', score: s.score, max: s.max,
+            submitReason: null, photos: 0, percent: s.max > 0 ? Math.round((s.score / s.max) * 1000) / 10 : null, minutes: null
+        });
+        const scanById = new Map(scanned.map(s => [s.studentId, s]));
         const students = all.map(r => {
+            if (scanById.has(r.Student_ID)) return scanRow(scanById.get(r.Student_ID));
             const began = parseTime(r.Started_At);
             const ended = parseTime(r.Submitted_At);
             const completed = r.Status === "Completed";
@@ -649,15 +665,25 @@ export async function handleExams(request, env, path, url, corsHeaders) {
             };
         });
 
-        const summary = scoreSummary(done.map(r => ({ score: Number(r.Final_Score) || 0, max: Number(r.Max_Score) || 0 })));
+        const enabledIds = new Set(all.map(r => r.Student_ID));
+        const scanOnly = scanned.filter(s => !enabledIds.has(s.studentId));
+        if (scanOnly.length) {
+            scanOnly.forEach(s => students.push(scanRow(s)));
+            students.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        }
+
+        const summary = scoreSummary(done.map(r => ({ score: Number(r.Final_Score) || 0, max: Number(r.Max_Score) || 0 }))
+            .concat(scanned.map(s => ({ score: s.score, max: s.max }))));
         const times = students.filter(s => s.minutes !== null).map(s => s.minutes);
 
         return new Response(JSON.stringify({
             success: true,
             examTitle: ce.Exam_Title,
             timeLimit: ce.Time_Limit || null,
-            assigned: all.length,
-            submitted: done.length,
+            assigned: all.length + scanOnly.length,
+            submitted: done.length + scanned.length,
+            scanned: scanned.length,
+            scannedNotAnalysed: scanned.length - scannedAnalysed.length,
             summary,
             avgMinutes: times.length ? Math.round((times.reduce((a, b) => a + b, 0) / times.length) * 10) / 10 : null,
             questions: stats,

@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import worker from '../../worker/worker.js';
 import { hashPassword } from '../../worker/password.js';
 import { signToken } from '../../worker/auth.js';
+import { buildScanSets, gradingSets } from '../../js/scan-items.js';
 
 const sql = new DatabaseSync(':memory:');
 const DB = {
@@ -617,6 +618,45 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('student cannot upload for another student', (await up(stuTok, { studentId: 'S2' })).s === 403);
   ok('student can upload for own group', (await up(stuTok, { isGroup: true, includedMembers: ['S2'] })).s === 201);
   globalThis.fetch = realFetch;
+}
+
+// ---- Exam results include scanned answer sheets
+{
+  const link = async (title, rows, scanBody) => {
+    const ex = await call('POST', '/api/exams', { token: L1, body: { lecturerId: 'L1', title, course: '', examData: rows } });
+    const c = await call('POST', '/api/class-exams', { token: L1, body: { courseId: 'C1', examId: ex.j.examId, term: 'MidTerm', category: 'Written', isActive: true, assignments: [{ studentId: 'S1', isEnabled: true }] } });
+    const a = sql.prepare('select Assessment_ID a from Class_Exams where Class_Exam_ID = ?').get(c.j.classExamId).a;
+    const sv = await call('POST', '/api/scan-sheets/save', { token: L1, body: { courseId: 'C1', assessmentId: a, title, term: 'MidTerm', category: 'Written', ...scanBody(ex.j.examId) } });
+    const r = await call('GET', '/api/exam-results?classExamId=' + c.j.classExamId, { token: L1 });
+    return { sv, r };
+  };
+  // all multiple choice (plain sheet): S1 right, S2 wrong on question 1, both right on question 2
+  const mc = await link('Scan MC', [[1, 'Capital of France?', ['Paris', 'Rome'], 'Paris', '', false], [1, 'Pick B', ['A', 'B', 'C'], 'B', '', false]], () => ({
+    numQuestions: 2, numChoices: 3, answerKey: [0, 1], bonus: [false, false],
+    sheets: [{ studentId: 'S1', answers: [0, 1] }, { studentId: 'S2', answers: [1, 1] }]
+  }));
+  ok('scan session saved (plain)', mc.sv.s === 200 || mc.sv.s === 201, JSON.stringify(mc.sv));
+  const m = mc.r.j;
+  ok('plain scans: both students counted as submitted', mc.r.s === 200 && m.submitted === 2 && m.scanned === 2 && m.assigned === 2, JSON.stringify(m).slice(0, 300));
+  ok('plain scans: average and spread include the scans', m.summary && m.summary.mean === 75 && m.summary.high === 100 && m.summary.low === 50 && m.summary.buckets[9] === 1 && m.summary.buckets[5] === 1, JSON.stringify(m.summary));
+  ok('plain scans: student rows say Scanned with their score', m.students.every(x => x.status === 'Scanned') && m.students.find(x => x.studentId === 'S1').score === 2 && m.students.find(x => x.studentId === 'S2').percent === 50);
+  ok('plain scans: question analysis counts the scans', m.questions[0].submitted === 2 && m.questions[0].fullPct === 50 && m.questions[0].options[1].count === 1 && m.questions[1].fullPct === 100, JSON.stringify(m.questions[0]).slice(0, 300));
+
+  // mixed sheet: one multiple choice (shaded) and one identification (marked by hand)
+  const rows = [[1, 'Capital of France?', ['Paris', 'Rome'], 'Paris', '', false], [1, 'Capital of Spain?', [], 'Madrid', '', false]];
+  const mx = await link('Scan Mixed', rows, (examId) => {
+    const built = buildScanSets(rows, { seed: examId, count: 1 });
+    const g = gradingSets(built);
+    return {
+      layout: built.cells, setKeys: g, answerKey: g[0].key, bonus: g[0].bonus, numQuestions: built.cells.length, numChoices: 2,
+      sheets: [{ studentId: 'S1', answers: [0], marks: { 1: 1 } }, { studentId: 'S2', answers: [1], marks: { 1: 0 } }]
+    };
+  });
+  ok('scan session saved (mixed)', mx.sv.s === 200 || mx.sv.s === 201, JSON.stringify(mx.sv));
+  const x = mx.r.j;
+  ok('mixed scans: counted with scores 100% and 0%', x.submitted === 2 && x.summary.mean === 50 && x.students.find(t => t.studentId === 'S1').score === 2 && x.students.find(t => t.studentId === 'S2').score === 0, JSON.stringify(x.summary));
+  ok('mixed scans: shaded and hand-marked questions are analysed', x.questions[0].fullPct === 50 && x.questions[1].fullPct === 50 && x.scannedNotAnalysed === 0, JSON.stringify(x.questions.map(q => q.fullPct)));
+  ok('an exam with no scans is unchanged', (await call('GET', '/api/exam-results?classExamId=' + ce.j.classExamId, { token: L1 })).j.scanned === 0);
 }
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

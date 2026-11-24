@@ -1134,7 +1134,7 @@ export const CourseExam = {
         const releaseRow = `<label class="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-700 cursor-pointer"><input type="checkbox" id="erReleaseToggle" class="w-4 h-4" ${d.release ? 'checked' : ''}> Let students review their answers and the right answers</label>`;
         const tiles = `
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                ${tile('Submitted', `${d.submitted}/${d.assigned}`)}
+                ${tile('Submitted', `${d.submitted}/${d.assigned}`, d.scanned ? `${d.scanned} scanned` : '')}
                 ${tile('Average', fmt(sm.mean, '%'))}
                 ${tile('Median', fmt(sm.median, '%'))}
                 ${tile('Highest / Lowest', `${fmt(sm.high, '%')} / ${fmt(sm.low, '%')}`)}
@@ -1232,7 +1232,7 @@ export const CourseExam = {
         const rows = shownStudents.map(s => `
             <tr class="border-t border-gray-100">
                 <td class="px-2 py-1.5 font-bold text-gray-800">${esc(s.name)} <span class="font-normal text-gray-500">${esc(s.studentNumber)}</span></td>
-                <td class="px-2 py-1.5 ${s.status === 'Completed' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'away' ? '<div class="text-[10px] font-bold text-red-700">Away too long: auto-submitted</div>' : s.submitReason === 'session-takeover' ? '<div class="text-[10px] font-bold text-red-700">Signed in on another device: auto-submitted</div>' : s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.submitReason && s.submitReason !== 'time' ? `<button type="button" class="er-continue-btn mt-0.5 mr-2 text-[11px] font-bold text-emerald-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}">Let continue</button>` : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>${AppState.user.isAdmin ? `Photos (${s.photos})` : 'Face photo'}</button>` : ''}</td>
+                <td class="px-2 py-1.5 ${s.status === 'Completed' || s.status === 'Scanned' ? 'text-green-700' : 'text-gray-500'}">${esc(s.status)}${s.submitReason === 'away' ? '<div class="text-[10px] font-bold text-red-700">Away too long: auto-submitted</div>' : s.submitReason === 'session-takeover' ? '<div class="text-[10px] font-bold text-red-700">Signed in on another device: auto-submitted</div>' : s.submitReason === 'focus-lost' ? '<div class="text-[10px] font-bold text-red-700">Left the exam screen: auto-submitted</div>' : s.submitReason === 'camera-off' ? '<div class="text-[10px] font-bold text-red-700">Camera turned off: auto-submitted</div>' : ''}${s.submitReason && s.submitReason !== 'time' ? `<button type="button" class="er-continue-btn mt-0.5 mr-2 text-[11px] font-bold text-emerald-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}">Let continue</button>` : ''}${s.photos ? `<button type="button" class="er-photos-btn mt-0.5 text-[11px] font-bold text-blue-700 underline" data-student-id="${esc(s.studentId)}" data-name="${esc(s.name)}"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>${AppState.user.isAdmin ? `Photos (${s.photos})` : 'Face photo'}</button>` : ''}</td>
                 <td class="px-2 py-1.5 text-right">${s.score === null ? '-' : `${s.score} / ${s.max}`}</td>
                 <td class="px-2 py-1.5 text-right font-bold">${fmt(s.percent, '%')}</td>
                 <td class="px-2 py-1.5 text-right">${s.minutes === null ? '-' : s.minutes + ' min'}</td>
@@ -1242,6 +1242,7 @@ export const CourseExam = {
         body.innerHTML = `
             ${releaseRow}
             ${tiles}
+            ${d.scanned ? `<p class="text-[11px] text-gray-500"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>${d.scanned} scanned answer sheet${d.scanned === 1 ? ' is' : 's are'} counted here${d.scannedNotAnalysed ? `; ${d.scannedNotAnalysed} from another printed set ${d.scannedNotAnalysed === 1 ? 'is' : 'are'} in the scores but not in the question analysis` : ''}. Give credit / Drop question changes online scores only.</p>` : ''}
             ${distribution}
             <div>
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
