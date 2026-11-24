@@ -65,7 +65,7 @@ export async function handleGroups(request, env, path, url, corsHeaders) {
         if (!await setBelongs(env, courseId, setId)) return json({ error: 'Set not found' }, 404, corsHeaders);
 
         const roster = await env.DB.prepare(
-            `SELECT u.User_ID, u.Name, u.Student_Number FROM Enrollments e JOIN Users u ON u.User_ID = e.Student_ID
+            `SELECT u.User_ID, u.Name, u.Student_Number, e.Seat_Number FROM Enrollments e JOIN Users u ON u.User_ID = e.Student_ID
              WHERE e.Course_ID = ? ORDER BY u.Name`
         ).bind(courseId).all();
         const rows = await setRows(env, courseId, setId);

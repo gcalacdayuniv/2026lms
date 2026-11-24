@@ -126,6 +126,7 @@ export const CourseGroups = {
     },
 
     handleChanges: async (e) => {
+        if (e.target.id === 'cgSort') { CourseGroups.render(); return; }
         if (e.target.id === 'cgSetSelect') {
             CourseGroups.setId = e.target.value;
             await CourseGroups.loadSet();
@@ -147,6 +148,23 @@ export const CourseGroups = {
         if (t.classList.contains('cg-name')) g.name = t.value;
         if (t.classList.contains('cg-topic')) g.topic = t.value;
         if (t.classList.contains('cg-name')) CourseGroups.renderAssignOptions();
+    },
+
+    // Names are stored "Last, Given", so a plain name sort is a last-name sort.
+    sorted: () => {
+        const mode = byId('cgSort') ? byId('cgSort').value : 'last';
+        const cmp = (a, b) => String(a || '').localeCompare(String(b || ''), undefined, { numeric: true, sensitivity: 'base' });
+        const given = (s) => (String(s.Name || '').split(',')[1] || '').trim();
+        const seat = (s) => { const n = parseFloat(s.Seat_Number); return Number.isNaN(n) ? Infinity : n; };
+        const groupName = (s) => { const g = CourseGroups.groups.find(x => x.gid === CourseGroups.assign[s.User_ID]); return g ? g.name : '\uffff'; };
+        const by = {
+            last: (a, b) => cmp(a.Name, b.Name),
+            given: (a, b) => cmp(given(a), given(b)) || cmp(a.Name, b.Name),
+            seat: (a, b) => (seat(a) === seat(b) ? 0 : seat(a) < seat(b) ? -1 : 1) || cmp(a.Name, b.Name),
+            number: (a, b) => cmp(a.Student_Number, b.Student_Number),
+            group: (a, b) => cmp(groupName(a), groupName(b)) || cmp(a.Name, b.Name)
+        };
+        return [...CourseGroups.students].sort(by[mode] || by.last);
     },
 
     addGroup: (name, topic = '') => {
@@ -197,9 +215,9 @@ export const CourseGroups = {
                 <button type="button" class="cg-remove-group text-red-500 hover:text-red-700 px-1" data-gid="${g.gid}" aria-label="Remove group"><i class="fa-solid fa-trash"></i></button>
             </div>`).join('') : '<p class="text-xs text-gray-500 italic">No groups yet. Add one, or split the class randomly.</p>';
 
-        byId('cgStudents').innerHTML = CourseGroups.students.map(s => `
+        byId('cgStudents').innerHTML = CourseGroups.sorted().map(s => `
             <tr>
-                <td class="px-3 py-2"><div class="font-bold text-gray-800">${esc(s.Name)}</div><div class="text-[10px] text-gray-500">${esc(s.Student_Number || 'N/A')}</div></td>
+                <td class="px-3 py-2"><div class="font-bold text-gray-800">${esc(s.Name)}</div><div class="text-[10px] text-gray-500">${esc(s.Student_Number || 'N/A')}${s.Seat_Number ? ` &middot; Seat ${esc(s.Seat_Number)}` : ''}</div></td>
                 <td class="px-3 py-2"><select class="cg-assign w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-50" data-id="${esc(s.User_ID)}"></select></td>
             </tr>`).join('');
         CourseGroups.renderAssignOptions();

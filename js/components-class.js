@@ -189,7 +189,18 @@ const ClassUI = {
                     </div>
                     <div id="cgGroups" class="mb-2"></div>
                     <button type="button" id="cgAddGroupBtn" class="mb-4 px-3 py-1.5 border border-violet-300 text-violet-700 hover:bg-violet-50 rounded text-xs font-bold"><i class="fa-solid fa-plus mr-1"></i>Add group</button>
-                    <div id="cgSummary" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <span id="cgSummary" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider"></span>
+                        <label class="flex items-center gap-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sort by
+                            <select id="cgSort" class="px-2 py-1 border border-gray-300 rounded text-xs bg-gray-50 normal-case font-medium">
+                                <option value="last">Last name</option>
+                                <option value="given">Given name</option>
+                                <option value="seat">Seat number</option>
+                                <option value="number">Student number</option>
+                                <option value="group">Group</option>
+                            </select>
+                        </label>
+                    </div>
                     <div class="border border-gray-200 rounded-lg bg-white">
                         <table class="w-full text-xs text-left">
                             <thead class="bg-gray-200 text-gray-700"><tr><th class="px-3 py-2">Student</th><th class="px-3 py-2">Group</th></tr></thead>
