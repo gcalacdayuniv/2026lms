@@ -5,6 +5,7 @@ import { CourseSummary } from './course-summary.js';
 import { UI } from './ui-feedback.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml as esc } from './html-utils.js';
+import { onBase, GRADE_BASE } from './grade-base.js';
 
 const fmt = (n) => Number(Number(n).toFixed(2));
 
@@ -171,9 +172,9 @@ export const CourseScores = {
                 if (!SUBMISSION_FALLBACK.includes(category)) el.textContent = '—';
                 return;
             }
-            const total = scored.reduce((sum, a) => sum + a.Score, 0);
-            const max = scored.reduce((sum, a) => sum + a.Max_Score, 0);
-            el.textContent = `${fmt(total)}/${fmt(max)}`;
+            // The card shows the average of the assessments on a base of 100; the breakdown list below keeps the raw scores.
+            const average = scored.reduce((sum, a) => sum + onBase(a.Score, a.Max_Score), 0) / scored.length;
+            el.textContent = `${fmt(average)}/${GRADE_BASE}`;
         });
     },
 
