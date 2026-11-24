@@ -45,7 +45,7 @@ export const ExamReview = {
         ExamReview.close();
         const m = document.createElement('div');
         m.id = 'examReviewModal';
-        m.className = 'fixed inset-0 z-[80] flex items-center justify-center p-0 sm:p-4';
+        m.className = 'fixed inset-0 z-[120] flex items-center justify-center p-0 sm:p-4';
         m.setAttribute('role', 'dialog');
         m.setAttribute('aria-modal', 'true');
         m.setAttribute('aria-label', 'Review your answers');
