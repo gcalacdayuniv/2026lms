@@ -202,7 +202,7 @@ export function defaultUploadTerm(course, now = new Date()) {
 }
 
 // Saves the Submissions row(s) after the file reached Drive.
-async function recordSubmission(env, body, fileUrl, user = null) {
+async function recordSubmission(env, body, fileUrl) {
     const isGroup = body.isGroup;
     const includedMembers = body.includedMembers || [];
 
@@ -220,12 +220,6 @@ async function recordSubmission(env, body, fileUrl, user = null) {
     if (isGroup) {
         const allGroupText = memberNames.length > 0 ? memberNames.join(', ') : 'None';
         finalDescription = `${body.description}\n\n[Group Upload by: ${uploaderName}]\n[Included Members: ${allGroupText}]`;
-    }
-
-    // A lecturer uploading for a student is recorded in the description, so the student can see who uploaded it.
-    if (user && user.role === 'lecturer') {
-        const lec = await env.DB.prepare("SELECT Name FROM Users WHERE User_ID = ?").bind(user.id).first();
-        finalDescription = `${finalDescription}\n\n[Uploaded by lecturer: ${lec ? lec.Name : 'Lecturer'}]`;
     }
 
     const subId = crypto.randomUUID();
@@ -277,7 +271,7 @@ export async function handleUploads(request, env, path, url, corsHeaders, user =
                 gasData = await callGas(env, JSON.stringify(body));
             }
 
-            await recordSubmission(env, body, gasData.fileUrl, user);
+            await recordSubmission(env, body, gasData.fileUrl);
             return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
         } catch (err) {
             const msg = err && err.message ? err.message : "Upload failed.";
@@ -331,7 +325,7 @@ export async function handleUploads(request, env, path, url, corsHeaders, user =
                 mimeType: body.mimeType,
                 pathParts: body.pathParts || []
             }));
-            await recordSubmission(env, body, gasData.fileUrl, user);
+            await recordSubmission(env, body, gasData.fileUrl);
             return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
         } catch (err) {
             const status = err instanceof UploadError ? err.status : 500;
@@ -348,8 +342,8 @@ export async function handleUploads(request, env, path, url, corsHeaders, user =
         return new Response(JSON.stringify({ success: true, term: defaultUploadTerm(c) }), { status: 200, headers: corsHeaders });
     }
 
-    // A lecturer changes the details (term, title, description) of a file they uploaded for a student. Rows of a group upload
-    // share the file, so they are all updated; the "[Group Upload ...]" / "[Uploaded by lecturer ...]" tags are kept.
+    // A lecturer changes the details (term, title, description) of a student's upload. Rows of a group upload share the file,
+    // so they are all updated; the "[Group Upload ...]" tags (and the old "[Uploaded by lecturer ...]" ones) are kept.
     if (request.method === "POST" && path === "/api/update-submission") {
         const body = await request.json();
         const title = String(body.title == null ? '' : body.title).trim();
@@ -360,12 +354,9 @@ export async function handleUploads(request, env, path, url, corsHeaders, user =
         if (/[.\/\\:*?"<>|]/.test(title)) return new Response(JSON.stringify({ error: "Title cannot contain special characters like dots (.) or slashes (/)." }), { status: 400, headers: corsHeaders });
         if (description.length > 2000) return new Response(JSON.stringify({ error: "Description is too long." }), { status: 400, headers: corsHeaders });
 
-        const row = await env.DB.prepare("SELECT Course_ID, File_URL, Description FROM Submissions WHERE Submission_ID = ?").bind(body.submissionId).first();
+        const row = await env.DB.prepare("SELECT Course_ID, File_URL, Title, Description FROM Submissions WHERE Submission_ID = ?").bind(body.submissionId).first();
         if (!row) return new Response(JSON.stringify({ error: "Submission not found" }), { status: 404, headers: corsHeaders });
-        if (!String(row.Description || '').includes('[Uploaded by lecturer:')) {
-            return new Response(JSON.stringify({ error: "Only files uploaded by the lecturer can be edited." }), { status: 403, headers: corsHeaders });
-        }
-        const rows = await env.DB.prepare("SELECT Submission_ID, Description FROM Submissions WHERE Course_ID = ? AND File_URL = ? AND Description LIKE '%[Uploaded by lecturer:%'").bind(row.Course_ID, row.File_URL).all();
+        const rows = await env.DB.prepare("SELECT Submission_ID, Description FROM Submissions WHERE Course_ID = ? AND File_URL = ? AND Title = ?").bind(row.Course_ID, row.File_URL, row.Title).all();
         const TAG = /\n\n\[(Group Upload by:|Uploaded by lecturer:)/;
         const stmts = (rows.results || []).map(r => {
             const d = String(r.Description || '');

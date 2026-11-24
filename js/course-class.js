@@ -88,7 +88,7 @@ export const CourseClass = {
             let descHtml = escapeHtml(sub.Description || '');
             descHtml = descHtml.replace(/\n/g, '<br>');
             descHtml = descHtml.replace(/\[Group Upload by: (.*?)\]/g, '<span class="block mt-1.5 text-[10px] text-purple-700 font-bold bg-purple-50 border border-purple-100 rounded px-1.5 py-0.5 inline-block"><i class="fa-solid fa-users mr-1"></i>Uploaded by: $1</span>');
-            descHtml = descHtml.replace(/\[Uploaded by lecturer: (.*?)\]/g, '<span class="block mt-1.5 text-[10px] text-blue-700 font-bold bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 inline-block"><i class="fa-solid fa-user-tie mr-1"></i>Uploaded by lecturer: $1</span>');
+            descHtml = descHtml.replace(/(<br>)*\[Uploaded by lecturer: .*?\]/g, '');   // older uploads carried this tag; it is no longer shown
             descHtml = descHtml.replace(/\[Included Members: (.*?)\]/g, '<span class="block text-gray-500 italic text-[9px] mt-0.5 leading-tight">Members: $1</span>');
 
             let gradingHtml = '';
@@ -142,7 +142,7 @@ export const CourseClass = {
                     <a href="${safeUrl(fileViewUrl(sub.File_URL))}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition shadow-sm text-center">
                         <i class="fa-solid ${sub.Type === 'url' ? 'fa-link' : 'fa-download'} block text-sm mb-0.5"></i> View
                     </a>
-                    ${isLecturer && /\[Uploaded by lecturer:/.test(sub.Description || '') ? `<button type="button" class="edit-submission-btn px-3 py-1 bg-white border border-blue-200 text-blue-700 rounded text-[10px] font-bold hover:bg-blue-50 transition" data-sub-id="${escapeHtml(sub.Submission_ID)}"><i class="fa-solid fa-pen mr-1"></i>Edit</button>` : ''}
+                    ${isLecturer ? `<button type="button" class="edit-submission-btn px-3 py-1 bg-white border border-blue-200 text-blue-700 rounded text-[10px] font-bold hover:bg-blue-50 transition" data-sub-id="${escapeHtml(sub.Submission_ID)}"><i class="fa-solid fa-pen mr-1"></i>Edit</button>` : ''}
                     </div>
                 </div>
                 ${gradingHtml}

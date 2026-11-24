@@ -672,7 +672,7 @@ const ClassUI = {
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeEditSubmissionBg"></div>
             <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto">
                 <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
-                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-pen text-blue-600 mr-2"></i>Edit uploaded file</h3>
+                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-pen text-blue-600 mr-2"></i>Edit upload</h3>
                     <button id="closeEditSubmissionBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline"></i>
                     </button>

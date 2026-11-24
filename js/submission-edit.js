@@ -1,6 +1,6 @@
 // js/submission-edit.js
-// Lecturer: change the term, title and description of a file the lecturer uploaded for a student.
-// The Worker keeps the "[Uploaded by lecturer ...]" / "[Group Upload ...]" tags and updates every member's row of a group upload.
+// Lecturer: change the term, title and description of a student's upload.
+// The Worker keeps the "[Group Upload ...]" tags and updates every member's row of a group upload.
 import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { CourseClass } from './course-class.js';

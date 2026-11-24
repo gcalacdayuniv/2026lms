@@ -595,7 +595,8 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
 // ---- Uploads: a lecturer may upload for a student of their own class (with group members); a student only for themselves
 {
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ success: true, fileUrl: 'https://drive.test/f1' }), { status: 200 });
+  let fileN = 0;
+  globalThis.fetch = async () => new Response(JSON.stringify({ success: true, fileUrl: 'https://drive.test/f' + (++fileN) }), { status: 200 });
   env.GAS_WEBHOOK_URL = 'https://gas.test/exec';
   sql.exec("update Users set account_status='Active' where User_ID in ('S1','S2')");   // earlier tests left them Inactive
   U('S3', 'stu3', 'student');   // not enrolled in C1
@@ -607,7 +608,7 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   const g = await up(L1, { isGroup: true, includedMembers: ['S2'] });
   ok('lecturer uploads for a student with a group member', g.s === 201, JSON.stringify(g));
   ok('group upload saved for the student and the member', rows('S1').length === 1 && rows('S2').length === 1);
-  ok('lecturer upload is marked in the description', rows('S1')[0].d.includes('[Uploaded by lecturer: lec1]') && rows('S2')[0].d.includes('[Included Members:'));
+  ok('lecturer upload is not marked as such in the description', !rows('S1')[0].d.includes('lecturer') && rows('S2')[0].d.includes('[Included Members:'));
   ok('another lecturer cannot upload for this class', (await up(l2.j.token, {})).s === 403);
   ok('lecturer cannot upload for a student not enrolled', (await up(L1, { studentId: 'S3' })).s === 403);
   sql.exec("update Enrollments set Group_Name='G2' where Student_ID='S2'");
@@ -621,17 +622,17 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   globalThis.fetch = realFetch;
 }
 
-// ---- Lecturer edits a file they uploaded; default upload term follows the date
+// ---- Lecturer edits a student's upload; default upload term follows the date
 {
-  const lecRow = sql.prepare("select Submission_ID id from Submissions where Student_ID='S1' and Title='Report' and Description like '%Uploaded by lecturer%' limit 1").get();
-  const stuRow = sql.prepare("select Submission_ID id from Submissions where Student_ID='S1' and Title='Report' and Description not like '%Uploaded by lecturer%' limit 1").get();
+  const lecRow = sql.prepare("select Submission_ID id from Submissions where Student_ID='S1' and Title='Report' order by rowid limit 1").get();
+  const stuRow = sql.prepare("select Submission_ID id from Submissions where Student_ID='S1' and Title='Report' order by rowid desc limit 1").get();
   const ed = (token, o) => call('POST', '/api/update-submission', { token, body: { submissionId: lecRow.id, term: 'FinalTerm', title: 'Report v2', description: 'Revised text', ...o } });
   const r = await ed(L1, {});
   ok('lecturer edits their uploaded file', r.s === 200 && r.j.updated >= 2, JSON.stringify(r.j));
   const after = sql.prepare("select Student_ID s, Term t, Title ti, Description d from Submissions where Title = 'Report v2'").all();
   ok('group copies all updated, term/title changed', after.length === 2 && after.every(x => x.t === 'FinalTerm'));
-  ok('description text changed and tags kept', after.every(x => x.d.startsWith('Revised text') && x.d.includes('[Uploaded by lecturer:')) && after.some(x => x.d.includes('[Included Members:')));
-  ok('a file the student uploaded cannot be edited', (await call('POST', '/api/update-submission', { token: L1, body: { submissionId: stuRow.id, term: 'MidTerm', title: 'X', description: '' } })).s === 403);
+  ok('description text changed and tags kept', after.every(x => x.d.startsWith('Revised text')) && after.some(x => x.d.includes('[Included Members:')));
+  ok('a different upload of the same student is not touched', (await call('POST', '/api/update-submission', { token: L1, body: { submissionId: stuRow.id, term: 'MidTerm', title: 'Own', description: '' } })).s === 200 && sql.prepare("select count(*) n from Submissions where Title='Report v2'").get().n === 2);
   ok('another lecturer cannot edit', (await ed(l2.j.token, {})).s === 403);
   ok('a student cannot edit', (await ed(await signToken(env, 'S1'), {})).s === 403);
   ok('bad term refused', (await ed(L1, { term: 'Other' })).s === 400);
