@@ -649,3 +649,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Tests:** `worker.test.mjs` saves a plain and a mixed scan for a class exam and checks the counts, average, spread, student rows and question analysis, and that an exam without scans is unchanged.
 - **Deploy:** Worker (`worker/exam-scan-results.js` is new; `worker/exams.js`) and site files (`js/course-exam.js`, `sw.js` cache `portal-shell-v73`). No secret, table or Apps Script change.
 
+## Extra credit in Record Scores
+- **Rule:** a score may be higher than the assessment's Max Score (extra credit). Record Scores keeps the number as typed (saved up to 100000, never below 0) and shows over-max entries with an amber box and a note ("n scores are above the max (extra credit). The class grade counts at most X."). Everywhere a grade is read, the score counts as **at most the max**: `GET /api/student-summary` and `GET /api/class-summary` (`worker/scores.js`) return the capped score, so the student's score cards, Class Summary, grade breakdowns and the class grade export all follow. `GET /api/assessment-scores` (the Record Scores grid) returns the raw score.
+- **Cap is applied when read, not when saved:** raising the Max Score later uncaps the stored score; lowering it caps it. Scan and exam scores already stop at their max.
+- **Code:** `CAPPED_SCORE_SQL` / `MAX_SCORE_ENTRY` in `worker/scores.js`; `CourseScores.markExtraCredit()` and `handleInput` in `js/course-scores.js`; `#scExtraNote` in `js/components-class.js`.
+- **Tests:** `worker.test.mjs` (extra score accepted and kept raw, capped in both summaries, negative and absurd scores refused, raising the max uncaps) and `phone-check.cjs` (amber flag and note).
+- **Deploy:** Worker (`worker/scores.js`) and site files (`js/course-scores.js`, `js/components-class.js`, `tailwind.css`, `sw.js` cache `portal-shell-v74`). No table, secret or Apps Script change.
+

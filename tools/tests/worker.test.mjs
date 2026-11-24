@@ -658,5 +658,23 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('mixed scans: shaded and hand-marked questions are analysed', x.questions[0].fullPct === 50 && x.questions[1].fullPct === 50 && x.scannedNotAnalysed === 0, JSON.stringify(x.questions.map(q => q.fullPct)));
   ok('an exam with no scans is unchanged', (await call('GET', '/api/exam-results?classExamId=' + ce.j.classExamId, { token: L1 })).j.scanned === 0);
 }
+
+// ---- Extra credit: a score above the max is kept in Record Scores and capped at the max in the class grade
+{
+  const mkA = await call('POST', '/api/assessments', { token: L1, body: { courseId: 'C1', term: 'MidTerm', category: 'Written', title: 'Extra Quiz', maxScore: 20, date: '2026-04-01' } });
+  const aid = mkA.j.assessmentId;
+  const put = (scores) => call('POST', '/api/assessment-scores', { token: L1, body: { assessmentId: aid, scores } });
+  ok('a score above the max is accepted', (await put([{ studentId: 'S1', score: 23 }, { studentId: 'S2', score: 18 }])).s === 200);
+  ok('Record Scores keeps the score as typed', ((await call('GET', `/api/assessment-scores?assessmentId=${aid}`, { token: L1 })).j.scores || []).some(r => r.Student_ID === 'S1' && r.Score === 23));
+  const sumS1 = await call('GET', '/api/student-summary?courseId=C1&studentId=S1', { token: L1 });
+  ok('student summary counts it as the max', sumS1.j.assessments.find(a => a.Title === 'Extra Quiz').Score === 20, JSON.stringify(sumS1.j.assessments.find(a => a.Title === 'Extra Quiz')));
+  const cls = await call('GET', '/api/class-summary?courseId=C1', { token: L1 });
+  const row = (id) => cls.j.students[id].assessments.find(a => a.Title === 'Extra Quiz').Score;
+  ok('class summary caps the extra credit and keeps normal scores', row('S1') === 20 && row('S2') === 18, JSON.stringify([row('S1'), row('S2')]));
+  ok('a negative score is still refused', (await put([{ studentId: 'S1', score: -1 }])).s === 400);
+  ok('an absurd score is refused', (await put([{ studentId: 'S1', score: 1e9 }])).s === 400);
+  await call('POST', '/api/assessments', { token: L1, body: { assessmentId: aid, courseId: 'C1', term: 'MidTerm', category: 'Written', title: 'Extra Quiz', maxScore: 25, date: '2026-04-01' } });
+  ok('raising the max uncaps it', (await call('GET', '/api/student-summary?courseId=C1&studentId=S1', { token: L1 })).j.assessments.find(a => a.Title === 'Extra Quiz').Score === 23);
+}
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

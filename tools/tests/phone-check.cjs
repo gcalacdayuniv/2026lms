@@ -64,6 +64,12 @@ const UTILITY = /^((sm|md|lg|xl|hover|focus|dark|disabled|group-hover|active):)*
     await page.click('#submitDocBtn'); await page.waitForTimeout(1200);
     let sent = null; try { sent = JSON.parse(decodeURIComponent(sentMeta || '')); } catch (e) { /* not sent */ }
     if (!sent || sent.studentId !== 'S0' || sent.courseId !== 'C1') errors.push('lecturer upload was not sent for the selected student: ' + JSON.stringify(sent));
+    // Record Scores: a score above the max is allowed and flagged as extra credit.
+    await page.evaluate(() => document.getElementById('openScoresModalBtn')?.click()); await page.waitForTimeout(900);
+    await page.fill('#scMax', '20'); await page.fill('.score-input', '25'); await page.waitForTimeout(200); await look('record scores extra credit');
+    const extra = await page.evaluate(() => { const n = document.getElementById('scExtraNote'); const i = document.querySelector('.score-input'); return { shown: !!n && !n.classList.contains('hidden') && n.textContent.includes('extra credit'), flagged: i.classList.contains('border-amber-500') }; });
+    if (!extra.shown || !extra.flagged) errors.push('over-max score was not flagged as extra credit: ' + JSON.stringify(extra));
+    await page.evaluate(() => history.back()); await page.waitForTimeout(300);
     await page.evaluate(async () => { const { ExamBuilder } = await import('/js/exam-builder.js'); await ExamBuilder.open({ title: 'T', course: 'IT101' }); }); await page.waitForTimeout(600); await look('exam builder');
     const violations = await page.evaluate(() => window.__csp);
     const missing = await page.evaluate((classes) => { const css = [...document.styleSheets].map(ss => { try { return [...ss.cssRules].map(r => r.cssText).join('\n'); } catch (e) { return ''; } }).join('\n'); return classes.filter(c => !css.includes('.' + CSS.escape(c))); }, [...seen]);

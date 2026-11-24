@@ -38,6 +38,7 @@ export const CourseScores = {
     init: () => {
         document.addEventListener('click', CourseScores.handleClicks);
         document.addEventListener('change', CourseScores.handleChanges);
+        document.addEventListener('input', CourseScores.handleInput);
         document.addEventListener('keydown', CourseScores.handleKeydown);
     },
 
@@ -70,6 +71,28 @@ export const CourseScores = {
     handleChanges: async (e) => {
         if (e.target.id === 'scAssessmentSelect') {
             await CourseScores.selectAssessment(e.target.value);
+        }
+    },
+
+    handleInput: (e) => {
+        if (e.target.id === 'scMax' || (e.target.classList && e.target.classList.contains('score-input'))) CourseScores.markExtraCredit();
+    },
+
+    // A score above the max is extra credit: kept as typed here, counted as the max in the class grade.
+    markExtraCredit: () => {
+        const max = parseFloat(document.getElementById('scMax')?.value);
+        let over = 0;
+        document.querySelectorAll('.score-input').forEach(input => {
+            const extra = max > 0 && parseFloat(input.value) > max;
+            input.classList.toggle('border-amber-500', extra);
+            input.classList.toggle('bg-amber-50', extra);
+            input.classList.toggle('border-gray-300', !extra);
+            if (extra) over++;
+        });
+        const note = document.getElementById('scExtraNote');
+        if (note) {
+            note.textContent = over ? `${over} score${over === 1 ? ' is' : 's are'} above the max (extra credit). The class grade counts at most ${fmt(max)}.` : '';
+            note.classList.toggle('hidden', !over);
         }
     },
 
@@ -264,6 +287,7 @@ export const CourseScores = {
                 </tr>
             `;
         }).join('');
+        CourseScores.markExtraCredit();
     },
 
     save: async () => {
@@ -290,10 +314,10 @@ export const CourseScores = {
                 continue;
             }
             const value = parseFloat(input.value);
-            if (isNaN(value) || value < 0 || value > max) {
+            if (isNaN(value) || value < 0) {
                 input.classList.add('border-red-500');
                 input.focus();
-                return CourseScores.setAlert(`Score for ${input.dataset.name} must be between 0 and ${fmt(max)}.`, false);
+                return CourseScores.setAlert(`Score for ${input.dataset.name} must be 0 or more (above ${fmt(max)} is extra credit).`, false);
             }
             // Only scores the lecturer changed are sent, so a score corrected elsewhere (scan review) is never overwritten by an older grid.
             if (base && base[input.dataset.studentId] !== undefined && same(base[input.dataset.studentId], value)) continue;

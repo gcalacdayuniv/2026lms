@@ -307,6 +307,7 @@ const ClassUI = {
                 </div>
 
                 <div id="scStudentCount" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2"></div>
+                <p id="scExtraNote" class="hidden text-[11px] font-bold text-amber-700 mb-2"></p>
                 <div class="overflow-auto flex-1 border border-gray-200 rounded-lg bg-white min-h-[200px]">
                     <table class="w-full text-xs text-left">
                         <thead class="bg-gray-200 text-gray-700 sticky top-0 shadow-sm z-10">

@@ -6,6 +6,10 @@
 import { ensureScanTables } from './schema.js';
 import { ASSESSMENT_TERMS, ASSESSMENT_CATEGORIES } from './constants.js';
 
+// Record Scores may hold more than the max (extra credit); every grade view reads the score capped at the max.
+const MAX_SCORE_ENTRY = 100000;
+const CAPPED_SCORE_SQL = "CASE WHEN s.Score > a.Max_Score THEN a.Max_Score ELSE s.Score END";
+
 export async function handleScores(request, env, path, url, corsHeaders) {
     if (request.method === "GET" && path === "/api/assessments") {
         const courseId = url.searchParams.get("courseId");
@@ -106,7 +110,7 @@ export async function handleScores(request, env, path, url, corsHeaders) {
 
         const assessment = await env.DB.prepare(
             "SELECT Max_Score FROM Assessments WHERE Assessment_ID = ?"
-        ).bind(assessmentId).first();
+        ).bind(assessmentId).first();   // a score may be above Max_Score (extra credit); the class grade caps it
         if (!assessment) {
             return new Response(JSON.stringify({ error: "Assessment not found." }), { status: 404, headers: corsHeaders });
         }
@@ -123,8 +127,8 @@ export async function handleScores(request, env, path, url, corsHeaders) {
 
         for (const entry of scores) {
             const value = parseFloat(entry.score);
-            if (!entry.studentId || isNaN(value) || value < 0 || value > assessment.Max_Score) {
-                return new Response(JSON.stringify({ error: `Invalid score. Scores must be between 0 and ${assessment.Max_Score}.` }), { status: 400, headers: corsHeaders });
+            if (!entry.studentId || !Number.isFinite(value) || value < 0 || value > MAX_SCORE_ENTRY) {
+                return new Response(JSON.stringify({ error: `Invalid score. Scores must be 0 or more (up to ${MAX_SCORE_ENTRY}).` }), { status: 400, headers: corsHeaders });
             }
             if (partial) statements.push(env.DB.prepare("DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?").bind(assessmentId, entry.studentId));
             statements.push(
@@ -171,7 +175,7 @@ export async function handleScores(request, env, path, url, corsHeaders) {
             // Sheet_ID = this student's scanned answer sheet (with a stored photo) for the assessment, if any.
             await ensureScanTables(env);
             const assessmentRes = await env.DB.prepare(
-                `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, s.Score,
+                `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, ${CAPPED_SCORE_SQL} AS Score,
                         (SELECT h.Sheet_ID FROM Scan_Sheets h JOIN Scan_Sessions ss ON ss.Session_ID = h.Session_ID
                           WHERE ss.Assessment_ID = a.Assessment_ID AND h.Student_ID = ? AND h.Photo_File_ID IS NOT NULL LIMIT 1) AS Sheet_ID,
                         (SELECT h.Scan_ID FROM Scan_Sheets h JOIN Scan_Sessions ss ON ss.Session_ID = h.Session_ID
@@ -185,7 +189,7 @@ export async function handleScores(request, env, path, url, corsHeaders) {
         } catch (err) {
             try {
                 const assessmentRes = await env.DB.prepare(
-                    `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, s.Score
+                    `SELECT a.Assessment_ID, a.Term, a.Category, a.Title, a.Max_Score, a.Date, ${CAPPED_SCORE_SQL} AS Score
                      FROM Assessments a
                      LEFT JOIN Assessment_Scores s ON s.Assessment_ID = a.Assessment_ID AND s.Student_ID = ?
                      WHERE a.Course_ID = ?
@@ -236,7 +240,11 @@ export async function handleScores(request, env, path, url, corsHeaders) {
         ).bind(courseId).all();
 
         const scoreOf = new Map();
-        for (const s of (scoreRows.results || [])) scoreOf.set(`${s.Assessment_ID}|${s.Student_ID}`, s.Score);
+        const maxOf = new Map((assessmentRows.results || []).map(a => [a.Assessment_ID, a.Max_Score]));
+        for (const s of (scoreRows.results || [])) {
+            const max = maxOf.get(s.Assessment_ID);
+            scoreOf.set(`${s.Assessment_ID}|${s.Student_ID}`, max > 0 && s.Score > max ? max : s.Score);   // extra credit counts up to the max
+        }
 
         const recordsOf = new Map();
         for (const r of (attendance.results || [])) {
