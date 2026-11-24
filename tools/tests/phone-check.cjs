@@ -51,6 +51,19 @@ const UTILITY = /^((sm|md|lg|xl|hover|focus|dark|disabled|group-hover|active):)*
         await page.evaluate((i) => document.getElementById(i)?.click(), id); await page.waitForTimeout(900); await look(id);
         await page.evaluate(() => history.back()); await page.waitForTimeout(300);
     }
+    // Lecturer uploads a document on behalf of a student (Manage Student > Upload document for student).
+    let sentMeta = null;
+    page.on('request', rq => { if (rq.method() === 'POST' && rq.url().includes('/api/upload-submission')) sentMeta = rq.headers()['x-submission-meta']; });
+    await page.evaluate(() => location.hash = '#class-C1'); await page.waitForTimeout(800);
+    await page.evaluate(() => document.querySelector('.manage-student-btn')?.click()); await page.waitForTimeout(500);
+    await page.evaluate(() => document.getElementById('manageUploadDocBtn')?.click()); await page.waitForTimeout(500); await look('lecturer upload form');
+    const banner = await page.evaluate(() => { const m = document.getElementById('submitDocModal'); const b = document.getElementById('submitDocForStudent'); return m && !m.classList.contains('hidden') && b ? b.textContent : ''; });
+    if (!banner.includes('Student Number 0')) errors.push('lecturer upload form did not open for the student (banner: "' + banner + '")');
+    await page.selectOption('#submitTerm', 'MidTerm'); await page.fill('#submitTitle', 'Report'); await page.fill('#submitDesc', 'Group report');
+    await page.selectOption('#submissionType', 'url'); await page.fill('#submitUrlInput', 'https://example.com/report');
+    await page.click('#submitDocBtn'); await page.waitForTimeout(1200);
+    let sent = null; try { sent = JSON.parse(decodeURIComponent(sentMeta || '')); } catch (e) { /* not sent */ }
+    if (!sent || sent.studentId !== 'S0' || sent.courseId !== 'C1') errors.push('lecturer upload was not sent for the selected student: ' + JSON.stringify(sent));
     await page.evaluate(async () => { const { ExamBuilder } = await import('/js/exam-builder.js'); await ExamBuilder.open({ title: 'T', course: 'IT101' }); }); await page.waitForTimeout(600); await look('exam builder');
     const violations = await page.evaluate(() => window.__csp);
     const missing = await page.evaluate((classes) => { const css = [...document.styleSheets].map(ss => { try { return [...ss.cssRules].map(r => r.cssText).join('\n'); } catch (e) { return ''; } }).join('\n'); return classes.filter(c => !css.includes('.' + CSS.escape(c))); }, [...seen]);

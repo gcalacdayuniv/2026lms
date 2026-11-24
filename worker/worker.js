@@ -83,7 +83,7 @@ export default {
             const examsResponse = await handleExams(request, env, path, url, corsHeaders);
             if (examsResponse) return examsResponse;
 
-            const uploadsResponse = await handleUploads(request, env, path, url, corsHeaders);
+            const uploadsResponse = await handleUploads(request, env, path, url, corsHeaders, gate.user);
             if (uploadsResponse) return uploadsResponse;
 
             const accountsResponse = await handleAccounts(request, env, path, url, corsHeaders);

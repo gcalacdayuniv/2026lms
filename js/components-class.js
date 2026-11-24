@@ -5,6 +5,7 @@ import { ScannerUI } from './components-scanner.js';
 import { Skeleton } from './skeletons.js';
 import { getLocalDateString } from './date-utils.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
+import { renderSubmitDocumentModal } from './components-dashboard.js';
 
 // Remembers whether the Present/Late/Excused/Absent buttons are collapsed in the class list.
 export const STATUS_COLLAPSED_KEY = 'attendance_status_collapsed';
@@ -425,6 +426,7 @@ const ClassUI = {
                     </div>
 
                     <button type="button" id="manageExamPhotosBtn" class="w-full py-2 border border-blue-300 text-blue-700 hover:bg-blue-50 rounded text-sm font-bold transition"><i class="fa-solid fa-camera mr-1.5" aria-hidden="true"></i>Review exam photos</button>
+                    <button type="button" id="manageUploadDocBtn" class="w-full py-2 border border-blue-300 text-blue-700 hover:bg-blue-50 rounded text-sm font-bold transition"><i class="fa-solid fa-cloud-arrow-up mr-1.5" aria-hidden="true"></i>Upload document for student</button>
 
                     <details class="border border-gray-200 rounded-lg p-3 bg-gray-50/50" id="manageDetailsBox">
                         <summary class="text-xs font-bold text-gray-700 cursor-pointer select-none"><i class="fa-solid fa-id-card text-blue-600 mr-1"></i>Edit Student Details</summary>
@@ -1076,6 +1078,7 @@ export const ClassComponents = {
             ${ClassUI.renderAddStudentModal()}
             ${ClassUI.renderRecitationModal()}
             ${ClassUI.renderGroupMembersModal()}
+            ${renderSubmitDocumentModal()}
             ${ExamUI.renderManagerModal()}
             ${ScannerUI.renderScannerModal()}
             ${ExamUI.renderPresentationOverlay()}

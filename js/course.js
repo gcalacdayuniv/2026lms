@@ -256,7 +256,16 @@ export const CourseModule = {
             document.getElementById('groupMembersModal').classList.add('hidden');
         }
 
+        if (e.target.closest('#manageUploadDocBtn')) {
+            const courseId = window.location.hash.replace('#class-', '');
+            const studentId = document.getElementById('manageStudentId').value;
+            const student = (CourseClass.currentStudents || []).find(x => x.User_ID === studentId);
+            if (!student) { UI.error('Could not find this student. Reopen the class and try again.'); return; }
+            CourseDashboard.openUploadForStudent(courseId, student);
+        }
+
         if (e.target.closest('#openSubmitDocModalBtn')) {
+            CourseDashboard.resetUploadTarget();
             document.getElementById('submitDocModal').classList.remove('hidden');
             const btn = e.target.closest('#openSubmitDocModalBtn');
             if(btn && btn.dataset.courseId) {
@@ -265,6 +274,7 @@ export const CourseModule = {
         }
         if (e.target.closest('#closeSubmitDocModalBtn') || e.target.id === 'closeSubmitDocModalBg') {
             document.getElementById('submitDocModal').classList.add('hidden');
+            CourseDashboard.resetUploadTarget();
         }
 
         if (e.target.closest('#openHistoryModalBtn')) {

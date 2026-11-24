@@ -3,6 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import worker from '../../worker/worker.js';
 import { hashPassword } from '../../worker/password.js';
+import { signToken } from '../../worker/auth.js';
 
 const sql = new DatabaseSync(':memory:');
 const DB = {
@@ -588,5 +589,34 @@ for (const p of pathOnly) {
   if (!reached) lost.push(p);
 }
 ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && lost.length === 0, 'not found: ' + lost.join(', '));
+
+// ---- Uploads: a lecturer may upload for a student of their own class (with group members); a student only for themselves
+{
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ success: true, fileUrl: 'https://drive.test/f1' }), { status: 200 });
+  env.GAS_WEBHOOK_URL = 'https://gas.test/exec';
+  sql.exec("update Users set account_status='Active' where User_ID in ('S1','S2')");   // earlier tests left them Inactive
+  U('S3', 'stu3', 'student');   // not enrolled in C1
+  sql.exec("update Enrollments set Group_Name='G1' where Course_ID='C1'");
+  const meta = (o = {}) => ({ courseId: 'C1', studentId: 'S1', term: 'MidTerm', title: 'Report', description: 'Final report', type: 'file', filename: 'report.pdf', mimeType: 'application/pdf', pathParts: ['General', 'Submitted'], base64: 'QUJD', ...o });
+  const up = (token, o) => call('POST', '/api/upload-submission', { token, body: meta(o) });
+  const rows = (id) => sql.prepare('select Description d from Submissions where Student_ID = ? and Title = ?').all(id, 'Report');
+
+  const g = await up(L1, { isGroup: true, includedMembers: ['S2'] });
+  ok('lecturer uploads for a student with a group member', g.s === 201, JSON.stringify(g));
+  ok('group upload saved for the student and the member', rows('S1').length === 1 && rows('S2').length === 1);
+  ok('lecturer upload is marked in the description', rows('S1')[0].d.includes('[Uploaded by lecturer: lec1]') && rows('S2')[0].d.includes('[Included Members:'));
+  ok('another lecturer cannot upload for this class', (await up(l2.j.token, {})).s === 403);
+  ok('lecturer cannot upload for a student not enrolled', (await up(L1, { studentId: 'S3' })).s === 403);
+  sql.exec("update Enrollments set Group_Name='G2' where Student_ID='S2'");
+  ok('group member from another group is refused', (await up(L1, { isGroup: true, includedMembers: ['S2'] })).s === 403);
+  sql.exec("update Enrollments set Group_Name='G1' where Student_ID='S2'");
+  sql.exec('update Users set Password_Changed_At = NULL, Sessions_Valid_From = NULL where User_ID = \'S1\'');
+  const stuTok = await signToken(env, 'S1');
+  ok('student uploads for themselves', (await up(stuTok, {})).s === 201);
+  ok('student cannot upload for another student', (await up(stuTok, { studentId: 'S2' })).s === 403);
+  ok('student can upload for own group', (await up(stuTok, { isGroup: true, includedMembers: ['S2'] })).s === 201);
+  globalThis.fetch = realFetch;
+}
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

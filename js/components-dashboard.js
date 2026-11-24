@@ -489,7 +489,7 @@ const DashboardUI = {
             <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSubmitDocModalBg"></div>
             <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto">
                 <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
-                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-cloud-arrow-up text-blue-600 mr-2"></i>Submit Document</h3>
+                    <h3 class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid fa-cloud-arrow-up text-blue-600 mr-2"></i><span id="submitDocTitle">Submit Document</span></h3>
                     <button id="closeSubmitDocModalBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden"></i>
                         <i class="fa-solid fa-xmark text-xl hidden sm:inline"></i>
@@ -498,6 +498,7 @@ const DashboardUI = {
                 <form id="submitDocForm" class="space-y-4">
                     <div id="submitDocError" class="hidden bg-red-100 text-red-700 p-3 rounded text-sm font-medium"></div>
                     <div id="submitDocSuccess" class="hidden bg-green-100 text-green-700 p-3 rounded text-sm font-medium"></div>
+                    <div id="submitDocForStudent" class="hidden bg-blue-50 border border-blue-200 text-blue-800 p-2 rounded text-xs font-bold"></div>
 
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Term</label>
@@ -534,7 +535,7 @@ const DashboardUI = {
                     <div id="groupUploadSection" class="hidden border border-purple-200 bg-purple-50 p-3 rounded-md mt-2">
                         <label class="flex items-center space-x-2 text-xs font-bold text-purple-800 cursor-pointer mb-2">
                             <input type="checkbox" id="isGroupUpload" class="rounded text-purple-600 focus:ring-purple-500">
-                            <span>Submit as Group Upload</span>
+                            <span id="groupUploadLabel">Submit as Group Upload</span>
                         </label>
                         <div id="groupMembersList" class="hidden space-y-1.5 mt-2 pt-2 border-t border-purple-200 max-h-32 overflow-y-auto">
                         </div>
@@ -663,6 +664,9 @@ const DashboardUI = {
         </div>
     `
 };
+
+// The Submit Document form is also opened by lecturers (Manage Student > Upload document for student).
+export const renderSubmitDocumentModal = () => DashboardUI.renderSubmitDocumentModal();
 
 export const DashboardComponents = {
     renderDashboard: (user) => {

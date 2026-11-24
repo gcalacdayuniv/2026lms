@@ -88,6 +88,7 @@ export const CourseClass = {
             let descHtml = escapeHtml(sub.Description || '');
             descHtml = descHtml.replace(/\n/g, '<br>');
             descHtml = descHtml.replace(/\[Group Upload by: (.*?)\]/g, '<span class="block mt-1.5 text-[10px] text-purple-700 font-bold bg-purple-50 border border-purple-100 rounded px-1.5 py-0.5 inline-block"><i class="fa-solid fa-users mr-1"></i>Uploaded by: $1</span>');
+            descHtml = descHtml.replace(/\[Uploaded by lecturer: (.*?)\]/g, '<span class="block mt-1.5 text-[10px] text-blue-700 font-bold bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 inline-block"><i class="fa-solid fa-user-tie mr-1"></i>Uploaded by lecturer: $1</span>');
             descHtml = descHtml.replace(/\[Included Members: (.*?)\]/g, '<span class="block text-gray-500 italic text-[9px] mt-0.5 leading-tight">Members: $1</span>');
 
             let gradingHtml = '';

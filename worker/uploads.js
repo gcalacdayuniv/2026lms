@@ -79,8 +79,20 @@ function validateMeta(meta) {
     }
 }
 
-// The uploader must be an Active user enrolled in the course, and so must every group member.
-async function verifyUploader(env, meta) {
+// The submission is saved for meta.studentId. A student can only upload for themselves; a lecturer can upload on
+// behalf of a student of their own class. The student must be an Active user enrolled in the course, and so must
+// every group member, who must also be in the student's group. `user` is null when the sign-in gate is off.
+async function verifyUploader(env, meta, user = null) {
+    if (user) {
+        if (user.role === 'lecturer') {
+            const own = await env.DB.prepare('SELECT 1 AS ok FROM Courses WHERE Course_ID = ? AND Lecturer_ID = ?')
+                .bind(meta.courseId, user.id).first();
+            if (!own) throw new UploadError('You can only upload for students in your own classes.', 403);
+        } else if (meta.studentId !== user.id) {
+            throw new UploadError('You can only upload your own submissions.', 403);
+        }
+    }
+
     const ids = [meta.studentId];
     if (meta.isGroup && Array.isArray(meta.includedMembers)) {
         for (const m of meta.includedMembers) if (!ids.includes(m)) ids.push(m);
@@ -100,6 +112,17 @@ async function verifyUploader(env, meta) {
     }
     if (ids.some(id => !ok.has(id))) {
         throw new UploadError('A selected group member is not an active student of this course.', 403);
+    }
+
+    if (ids.length > 1) {
+        const groups = await env.DB.prepare(
+            `SELECT Student_ID, Group_Name FROM Enrollments WHERE Course_ID = ? AND Student_ID IN (${placeholders})`
+        ).bind(meta.courseId, ...ids).all();
+        const byId = new Map((groups.results || []).map(r => [r.Student_ID, r.Group_Name]));
+        const groupName = byId.get(meta.studentId);
+        if (!groupName || ids.some(id => byId.get(id) !== groupName)) {
+            throw new UploadError('Group members must be in the same group as the student.', 403);
+        }
     }
 }
 
@@ -168,7 +191,7 @@ async function streamToGas(env, request, prefix, suffix, maxBytes) {
 }
 
 // Saves the Submissions row(s) after the file reached Drive.
-async function recordSubmission(env, body, fileUrl) {
+async function recordSubmission(env, body, fileUrl, user = null) {
     const isGroup = body.isGroup;
     const includedMembers = body.includedMembers || [];
 
@@ -186,6 +209,12 @@ async function recordSubmission(env, body, fileUrl) {
     if (isGroup) {
         const allGroupText = memberNames.length > 0 ? memberNames.join(', ') : 'None';
         finalDescription = `${body.description}\n\n[Group Upload by: ${uploaderName}]\n[Included Members: ${allGroupText}]`;
+    }
+
+    // A lecturer uploading for a student is recorded in the description, so the student can see who uploaded it.
+    if (user && user.role === 'lecturer') {
+        const lec = await env.DB.prepare("SELECT Name FROM Users WHERE User_ID = ?").bind(user.id).first();
+        finalDescription = `${finalDescription}\n\n[Uploaded by lecturer: ${lec ? lec.Name : 'Lecturer'}]`;
     }
 
     const subId = crypto.randomUUID();
@@ -208,7 +237,7 @@ async function recordSubmission(env, body, fileUrl) {
 }
 
 // Returns a Response when the request is handled here, otherwise null.
-export async function handleUploads(request, env, path, url, corsHeaders) {
+export async function handleUploads(request, env, path, url, corsHeaders, user = null) {
     if (request.method === "POST" && path === "/api/upload-submission") {
         try {
             const metaHeader = request.headers.get("X-Submission-Meta");
@@ -219,7 +248,7 @@ export async function handleUploads(request, env, path, url, corsHeaders) {
                 checkContentLength(request, MAX_SINGLE_BODY_BYTES);
                 body = JSON.parse(decodeURIComponent(metaHeader));
                 validateMeta(body);
-                await verifyUploader(env, body);
+                await verifyUploader(env, body, user);
 
                 const gasMeta = JSON.stringify({
                     filename: body.filename,
@@ -233,11 +262,11 @@ export async function handleUploads(request, env, path, url, corsHeaders) {
                 checkContentLength(request, MAX_LEGACY_JSON_BYTES);
                 body = await request.json();
                 validateMeta(body);
-                await verifyUploader(env, body);
+                await verifyUploader(env, body, user);
                 gasData = await callGas(env, JSON.stringify(body));
             }
 
-            await recordSubmission(env, body, gasData.fileUrl);
+            await recordSubmission(env, body, gasData.fileUrl, user);
             return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
         } catch (err) {
             const msg = err && err.message ? err.message : "Upload failed.";
@@ -261,7 +290,7 @@ export async function handleUploads(request, env, path, url, corsHeaders) {
             if (!info.courseId || !info.studentId) {
                 throw new UploadError("Missing course or student.");
             }
-            await verifyUploader(env, { courseId: info.courseId, studentId: info.studentId });
+            await verifyUploader(env, { courseId: info.courseId, studentId: info.studentId }, user);
 
             const prefix = JSON.stringify({ action: "chunk", uploadId, index, total }).slice(0, -1) + ',"data":"';
             await streamToGas(env, request, prefix, '"}', MAX_CHUNK_BODY_BYTES);
@@ -281,7 +310,7 @@ export async function handleUploads(request, env, path, url, corsHeaders) {
                 return new Response(JSON.stringify({ error: "Invalid upload details." }), { status: 400, headers: corsHeaders });
             }
             validateMeta(body);
-            await verifyUploader(env, body);
+            await verifyUploader(env, body, user);
 
             const gasData = await callGas(env, JSON.stringify({
                 action: "finish",
@@ -291,7 +320,7 @@ export async function handleUploads(request, env, path, url, corsHeaders) {
                 mimeType: body.mimeType,
                 pathParts: body.pathParts || []
             }));
-            await recordSubmission(env, body, gasData.fileUrl);
+            await recordSubmission(env, body, gasData.fileUrl, user);
             return new Response(JSON.stringify({ success: true, fileUrl: gasData.fileUrl }), { status: 201, headers: corsHeaders });
         } catch (err) {
             const status = err instanceof UploadError ? err.status : 500;

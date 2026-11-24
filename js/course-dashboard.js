@@ -464,7 +464,42 @@ document.addEventListener('click', async (e) => {
 export const CourseDashboard = {
     showArchivedCourses: false,
     termFilter: '',
-    loadGroupMembersForUpload: async (courseId) => {
+
+    // Set while a lecturer uploads on behalf of a student: { courseId, student }. Null for a student's own upload.
+    uploadTarget: null,
+
+    // Lecturer: opens the Submit Document form for one student of the class.
+    openUploadForStudent: (courseId, student) => {
+        CourseDashboard.uploadTarget = { courseId, student };
+        const form = document.getElementById('submitDocForm');
+        if (form) form.reset();
+        const type = document.getElementById('submissionType');
+        if (type) type.dispatchEvent(new Event('change', { bubbles: true }));
+        ['submitDocError', 'submitDocSuccess', 'submitDocProgress'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+        const banner = document.getElementById('submitDocForStudent');
+        if (banner) {
+            banner.textContent = `Uploading for: ${student.Name}${student.Student_Number ? ' (' + student.Student_Number + ')' : ''}`;
+            banner.classList.remove('hidden');
+        }
+        const title = document.getElementById('submitDocTitle');
+        if (title) title.textContent = 'Upload for Student';
+        const label = document.getElementById('groupUploadLabel');
+        if (label) label.textContent = 'Upload for the whole group (select members)';
+        document.getElementById('submitDocModal').classList.remove('hidden');
+        CourseDashboard.loadGroupMembersForUpload(courseId, student.User_ID);
+    },
+
+    // Back to the student's own form (titles and banner restored).
+    resetUploadTarget: () => {
+        CourseDashboard.uploadTarget = null;
+        document.getElementById('submitDocForStudent')?.classList.add('hidden');
+        const title = document.getElementById('submitDocTitle');
+        if (title) title.textContent = 'Submit Document';
+        const label = document.getElementById('groupUploadLabel');
+        if (label) label.textContent = 'Submit as Group Upload';
+    },
+
+    loadGroupMembersForUpload: async (courseId, studentId = AppState.user.User_ID) => {
         const section = document.getElementById('groupUploadSection');
         const list = document.getElementById('groupMembersList');
         const checkbox = document.getElementById('isGroupUpload');
@@ -477,7 +512,7 @@ export const CourseDashboard = {
         list.classList.add('hidden');
 
         try {
-            const data = await apiFetch(`/api/group-members?courseId=${courseId}&studentId=${AppState.user.User_ID}`);
+            const data = await apiFetch(`/api/group-members?courseId=${courseId}&studentId=${studentId}`);
             if (data.groupName && data.members && data.members.length > 0) {
                 section.classList.remove('hidden');
                 list.innerHTML = data.members.map(m => `
@@ -505,7 +540,9 @@ export const CourseDashboard = {
         btn.disabled = true;
 
         try {
-            const courseId = document.getElementById('openSubmitDocModalBtn').dataset.courseId;
+            // A lecturer uploads on behalf of a student; otherwise the signed-in student uploads for themselves.
+            const target = CourseDashboard.uploadTarget;
+            const courseId = target ? target.courseId : document.getElementById('openSubmitDocModalBtn').dataset.courseId;
             if (!courseId) throw new Error("Could not identify the active course.");
 
             const term = document.getElementById('submitTerm').value;
@@ -529,7 +566,7 @@ export const CourseDashboard = {
                 });
             }
 
-            const user = AppState.user;
+            const user = target ? target.student : AppState.user;
             const now = new Date();
             const yyyy = now.getFullYear();
             const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -539,8 +576,8 @@ export const CourseDashboard = {
             const timestamp = `${yyyy}${mm}${dd}${hh}${ss}`;
 
             const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, ' ');
-            const studentName = user.Name.replace(/[^a-zA-Z0-9_-]/g, ' ');
-            const baseFilename = `${term}_${timestamp}_${user.Student_Number}_${studentName}_${safeTitle}`;
+            const studentName = String(user.Name || '').replace(/[^a-zA-Z0-9_-]/g, ' ');
+            const baseFilename = `${term}_${timestamp}_${user.Student_Number || ''}_${studentName}_${safeTitle}`;
 
             const courseYearSection = [user.Program_Course, user.Program_Year, user.Program_Section].filter(Boolean).join(" ") || "General";
 
@@ -629,6 +666,7 @@ export const CourseDashboard = {
             setTimeout(() => {
                 document.getElementById('submitDocModal').classList.add('hidden');
                 successDiv.classList.add('hidden');
+                CourseDashboard.resetUploadTarget();
 
                 const summaryModal = document.getElementById('studentSummaryModal');
                 if (summaryModal && !summaryModal.classList.contains('hidden')) {
