@@ -466,3 +466,12 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Tests:** `worker.test.mjs` "Lecturer edits a file they uploaded; default upload term follows the date".
 - **Deploy:** Worker (`worker/uploads.js`, `worker/auth.js`) and site files (`js/my-groups.js`, `js/submission-edit.js` new; `app.js`, `components-class.js`, `components-dashboard.js`, `course-class.js`, `course-dashboard.js`, `course.js`, `styles.css`, `tailwind.css`, `sw.js` cache `portal-shell-v83`). No table or Apps Script change.
 
+## Forgot password: email a new one (self-service)
+- **What:** on the sign-in screen, "Forgot password? Email me a new one" opens a small form: last name, student number, email, contact number. If **all four** match one student account, a new temporary password is emailed to the address on file through the Apps Script (`action: "email"`). The student signs in and changes it in the profile.
+- **Matching (`detailsMatch` in `worker/accounts.js`):** last name = the part of "Last, Given" before the comma; case-insensitive; email case-insensitive; contact numbers compared by their last 10 digits (spaces, dashes, +63 ignored); student number case-insensitive.
+- **Safe by design:** `POST /api/forgot-password` (public) always answers the same text whether or not the details match, so it cannot be used to find accounts. The password is changed only AFTER the email was accepted by the Apps Script, so a failed email never locks the student out. The answer never contains the password. Rate limit: 3 requests per student number and 10 per address per hour (`fp:sn:` / `fp:ip:` in `Login_Attempts`), every request counts.
+- **Still there:** "Or ask my lecturer to reset it" (the older request to the lecturer) and the lecturer's own Reset Password (which also emails the student).
+- **Needs:** the Apps Script email setup from "Password reset by email" (new `gas/Code.gs` deployed, mail permission accepted).
+- **Tests:** `worker.test.mjs` "Forgot password: four matching details email a new password directly".
+- **Deploy:** Worker (`worker/accounts.js`, `worker/auth.js`) and site files (`js/components-auth.js`, `js/forgot-password.js`, `sw.js` cache `portal-shell-v88`). No table or secret change.
+

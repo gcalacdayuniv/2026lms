@@ -789,5 +789,45 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   delete env.GAS_WEBHOOK_URL;
 }
 
+// ---- Forgot password: four matching details email a new password directly
+{
+  const realFetch = globalThis.fetch;
+  const sent = [];
+  globalThis.fetch = async (u, init) => { sent.push(JSON.parse(init.body)); return new Response(JSON.stringify({ success: true }), { status: 200 }); };
+  env.GAS_WEBHOOK_URL = 'https://gas.test/exec';
+  sql.exec("update Users set Name='Dela Cruz, Ana', Student_Number='25-1111', Email='ana@x.com', Contact_Number='0917 123 4567' where User_ID='S2'");
+  sql.exec("delete from Login_Attempts where Attempt_Key like 'fp:%'");
+  const fp = (o = {}) => call('POST', '/api/forgot-password', { body: { lastName: 'dela cruz', studentNumber: '25-1111', email: 'ANA@x.com', contact: '+63 917-123-4567', ...o } });
+  const before = sql.prepare("select Password p from Users where User_ID='S2'").get().p;
+  const bad = await fp({ email: 'other@x.com' });
+  ok('wrong email: same answer, nothing sent, password unchanged', bad.s === 200 && !sent.length && sql.prepare("select Password p from Users where User_ID='S2'").get().p === before);
+  ok('wrong last name: nothing sent', (await fp({ lastName: 'Santos' })).s === 200 && !sent.length);
+  ok('wrong contact: nothing sent', (await fp({ contact: '09170000000' })).s === 200 && !sent.length);
+  ok('missing detail is refused', (await fp({ contact: '' })).s === 400);
+  sql.exec("delete from Login_Attempts where Attempt_Key like 'fp:%'");
+  const good = await fp();
+  const mail = sent.find(x => x.action === 'email');
+  ok('all four details match: same answer and an email is sent', good.s === 200 && !!mail && mail.to === 'ana@x.com', JSON.stringify(good));
+  ok('the answer never contains the password', !JSON.stringify(good.j).includes(/Temporary password: (\S{10})/.exec(mail.body)[1]));
+  const pw = /Temporary password: (\S{10})/.exec(mail.body)[1];
+  ok('the emailed password works', (await call('POST', '/api/login', { body: { identifier: 'stu2', password: pw } })).s === 200);
+  // email failure: the password must stay as it was
+  sql.exec("delete from Login_Attempts where Attempt_Key like 'fp:%'");
+  const keep = sql.prepare("select Password p from Users where User_ID='S2'").get().p;
+  globalThis.fetch = async () => new Response(JSON.stringify({ success: false, error: 'Mail off' }), { status: 200 });
+  await fp();
+  ok('if the email fails the password is not changed', sql.prepare("select Password p from Users where User_ID='S2'").get().p === keep);
+  // not a student / unknown number
+  ok('unknown student number: same answer', (await fp({ studentNumber: '99-9999' })).s === 200);
+  // rate limit: 3 per student number per hour
+  sql.exec("delete from Login_Attempts where Attempt_Key like 'fp:%'");
+  await fp(); await fp(); await fp();
+  ok('4th request for the same student number is limited', (await fp()).s === 429);
+  sql.exec("delete from Login_Attempts where Attempt_Key like 'fp:%'");
+  sql.exec("update Users set Name='Two', Student_Number=NULL, Email='two@x.com', Contact_Number=NULL where User_ID='S2'");
+  globalThis.fetch = realFetch;
+  delete env.GAS_WEBHOOK_URL;
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

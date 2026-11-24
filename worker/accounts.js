@@ -30,6 +30,39 @@ function nextYearLevel(v, maxYear) {
 
 
 // Returns a Response when the request is handled here, otherwise null.
+
+// ---- Temporary passwords: generated here, emailed through the Apps Script ----
+const TEMP_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const makeTempPassword = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => TEMP_ALPHABET[b % TEMP_ALPHABET.length]).join("");
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Emails a temporary password. Returns true only when the Apps Script accepted the mail.
+async function emailTempPassword(env, target, tempPassword, intro) {
+    const email = String(target.Email || "").trim();
+    if (!EMAIL_RE.test(email)) return false;
+    try {
+        await callGas(env, JSON.stringify({
+            action: "email",
+            to: email,
+            subject: "Your new temporary password",
+            body: `Hello ${String(target.Name || "").split(",").slice(1).join(",").trim() || "student"},\n\n${intro}\n\nTemporary password: ${tempPassword}\n\nSign in with it, then change it in your profile. If you did not ask for this, tell your lecturer.`
+        }));
+        return true;
+    } catch (err) {
+        console.error("Password email failed", err && err.message ? err.message : err);
+        return false;
+    }
+}
+
+// Same person? Last name is the part of "Last, Given" before the comma; contact numbers are compared by their last 10 digits.
+const sameText = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase() && String(a || "").trim() !== "";
+const lastTen = (v) => String(v || "").replace(/\D/g, "").slice(-10);
+export const detailsMatch = (u, given) =>
+    sameText(String(u.Name || "").split(",")[0], given.lastName) &&
+    sameText(u.Student_Number, given.studentNumber) &&
+    sameText(u.Email, given.email) &&
+    lastTen(u.Contact_Number).length >= 7 && lastTen(u.Contact_Number) === lastTen(given.contact);
+
 export async function handleAccounts(request, env, path, url, corsHeaders) {
     if (request.method === "POST" && path === "/api/register") {
         const body = await request.json();
@@ -454,6 +487,34 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         return same;
     }
 
+    // A student who forgot the password types four details (last name, student number, email, contact number). When all four
+    // match the account, a new temporary password is emailed to the address on file. The answer is always the same, so nobody
+    // can use this to find out which accounts exist. The password is changed only after the email was accepted.
+    if (request.method === "POST" && path === "/api/forgot-password") {
+        const body = await request.json();
+        const given = { lastName: body.lastName, studentNumber: body.studentNumber, email: body.email, contact: body.contact };
+        const same = new Response(JSON.stringify({ success: true, message: "If your details match our records, a new temporary password was sent to your email address." }), { status: 200, headers: corsHeaders });
+        const sn = String(given.studentNumber || "").trim();
+        if (!sn || sn.length > 40 || [given.lastName, given.email, given.contact].some(v => !String(v || "").trim() || String(v).length > 120)) {
+            return new Response(JSON.stringify({ error: "Fill in all four details." }), { status: 400, headers: corsHeaders });
+        }
+        const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+        const keys = [{ key: `fp:ip:${ip}`, max: 10 }, { key: `fp:sn:${sn.toLowerCase().slice(0, 40)}`, max: 3 }];
+        const wait = await loginLockedFor(env, keys);
+        if (wait > 0) return tooManyTries(corsHeaders, wait, "reset requests");
+        await loginFailed(env, keys);   // every request counts, matched or not
+
+        const u = await env.DB.prepare("SELECT User_ID, Name, Email, Contact_Number, Student_Number, role FROM Users WHERE Student_Number COLLATE NOCASE = ?").bind(sn).first();
+        if (!u || String(u.role || "").toLowerCase() !== "student" || !detailsMatch(u, given)) return same;
+
+        const tempPassword = makeTempPassword();
+        if (!await emailTempPassword(env, u, tempPassword, "You asked for a new password for your account.")) return same;
+        await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(await hashPassword(tempPassword, env), u.User_ID).run();
+        if (authEnabled(env)) await markPasswordChanged(env, u.User_ID);
+        try { await ensurePasswordResetRequests(env); await env.DB.prepare("DELETE FROM Password_Reset_Requests WHERE User_ID = ?").bind(u.User_ID).run(); } catch (e) { /* tidied later */ }
+        return same;
+    }
+
     // Requests a lecturer can act on: students in their classes, and students who are in no class yet.
     if (request.method === "GET" && path === "/api/password-reset-requests") {
         await ensurePasswordResetRequests(env);
@@ -490,9 +551,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         if (!target || String(target.role || '').toLowerCase() !== 'student') {
             return new Response(JSON.stringify({ error: "Only a student's password can be reset." }), { status: 403, headers: corsHeaders });
         }
-        const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        const bytes = crypto.getRandomValues(new Uint8Array(10));
-        const tempPassword = Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
+        const tempPassword = makeTempPassword();
         const newHash = await hashPassword(tempPassword, env);
         await env.DB.prepare("UPDATE Users SET Password = ? WHERE User_ID = ?").bind(newHash, studentId).run();
         if (authEnabled(env)) await markPasswordChanged(env, studentId);
@@ -500,21 +559,8 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
 
         // The new password is emailed through the Apps Script. Only when that is not possible (no email on file, Apps Script
         // not updated or down) is it shown to the lecturer, once, to hand over.
-        let emailed = false;
         const email = String(target.Email || '').trim();
-        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            try {
-                await callGas(env, JSON.stringify({
-                    action: 'email',
-                    to: email,
-                    subject: 'Your new temporary password',
-                    body: `Hello ${String(target.Name || '').split(',').slice(1).join(',').trim() || 'student'},\n\nYour password was reset by your lecturer.\n\nTemporary password: ${tempPassword}\n\nSign in with it, then change it in your profile. If you did not ask for this, tell your lecturer.`
-                }));
-                emailed = true;
-            } catch (err) {
-                console.error('Password email failed', err && err.message ? err.message : err);
-            }
-        }
+        const emailed = await emailTempPassword(env, target, tempPassword, "Your password was reset by your lecturer.");
         const maskedEmail = emailed ? email.replace(/^(.).*(@.*)$/, '$1***$2') : null;
         return new Response(JSON.stringify(Object.assign({ success: true, message: "Password reset successfully", emailed, email: maskedEmail }, emailed ? {} : { tempPassword })), { status: 200, headers: corsHeaders });
     }

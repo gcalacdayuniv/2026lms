@@ -1,4 +1,4 @@
-// Sign-in screen: a student who forgot the password asks their lecturer to reset it.
+// Sign-in screen: a student who forgot the password either gets a new one by email (four details must match), or asks their lecturer.
 import { apiFetch } from './globals.js';
 
 document.addEventListener('click', async (e) => {
@@ -25,5 +25,33 @@ document.addEventListener('click', async (e) => {
         errorDiv.classList.remove('hidden');
     } finally {
         btn.disabled = false;
+    }
+});
+
+// Email me a new password: last name, student number, email and contact number must all match the account.
+document.addEventListener('click', async (e) => {
+    if (e.target.closest('#forgotOpenBtn')) {
+        document.getElementById('forgotPanel')?.classList.toggle('hidden');
+        document.getElementById('fpLastName')?.focus();
+        return;
+    }
+    const send = e.target.closest('#fpSendBtn');
+    if (!send) return;
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+    const msg = document.getElementById('forgotMsg');
+    const show = (text, ok) => {
+        msg.textContent = text;
+        msg.className = `p-2 rounded text-xs font-medium ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'}`;
+    };
+    const body = { lastName: val('fpLastName'), studentNumber: val('fpStudentNumber'), email: val('fpEmail'), contact: val('fpContact') };
+    if (Object.values(body).some(v => !v)) { show('Fill in all four details.', false); return; }
+    send.disabled = true;
+    try {
+        const r = await apiFetch('/api/forgot-password', { method: 'POST', body: JSON.stringify(body) });
+        show(`${r.message} Check your inbox (and spam). If nothing arrives, ask your lecturer.`, true);
+    } catch (err) {
+        show(err.message || 'Could not send the request.', false);
+    } finally {
+        send.disabled = false;
     }
 });

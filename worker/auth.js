@@ -92,6 +92,7 @@ const LECTURER = { who: 'lecturer' };
 export const RULES = {
     'POST /api/login': PUBLIC,
     'POST /api/register': PUBLIC,
+    'POST /api/forgot-password': PUBLIC,          // always answers the same; rate limited
     'POST /api/request-password-reset': PUBLIC,   // always answers the same, so it reveals nothing
     'GET /api/password-reset-requests': { who: 'lecturer', mine: ['lecturerId'] },
     'POST /api/dismiss-password-request': { who: 'lecturer' },

@@ -41,8 +41,18 @@ export const AuthUI = {
                         Sign In
                     </button>
                     <div id="loginInfo" role="status" class="hidden bg-green-100 text-green-800 p-3 rounded text-sm"></div>
-                    <button type="button" id="forgotPwdBtn" class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 min-h-[44px]">Forgot password? Ask my lecturer to reset it</button>
+                    <button type="button" id="forgotOpenBtn" class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 min-h-[44px]">Forgot password? Email me a new one</button>
+                    <button type="button" id="forgotPwdBtn" class="w-full text-center text-xs font-medium text-gray-500 hover:text-gray-800 min-h-[44px]">Or ask my lecturer to reset it</button>
                 </form>
+                <div id="forgotPanel" class="hidden mt-2 p-3 border border-blue-200 bg-blue-50 rounded-md space-y-3">
+                    <p class="text-xs text-blue-900">Type the same details you used to register. If they all match, a new temporary password is emailed to you.</p>
+                    <div id="forgotMsg" role="status" class="hidden p-2 rounded text-xs font-medium"></div>
+                    <input type="text" id="fpLastName" autocomplete="family-name" placeholder="Last name" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
+                    <input type="text" id="fpStudentNumber" inputmode="text" placeholder="Student number" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
+                    <input type="email" id="fpEmail" autocomplete="email" placeholder="Email address" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
+                    <input type="tel" id="fpContact" autocomplete="tel" placeholder="Contact number" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
+                    <button type="button" id="fpSendBtn" class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 rounded-md min-h-[44px]">Email me a new password</button>
+                </div>
                 <div class="mt-6 text-center">
                     <p class="text-sm text-gray-600">Don't have an account? <a href="#register" class="text-blue-600 font-medium hover:text-blue-500">Register here</a></p>
                 </div>
