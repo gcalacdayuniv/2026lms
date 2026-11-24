@@ -154,6 +154,21 @@ export async function buildClassGrade(ExcelJS, { course, rows, templateBytes }) 
         }
         ws.getCell(5, t.exam).value = plan.exams.length ? plan.exams.length * GRADE_BASE : null;
         t.examIds = plan.exams.map(a => a.Assessment_ID);
+
+        // A group with no activity is given full credit (100 for everyone), so it does not pull the term grade down
+        // and acts as a bonus. A term with no assessments at all has not started and is left blank.
+        t.fullCredit = [];
+        if (plan.written.length + plan.perf.length + plan.exams.length > 0) {
+            const give = (col, label, what) => {
+                ws.getCell(3, col).value = label;
+                ws.getCell(5, col).value = GRADE_BASE;
+                t.fullCredit.push(col);
+                warnings.push(`${termName} ${what}: no activity yet, counted as full credit.`);
+            };
+            if (!plan.written.length) give(t.written, 'No activity', 'written outputs');
+            if (!plan.perf.length && !t.extras.length) give(t.perf, 'No activity', 'performance outputs');
+            if (!plan.exams.length) give(t.exam, null, 'major exam');
+        }
     }
 
     // Students.
@@ -193,6 +208,7 @@ export async function buildClassGrade(ExcelJS, { course, rows, templateBytes }) 
             const t = TERMS[term];
             const scores = t.examIds.map(id => scoreOf.get(id)).filter(v => v !== undefined && v !== null);
             if (scores.length) ws.getCell(r, t.exam).value = scores.reduce((s, v) => s + v, 0);
+            for (const col of t.fullCredit || []) ws.getCell(r, col).value = GRADE_BASE;
         }
 
         // Midterm formulas.
