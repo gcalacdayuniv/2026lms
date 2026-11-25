@@ -114,13 +114,16 @@ async function save(env, courseId, rows, plan) {
 const PATHS = new Set(['/api/set-seat', '/api/auto-seat', '/api/seat-order', '/api/seat-insert']);
 
 export async function handleSeats(request, env, path, url, corsHeaders) {
-    // Floor plan data for students: which seat numbers are taken and which one is theirs. No names, so classmates stay private.
+    // Floor plan data for a student: their own seat and the highest seat number (so the room has the right number of rows).
+    // Nothing about classmates is sent.
     if (request.method === 'GET' && path === '/api/seat-map') {
         const courseId = url.searchParams.get('courseId');
         if (!courseId) return json({ error: 'Missing courseId' }, 400, corsHeaders);
         const me = url.searchParams.get('studentId') || '';
         const rows = (await roster(env, courseId)).filter(s => isSeatable(s) && seatKey(s.Seat_Number));
-        return json({ success: true, seats: rows.map(s => ({ seat: String(s.Seat_Number).trim(), mine: s.User_ID === me })) }, 200, corsHeaders);
+        const mine = rows.find(s => s.User_ID === me);
+        const top = rows.reduce((m, s) => Number.isFinite(num(s)) ? Math.max(m, num(s)) : m, 0);
+        return json({ success: true, mine: mine ? String(mine.Seat_Number).trim() : '', maxSeat: Math.floor(top) }, 200, corsHeaders);
     }
     if (request.method !== 'POST' || !PATHS.has(path)) return null;
     await ensureSeatLock(env);

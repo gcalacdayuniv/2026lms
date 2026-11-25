@@ -206,7 +206,7 @@ export const CourseSeats = {
         const modal = byId('seatPlanModal');
         if (!modal || modal.classList.contains('hidden')) return;
 
-        if (e.target.closest('#csMapBtn')) { SeatMap.openLecturer(CourseSeats.students()); return; }
+        if (e.target.closest('#csMapBtn')) { SeatMap.openLecturer(CourseSeats.students(), { courseId: getCourseId(), onDirty: () => { CourseSeats.changed = true; } }); return; }
 
         const up = e.target.closest('.cs-up'), down = e.target.closest('.cs-down');
         if (up || down) { CourseSeats.step((up || down).dataset.studentId, up ? -1 : 1); return; }
