@@ -494,3 +494,4 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 ## Score cards: percentage with the 60 + 40 transmutation
 - **What:** the term score cards (Quizzes/Long, Narrative, Individual, Tasks, Report, Major Exam) show a percentage only (no "/100"): average of the assessments on base 100, then x 60 + 40 (e.g. average 50 -> 70%, 100 -> 100%, 0 -> 40%). Participation and Attendance cards are unchanged; the breakdown list and Class Summary keep raw scores.
 - **Files:** `js/course-scores.js` (`renderTermScores`), `sw.js` v92. Deploy: site files only.
+- **Skeleton details (v94):** the name / seat / points block under the caller button is always on screen as one form: a pulsing skeleton until a student is called (and again while the wheel spins), then the real details. The wheel sits in the same circle where the photo lands.

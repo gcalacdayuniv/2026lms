@@ -798,8 +798,20 @@ const ClassUI = {
                     CALL STUDENT
                 </button>
 
-                <div id="recitationResult" class="hidden w-full text-center fade-in bg-purple-50 p-6 rounded-xl border border-purple-200">
+                <div id="recitationResult" class="w-full text-center bg-purple-50 p-5 mt-3 rounded-xl border border-purple-200">
                     <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Selected Student</p>
+                    <div id="recitationSkeleton" class="animate-pulse flex flex-col items-center" aria-hidden="true">
+                        <div class="h-8 w-3/4 bg-purple-200 rounded mb-4"></div>
+                        <div class="h-11 w-40 bg-purple-100 rounded-lg mb-6"></div>
+                        <div class="h-3 w-32 bg-purple-200 rounded mb-3"></div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-12 h-12 rounded-full bg-purple-100"></div>
+                            <div class="w-24 h-12 rounded-lg bg-purple-100"></div>
+                            <div class="w-12 h-12 rounded-full bg-purple-100"></div>
+                        </div>
+                        <div class="h-3 w-56 bg-purple-100 rounded"></div>
+                    </div>
+                    <div id="recitationDetails" class="hidden fade-in">
                     <h4 id="recitationResultName" class="text-2xl font-black text-gray-900 mb-4"></h4>
 
                     <div class="flex flex-col items-center mb-6 w-full px-4">
@@ -819,7 +831,7 @@ const ClassUI = {
                         <p id="recitationPointsHint" class="text-[11px] text-purple-700 mt-1.5 leading-snug"></p>
                         <p id="recitationPointsStatus" role="status" aria-live="polite" class="text-[11px] font-bold mt-1 min-h-[16px]"></p>
                     </div>
-
+                    </div>
                 </div>
             </div>
         </div>

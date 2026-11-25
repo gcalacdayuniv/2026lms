@@ -71,8 +71,14 @@ export const CourseRecitation = {
     },
 
     // The same circle shows the wheel or the called student's photo; the button reads CALL STUDENT, then CALL NEXT.
+    // One form: the details under the button are a skeleton until a student is called.
+    showDetails: (on) => {
+        document.getElementById('recitationSkeleton').classList.toggle('hidden', on);
+        document.getElementById('recitationDetails').classList.toggle('hidden', !on);
+    },
+
     showWheelOnly: () => {
-        document.getElementById('recitationResult').classList.add('hidden');
+        CourseRecitation.showDetails(false);
         const photo = document.getElementById('recitationResultAvatar');
         photo.classList.add('hidden');
         photo.innerHTML = '';
@@ -392,7 +398,7 @@ export const CourseRecitation = {
 
     spin: () => {
         if (CourseRecitation.isSpinning) return;
-        if (CourseRecitation.currentSelectedStudentId && !document.getElementById('recitationResult').classList.contains('hidden')) {
+        if (CourseRecitation.currentSelectedStudentId && !document.getElementById('recitationDetails').classList.contains('hidden')) {
             CourseRecitation.resetToWheel();   // CALL NEXT: save the points, redraw the wheel without the called student
         }
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
@@ -411,7 +417,7 @@ export const CourseRecitation = {
         if (CourseRecitation.isSpinning || availableStudents.length === 0) return;
         CourseRecitation.isSpinning = true;
 
-        document.getElementById('recitationResult').classList.add('hidden');
+        CourseRecitation.showDetails(false);
         document.getElementById('recitationResultAvatar').classList.add('hidden');
         document.getElementById('wheelPointer')?.classList.remove('hidden');
         document.getElementById('spinWheelBtn').disabled = true;
@@ -496,7 +502,7 @@ export const CourseRecitation = {
             const from = { cx: dial.left + dial.width / 2, cy: dial.top + dial.height / 2 - 0.68 * (dial.height / 2), size: startSize };
 
             document.getElementById('spinWheelBtn').textContent = 'CALL NEXT';
-            document.getElementById('recitationResult').classList.remove('hidden');
+            CourseRecitation.showDetails(true);
             CourseRecitation.zoomIn(from, avatarSrc);
 
             wheel.style.transition = 'none';
