@@ -616,8 +616,6 @@ const DashboardUI = {
                 </div>
                 <div id="ssEnrollmentInfo" class="hidden ss-info-grid max-w-4xl mx-auto px-4 sm:px-6 pb-3">
                     <button type="button" id="ssSeatBtn" class="ss-info-cell seat-map-trigger text-left rounded-lg px-2 py-1.5 -mx-2 -my-1 disabled:cursor-default enabled:hover:bg-white/10 enabled:bg-white/10" disabled aria-label="Seat, show the floor plan"><div class="ss-info-label"><i class="fa-solid fa-chair" aria-hidden="true"></i> Seat</div><div class="ss-info-val"><span id="ssSeat">-</span><i id="ssSeatIcon" class="fa-solid fa-table-cells hidden ml-1.5 text-[10px]" aria-hidden="true"></i></div></button>
-                    <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-user-group" aria-hidden="true"></i> Group</div><div class="ss-info-val ss-marq"><span id="ssGroup">-</span></div></div>
-                    <div class="ss-info-cell"><div class="ss-info-label"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Topic</div><div class="ss-info-val ss-marq"><span id="ssTopic">-</span></div></div>
                 </div>
                 <div id="ssTermTabs" class="ss-tabs max-w-4xl mx-auto" role="tablist" aria-label="Term">
                     <button type="button" role="tab" class="ss-term-tab is-active" data-term="midterm" aria-selected="true">Mid Term</button>

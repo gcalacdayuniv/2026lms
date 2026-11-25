@@ -1189,7 +1189,10 @@ export const ClassComponents = {
                     </div>
                 </div>
 
-<div id="classFab" class="fixed bottom-6 right-6 z-50" style="transition: opacity 0.3s;">
+<div id="classFab" class="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-3" style="transition: opacity 0.3s;">
+                    <button type="button" id="openFloorPlanFab" aria-label="Classroom floor plan" title="Classroom floor plan" class="w-14 h-14 bg-sky-600 hover:bg-sky-700 text-white rounded-full shadow-lg flex items-center justify-center focus:outline-none focus-visible:ring-4 ring-sky-300 transition">
+                        <i class="fa-solid fa-table-cells text-2xl" aria-hidden="true"></i>
+                    </button>
                     <button type="button" id="openRecitationBtn" aria-label="Student Caller" title="Student Caller" class="w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center focus:outline-none focus-visible:ring-4 ring-purple-300 transition">
                         <i class="fa-solid fa-bullhorn text-2xl" aria-hidden="true"></i>
                     </button>

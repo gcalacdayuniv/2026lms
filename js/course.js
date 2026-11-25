@@ -338,23 +338,7 @@ export const CourseModule = {
                     seatBtn.disabled = !hasSeat;
                     document.getElementById('ssSeatIcon').classList.toggle('hidden', !hasSeat);
 
-                    const groupEl = document.getElementById('ssGroup');
-                    if (data.enrollment.Group_Name) {
-                        groupEl.textContent = data.enrollment.Group_Name;
-                        groupEl.classList.add('cursor-pointer', 'underline');
-                        groupEl.dataset.courseId = courseId;
-                        groupEl.dataset.group = data.enrollment.Group_Name;
-                    } else {
-                        groupEl.textContent = 'N/A';
-                        groupEl.classList.remove('cursor-pointer', 'underline');
-                        delete groupEl.dataset.courseId;
-                        delete groupEl.dataset.group;
-                    }
-
-                    document.getElementById('ssTopic').textContent = data.enrollment.Assigned_Topic || 'N/A';
                     document.getElementById('ssEnrollmentInfo').classList.remove('hidden');
-                    StudentSummaryUI.marquee('ssGroup');
-                    StudentSummaryUI.marquee('ssTopic');
                 }
 
 

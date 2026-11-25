@@ -301,9 +301,9 @@ export const SeatMap = {
             if (t) { e.preventDefault(); e.stopPropagation(); SeatMap.openStudent(t.dataset.courseId); }
         }, true);
         document.addEventListener('click', async (e) => {
-            if (e.target.closest('#attendanceFloorBtn')) {
+            if (e.target.closest('#attendanceFloorBtn') || e.target.closest('#openFloorPlanFab')) {
                 const courseId = window.location.hash.replace('#class-', '');
-                await SeatMap.openLecturer(CourseClass.currentStudents, { courseId, attendance: true, onDirty: () => CourseClass.loadClassScreen(courseId, true) });
+                await SeatMap.openLecturer(CourseClass.currentStudents, { courseId, attendance: !!e.target.closest('#attendanceFloorBtn'), onDirty: () => CourseClass.loadClassScreen(courseId, true) });
                 return;
             }
             if (e.target.closest('#seatMapClose') || e.target.id === 'seatMapBg') { SeatMap.close(); return; }
