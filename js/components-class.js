@@ -798,9 +798,10 @@ const ClassUI = {
                     CALL STUDENT
                 </button>
 
-                <div id="recitationResult" class="w-full text-center bg-purple-50 p-5 mt-3 rounded-xl border border-purple-200 min-h-[262px]">
+                <div id="recitationResult" class="w-full text-center bg-purple-50 p-5 mt-3 rounded-xl border border-purple-200">
                     <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Selected Student</p>
-                    <div id="recitationSkeleton" class="animate-pulse flex flex-col items-center" aria-hidden="true">
+                    <div id="recitationBody" class="grid">
+                    <div id="recitationSkeleton" class="col-start-1 row-start-1 animate-pulse flex flex-col items-center" aria-hidden="true">
                         <div class="h-8 w-3/4 bg-purple-200 rounded mb-4"></div>
                         <div class="h-11 w-40 bg-purple-100 rounded-lg mb-6"></div>
                         <div class="h-3 w-32 bg-purple-200 rounded mb-3"></div>
@@ -811,7 +812,7 @@ const ClassUI = {
                         </div>
                         <div class="h-3 w-56 bg-purple-100 rounded"></div>
                     </div>
-                    <div id="recitationDetails" class="hidden fade-in">
+                    <div id="recitationDetails" class="col-start-1 row-start-1 invisible">
                     <h4 id="recitationResultName" class="text-2xl font-black text-gray-900 mb-4"></h4>
 
                     <div class="flex flex-col items-center mb-6 w-full px-4">
@@ -828,8 +829,9 @@ const ClassUI = {
                             <input id="recitationPointsInput" type="number" min="0" max="999" step="1" inputmode="numeric" placeholder="0" class="w-24 px-3 py-2 text-center text-2xl font-black text-gray-900 border-2 border-purple-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:text-gray-400 transition">
                             <button type="button" id="recitationPointsPlus" aria-label="Add 1 point" class="w-12 h-12 flex items-center justify-center rounded-full bg-purple-600 border-2 border-purple-600 text-white text-2xl font-black leading-none hover:bg-purple-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed transition">+</button>
                         </div>
-                        <p id="recitationPointsHint" class="text-[11px] text-purple-700 mt-1.5 leading-snug"></p>
+                        <p id="recitationPointsHint" class="text-[11px] text-purple-700 mt-1.5 leading-snug min-h-[30px]"></p>
                         <p id="recitationPointsStatus" role="status" aria-live="polite" class="text-[11px] font-bold mt-1 min-h-[16px]"></p>
+                    </div>
                     </div>
                     </div>
                 </div>

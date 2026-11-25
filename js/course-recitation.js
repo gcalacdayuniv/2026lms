@@ -29,6 +29,7 @@ const getStudentRow = (userId) => {
 export const CourseRecitation = {
     students: [],
     isSpinning: false,
+    detailsOn: false,
     currentSelectedStudentId: null,
     savedPoints: {},  // points the server holds for each student on the shown date, by student id
     pendingSave: null,
@@ -73,8 +74,10 @@ export const CourseRecitation = {
     // The same circle shows the wheel or the called student's photo; the button reads CALL STUDENT, then CALL NEXT.
     // One form: the details under the button are a skeleton until a student is called.
     showDetails: (on) => {
-        document.getElementById('recitationSkeleton').classList.toggle('hidden', on);
-        document.getElementById('recitationDetails').classList.toggle('hidden', !on);
+        // Both layers share one grid cell, so the card is always as tall as the taller one and the wheel never moves.
+        CourseRecitation.detailsOn = on;
+        document.getElementById('recitationSkeleton').classList.toggle('invisible', on);
+        document.getElementById('recitationDetails').classList.toggle('invisible', !on);
     },
 
     showWheelOnly: () => {
@@ -398,7 +401,7 @@ export const CourseRecitation = {
 
     spin: () => {
         if (CourseRecitation.isSpinning) return;
-        if (CourseRecitation.currentSelectedStudentId && !document.getElementById('recitationDetails').classList.contains('hidden')) {
+        if (CourseRecitation.currentSelectedStudentId && CourseRecitation.detailsOn) {
             CourseRecitation.resetToWheel();   // CALL NEXT: save the points, redraw the wheel without the called student
         }
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
