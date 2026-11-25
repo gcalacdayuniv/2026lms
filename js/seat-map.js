@@ -2,7 +2,7 @@
 // Classroom floor plan: rows of 10 seats, two columns of 5 with an aisle between them. Row 1 is nearest the board.
 // Student view (students only): the room as a student facing the board sees it, seats 1-10 left to right on row 1, 11-20 on row 2 ...
 //   Only the student's own seat is marked ("YOU"); no classmate is identified.
-// Lecturer view (lecturers only): the room as the lecturer facing the class sees it, so row 1 is at the bottom next to the lecturer
+// Lecturer view (full-screen overlay; Check attendance sits in the header; tapping a box (attendance off) opens a small participation popover on it) (lecturers only): the room as the lecturer facing the class sees it, so row 1 is at the bottom next to the lecturer
 //   bar and each row runs 10 ... 1. It is built for a wide (landscape) screen: ten large boxes across, each with the student's profile
 //   picture as its background. In Attendance mode a tap puts the chosen status (Present, Late, Absent, Excused) on that student and
 //   saves it at once (/api/attendance/single), so the plan doubles as an attendance sheet.
@@ -52,13 +52,14 @@ export const SeatMap = {
                         <h3 id="seatMapTitle" class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chair text-sky-600 mr-2" aria-hidden="true"></i><span id="seatMapTitleText">Classroom floor plan</span></h3>
                         <p id="seatMapSub" class="text-xs text-gray-500"></p>
                     </div>
+                    <div id="smHeadTools" class="hidden shrink-0"></div>
                     <button id="seatMapClose" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div id="smTools" class="hidden mb-1.5"></div>
                 <div id="smInfo" role="status" class="mb-2 px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sm text-sky-900 min-h-[36px]"></div>
-                <div id="smPlan" class="overflow-auto flex-1"></div>
+                <div id="smPlan" class="overflow-auto flex-1 relative"></div>
             </div>`;
         document.body.appendChild(el);
     },
@@ -99,8 +100,16 @@ export const SeatMap = {
         SeatMap.ensureModal();
         SeatMap.state = state;
         const lecturer = state.pov === 'lecturer';
-        byId('seatMapPanel').classList.toggle('max-w-xl', !lecturer);
-        byId('seatMapPanel').classList.toggle('max-w-6xl', lecturer);
+        // Lecturer: a true full-screen overlay (no margin, corners or width limit). Student: the small centred card.
+        const panel = byId('seatMapPanel'), root = byId('seatMapModal');
+        panel.classList.toggle('max-w-xl', !lecturer);
+        panel.classList.toggle('max-w-none', lecturer);
+        panel.classList.toggle('sm:rounded-lg', !lecturer);
+        panel.classList.toggle('sm:h-auto', !lecturer);
+        panel.classList.toggle('sm:max-h-[96vh]', !lecturer);
+        panel.classList.toggle('rounded-none', lecturer);
+        panel.classList.toggle('h-full', lecturer);
+        root.classList.toggle('sm:p-4', !lecturer);
         byId('seatMapTitleText').textContent = lecturer ? 'Classroom floor plan' : 'Your seat';
         byId('seatMapSub').textContent = '';
         byId('seatMapSub').classList.add('hidden');
@@ -141,6 +150,7 @@ export const SeatMap = {
         const st = SeatMap.state;
         if (!st || st.pov !== 'lecturer') return;
         st.att.on = on;
+        st.pop = null;
         SeatMap.tools();
         if (on) await SeatMap.loadAttendance();
         SeatMap.render();
@@ -152,6 +162,7 @@ export const SeatMap = {
             const r = await apiFetch(`/api/attendance?courseId=${encodeURIComponent(st.courseId)}&date=${encodeURIComponent(a.date)}&_t=${Date.now()}`);
             a.records = new Map((r.records || []).map(x => [x.Student_ID, { status: x.Status || '', points: Number(x.Performance_Points) || 0 }]));
             a.noClass = !!r.isNoClass;
+            a.loadedDate = a.date;
         } catch (err) {
             a.records = new Map(); a.noClass = false;
             UI.error(err.message || 'Could not load attendance.');
@@ -194,15 +205,18 @@ export const SeatMap = {
         const box = byId('smTools');
         const st = SeatMap.state;
         if (!box || !st) return;
-        if (st.pov !== 'lecturer') { box.classList.add('hidden'); box.innerHTML = ''; return; }
+        if (st.pov !== 'lecturer') { box.classList.add('hidden'); box.innerHTML = ''; byId('smHeadTools')?.classList.add('hidden'); return; }
         const a = st.att;
+        const head = byId('smHeadTools');
+        head.classList.remove('hidden');
+        head.innerHTML = `<button type="button" id="smAttToggle" aria-pressed="${a.on}" class="min-h-[44px] px-3 rounded-md border text-sm font-bold ${a.on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-300'}"><i class="fa-solid fa-clipboard-user mr-1" aria-hidden="true"></i>${a.on ? 'Checking attendance' : 'Check attendance'}</button>`;
+        if (!a.on) { box.classList.add('hidden'); box.innerHTML = ''; return; }
         box.classList.remove('hidden');
         box.innerHTML = `<div class="flex flex-wrap items-center gap-2">
-            <button type="button" id="smAttToggle" aria-pressed="${a.on}" class="min-h-[44px] px-3 rounded-md border text-sm font-bold ${a.on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-300'}"><i class="fa-solid fa-clipboard-user mr-1" aria-hidden="true"></i>${a.on ? 'Checking attendance' : 'Check attendance'}</button>
-            ${a.on ? `<input type="date" id="smAttDate" value="${esc(a.date)}" aria-label="Attendance date" class="min-h-[44px] px-2 border border-gray-300 rounded-md text-sm">
+            <input type="date" id="smAttDate" value="${esc(a.date)}" aria-label="Attendance date" class="min-h-[44px] px-2 border border-gray-300 rounded-md text-sm">
             <div class="flex gap-1" role="group" aria-label="Status to give">${STATUSES.map(s => `<button type="button" class="sm-brush min-h-[44px] min-w-[44px] px-2 rounded-md border text-sm font-bold ${a.brush === s.key ? s.btn : 'bg-white ' + s.idle}" data-status="${s.key}" aria-pressed="${a.brush === s.key}" title="${s.key}">${s.letter}<span class="hidden lg:inline">${s.key.slice(1)}</span></button>`).join('')}</div>
             <button type="button" id="smAllPresent" class="min-h-[44px] px-3 rounded-md border border-green-300 text-green-700 text-sm font-bold bg-white" title="Mark everyone with no status as present">Rest present</button>
-            <span id="smCounts" class="text-xs font-bold text-gray-600 sm:ml-auto"></span>` : ''}
+            <span id="smCounts" class="text-xs font-bold text-gray-600 sm:ml-auto"></span>
         </div>`;
     },
 
@@ -276,6 +290,7 @@ export const SeatMap = {
         const extras = st.extras.length ? `<p class="text-[11px] text-gray-500 mt-1 text-center">Other seat labels: ${st.extras.map(x => esc(x.seat) + ' (' + esc(x.name) + ')').join(', ')}</p>` : '';
 
         plan.innerHTML = `${lecturerPov ? '' : bar('fa-chalkboard', 'Board', 'bg-gray-800')}<div class="space-y-1.5" role="group" aria-label="Seats">${rowHtml}</div>${lecturerPov ? bar('fa-chalkboard-user', 'Lecturer', 'bg-sky-700') : ''}${note}${legend}${extras}`;
+        if (st.pop) { plan.insertAdjacentHTML('beforeend', SeatMap.popHtml(st.pop)); SeatMap.popPlace(); }
         SeatMap.info();
         SeatMap.counts();
     },
@@ -287,13 +302,76 @@ export const SeatMap = {
             box.innerHTML = st.mine ? `Your seat is <b>${esc(st.mine)}</b>.` : 'You have no seat yet.';
             return;
         }
+        // Lecturer: no tips bar; only a no-class warning in attendance mode.
         const a = st.att;
-        if (a.on && a.noClass) { box.innerHTML = `<b>${esc(a.date)}</b> is marked as a no-class day.`; return; }
-        const info = st.picked ? st.seats.get(st.picked) : null;
-        if (!info) { box.textContent = a.on ? `Pick a status (${a.brush} is selected), then tap the seats.` : 'Tap a seat to see who sits there.'; return; }
-        const row = Math.ceil(st.picked / PER_ROW), pos = (st.picked - 1) % PER_ROW + 1;
-        const rec = a.on ? a.records.get(info.id) : null;
-        box.innerHTML = `<b>Seat ${st.picked}</b>: ${esc(info.name)}${info.eye && info.eye !== 'No Eye Condition' ? ' (' + esc(info.eye) + ')' : ''}${info.locked ? ', locked' : ''}, row ${row}, ${pos <= PER_COLUMN ? 'left' : 'right'} column${rec && rec.status ? ' &middot; <b>' + esc(rec.status) + '</b>' : ''}.`;
+        if (a.on && a.noClass) { box.classList.remove('hidden'); box.innerHTML = `<b>${esc(a.date)}</b> is marked as a no-class day.`; }
+        else { box.classList.add('hidden'); box.textContent = ''; }
+    },
+
+    // ---- participation popover, anchored on the tapped box
+    openPop: async (n) => {
+        const st = SeatMap.state, a = st.att, info = st.seats.get(n);
+        if (!info) return;
+        if (a.loadedDate !== a.date) { await SeatMap.loadAttendance(); a.loadedDate = a.date; }
+        const pts = a.records.get(info.id)?.points || 0;
+        st.pop = { n, info, value: pts, saved: pts, chain: Promise.resolve() };
+        SeatMap.render();
+    },
+
+    closePop: () => {
+        const st = SeatMap.state;
+        if (!st || !st.pop) return;
+        st.pop = null;
+        SeatMap.render();
+    },
+
+    popPlace: () => {
+        const st = SeatMap.state, plan = byId('smPlan'), pop = byId('smPop');
+        if (!st || !st.pop || !plan || !pop) return;
+        const seat = plan.querySelector(`button.sm-seat[data-seat="${st.pop.n}"]`);
+        if (!seat) return;
+        const w = pop.offsetWidth, h = pop.offsetHeight;
+        let top = seat.offsetTop - h - 6;
+        if (top < plan.scrollTop) top = seat.offsetTop + seat.offsetHeight + 6;      // no room above: sit below the box
+        const left = Math.max(2, Math.min(seat.offsetLeft + seat.offsetWidth / 2 - w / 2, plan.scrollWidth - w - 2));
+        pop.style.top = `${top}px`;
+        pop.style.left = `${left}px`;
+        pop.style.visibility = 'visible';
+    },
+
+    popHtml: (pop) => `<div id="smPop" role="dialog" aria-label="Participation for ${esc(pop.info.name)}" class="absolute z-20 w-52 rounded-lg bg-white border border-gray-300 shadow-xl p-2" style="visibility:hidden;top:0;left:0">
+        <div class="flex items-center gap-1 mb-1.5"><p class="flex-1 min-w-0 text-xs font-bold text-gray-800 truncate">${esc(pop.info.name)}</p>
+            <button type="button" id="smPopClose" aria-label="Close" class="w-8 h-8 shrink-0 text-gray-500"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+        <p class="text-[11px] text-gray-500 mb-1">Participation points</p>
+        <div class="flex items-center gap-1">
+            <button type="button" class="sm-pop-step min-h-[44px] min-w-[44px] rounded-md border border-red-300 text-red-700 font-black text-lg bg-white" data-step="-1" aria-label="Minus one point">&minus;</button>
+            <input type="number" id="smPopVal" step="1" value="${pop.value}" aria-label="Participation points" class="min-h-[44px] min-w-0 flex-1 w-full text-center border border-gray-300 rounded-md font-bold">
+            <button type="button" class="sm-pop-step min-h-[44px] min-w-[44px] rounded-md border border-green-300 text-green-700 font-black text-lg bg-white" data-step="1" aria-label="Plus one point">+</button>
+        </div>
+        <p id="smPopStatus" class="text-[11px] text-gray-500 mt-1 min-h-[14px]" role="status"></p>
+    </div>`,
+
+    savePop: () => {
+        const st = SeatMap.state, pop = st && st.pop;
+        if (!pop) return;
+        const status = () => byId('smPopStatus');
+        if (status()) status().textContent = 'Saving...';
+        pop.chain = pop.chain.then(async () => {
+            const delta = pop.value - pop.saved;
+            if (!delta) { if (st.pop === pop && status()) status().textContent = 'Saved'; return; }
+            try {
+                await post('/api/add-participation-points', { courseId: st.courseId, studentId: pop.info.id, date: st.att.date, points: delta });
+                pop.saved += delta;
+                const rec = st.att.records.get(pop.info.id);
+                st.att.records.set(pop.info.id, { status: rec ? rec.status : 'Present', points: pop.saved });
+                st.att.dirty = true;
+                if (st.pop === pop && pop.value === pop.saved && status()) status().textContent = 'Saved';
+            } catch (err) {
+                pop.value = pop.saved;
+                if (st.pop === pop && byId('smPopVal')) { byId('smPopVal').value = pop.value; status().textContent = `Not saved: ${err.message}`; }
+                else UI.error(`Not saved for ${pop.info.name}: ${err.message}`);
+            }
+        });
     },
 
     init: () => {
@@ -303,15 +381,25 @@ export const SeatMap = {
             if (t) { e.preventDefault(); e.stopPropagation(); SeatMap.openStudent(t.dataset.courseId); }
         }, true);
         document.addEventListener('click', async (e) => {
-            if (e.target.closest('#attendanceFloorBtn') || e.target.closest('#openFloorPlanFab')) {
+            if (e.target.closest('#attendanceFloorBtn')) {
                 const courseId = window.location.hash.replace('#class-', '');
-                await SeatMap.openLecturer(CourseClass.currentStudents, { courseId, attendance: !!e.target.closest('#attendanceFloorBtn'), onDirty: () => CourseClass.loadClassScreen(courseId, true) });
+                await SeatMap.openLecturer(CourseClass.currentStudents, { courseId, attendance: true, onDirty: () => CourseClass.loadClassScreen(courseId, true) });
                 return;
             }
             if (e.target.closest('#seatMapClose') || e.target.id === 'seatMapBg') { SeatMap.close(); return; }
             const st = SeatMap.state;
             if (!st || !byId('seatMapModal') || byId('seatMapModal').classList.contains('hidden')) return;
             if (e.target.closest('#smAttToggle')) { await SeatMap.attendanceOn(!st.att.on); return; }
+            if (e.target.closest('#smPopClose')) { SeatMap.closePop(); return; }
+            const step = e.target.closest('.sm-pop-step');
+            if (step && st.pop) {
+                st.pop.value = Math.round((st.pop.value + Number(step.dataset.step)) * 100) / 100;
+                byId('smPopVal').value = st.pop.value;
+                SeatMap.savePop();
+                return;
+            }
+            if (e.target.closest('#smPop')) return;
+            if (st.pop && !e.target.closest('button.sm-seat')) { SeatMap.closePop(); }
             const brush = e.target.closest('.sm-brush');
             if (brush) { st.att.brush = brush.dataset.status; SeatMap.tools(); SeatMap.info(); return; }
             if (e.target.closest('#smAllPresent')) { await SeatMap.markAllPresent(); return; }
@@ -320,6 +408,9 @@ export const SeatMap = {
                 const n = Number(seat.dataset.seat);
                 st.picked = n;
                 const info = st.seats.get(n);
+                if (st.pop && st.pop.n === n) { SeatMap.closePop(); return; }
+                if (!st.att.on) { await SeatMap.openPop(n); return; }
+                st.pop = null;
                 if (st.att.on && info && !st.att.noClass) {
                     const cur = st.att.records.get(info.id)?.status || '';
                     await SeatMap.setStatus(info, cur === st.att.brush ? '' : st.att.brush);   // tapping the same status again clears it
@@ -327,8 +418,13 @@ export const SeatMap = {
             }
         });
         document.addEventListener('change', async (e) => {
+            if (e.target.id === 'smPopVal' && SeatMap.state && SeatMap.state.pop) {
+                const v = Number(e.target.value);
+                if (Number.isFinite(v)) { SeatMap.state.pop.value = v; SeatMap.savePop(); } else e.target.value = SeatMap.state.pop.value;
+                return;
+            }
             if (e.target.id !== 'smAttDate' || !SeatMap.state) return;
-            if (e.target.value) { SeatMap.state.att.date = e.target.value; await SeatMap.loadAttendance(); SeatMap.render(); }
+            if (e.target.value) { SeatMap.state.att.date = e.target.value; SeatMap.state.pop = null; await SeatMap.loadAttendance(); SeatMap.render(); }
         });
         const relayout = () => setTimeout(() => { SeatMap.layout(); if (SeatMap.state && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.render(); }, 120);
         window.addEventListener('resize', relayout);
