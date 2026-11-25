@@ -798,7 +798,7 @@ const ClassUI = {
                     CALL STUDENT
                 </button>
 
-                <div id="recitationResult" class="w-full text-center bg-purple-50 p-5 mt-3 rounded-xl border border-purple-200">
+                <div id="recitationResult" class="w-full text-center bg-purple-50 p-5 mt-3 rounded-xl border border-purple-200 min-h-[262px]">
                     <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Selected Student</p>
                     <div id="recitationSkeleton" class="animate-pulse flex flex-col items-center" aria-hidden="true">
                         <div class="h-8 w-3/4 bg-purple-200 rounded mb-4"></div>

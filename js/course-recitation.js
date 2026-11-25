@@ -483,7 +483,7 @@ export const CourseRecitation = {
                 seatDisplay.textContent = selectedStudent.Seat_Number || 'Unassigned';
             }
 
-            const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
+            const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar, 640);
             const avatarImg = avatarSrc
                 ? `<img src="${safeUrl(avatarSrc)}" alt="" class="w-full h-full object-cover" style="object-position:50% 25%">`
                 : `<i class="fa-solid fa-circle-user text-[200px] text-gray-300" aria-hidden="true"></i>`;
@@ -491,6 +491,9 @@ export const CourseRecitation = {
             // The photo fills the wheel's own circle (same size, same place); the wheel stays underneath.
             const photoBox = document.getElementById('recitationResultAvatar');
             photoBox.innerHTML = avatarImg;
+            // The small thumbnail the wheel already loaded shows at once behind the sharper photo, so the circle is never blank.
+            const quick = getLoadableAvatarSrc(selectedStudent.Avatar, 256);
+            photoBox.style.background = quick ? `#f3f4f6 url("${safeUrl(quick)}") center 25% / cover no-repeat` : '';
             photoBox.classList.remove('hidden');
             document.getElementById('wheelPointer')?.classList.add('hidden');
             document.getElementById('recitationResultName').textContent = selectedStudent.Name;
