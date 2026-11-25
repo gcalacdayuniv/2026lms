@@ -489,3 +489,7 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Rules: same server routes and generic answers (`/api/forgot-password`, `/api/request-password-reset`); success/error shown inside the modal; Esc, back arrow, backdrop close.
 - Files: `js/components-auth.js` (`renderForgotModals`), `js/forgot-password.js`, `sw.js` v91.
 - Tests: run-tests + phone-check pass. Deploy: site files only.
+
+## Score cards: percentage with the 60 + 40 transmutation
+- **What:** the term score cards (Quizzes/Long, Narrative, Individual, Tasks, Report, Major Exam) show a percentage only (no "/100"): average of the assessments on base 100, then x 60 + 40 (e.g. average 50 -> 70%, 100 -> 100%, 0 -> 40%). Participation and Attendance cards are unchanged; the breakdown list and Class Summary keep raw scores.
+- **Files:** `js/course-scores.js` (`renderTermScores`), `sw.js` v92. Deploy: site files only.

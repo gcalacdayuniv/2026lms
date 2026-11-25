@@ -172,9 +172,10 @@ export const CourseScores = {
                 if (!SUBMISSION_FALLBACK.includes(category)) el.textContent = '—';
                 return;
             }
-            // The card shows the average of the assessments on a base of 100; the breakdown list below keeps the raw scores.
+            // The card shows a percentage only: the average on a base of 100, then x 60 + 40 (the transmutation used by the Class
+            // Grade template). The breakdown list below keeps the raw scores.
             const average = scored.reduce((sum, a) => sum + onBase(a.Score, a.Max_Score), 0) / scored.length;
-            el.textContent = `${fmt(average)}/${GRADE_BASE}`;
+            el.textContent = `${fmt(average / GRADE_BASE * 60 + 40)}%`;
         });
     },
 
