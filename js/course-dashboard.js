@@ -6,7 +6,7 @@ import { Skeleton } from './skeletons.js';
 import { escapeHtml } from './html-utils.js';
 import { formatSchedule } from './schedule-time.js';
 import { getLocalDateString } from './date-utils.js';
-import { getTerm, loadTerm } from './current-term.js';
+import { loadTerm } from './current-term.js';
 import { joinFormHtml } from './class-invite.js';
 import { refreshResetBadge } from './password-requests.js';
 
@@ -417,15 +417,6 @@ const SEM_RANK = { '1st Semester': 1, '2nd Semester': 2, 'Summer': 3 };
 const termKey = (c) => [c.AcademicYear, c.Semester].filter(Boolean).join('|');
 const termLabel = (c) => [c.AcademicYear && `AY ${c.AcademicYear}`, c.Semester].filter(Boolean).join(' · ') || 'No term set';
 // The current term is set by an admin (Admin tools); until then it follows the calendar in GMT+8.
-const currentTerm = () => getTerm();
-document.addEventListener('term-changed', () => { if (CourseDashboard.repaintLecturer && CourseDashboard.lecturerData) CourseDashboard.repaintLecturer(); });
-// Classes without a term count as current, so older classes never disappear.
-const isCurrentTerm = (c) => {
-    if (!c.AcademicYear && !c.Semester) return true;
-    const t = currentTerm();
-    return (!c.AcademicYear || c.AcademicYear === t.ay) && (!c.Semester || c.Semester === t.sem);
-};
-const savedTermFilter = () => { try { return localStorage.getItem('course_term_filter') || ''; } catch (e) { return ''; } };
 // Newest academic year first; inside a year, later semesters first.
 const compareTerms = (a, b) => {
     const [ay1, s1] = a.split('|'), [ay2, s2] = b.split('|');
@@ -436,19 +427,12 @@ const compareTerms = (a, b) => {
 document.addEventListener('change', (e) => {
     if (e.target && e.target.id === 'groupUploadSet') CourseDashboard.loadUploadSetMembers().catch(() => {});
     if (!e.target || e.target.id !== 'courseTermFilter') return;
-    CourseDashboard.termFilter = e.target.value;
-    try { localStorage.setItem('course_term_filter', e.target.value); } catch (err) { /* storage unavailable */ }
+    CourseDashboard.view = e.target.value === 'archived' ? 'archived' : 'active';   // My classes / Archived classes
     if (CourseDashboard.repaintLecturer) CourseDashboard.repaintLecturer();
 });
 
 // Archive / restore a class (lecturer). Archived classes leave the main list; nothing is deleted.
 document.addEventListener('click', async (e) => {
-    const toggle = e.target.closest && e.target.closest('#toggleArchivedCoursesBtn');
-    if (toggle) {
-        CourseDashboard.showArchivedCourses = !CourseDashboard.showArchivedCourses;
-        if (CourseDashboard.repaintLecturer) CourseDashboard.repaintLecturer();
-        return;
-    }
     const btn = e.target.closest && e.target.closest('.archive-course-btn');
     if (!btn) return;
     const archive = btn.dataset.archive === '1';
@@ -465,8 +449,7 @@ document.addEventListener('click', async (e) => {
 });
 
 export const CourseDashboard = {
-    showArchivedCourses: false,
-    termFilter: '',
+    view: 'active',   // 'active' = My classes, 'archived' = Archived classes (a separate list, grouped by academic year and term)
 
     // Set while a lecturer uploads on behalf of a student: { courseId, student }. Null for a student's own upload.
     uploadTarget: null,
@@ -791,39 +774,27 @@ export const CourseDashboard = {
             CourseDashboard.repaintLecturer = () => paint(CourseDashboard.lecturerData);
             const archivedCourses = data.courses.filter(c => Number(c.Archived) === 1);
             const activeCourses = data.courses.filter(c => Number(c.Archived) !== 1);
-            // Term filter: Current term (default when something is in it) / All terms / one term.
-            const terms = [...new Set(activeCourses.filter(c => c.AcademicYear || c.Semester).map(termKey))].sort(compareTerms);
-            const hasCurrent = activeCourses.some(c => (c.AcademicYear || c.Semester) && isCurrentTerm(c));
-            let filter = CourseDashboard.termFilter || savedTermFilter() || (hasCurrent ? 'current' : 'all');
-            if (filter !== 'current' && filter !== 'all' && !terms.includes(filter)) filter = hasCurrent ? 'current' : 'all';
-            if (!terms.length) filter = 'all';
-            const shownCourses = activeCourses.filter(c => filter === 'all' ? true : filter === 'current' ? isCurrentTerm(c) : termKey(c) === filter);
+            // Two lists: My classes (everything not archived) and Archived classes, which are not drawn at all until chosen.
+            if (!archivedCourses.length) CourseDashboard.view = 'active';
+            const archivedView = CourseDashboard.view === 'archived';
             let coursesHtml;
-            if (filter === 'all' && terms.length) {
-                // Headings per term; classes without a term go last.
-                const groups = [...terms, ''].map(k => [k, shownCourses.filter(c => termKey(c) === k)]).filter(([, list]) => list.length);
-                coursesHtml = groups.map(([k, list]) => `<h3 class="col-span-full text-xs font-black uppercase tracking-wider text-gray-500 ${k ? '' : 'mt-2'} -mb-2">${escapeHtml(k ? termLabel(list[0]) : 'No term set')}${k && isCurrentTerm(list[0]) ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-green-100 text-green-700 normal-case tracking-normal">Current</span>' : ''}</h3>${list.map(lecturerCourseCardHtml).join('')}`).join('');
+            if (archivedView) {
+                // Headings per academic year and term, newest first; classes without a term go last.
+                const terms = [...new Set(archivedCourses.filter(c => c.AcademicYear || c.Semester).map(termKey))].sort(compareTerms);
+                const groups = [...terms, ''].map(k => [k, archivedCourses.filter(c => termKey(c) === k)]).filter(([, list]) => list.length);
+                coursesHtml = groups.map(([k, list]) => `<h3 class="col-span-full text-xs font-black uppercase tracking-wider text-gray-500 ${k ? '' : 'mt-2'} -mb-2">${escapeHtml(k ? termLabel(list[0]) : 'No term set')} <span class="ml-1 font-semibold normal-case text-gray-400">${list.length} class${list.length === 1 ? '' : 'es'}</span></h3>${list.map(lecturerCourseCardHtml).join('')}`).join('');
             } else {
-                coursesHtml = shownCourses.map(lecturerCourseCardHtml).join('');
+                coursesHtml = activeCourses.map(lecturerCourseCardHtml).join('');
             }
-            if (!coursesHtml && activeCourses.length) {
-                coursesHtml = '<div class="col-span-full p-6 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">No classes in this term. Choose another term or All terms.</div>';
-            }
-            const termFilterHtml = terms.length ? `<select id="courseTermFilter" aria-label="Term" class="shrink-0 max-w-[9rem] sm:max-w-none px-3 py-2.5 border border-gray-300 rounded-full text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="current"${filter === 'current' ? ' selected' : ''}>Current term</option>
-                    <option value="all"${filter === 'all' ? ' selected' : ''}>All terms</option>
-                    ${terms.map(k => `<option value="${escapeHtml(k)}"${filter === k ? ' selected' : ''}>${escapeHtml(termLabel(activeCourses.find(c => termKey(c) === k)))}</option>`).join('')}
+            const viewSelectHtml = archivedCourses.length ? `<select id="courseTermFilter" aria-label="Show" class="shrink-0 max-w-[11rem] sm:max-w-none px-3 py-2.5 border border-gray-300 rounded-full text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="active"${archivedView ? '' : ' selected'}>My classes (${activeCourses.length})</option>
+                    <option value="archived"${archivedView ? ' selected' : ''}>Archived classes (${archivedCourses.length})</option>
                 </select>` : '';
             const days7 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-            const filterBar = data.courses.length >= 3 ? searchBarHtml(days7, termFilterHtml) : (termFilterHtml ? searchBarHtml([], termFilterHtml, false) : '');
-            const archivedHtml = archivedCourses.length ? `
-                    <div class="mt-8">
-                        <button type="button" id="toggleArchivedCoursesBtn" class="inline-flex items-center text-sm font-bold text-gray-600 hover:text-indigo-700" aria-expanded="${CourseDashboard.showArchivedCourses ? 'true' : 'false'}"><i class="fa-solid fa-box-archive mr-2" aria-hidden="true"></i>${CourseDashboard.showArchivedCourses ? 'Hide' : 'Show'} archived classes (${archivedCourses.length})</button>
-                        <div class="${CourseDashboard.showArchivedCourses ? '' : 'hidden'} grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-4 opacity-80">${archivedCourses.map(lecturerCourseCardHtml).join('')}</div>
-                    </div>` : '';
+            const filterBar = data.courses.length >= 3 ? searchBarHtml(archivedView ? [] : days7, viewSelectHtml) : (viewSelectHtml ? searchBarHtml([], viewSelectHtml, false) : '');
 
             if (!coursesHtml && archivedCourses.length) {
-                coursesHtml = '<div class="col-span-full p-6 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">All your classes are archived. Create a new class or restore one below.</div>';
+                coursesHtml = '<div class="col-span-full p-6 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium">All your classes are archived. Create a new class, or open Archived classes to restore one.</div>';
             } else if (!coursesHtml) {
                 coursesHtml = `<div class="col-span-full p-8 text-center text-gray-500 border-2 border-dashed rounded-xl bg-gray-50 font-medium"><div class="mx-auto mb-3 w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i></div><p class="mb-1 font-bold text-gray-700">No courses yet</p><p class="mb-4 text-sm">Create your first course to start taking attendance.</p><button type="button" id="emptyNewCourseBtn" class="open-create-course-btn flex-shrink-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"><i class="fa-solid fa-plus mr-2"></i> New Course</button></div>`;
             }
@@ -834,7 +805,6 @@ export const CourseDashboard = {
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${coursesHtml}
                     </div>
-                    ${archivedHtml}
                 </div>
             `;
         };
