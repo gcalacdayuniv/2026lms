@@ -63,15 +63,40 @@ const pictureIcon = (src, size, maskable) => new Promise((resolve) => {
     img.src = src;
 });
 
+// The launch background is the colour of the icon's edge (the navy of the logo), so the splash looks like one piece with the logo.
+// Samples the middle of each side (the corners of a rounded icon are transparent); falls back to the old white/dark.
+const edgeColor = (src) => new Promise((resolve) => {
+    const fallback = Theme.isDark() ? '#0b1220' : '#ffffff';
+    const img = new Image();
+    img.onload = () => {
+        try {
+            const c = document.createElement('canvas');
+            c.width = c.height = 16;
+            const x = c.getContext('2d', { willReadFrequently: true });
+            x.drawImage(img, 0, 0, 16, 16);
+            let r = 0, g = 0, b = 0, n = 0;
+            [[1, 8], [14, 8], [8, 1], [8, 14], [2, 4], [13, 4], [2, 11], [13, 11]].forEach(([px, py]) => {
+                const d = x.getImageData(px, py, 1, 1).data;
+                if (d[3] > 200) { r += d[0]; g += d[1]; b += d[2]; n++; }
+            });
+            if (!n) { resolve(fallback); return; }
+            const hex = (v) => Math.round(v / n).toString(16).padStart(2, '0');
+            resolve(`#${hex(r)}${hex(g)}${hex(b)}`);
+        } catch (err) { resolve(fallback); }
+    };
+    img.onerror = () => resolve(fallback);
+    img.src = src;
+});
+
 // iPhone launch image: Safari matches it by exact screen size, so it is made for this device only
 // (it takes effect the next time the app is added to the Home Screen).
-const addSplash = (icon) => {
+const addSplash = (icon, bg) => {
     if (!isIos()) return;
     const w = window.screen.width, h = window.screen.height, r = window.devicePixelRatio || 1;
     const c = document.createElement('canvas');
     c.width = Math.round(w * r); c.height = Math.round(h * r);
     const x = c.getContext('2d');
-    x.fillStyle = Theme.isDark() ? '#0b1220' : '#ffffff';
+    x.fillStyle = bg;
     x.fillRect(0, 0, c.width, c.height);
     const img = new Image();
     img.onload = () => {
@@ -99,7 +124,8 @@ export const PWA = {
     deferred: null,
 
     // (Re)writes the manifest and the Home Screen icon. The manifest is a blob made here because the site only serves static files.
-    applyIcons: (icon192, icon512, maskable) => {
+    applyIcons: async (icon192, icon512, maskable) => {
+        const bg = await edgeColor(icon512);
         const base = new URL('./', window.location.href).href;
         const manifest = {
             name: document.title || 'Online Portal',
@@ -108,7 +134,7 @@ export const PWA = {
             scope: base,
             display: 'standalone',
             orientation: 'portrait',
-            background_color: Theme.isDark() ? '#0b1220' : '#ffffff',
+            background_color: bg,
             theme_color: THEME,
             icons: [
                 { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -125,7 +151,7 @@ export const PWA = {
         let apple = document.getElementById('appleIcon');
         if (apple) apple.setAttribute('href', icon192);
         else addHead('link', { id: 'appleIcon', rel: 'apple-touch-icon', href: icon192 });
-        addSplash(icon512);
+        addSplash(icon512, bg);
     },
 
     // The installed app uses the Admin's site icon (a null src goes back to the built-in icon).
