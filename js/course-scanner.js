@@ -701,10 +701,10 @@ export const CourseScanner = {
     },
 
     // Shows the sheet that was just read, right away, inside the full-screen view.
-    showLiveReview: (row) => {
+    showLiveReview: (row, recaptured = false) => {
         CourseScanner.liveReviewRow = row;
         const box = $('scnLiveReview');
-        box.innerHTML = `<div class="mb-2 rounded bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold px-3 py-2"><i class="fa-solid fa-circle-question mr-1"></i> Captured the moment all 4 corners were seen. If the sheet looks off or a corner was missed, tap Recapture to replace it.</div>`
+        box.innerHTML = `<div class="mb-2 rounded bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold px-3 py-2"><i class="fa-solid fa-circle-question mr-1"></i> ${recaptured ? 'Same student as an earlier sheet: this capture replaced it. ' : ''}If the sheet looks off or a corner was missed, tap Capture next sheet and scan this paper again: a sheet of the same student replaces the earlier one.</div>`
             + CourseScanner.rowHtml(row, CourseScanner.duplicateIds(), 'scnLv');
         box.querySelector('details')?.setAttribute('open', '');
         CourseScanner.liveMode('review');
@@ -866,17 +866,14 @@ export const CourseScanner = {
             CourseScanner.renderRows();
             CourseScanner.markChange();
 
-            // The camera stays on for the next paper: wait for this sheet to leave the view (or move) before reading again.
             live.steady = 0;
-            live.armed = false;
-            live.shot = norm || null;
             if (navigator.vibrate) navigator.vibrate(60);
-            const student = row.studentId ? CourseScanner.students.find(x => x.User_ID === row.studentId) : null;
-            const who = student ? student.Name : (row.ok ? 'Sheet (student not matched)' : 'Sheet');
-            const score = row.ok ? ` ${fmt(CourseScanner.scoreRow(row, CourseScanner.cfg.cap).final)}/${fmt(CourseScanner.cfg.cap)}` : '';
-            const count = CourseScanner.rows.filter(r => r.ok).length;
-            live.lastMsg = `${replaced ? 'Recaptured' : 'Captured'}: ${who}${score}. ${count} scanned. Show the next paper.`;
-            CourseScanner.setLiveStatus(live.lastMsg, 'green', 1);
+
+            // One sheet per live session: the camera stops and that sheet is shown for checking.
+            // "Capture next sheet" starts the camera again; a sheet of a student who already has one replaces it.
+            await new Promise(r => setTimeout(r, 300));
+            CourseScanner.stopLive(true);
+            CourseScanner.showLiveReview(row, Boolean(replaced));
         } catch (err) {
             console.error(err);
             CourseScanner.setLiveStatus('Could not read the sheet. Try again.', 'red', 0);
@@ -1510,13 +1507,11 @@ export const CourseScanner = {
         if (e.target.closest('#scnLiveBtn')) await CourseScanner.startLive();
         if (e.target.closest('#scnLiveStopBtn')) CourseScanner.stopLive();
         if (e.target.closest('#scnCaptureAgainBtn')) {
-            // Keep the first capture until the new one succeeds, then replace it.
-            const old = CourseScanner.liveReviewRow;
+            // Next paper: the camera starts again. A sheet of a student who already has one replaces it (see liveCapture).
             CourseScanner.renderRows();
             CourseScanner.liveReviewRow = null;
             CourseScanner.flush();
             await CourseScanner.startLive();
-            CourseScanner.live.replacing = CourseScanner.live.stream ? old : null;
         }
         if (e.target.closest('#scnAfterDoneBtn')) CourseScanner.stopLive();
         if (e.target.closest('#scnLiveCaptureBtn')) await CourseScanner.liveCapture(CourseScanner.live.prev);
