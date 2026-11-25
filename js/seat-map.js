@@ -102,18 +102,34 @@ export const SeatMap = {
         byId('seatMapPanel').classList.toggle('max-w-xl', !lecturer);
         byId('seatMapPanel').classList.toggle('max-w-6xl', lecturer);
         byId('seatMapTitleText').textContent = lecturer ? 'Classroom floor plan' : 'Your seat';
-        // The hint is only for a phone held upright; held sideways every pixel of height goes to the seats.
-        const upright = window.innerHeight > window.innerWidth;
-        byId('seatMapSub').textContent = lecturer ? (upright ? 'Hold your phone sideways for the best view.' : '') : '';
-        byId('seatMapSub').classList.toggle('hidden', !byId('seatMapSub').textContent);
+        byId('seatMapSub').textContent = '';
+        byId('seatMapSub').classList.add('hidden');
         byId('seatMapModal').classList.remove('hidden');
+        SeatMap.layout();
         SeatMap.tools();
         SeatMap.render();
         if (lecturer) try { screen.orientation?.lock?.('landscape')?.catch(() => {}); } catch (e) { /* not allowed outside an installed app */ }
     },
 
+    // The lecturer's plan is always landscape on a phone. A phone held upright cannot be forced to rotate by a web page, so the panel
+    // is turned a quarter turn with CSS (the lecturer turns the phone counter-clockwise to read it); a phone already held sideways,
+    // a tablet or a computer just shows it normally.
+    layout: () => {
+        const panel = byId('seatMapPanel');
+        const st = SeatMap.state;
+        if (!panel) return;
+        const w = window.innerWidth, h = window.innerHeight;
+        const turn = !!st && st.pov === 'lecturer' && w < h && w < 700 && !byId('seatMapModal').classList.contains('hidden');
+        if (turn) {
+            Object.assign(panel.style, { position: 'fixed', top: '0', left: '0', width: `${h}px`, height: `${w}px`, maxWidth: 'none', maxHeight: 'none', margin: '0', borderRadius: '0', transformOrigin: '0 0', transform: `translateX(${w}px) rotate(90deg)` });
+        } else {
+            ['position', 'top', 'left', 'width', 'height', 'maxWidth', 'maxHeight', 'margin', 'borderRadius', 'transformOrigin', 'transform'].forEach(k => { panel.style[k] = ''; });
+        }
+    },
+
     close: () => {
         byId('seatMapModal')?.classList.add('hidden');
+        SeatMap.layout();
         try { screen.orientation?.unlock?.(); } catch (e) { /* ignore */ }
         const st = SeatMap.state;
         if (st && st.att && st.att.dirty && SeatMap.onDirty) SeatMap.onDirty();
@@ -312,6 +328,9 @@ export const SeatMap = {
             if (e.target.id !== 'smAttDate' || !SeatMap.state) return;
             if (e.target.value) { SeatMap.state.att.date = e.target.value; await SeatMap.loadAttendance(); SeatMap.render(); }
         });
+        const relayout = () => setTimeout(() => { SeatMap.layout(); if (SeatMap.state && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.render(); }, 120);
+        window.addEventListener('resize', relayout);
+        window.addEventListener('orientationchange', relayout);
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.close(); });
     }
 };

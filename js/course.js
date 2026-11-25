@@ -330,12 +330,13 @@ export const CourseModule = {
                 CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
 
                 if (data.enrollment) {
-                    const seatEl = document.getElementById('ssSeat');
-                    seatEl.textContent = data.enrollment.Seat_Number || 'N/A';
-                    if (data.enrollment.Seat_Number) {
-                        seatEl.innerHTML = `<button type="button" class="seat-map-trigger font-bold underline decoration-dotted min-h-[44px]" data-course-id="${escapeHtml(courseId)}" aria-label="Show the floor plan"><span id="ssSeatNo"></span> <i class="fa-solid fa-table-cells text-xs" aria-hidden="true"></i></button>`;
-                        document.getElementById('ssSeatNo').textContent = data.enrollment.Seat_Number;
-                    }
+                    document.getElementById('ssSeat').textContent = data.enrollment.Seat_Number || 'N/A';
+                    // The whole Seat cell opens the classroom floor plan once there is a seat.
+                    const seatBtn = document.getElementById('ssSeatBtn');
+                    const hasSeat = !!data.enrollment.Seat_Number;
+                    seatBtn.dataset.courseId = courseId;
+                    seatBtn.disabled = !hasSeat;
+                    document.getElementById('ssSeatIcon').classList.toggle('hidden', !hasSeat);
 
                     const groupEl = document.getElementById('ssGroup');
                     if (data.enrollment.Group_Name) {

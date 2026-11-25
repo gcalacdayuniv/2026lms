@@ -1,7 +1,7 @@
 // sw.js - service worker of the installed app.
 // Pages, scripts and styles: network first (so a new deploy shows at once), the last copy when offline or slow.
 // API calls and anything else are never touched.
-const CACHE = 'portal-shell-v103';
+const CACHE = 'portal-shell-v104';
 const SHELL = ['./', 'index.html', 'terms.html', 'styles.css', 'dark.css', 'tailwind.css', 'js/theme-boot.js', 'vendor/fontawesome/fontawesome.css'];
 const CDN_HOSTS = ['cdnjs.cloudflare.com'];
 const NETWORK_WAIT_MS = 4000;
