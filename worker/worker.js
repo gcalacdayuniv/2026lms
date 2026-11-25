@@ -3,6 +3,7 @@ import { authorize } from './auth.js';
 import { handleAttendance } from './attendance.js';
 import { handleScores } from './scores.js';
 import { handleGroups } from './groups.js';
+import { handleSeats } from './seats.js';
 import { handleExams } from './exams.js';
 import { handleExamPhotos } from './exam-photos.js';
 import { handleRoles } from './roles.js';
@@ -92,6 +93,9 @@ export default {
 
             const groupsResponse = await handleGroups(request, env, path, url, corsHeaders);
             if (groupsResponse) return groupsResponse;
+
+            const seatsResponse = await handleSeats(request, env, path, url, corsHeaders);
+            if (seatsResponse) return seatsResponse;
 
             const coursesResponse = await handleCourses(request, env, path, url, corsHeaders);
             if (coursesResponse) return coursesResponse;

@@ -30,6 +30,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 | auth.js | token sign/verify, `RULES`, `OWNER_SQL`, ownership checks |
 | accounts.js | register, login/logout, password change + reset (emails temp password via GAS), prefs, current term, profile/admin edit, user list/status, year-level advance |
 | courses.js | programs, courses CRUD/duplicate/archive, enroll/join/invite, roster, student details, notes, `/api/group-members` |
+| seats.js | Seat Plan: `/api/set-seat` (no duplicate seats, lock), `/api/auto-seat` (eye group then last name; `planSeats`) |
 | groups.js | group sets: `/api/group-sets`, `group-set(-create/-rename/-delete/-save)`, `student-groups`; `groupNameIn()` used by uploads |
 | attendance.js | attendance dates, no-class days, attendance records, participation points |
 | scores.js | assessments, scores (capped at max, extra credit), `/api/student-summary`, `/api/class-summary` |
@@ -44,6 +45,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 - Dashboard / class list: course-dashboard.js (course cards, **upload form logic**), components-dashboard.js (dashboard + student summary + submit/history/My Groups modals), dash-nav.js, card-more.js (menu shortcuts), duplicate-course.js, year-advance.js, current-term.js.
 - Class screen (lecturer): course.js (main click handlers, student summary open), course-class.js (roster, **submission history cards**), components-class.js (class template, Course Actions menu tiles, Record Scores/Groups/Edit-upload modals), course-attendance*.js, course-recitation.js, course-roster-tools.js, lecturer-notes.js, class-invite.js.
 - Scores/grades: course-scores.js (Record Scores, group fill), course-summary.js (Class Summary), grade-base.js (`onBase`, used only by the export), class-grade-export.js + class-grade-template.js (ExcelJS), participation.js.
+- Seat Plan: course-seats.js (modal in components-class.js, tile in the Course Actions menu and card-more.js).
 - Groups/uploads: course-groups.js (lecturer Groups screen), my-groups.js (student screen), submission-edit.js (lecturer edits an upload).
 - Exams: exam-builder*.js, course-exam.js, components-exam.js, exam-secure.js, exam-sets.js, exam-share.js, exam-print.js, exam-review.js, exam-photo-review.js.
 - Scanner/OMR: course-scanner*.js, course-scan-*.js, omr-*.js, scan-*.js, sheet-print.js, student-sheet-viewer.js, components-scanner.js.

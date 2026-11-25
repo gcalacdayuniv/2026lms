@@ -849,5 +849,35 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   delete env.GAS_WEBHOOK_URL;
 }
 
+// ---- Seat Plan: no duplicate seats, auto-assign by eye group then last name, locked seats stay
+{
+  sql.exec("delete from Enrollments where Course_ID='SP'");
+  sql.exec("insert into Courses(Course_ID,CourseCode,CourseTitle,Lecturer_ID) values('SP','SP','Seats','L1')");
+  const stu = (id, name, eye, status = 'Active') => {
+    sql.prepare("insert or replace into Users(User_ID,Username,Name,role,account_status,eye_condition) values(?,?,?,?,?,?)").run(id, id, name, 'student', status, eye);
+    sql.prepare("insert into Enrollments(Course_ID,Student_ID) values('SP',?)").run(id);
+  };
+  stu('P1', 'Zamora, Zed', 'No Eye Condition'); stu('P2', 'Abad, Amy', 'Far Sighted'); stu('P3', 'Cruz, Cy', 'Near Sighted');
+  stu('P4', 'Dela, Dan', 'Legally Blind'); stu('P5', 'Bato, Bea', 'Near Sighted'); stu('P6', 'Off, Ina', 'No Eye Condition', 'Inactive');
+  const seatOf = (id) => sql.prepare("select Seat_Number s from Enrollments where Course_ID='SP' and Student_ID=?").get(id).s;
+  const set = (studentId, seat, locked) => call('POST', '/api/set-seat', { token: L1, body: { courseId: 'SP', studentId, seat, locked } });
+  ok('set a seat', (await set('P1', '2', true)).s === 200 && seatOf('P1') === '2');
+  const dup = await set('P2', ' 2 ', false);
+  ok('a duplicate seat is refused with the owner named', dup.s === 409 && /Zamora/.test(dup.j.error) && seatOf('P2') == null, JSON.stringify(dup.j));
+  ok('the roster edit refuses a duplicate too', (await call('POST', '/api/update-student-info', { token: L1, body: { courseId: 'SP', studentId: 'P2', seatNumber: '2', groupName: '', assignedTopic: '' } })).s === 409);
+  ok('another lecturer cannot seat my class', (await call('POST', '/api/set-seat', { token: l2.j.token, body: { courseId: 'SP', studentId: 'P2', seat: '9' } })).s === 403);
+  const all = await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } });
+  // locked P1 keeps 2; order: Legally Blind (Dela) 1, Near Sighted (Bato) 3, (Cruz) 4, Far Sighted (Abad) 5; inactive untouched
+  ok('auto-assign by eye group then last name, skipping the locked seat', all.s === 200 && seatOf('P4') === '1' && seatOf('P1') === '2' && seatOf('P5') === '3' && seatOf('P3') === '4' && seatOf('P2') === '5', JSON.stringify(all.j.seats));
+  ok('inactive students are not seated', seatOf('P6') == null);
+  const seats = sql.prepare("select Seat_Number s from Enrollments where Course_ID='SP' and Seat_Number is not null").all().map(r => r.s);
+  ok('no duplicate seat numbers', new Set(seats).size === seats.length);
+  stu('P7', 'Alba, Al', 'No Eye Condition'); stu('P8', 'Zapata, Zoe', 'Legally Blind');
+  const un = await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'unseated' } });
+  ok('unseated mode seats only new students, eye group first, lowest free number', un.s === 200 && un.j.assigned === 2 && seatOf('P8') === '6' && seatOf('P7') === '7' && seatOf('P4') === '1', JSON.stringify(un.j));
+  ok('unlock lets auto-assign move the seat', (await set('P1', '2', false)).s === 200 && (await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } })).s === 200 && seatOf('P4') === '1' && seatOf('P8') === '2');
+  ok('clearing a seat also clears the lock', (await set('P1', '', true)).s === 200 && sql.prepare("select Seat_Locked l from Enrollments where Student_ID='P1' and Course_ID='SP'").get().l === 0);
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

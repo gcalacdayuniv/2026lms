@@ -67,6 +67,10 @@ const ClassUI = {
                             <span class="menu-tile-icon bg-gray-200 text-gray-800"><i class="fa-solid fa-print" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Print Roster</span>
                         </button>
+                        <button type="button" id="openSeatPlanBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-sky-100 text-sky-700"><i class="fa-solid fa-chair" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Seat Plan</span>
+                        </button>
                         <button type="button" id="openGroupsBtn" class="menu-tile">
                             <span class="menu-tile-icon bg-violet-100 text-violet-700"><i class="fa-solid fa-people-group" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">Groups</span>
@@ -153,6 +157,30 @@ const ClassUI = {
                         </button>
                     </div>
                 </details>
+            </div>
+        </div>
+    `,
+
+    renderSeatPlanModal: () => `
+        <div id="seatPlanModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center fade-in p-0 sm:p-4">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeSeatPlanBg"></div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[95vh] flex flex-col">
+                <div class="flex items-center gap-3 mb-3 border-b pb-3 app-page-header">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chair text-sky-600 mr-2" aria-hidden="true"></i>Seat Plan</h3>
+                        <p class="text-xs text-gray-500">One seat per student, no duplicates. Lock a seat to keep it when you auto-assign.</p>
+                    </div>
+                    <button id="closeSeatPlanBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div id="csAlert" role="status" class="hidden mb-3 p-2 rounded text-xs font-bold"></div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <button type="button" id="csAutoAllBtn" class="min-h-[44px] px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-sm font-bold"><i class="fa-solid fa-wand-magic-sparkles mr-1" aria-hidden="true"></i>Auto-assign all</button>
+                    <button type="button" id="csAutoNewBtn" class="min-h-[44px] px-3 py-2 bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 rounded-md text-sm font-bold"><i class="fa-solid fa-user-plus mr-1" aria-hidden="true"></i>Seat new students</button>
+                </div>
+                <p class="text-[11px] text-gray-500 mb-3">Front to back: Legally Blind, Near Sighted, No Eye Condition, Far Sighted; then A to Z by last name. Locked seats are skipped. <b>Seat new students</b> only fills students without a seat (lowest free number).</p>
+                <div id="csList" class="overflow-auto flex-1 min-h-[200px] border border-gray-200 rounded-lg divide-y divide-gray-100"></div>
             </div>
         </div>
     `,
@@ -961,7 +989,7 @@ export const ClassComponents = {
                                 </div>
                                 ${displayProgram ? `<div class="text-[11px] text-blue-700 font-medium mt-0.5"><i class="fa-solid fa-graduation-cap mr-1"></i>Program: ${escapeHtml(displayProgram)}</div>` : ''}
                                 <div class="text-[10px] font-bold text-gray-500 mt-1 uppercase">
-                                    Seat: <span class="text-gray-800">${escapeHtml(s.Seat_Number || '')}</span>
+                                    Seat: <span class="text-gray-800">${escapeHtml(s.Seat_Number || '')}</span>${Number(s.Seat_Locked) === 1 && s.Seat_Number ? ' <i class="fa-solid fa-lock text-sky-600" title="Seat locked" aria-label="Seat locked"></i>' : ''}
                                     &nbsp;|&nbsp; Group: ${groupDisplay}
                                     &nbsp;|&nbsp; Topic: <span class="text-gray-800">${escapeHtml(s.Assigned_Topic || '')}</span>
                                 </div>
@@ -1181,6 +1209,7 @@ export const ClassComponents = {
             ${ClassUI.renderScoresModal()}
             ${ClassUI.renderAttendanceDatesModal()}
             ${ClassUI.renderGroupsModal()}
+            ${ClassUI.renderSeatPlanModal()}
             ${ClassUI.renderNoClassModal()}
             ${ClassUI.renderManageStudentModal()}
             ${ClassUI.renderSummaryModal()}

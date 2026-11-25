@@ -321,3 +321,11 @@ export async function ensureGroupTables(env) {
     ]);
     groupTablesReady = true;
 }
+
+// A locked seat is skipped by auto-assignment (Seat Plan).
+let seatLockReady = false;
+export async function ensureSeatLock(env) {
+    if (seatLockReady) return;
+    try { await env.DB.prepare("ALTER TABLE Enrollments ADD COLUMN Seat_Locked INTEGER DEFAULT 0").run(); } catch (e) { /* already there */ }
+    seatLockReady = true;
+}

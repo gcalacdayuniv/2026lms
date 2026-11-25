@@ -158,6 +158,9 @@ export const CourseModule = {
                 }
             } catch (err) {
                 console.error('Failed to update student info:', err);
+                UI.error(err.message || 'Could not save the change.');   // e.g. "Seat 5 is already taken by ..."
+                const was = CourseClass.currentStudents.find(s => s.User_ID === studentId);
+                if (was && e.target.id === 'manageSeatInput') e.target.value = was.Seat_Number || '';
             }
         }
 

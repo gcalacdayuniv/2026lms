@@ -4,7 +4,7 @@
 import { findClassByCode, enrollStudent } from './join.js';
 import { sweepEndedAccounts } from './term-sweep.js';
 import { ensureExamSecurity } from './exam-photos.js';
-import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode, ensureCourseRoom } from './schema.js';
+import { ensureLecturerNotes, ensureReactivationColumns, ensureInviteCode, setInviteCode, ensureCourseRoom, ensureSeatLock } from './schema.js';
 import { CLEAR_REACTIVATION_SQL, getCurrentTerm } from './shared.js';
 import { groupNameIn, REPORTING } from './groups.js';
 
@@ -354,8 +354,9 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
         }
 
         await ensureExamSecurity(env);
+        await ensureSeatLock(env);
         const students = await env.DB.prepare(
-            `SELECT u.User_ID, u.Name, u.Avatar, u.Exam_Secure, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, u.Reactivation_Requested, e.Seat_Number, e.Group_Name, e.Assigned_Topic
+            `SELECT u.User_ID, u.Name, u.Avatar, u.Exam_Secure, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, u.Reactivation_Requested, COALESCE(e.Seat_Locked, 0) AS Seat_Locked, e.Seat_Number, e.Group_Name, e.Assigned_Topic
              FROM Enrollments e
              JOIN Users u ON e.Student_ID = u.User_ID
              WHERE e.Course_ID = ?`
@@ -407,6 +408,16 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
 
     if (request.method === "POST" && path === "/api/update-student-info") {
         const body = await request.json();
+
+        // One seat number per student in a class.
+        const wantSeat = String(body.seatNumber == null ? '' : body.seatNumber).trim();
+        if (wantSeat) {
+            const dup = await env.DB.prepare(
+                `SELECT u.Name FROM Enrollments e JOIN Users u ON u.User_ID = e.Student_ID
+                 WHERE e.Course_ID = ? AND e.Student_ID != ? AND LOWER(TRIM(COALESCE(e.Seat_Number, ''))) = LOWER(?)`
+            ).bind(body.courseId, body.studentId, wantSeat).first();
+            if (dup) return new Response(JSON.stringify({ error: `Seat ${wantSeat} is already taken by ${dup.Name}.` }), { status: 409, headers: corsHeaders });
+        }
 
         await env.DB.prepare(
             `UPDATE Enrollments SET Seat_Number = ?, Group_Name = ?, Assigned_Topic = ? WHERE Course_ID = ? AND Student_ID = ?`
