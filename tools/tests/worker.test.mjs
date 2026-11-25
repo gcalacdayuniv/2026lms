@@ -858,7 +858,7 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
     sql.prepare("insert into Enrollments(Course_ID,Student_ID) values('SP',?)").run(id);
   };
   stu('P1', 'Zamora, Zed', 'No Eye Condition'); stu('P2', 'Abad, Amy', 'Far Sighted'); stu('P3', 'Cruz, Cy', 'Near Sighted');
-  stu('P4', 'Dela, Dan', 'Legally Blind'); stu('P5', 'Bato, Bea', 'Near Sighted'); stu('P6', 'Off, Ina', 'No Eye Condition', 'Inactive');
+  stu('P4', 'Dela, Dan', 'Legally Blind'); stu('P5', 'Bato, Bea', 'Near Sighted'); stu('P6', 'Off, Ina', 'No Eye Condition', 'Dropped');
   const seatOf = (id) => sql.prepare("select Seat_Number s from Enrollments where Course_ID='SP' and Student_ID=?").get(id).s;
   const set = (studentId, seat, locked) => call('POST', '/api/set-seat', { token: L1, body: { courseId: 'SP', studentId, seat, locked } });
   ok('set a seat', (await set('P1', '2', true)).s === 200 && seatOf('P1') === '2');
@@ -869,13 +869,35 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   const all = await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } });
   // locked P1 keeps 2; order: Legally Blind (Dela) 1, Near Sighted (Bato) 3, (Cruz) 4, Far Sighted (Abad) 5; inactive untouched
   ok('auto-assign by eye group then last name, skipping the locked seat', all.s === 200 && seatOf('P4') === '1' && seatOf('P1') === '2' && seatOf('P5') === '3' && seatOf('P3') === '4' && seatOf('P2') === '5', JSON.stringify(all.j.seats));
-  ok('inactive students are not seated', seatOf('P6') == null);
+  ok('Dropped students are not seated', seatOf('P6') == null);
   const seats = sql.prepare("select Seat_Number s from Enrollments where Course_ID='SP' and Seat_Number is not null").all().map(r => r.s);
   ok('no duplicate seat numbers', new Set(seats).size === seats.length);
   stu('P7', 'Alba, Al', 'No Eye Condition'); stu('P8', 'Zapata, Zoe', 'Legally Blind');
   const un = await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'unseated' } });
   ok('unseated mode seats only new students, eye group first, lowest free number', un.s === 200 && un.j.assigned === 2 && seatOf('P8') === '6' && seatOf('P7') === '7' && seatOf('P4') === '1', JSON.stringify(un.j));
   ok('unlock lets auto-assign move the seat', (await set('P1', '2', false)).s === 200 && (await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } })).s === 200 && seatOf('P4') === '1' && seatOf('P8') === '2');
+  // drag / up-down: reorder, locked seats stay, numbers follow the new order
+  const order = () => sql.prepare("select Student_ID id from Enrollments where Course_ID='SP' and Seat_Number is not null order by cast(Seat_Number as integer)").all().map(r => r.id);
+  await set('P1', '', false);
+  await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } });
+  const before = order();
+  const moved = [before[3], ...before.filter((_, i) => i !== 3)];
+  ok('seat-order renumbers by the dropped position', (await call('POST', '/api/seat-order', { token: L1, body: { courseId: 'SP', order: moved } })).s === 200 && JSON.stringify(order()) === JSON.stringify(moved), order().join());
+  await set(moved[2], seatOf(moved[2]), true);
+  const lockedSeat = seatOf(moved[2]);
+  await call('POST', '/api/seat-order', { token: L1, body: { courseId: 'SP', order: [...moved].reverse() } });
+  ok('a locked student keeps the seat in a reorder', seatOf(moved[2]) === lockedSeat);
+  const seats2 = sql.prepare("select Seat_Number s from Enrollments where Course_ID='SP' and Seat_Number is not null").all().map(r => r.s);
+  ok('still no duplicates after reorder', new Set(seats2).size === seats2.length);
+  // insert: P9 (Near Sighted, Aaron) joins the near-sighted group; P10 goes after the last seat
+  await set(moved[2], seatOf(moved[2]), false);
+  await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } });
+  stu('P9', 'Aaron, Al', 'Near Sighted'); stu('P10', 'Yu, Yan', 'No Eye Condition');
+  const top = Math.max(...sql.prepare("select Seat_Number s from Enrollments where Course_ID='SP' and Seat_Number is not null").all().map(r => Number(r.s)));
+  ok('insert at the end takes the next number after the last seat', (await call('POST', '/api/seat-insert', { token: L1, body: { courseId: 'SP', studentId: 'P10', where: 'end' } })).s === 200 && Number(seatOf('P10')) === top + 1);
+  const dela = Number(seatOf('P8'));   // last of the Legally Blind group (Dela, Zapata)
+  ok('insert into the eye group shifts the seats behind', (await call('POST', '/api/seat-insert', { token: L1, body: { courseId: 'SP', studentId: 'P9', where: 'group' } })).s === 200 && Number(seatOf('P9')) === dela + 1 && Number(seatOf('P5')) === dela + 2);
+  ok('inactive and suspended students are seated', (sql.prepare("update Users set account_status='Suspended' where User_ID='P7'").run(), (await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } })).s === 200 && seatOf('P7') != null));
   ok('clearing a seat also clears the lock', (await set('P1', '', true)).s === 200 && sql.prepare("select Seat_Locked l from Enrollments where Student_ID='P1' and Course_ID='SP'").get().l === 0);
 }
 
