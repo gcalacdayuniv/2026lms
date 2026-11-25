@@ -898,6 +898,13 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   const dela = Number(seatOf('P8'));   // last of the Legally Blind group (Dela, Zapata)
   ok('insert into the eye group shifts the seats behind', (await call('POST', '/api/seat-insert', { token: L1, body: { courseId: 'SP', studentId: 'P9', where: 'group' } })).s === 200 && Number(seatOf('P9')) === dela + 1 && Number(seatOf('P5')) === dela + 2);
   ok('inactive and suspended students are seated', (sql.prepare("update Users set account_status='Suspended' where User_ID='P7'").run(), (await call('POST', '/api/auto-seat', { token: L1, body: { courseId: 'SP', mode: 'all' } })).s === 200 && seatOf('P7') != null));
+  // floor plan data for a student: seat numbers and own seat only, no names
+  sql.exec("insert or ignore into Enrollments(Course_ID,Student_ID) values('SP','S1')");
+  sql.exec("update Enrollments set Seat_Number='4' where Course_ID='SP' and Student_ID='S1'");
+  const sm = await call('GET', '/api/seat-map?courseId=SP&studentId=S1', { token: s1.j.token });
+  ok('student gets the floor plan with own seat marked and no names', sm.s === 200 && sm.j.seats.some(x => x.mine && x.seat === '4') && !JSON.stringify(sm.j).includes('Dela'), JSON.stringify(sm.j).slice(0, 200));
+  ok('student cannot read another student\'s plan', (await call('GET', '/api/seat-map?courseId=SP&studentId=P4', { token: s1.j.token })).s === 403);
+  ok('a student not in the class is refused', (await call('GET', '/api/seat-map?courseId=C-NONE&studentId=S1', { token: s1.j.token })).s === 403);
   ok('clearing a seat also clears the lock', (await set('P1', '', true)).s === 200 && sql.prepare("select Seat_Locked l from Enrollments where Student_ID='P1' and Course_ID='SP'").get().l === 0);
 }
 

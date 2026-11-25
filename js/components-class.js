@@ -178,6 +178,7 @@ const ClassUI = {
                 <div class="grid grid-cols-2 gap-2 mb-2">
                     <button type="button" id="csAutoAllBtn" class="min-h-[44px] px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-sm font-bold"><i class="fa-solid fa-wand-magic-sparkles mr-1" aria-hidden="true"></i>Reassign all seats</button>
                     <button type="button" id="csAutoNewBtn" class="min-h-[44px] px-3 py-2 bg-white border border-sky-300 text-sky-700 hover:bg-sky-50 rounded-md text-sm font-bold"><i class="fa-solid fa-user-plus mr-1" aria-hidden="true"></i>Seat new students</button>
+                    <button type="button" id="csMapBtn" class="col-span-2 min-h-[44px] px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-md text-sm font-bold"><i class="fa-solid fa-table-cells mr-1" aria-hidden="true"></i>View floor plan</button>
                 </div>
                 <p class="text-[11px] text-gray-500 mb-3">Drag <i class="fa-solid fa-grip-vertical" aria-hidden="true"></i> or use the arrows to move a student: the seat numbers follow. Press <b>+</b> on a student with no seat to place them. Reassign order: Legally Blind, Near Sighted, No Eye Condition, Far Sighted, then A to Z by last name. Locked seats never move. UD, Dropped and Graduated students get no seat.</p>
                 <div id="csList" class="overflow-auto flex-1 min-h-[200px] border border-gray-200 rounded-lg divide-y divide-gray-100"></div>

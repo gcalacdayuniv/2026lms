@@ -114,6 +114,14 @@ async function save(env, courseId, rows, plan) {
 const PATHS = new Set(['/api/set-seat', '/api/auto-seat', '/api/seat-order', '/api/seat-insert']);
 
 export async function handleSeats(request, env, path, url, corsHeaders) {
+    // Floor plan data for students: which seat numbers are taken and which one is theirs. No names, so classmates stay private.
+    if (request.method === 'GET' && path === '/api/seat-map') {
+        const courseId = url.searchParams.get('courseId');
+        if (!courseId) return json({ error: 'Missing courseId' }, 400, corsHeaders);
+        const me = url.searchParams.get('studentId') || '';
+        const rows = (await roster(env, courseId)).filter(s => isSeatable(s) && seatKey(s.Seat_Number));
+        return json({ success: true, seats: rows.map(s => ({ seat: String(s.Seat_Number).trim(), mine: s.User_ID === me })) }, 200, corsHeaders);
+    }
     if (request.method !== 'POST' || !PATHS.has(path)) return null;
     await ensureSeatLock(env);
     const body = await request.json().catch(() => ({}));

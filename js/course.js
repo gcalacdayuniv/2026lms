@@ -330,7 +330,12 @@ export const CourseModule = {
                 CourseClass.renderSubmissionsHistory(data.submissions, 'historySubmissionsList');
 
                 if (data.enrollment) {
-                    document.getElementById('ssSeat').textContent = data.enrollment.Seat_Number || 'N/A';
+                    const seatEl = document.getElementById('ssSeat');
+                    seatEl.textContent = data.enrollment.Seat_Number || 'N/A';
+                    if (data.enrollment.Seat_Number) {
+                        seatEl.innerHTML = `<button type="button" class="seat-map-trigger font-bold underline decoration-dotted min-h-[44px]" data-course-id="${escapeHtml(courseId)}" aria-label="Show the floor plan"><span id="ssSeatNo"></span> <i class="fa-solid fa-table-cells text-xs" aria-hidden="true"></i></button>`;
+                        document.getElementById('ssSeatNo').textContent = data.enrollment.Seat_Number;
+                    }
 
                     const groupEl = document.getElementById('ssGroup');
                     if (data.enrollment.Group_Name) {

@@ -25,6 +25,7 @@ import { CourseAttendance } from './course-attendance.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { CourseGroups } from './course-groups.js';
 import { CourseSeats } from './course-seats.js';
+import { SeatMap } from './seat-map.js';
 import { SubmissionEdit } from './submission-edit.js';
 import { MyGroups } from './my-groups.js';
 import { AppState } from './globals.js';
@@ -60,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseAttendanceDates.init();
     CourseGroups.init();
     CourseSeats.init();
+    SeatMap.init();
     SubmissionEdit.init();
     MyGroups.init();
     AppRouter.init();

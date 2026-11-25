@@ -344,7 +344,7 @@ const enrolledCourseCardHtml = (c) => `
                     <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
                     ${c.Room ? `<div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-door-open w-5 text-gray-400"></i> Room: <span class="font-bold">${escapeHtml(c.Room)}</span></div>` : ''}
-                    <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${escapeHtml(c.Seat_Number || 'Unassigned')}</span></div>
+                    <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: ${c.Seat_Number ? `<button type="button" class="seat-map-trigger font-bold text-blue-700 underline decoration-dotted min-h-[44px] px-1" data-course-id="${escapeHtml(c.Course_ID)}" aria-label="Seat ${escapeHtml(c.Seat_Number)}, show the floor plan">${escapeHtml(c.Seat_Number)} <i class="fa-solid fa-table-cells text-xs" aria-hidden="true"></i></button>` : '<span class="font-bold">Unassigned</span>'}</div>
                     ${studentChipsHtml(c)}
                 </div>
             `;

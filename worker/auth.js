@@ -116,6 +116,7 @@ export const RULES = {
     'GET /api/course-details': { who: 'any', enrolled: true },
     'GET /api/no-class': { who: 'any', enrolled: true },
     'GET /api/student-summary': { who: 'any', self: ['studentId'], enrolled: true },
+    'GET /api/seat-map': { who: 'any', self: ['studentId'], enrolled: true },   // seat numbers only, no names
     'GET /api/group-members': { who: 'any', self: ['studentId'], enrolled: true },
     'GET /api/group-sets': { who: 'any', enrolled: true },
     'GET /api/group-set': { who: 'lecturer' },

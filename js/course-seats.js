@@ -7,6 +7,7 @@ import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { CourseClass } from './course-class.js';
+import { SeatMap } from './seat-map.js';
 
 const getCourseId = () => window.location.hash.replace('#class-', '');
 const byId = (id) => document.getElementById(id);
@@ -204,6 +205,8 @@ export const CourseSeats = {
         if (e.target.closest('#closeSeatPlanBtn') || e.target.id === 'closeSeatPlanBg') { CourseSeats.close(); return; }
         const modal = byId('seatPlanModal');
         if (!modal || modal.classList.contains('hidden')) return;
+
+        if (e.target.closest('#csMapBtn')) { SeatMap.openLecturer(CourseSeats.students()); return; }
 
         const up = e.target.closest('.cs-up'), down = e.target.closest('.cs-down');
         if (up || down) { CourseSeats.step((up || down).dataset.studentId, up ? -1 : 1); return; }
