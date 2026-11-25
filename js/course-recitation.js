@@ -37,9 +37,7 @@ export const CourseRecitation = {
 
     openModal: async (courseId) => {
         document.getElementById('recitationModal').classList.remove('hidden');
-        document.getElementById('recitationResult').classList.add('hidden');
-        document.getElementById('wheelContainer').classList.remove('hidden');
-        document.getElementById('spinWheelBtn').classList.remove('hidden');
+        CourseRecitation.showWheelOnly();
         document.getElementById('spinWheelBtn').disabled = false;
 
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
@@ -68,17 +66,23 @@ export const CourseRecitation = {
         if (CourseRecitation.isSpinning) return;
         CourseRecitation.flushPoints();
         document.getElementById('recitationModal').classList.add('hidden');
-        document.getElementById('recitationResult').classList.add('hidden');
-        document.getElementById('wheelContainer').classList.remove('hidden');
-        document.getElementById('spinWheelBtn').classList.remove('hidden');
+        CourseRecitation.showWheelOnly();
         document.getElementById('calledListModal')?.classList.add('hidden');
+    },
+
+    // The same circle shows the wheel or the called student's photo; the button reads CALL STUDENT, then CALL NEXT.
+    showWheelOnly: () => {
+        document.getElementById('recitationResult').classList.add('hidden');
+        const photo = document.getElementById('recitationResultAvatar');
+        photo.classList.add('hidden');
+        photo.innerHTML = '';
+        document.getElementById('wheelPointer')?.classList.remove('hidden');
+        document.getElementById('spinWheelBtn').textContent = 'CALL STUDENT';
     },
 
     resetToWheel: () => {
         CourseRecitation.flushPoints();
-        document.getElementById('recitationResult').classList.add('hidden');
-        document.getElementById('wheelContainer').classList.remove('hidden');
-        document.getElementById('spinWheelBtn').classList.remove('hidden');
+        CourseRecitation.showWheelOnly();
         CourseRecitation.drawWheel();
     },
 
@@ -298,22 +302,22 @@ export const CourseRecitation = {
 
     // The called student's photo grows out of their slice into the result card.
     zoomIn: (from, src) => {
-        const target = document.querySelector('#recitationResultAvatar img');
+        const target = document.getElementById('recitationResultAvatar');   // the wheel's own circle, photo inside
         if (!target || !src || !target.animate || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
         target.style.visibility = 'hidden';
         requestAnimationFrame(() => {
             const end = target.getBoundingClientRect();
             if (!end.width) { target.style.visibility = ''; return; }
             const fly = document.createElement('img');
-            fly.src = target.src;
+            fly.src = src;
             fly.alt = '';
             fly.setAttribute('aria-hidden', 'true');
-            fly.style.cssText = 'position:fixed;z-index:130;border-radius:9999px;object-fit:cover;border:4px solid #a855f7;box-shadow:0 10px 30px rgba(88,28,135,.35);pointer-events:none;margin:0';
+            fly.style.cssText = 'position:fixed;z-index:130;border-radius:9999px;object-fit:cover;border:4px solid #374151;box-shadow:0 10px 30px rgba(0,0,0,.25);pointer-events:none;margin:0';
             document.body.appendChild(fly);
             const box = (cx, cy, size) => ({ left: `${cx - size / 2}px`, top: `${cy - size / 2}px`, width: `${size}px`, height: `${size}px` });
             const anim = fly.animate([
                 box(from.cx, from.cy, from.size),
-                { ...box(end.left + end.width / 2, end.top + end.height / 2, end.width * 1.12), offset: 0.75 },
+                { ...box(end.left + end.width / 2, end.top + end.height / 2, end.width * 1.04), offset: 0.75 },
                 box(end.left + end.width / 2, end.top + end.height / 2, end.width)
             ], { duration: 800, easing: 'cubic-bezier(.4,.1,.2,1)', fill: 'forwards' });
             const done = () => { target.style.visibility = ''; fly.remove(); };
@@ -387,6 +391,10 @@ export const CourseRecitation = {
     },
 
     spin: () => {
+        if (CourseRecitation.isSpinning) return;
+        if (CourseRecitation.currentSelectedStudentId && !document.getElementById('recitationResult').classList.contains('hidden')) {
+            CourseRecitation.resetToWheel();   // CALL NEXT: save the points, redraw the wheel without the called student
+        }
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
         const calledKey = getCalledKey();
 
@@ -404,6 +412,8 @@ export const CourseRecitation = {
         CourseRecitation.isSpinning = true;
 
         document.getElementById('recitationResult').classList.add('hidden');
+        document.getElementById('recitationResultAvatar').classList.add('hidden');
+        document.getElementById('wheelPointer')?.classList.remove('hidden');
         document.getElementById('spinWheelBtn').disabled = true;
 
         let selectedIndex = 0;
@@ -469,10 +479,14 @@ export const CourseRecitation = {
 
             const avatarSrc = getLoadableAvatarSrc(selectedStudent.Avatar);
             const avatarImg = avatarSrc
-                ? `<img src="${safeUrl(avatarSrc)}" class="w-32 h-32 rounded-full object-cover border-4 border-purple-500 mx-auto shadow-md">`
-                : `<i class="fa-solid fa-circle-user text-[128px] text-gray-300"></i>`;
+                ? `<img src="${safeUrl(avatarSrc)}" alt="" class="w-full h-full object-cover" style="object-position:50% 25%">`
+                : `<i class="fa-solid fa-circle-user text-[200px] text-gray-300" aria-hidden="true"></i>`;
 
-            document.getElementById('recitationResultAvatar').innerHTML = avatarImg;
+            // The photo fills the wheel's own circle (same size, same place); the wheel stays underneath.
+            const photoBox = document.getElementById('recitationResultAvatar');
+            photoBox.innerHTML = avatarImg;
+            photoBox.classList.remove('hidden');
+            document.getElementById('wheelPointer')?.classList.add('hidden');
             document.getElementById('recitationResultName').textContent = selectedStudent.Name;
 
             // Where the winning slice is (under the pointer, at the top of the wheel), measured before the wheel is hidden.
@@ -481,8 +495,7 @@ export const CourseRecitation = {
             const startSize = totalSlices <= 2 ? 120 : Math.max(36, Math.min(110, 2 * 0.68 * (dial.width / 2) * Math.sin(half)));
             const from = { cx: dial.left + dial.width / 2, cy: dial.top + dial.height / 2 - 0.68 * (dial.height / 2), size: startSize };
 
-            document.getElementById('wheelContainer').classList.add('hidden');
-            document.getElementById('spinWheelBtn').classList.add('hidden');
+            document.getElementById('spinWheelBtn').textContent = 'CALL NEXT';
             document.getElementById('recitationResult').classList.remove('hidden');
             CourseRecitation.zoomIn(from, avatarSrc);
 

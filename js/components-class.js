@@ -786,10 +786,11 @@ const ClassUI = {
                 </div>
 
                 <div id="wheelContainer" class="w-full flex flex-col items-center">
-                    <div class="relative w-64 h-64 mb-6">
-                        <div class="absolute top-[-15px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-600 z-20 filter drop-shadow-md"></div>
+                    <div id="wheelDial" class="relative w-64 h-64 mb-6">
+                        <div id="wheelPointer" class="absolute top-[-15px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-600 z-20 filter drop-shadow-md"></div>
                         <div id="recitationWheel" class="w-full h-full rounded-full border-4 border-gray-700 shadow-inner overflow-hidden relative">
                         </div>
+                        <div id="recitationResultAvatar" class="hidden absolute inset-0 z-10 rounded-full border-4 border-gray-700 bg-gray-100 overflow-hidden flex items-center justify-center shadow-inner"></div>
                     </div>
                 </div>
 
@@ -798,8 +799,7 @@ const ClassUI = {
                 </button>
 
                 <div id="recitationResult" class="hidden w-full text-center fade-in bg-purple-50 p-6 rounded-xl border border-purple-200">
-                    <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-4">Selected Student</p>
-                    <div id="recitationResultAvatar" class="mb-4"></div>
+                    <p class="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Selected Student</p>
                     <h4 id="recitationResultName" class="text-2xl font-black text-gray-900 mb-4"></h4>
 
                     <div class="flex flex-col items-center mb-6 w-full px-4">
@@ -820,9 +820,6 @@ const ClassUI = {
                         <p id="recitationPointsStatus" role="status" aria-live="polite" class="text-[11px] font-bold mt-1 min-h-[16px]"></p>
                     </div>
 
-                    <button id="nextStudentBtn" class="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 font-black py-2 rounded-lg shadow-sm transition transform active:scale-95 focus:outline-none">
-                        Call Next Student
-                    </button>
                 </div>
             </div>
         </div>

@@ -196,7 +196,7 @@ export const CourseModule = {
 
         if (e.target.name === 'callerMode') {
             document.getElementById('toggleCalledListBtn').classList.toggle('hidden', e.target.value !== '2');
-            CourseRecitation.drawWheel();
+            CourseRecitation.resetToWheel();
         }
     },
 
@@ -752,12 +752,6 @@ export const CourseModule = {
         }
 
         if (e.target.closest('#spinWheelBtn')) {
-            CourseRecitation.spin();
-        }
-
-        if (e.target.closest('#nextStudentBtn')) {
-            // Straight to the next spin: points are saved first, the wheel is redrawn without the called student, then it spins.
-            CourseRecitation.resetToWheel();
             CourseRecitation.spin();
         }
 
