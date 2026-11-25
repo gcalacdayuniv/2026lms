@@ -344,7 +344,9 @@ const enrolledCourseCardHtml = (c) => `
                     <div class="text-sm text-gray-700 font-medium"><i class="fa-solid fa-chalkboard-user w-5 text-gray-400"></i> ${escapeHtml(c.LecturerName)}</div>
                     <div class="text-sm text-gray-700 mt-1"><i class="fa-regular fa-calendar w-5 text-gray-400"></i> ${escapeHtml(c.ScheduleDay)} &nbsp;|&nbsp; <i class="fa-regular fa-clock text-gray-400"></i> ${escapeHtml(c.TimePeriod)}</div>
                     ${c.Room ? `<div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-door-open w-5 text-gray-400"></i> Room: <span class="font-bold">${escapeHtml(c.Room)}</span></div>` : ''}
-                    <div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">${escapeHtml(c.Seat_Number || 'Unassigned')}</span></div>
+                    ${c.Seat_Number
+                        ? `<button type="button" class="seat-map-trigger mt-3 w-full min-h-[44px] flex items-center justify-between gap-2 px-3 rounded-lg border border-green-300 bg-green-100 text-green-800 text-sm font-black hover:bg-green-200" data-course-id="${escapeHtml(c.Course_ID)}" aria-label="Seat ${escapeHtml(c.Seat_Number)}, view seating arrangement"><span><i class="fa-solid fa-chair mr-2" aria-hidden="true"></i>Seat ${escapeHtml(c.Seat_Number)}</span><span class="text-xs font-bold">View seating arrangement <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></span></button>`
+                        : `<div class="text-sm text-gray-700 mt-1"><i class="fa-solid fa-chair w-5 text-gray-400"></i> Seat: <span class="font-bold">Unassigned</span></div>`}
                     ${studentChipsHtml(c)}
                 </div>
             `;
