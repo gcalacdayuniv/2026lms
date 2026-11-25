@@ -246,7 +246,9 @@ export const SeatMap = {
         const plan = byId('smPlan');
         if (!st || !plan) return;
         const lecturerPov = st.pov === 'lecturer';
-        const top = Math.max(PER_ROW, ...st.seats.keys(), st.maxSeat || 0, Number(st.mine) || 0);
+        // At least 4 rows for the lecturer and 5 for a student; more rows are added when a seat number needs them.
+        const minRows = lecturerPov ? 4 : 5;
+        const top = Math.max(PER_ROW * minRows, ...st.seats.keys(), st.maxSeat || 0, Number(st.mine) || 0);
         const rows = Math.ceil(top / PER_ROW);
         const rowNumbers = Array.from({ length: rows }, (_, r) => r);
         if (lecturerPov) rowNumbers.reverse();      // the lecturer's view is the room turned half a turn: back rows on top
