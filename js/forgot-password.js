@@ -1,57 +1,69 @@
-// Sign-in screen: a student who forgot the password either gets a new one by email (four details must match), or asks their lecturer.
+// Sign-in screen: "Forgot password?" opens a modal. A student either gets a new password by email (four details must match)
+// or asks their lecturer in a second modal (one field: username, student number, email or contact number).
 import { apiFetch } from './globals.js';
 
-document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('#forgotPwdBtn');
-    if (!btn) return;
-    const idInput = document.getElementById('loginIdentifier');
-    const errorDiv = document.getElementById('loginError'), info = document.getElementById('loginInfo');
-    errorDiv.classList.add('hidden');
-    info.classList.add('hidden');
-    const identifier = idInput ? idInput.value.trim() : '';
-    if (!identifier) {
-        errorDiv.textContent = 'Type your username, student number or email above first, then ask for a reset.';
-        errorDiv.classList.remove('hidden');
-        if (idInput) idInput.focus();
-        return;
-    }
-    btn.disabled = true;
-    try {
-        const r = await apiFetch('/api/request-password-reset', { method: 'POST', body: JSON.stringify({ identifier }) });
-        info.textContent = `${r.message} Your lecturer will give you a temporary password. Change it after you sign in.`;
-        info.classList.remove('hidden');
-    } catch (err) {
-        errorDiv.textContent = err.message || 'Could not send the request.';
-        errorDiv.classList.remove('hidden');
-    } finally {
-        btn.disabled = false;
+const $ = (id) => document.getElementById(id);
+const open = (id, focusId) => { $(id)?.classList.remove('hidden'); setTimeout(() => $(focusId)?.focus(), 50); };
+const close = (id) => $(id)?.classList.add('hidden');
+const show = (id, text, ok) => {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = text;
+    el.className = `p-3 rounded text-sm font-medium ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'}`;
+};
+const hide = (id) => $(id)?.classList.add('hidden');
+
+document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t.closest('#forgotOpenBtn')) {
+        hide('forgotMsg');
+        open('forgotModal', 'fpLastName');
+    } else if (t.closest('#forgotCloseBtn') || t.id === 'forgotBg') {
+        close('forgotModal');
+    } else if (t.closest('#askLecturerOpenBtn')) {
+        hide('lecturerResetMsg');
+        open('lecturerResetModal', 'lrIdentifier');
+    } else if (t.closest('#lecturerResetCloseBtn') || t.id === 'lecturerResetBg') {
+        close('lecturerResetModal');
     }
 });
 
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if ($('lecturerResetModal') && !$('lecturerResetModal').classList.contains('hidden')) close('lecturerResetModal');
+    else close('forgotModal');
+});
+
 // Email me a new password: last name, student number, email and contact number must all match the account.
-document.addEventListener('click', async (e) => {
-    if (e.target.closest('#forgotOpenBtn')) {
-        document.getElementById('forgotPanel')?.classList.toggle('hidden');
-        document.getElementById('fpLastName')?.focus();
-        return;
-    }
-    const send = e.target.closest('#fpSendBtn');
-    if (!send) return;
-    const val = (id) => (document.getElementById(id)?.value || '').trim();
-    const msg = document.getElementById('forgotMsg');
-    const show = (text, ok) => {
-        msg.textContent = text;
-        msg.className = `p-2 rounded text-xs font-medium ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'}`;
-    };
-    const body = { lastName: val('fpLastName'), studentNumber: val('fpStudentNumber'), email: val('fpEmail'), contact: val('fpContact') };
-    if (Object.values(body).some(v => !v)) { show('Fill in all four details.', false); return; }
-    send.disabled = true;
-    try {
-        const r = await apiFetch('/api/forgot-password', { method: 'POST', body: JSON.stringify(body) });
-        show(`${r.message} Check your inbox (and spam). If nothing arrives, ask your lecturer.`, true);
-    } catch (err) {
-        show(err.message || 'Could not send the request.', false);
-    } finally {
-        send.disabled = false;
+document.addEventListener('submit', async (e) => {
+    if (e.target.id === 'forgotForm') {
+        e.preventDefault();
+        const val = (id) => ($(id)?.value || '').trim();
+        const body = { lastName: val('fpLastName'), studentNumber: val('fpStudentNumber'), email: val('fpEmail'), contact: val('fpContact') };
+        if (Object.values(body).some(v => !v)) { show('forgotMsg', 'Fill in all four details.', false); return; }
+        const send = $('fpSendBtn');
+        send.disabled = true;
+        try {
+            const r = await apiFetch('/api/forgot-password', { method: 'POST', body: JSON.stringify(body) });
+            show('forgotMsg', `${r.message} Check your inbox (and spam). If nothing arrives, ask your lecturer.`, true);
+        } catch (err) {
+            show('forgotMsg', err.message || 'Could not send the request.', false);
+        } finally {
+            send.disabled = false;
+        }
+    } else if (e.target.id === 'lecturerResetForm') {
+        e.preventDefault();
+        const identifier = ($('lrIdentifier')?.value || '').trim();
+        if (!identifier) { show('lecturerResetMsg', 'Type your username, student number, email or contact number.', false); $('lrIdentifier')?.focus(); return; }
+        const send = $('lrSendBtn');
+        send.disabled = true;
+        try {
+            const r = await apiFetch('/api/request-password-reset', { method: 'POST', body: JSON.stringify({ identifier }) });
+            show('lecturerResetMsg', `${r.message} Your lecturer will give you a temporary password. Change it after you sign in.`, true);
+        } catch (err) {
+            show('lecturerResetMsg', err.message || 'Could not send the request.', false);
+        } finally {
+            send.disabled = false;
+        }
     }
 });

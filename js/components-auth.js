@@ -41,24 +41,61 @@ export const AuthUI = {
                         Sign In
                     </button>
                     <div id="loginInfo" role="status" class="hidden bg-green-100 text-green-800 p-3 rounded text-sm"></div>
-                    <button type="button" id="forgotOpenBtn" class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 min-h-[44px]">Forgot password? Email me a new one</button>
-                    <button type="button" id="forgotPwdBtn" class="w-full text-center text-xs font-medium text-gray-500 hover:text-gray-800 min-h-[44px]">Or ask my lecturer to reset it</button>
+                    <button type="button" id="forgotOpenBtn" class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 min-h-[44px]">Forgot password?</button>
                 </form>
-                <div id="forgotPanel" class="hidden mt-2 p-3 border border-blue-200 bg-blue-50 rounded-md space-y-3">
-                    <p class="text-xs text-blue-900">Type the same details you used to register. If they all match, a new temporary password is emailed to you.</p>
-                    <div id="forgotMsg" role="status" class="hidden p-2 rounded text-xs font-medium"></div>
-                    <input type="text" id="fpLastName" autocomplete="family-name" placeholder="Last name" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
-                    <input type="text" id="fpStudentNumber" inputmode="text" placeholder="Student number" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
-                    <input type="email" id="fpEmail" autocomplete="email" placeholder="Email address" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
-                    <input type="tel" id="fpContact" autocomplete="tel" placeholder="Contact number" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-base">
-                    <button type="button" id="fpSendBtn" class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 rounded-md min-h-[44px]">Email me a new password</button>
-                </div>
                 <div class="mt-6 text-center">
                     <p class="text-sm text-gray-600">Don't have an account? <a href="#register" class="text-blue-600 font-medium hover:text-blue-500">Register here</a></p>
                 </div>
             </div>
         </main>
+        ${AuthUI.renderForgotModals()}
     `,
+
+    renderForgotModals: () => {
+        const head = (id, closeId, icon, title) => `
+                <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
+                    <h3 id="${id}" class="text-lg font-bold text-gray-800 flex-1 min-w-0"><i class="fa-solid ${icon} text-blue-600 mr-2" aria-hidden="true"></i>${title}</h3>
+                    <button id="${closeId}" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i>
+                        <i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
+                    </button>
+                </div>`;
+        const field = (id, label, type, extra) => `
+                    <div>
+                        <label for="${id}" class="block text-sm font-medium text-gray-700">${label}</label>
+                        <input type="${type}" id="${id}" ${extra} class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-base min-h-[44px] focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>`;
+        return `
+        <div id="forgotModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="forgotTitle">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="forgotBg"></div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto flex flex-col">
+                ${head('forgotTitle', 'forgotCloseBtn', 'fa-key', 'Forgot password')}
+                <form id="forgotForm" class="space-y-3" novalidate>
+                    <p class="text-sm text-gray-600">Enter the same details you used to register. If they all match, a new temporary password is emailed to you.</p>
+                    <div id="forgotMsg" role="status" class="hidden p-3 rounded text-sm font-medium"></div>
+                    ${field('fpLastName', 'Last name', 'text', 'autocomplete="family-name" enterkeyhint="next"')}
+                    ${field('fpStudentNumber', 'Student number', 'text', 'autocomplete="off" enterkeyhint="next" placeholder="00-0000"')}
+                    ${field('fpEmail', 'Email address', 'email', 'autocomplete="email" inputmode="email" autocapitalize="none" enterkeyhint="next"')}
+                    ${field('fpContact', 'Contact number', 'tel', 'autocomplete="tel" inputmode="tel" enterkeyhint="go"')}
+                    <button type="submit" id="fpSendBtn" class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 rounded-md min-h-[44px]"><i class="fa-solid fa-envelope mr-2" aria-hidden="true"></i>Email me a new password</button>
+                    <div class="flex items-center gap-3 text-xs text-gray-400" aria-hidden="true"><span class="flex-1 border-t"></span>or<span class="flex-1 border-t"></span></div>
+                    <button type="button" id="askLecturerOpenBtn" class="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2.5 rounded-md min-h-[44px]"><i class="fa-solid fa-chalkboard-user mr-2" aria-hidden="true"></i>Ask my lecturer to reset it</button>
+                </form>
+            </div>
+        </div>
+        <div id="lecturerResetModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center fade-in p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="lecturerResetTitle">
+            <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="lecturerResetBg"></div>
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] overflow-y-auto flex flex-col">
+                ${head('lecturerResetTitle', 'lecturerResetCloseBtn', 'fa-chalkboard-user', 'Ask my lecturer')}
+                <form id="lecturerResetForm" class="space-y-3" novalidate>
+                    <p class="text-sm text-gray-600">Your lecturer will be asked to reset your password and will give you a temporary one. Change it after you sign in.</p>
+                    <div id="lecturerResetMsg" role="status" class="hidden p-3 rounded text-sm font-medium"></div>
+                    ${field('lrIdentifier', 'Username, student number, email or contact number', 'text', 'autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go"')}
+                    <button type="submit" id="lrSendBtn" class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 rounded-md min-h-[44px]">Send request to my lecturer</button>
+                </form>
+            </div>
+        </div>`;
+    },
 
     renderRegister: () => `
         <main id="mainContent" class="flex flex-col justify-center items-center min-h-screen p-0 sm:p-4 auth-screen">

@@ -483,3 +483,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Tests:** `worker.test.mjs` (builder parity; set B and set C reviews; wrong answer shown; exam results analysis). Live capture is camera-driven and was not run in the automated tests: try it on a phone.
 - **Deploy:** Worker (`worker/exam-sets.js` new, `exam-scan-results.js`, `exams.js`, `scan-sheets.js`) and site files (`js/course-scanner.js`, `js/components-scanner.js`, `sw.js` cache `portal-shell-v90`). No table, secret or Apps Script change.
 
+
+## Forgot password modals
+- What: sign-in has one "Forgot password?" button. It opens a modal (`#forgotModal`) with last name, student number, email and contact number (labelled fields, Enter submits) that emails a new temporary password. "Ask my lecturer to reset it" opens a second modal (`#lecturerResetModal`) with one field (username, student number, email or contact number); it no longer reads the sign-in field.
+- Rules: same server routes and generic answers (`/api/forgot-password`, `/api/request-password-reset`); success/error shown inside the modal; Esc, back arrow, backdrop close.
+- Files: `js/components-auth.js` (`renderForgotModals`), `js/forgot-password.js`, `sw.js` v91.
+- Tests: run-tests + phone-check pass. Deploy: site files only.
