@@ -8,6 +8,7 @@ import { ensureScanTables } from './schema.js';
 import { safeJson } from './shared.js';
 import { decodeItem, setMaxPoints } from './scan-grade.js';
 import { questionPoints, questionType } from './grading.js';
+import { scannableItems, buildSets, indexesOf } from './exam-sets.js';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 const list = (text) => { const v = safeJson(text); return Array.isArray(v) ? v : []; };
@@ -23,9 +24,21 @@ const plainRows = (questions) => {
 };
 
 // What is needed to read the sheets of one session (see convertSheet).
-export const scanContext = (session, questions) => {
+// examId rebuilds the printed sets B-F of a plain (all multiple-choice) paper: their questions and choices were shuffled from it.
+export const scanContext = (session, questions, examId = '') => {
     const mixed = Boolean(session.Layout);
-    return { mixed, setKeys: list(session.Set_Keys), plain: mixed ? null : plainRows(questions) };
+    return { mixed, setKeys: list(session.Set_Keys), plain: mixed ? null : plainRows(questions), examId, questions };
+};
+
+// The printed set number setNo (1 = B ...) of a plain paper, rebuilt from the exam, or null when it does not match what was
+// scanned (for example the exam was edited after the sheets were scanned).
+const rebuildPlainSet = (ctx, setNo) => {
+    const saved = ctx.setKeys[setNo];
+    if (!ctx.examId || !saved || !Array.isArray(saved.key)) return null;
+    const sets = buildSets(scannableItems(ctx.questions), { seed: ctx.examId, count: ctx.setKeys.length });
+    const set = sets[setNo];
+    if (!set || JSON.stringify(set.key) !== JSON.stringify(saved.key)) return null;
+    return set;
 };
 
 // One saved sheet as the answers an online student would have given. Returns
@@ -66,6 +79,19 @@ export function convertSheet(ctx, h, questions) {
         return { answers: exam, marks, written, order };
     }
     const plain = ctx.plain;
+    // A plain paper of printed set B-F: question order and choices are rebuilt from the exam, then each answer is read from them.
+    if (plain && plain.length === questions.length && plain.length === given.length && setNo > 0 && ctx.setKeys[setNo]) {
+        const set = rebuildPlainSet(ctx, setNo);
+        if (!set || set.items.length !== given.length) return null;
+        const order = [];
+        set.items.forEach((it, j) => {
+            const code = given[j];
+            order.push(it.orig);
+            if (it.multi) exam[it.orig] = Number.isInteger(code) && code >= 1000 ? indexesOf(code).filter(k => k < it.choices.length).map(k => it.choices[k]) : [];
+            else exam[it.orig] = Number.isInteger(code) && code >= 0 && code < it.choices.length ? it.choices[code] : '';
+        });
+        return { answers: exam, marks: {}, written: {}, order };
+    }
     if (plain && plain.length === questions.length && plain.length === given.length && (setNo <= 0 || !ctx.setKeys[setNo])) {
         plain.forEach((o, j) => {
             const choices = questions[o][2];
@@ -80,7 +106,7 @@ export function convertSheet(ctx, h, questions) {
 // answers (one per exam question) and marks ({ question index: points }) are null when the sheet cannot be
 // matched to the exam's questions (a plain sheet of another printed set): the score still counts, the question
 // analysis leaves that sheet out.
-export async function scannedResults(env, courseId, assessmentId, questions) {
+export async function scannedResults(env, courseId, assessmentId, questions, examId = '') {
     if (!courseId || !assessmentId) return [];
     await ensureScanTables(env);
     const session = await env.DB.prepare(
@@ -93,7 +119,7 @@ export async function scannedResults(env, courseId, assessmentId, questions) {
     const mixed = Boolean(session.Layout);
     let max = Number(assessment && assessment.Max_Score);
     if (!(max > 0)) max = mixed && setKeys[0] ? setMaxPoints(setKeys[0]) : Math.max(1, list(session.Bonus_Flags).filter(b => !b).length);
-    const ctx = scanContext(session, questions);
+    const ctx = scanContext(session, questions, examId);
 
     const rows = (await env.DB.prepare(
         `SELECT h.Student_ID, h.Answers, h.Score, h.Set_No, h.Marks, u.Name, u.Student_Number

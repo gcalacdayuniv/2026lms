@@ -34,7 +34,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 | attendance.js | attendance dates, no-class days, attendance records, participation points |
 | scores.js | assessments, scores (capped at max, extra credit), `/api/student-summary`, `/api/class-summary` |
 | uploads.js | submissions: upload (single + chunked), grade, `update-submission`, `default-upload-term`, uploader checks |
-| exams.js, exam-session.js, exam-photos.js, exam-scan-results.js | exams, class exams, attempts, secure mode, photos, scan results merged into exam results |
+| exams.js, exam-session.js, exam-photos.js, exam-scan-results.js, exam-sets.js (Worker copy of js/exam-sets.js; keep in sync) | exams, class exams, attempts, secure mode, photos, scan results merged into exam results |
 | scan-sheets.js, scan-grade.js, grading.js | scanned answer sheets, sessions, grading, student sheet review |
 | gas.js | `callGas` / `gasUrl` (Drive upload/read, `action:"email"`) |
 | schema.js | all `ensure*` table creation; shared.js: helpers (term, lockouts, `runInChunks`); join.js, roles.js, password.js, http.js, constants.js, site-settings.js, term-sweep.js |
@@ -59,7 +59,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 - `phone-check.cjs`: Playwright at phone width, checks CSP, missing Tailwind classes, sideways scroll, script errors. `omr-check.cjs` for the scanner (`--omr`).
 
 ## Recent changes (newest last; details in docs/FEATURES.md)
-Lecturer uploads for a student + group members; scanned sheets in Exam Results; extra credit; student review of scanned paper; grade base 100 (Class Grade .xlsx export only; dashboards show raw scores) + no-activity full credit; group sets (Reporting set = Enrollments.Group_Name, others in Group_Sets/Group_Members) with topics, random split, sortable list, per-set uploads, group score fill, student My Groups screen; password reset emails temp password through GAS (lecturer reset + self-service Forgot password with last name/student number/email/contact); upload term default by date, Upload as Individual/Group, lecturer edits any student upload (lecturer uploads are not marked).
+Lecturer uploads for a student + group members; scanned sheets in Exam Results; extra credit; student review of scanned paper; grade base 100 (Class Grade .xlsx export only; dashboards show raw scores) + no-activity full credit; group sets (Reporting set = Enrollments.Group_Name, others in Group_Sets/Group_Members) with topics, random split, sortable list, per-set uploads, group score fill, student My Groups screen; password reset emails temp password through GAS (lecturer reset + self-service Forgot password with last name/student number/email/contact); upload term default by date, Upload as Individual/Group, lecturer edits any student upload (lecturer uploads are not marked); live scan continues to the next paper (duplicate student = recapture); students can review scanned papers of every printed set.
 
 ## Keeping this file useful
 Update this map in the same commit when a file is added, renamed or changes responsibility, or when a standing rule changes. Keep it under ~120 lines: it is an index, not documentation.

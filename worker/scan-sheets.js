@@ -415,14 +415,14 @@ export async function handleScanSheets(request, env, path, url, corsHeaders) {
         if (!h || h.Student_ID !== studentId) return json(corsHeaders, { error: 'Answer sheet not found.' }, 404);
         await ensureAccessibleExamTables(env);
         const ce = await env.DB.prepare(
-            `SELECT ce.Release, ce.Adjustments, e.Title AS Exam_Title, e.ExamData FROM Class_Exams ce JOIN Exams e ON e.Exam_ID = ce.Exam_ID
+            `SELECT ce.Release, ce.Adjustments, ce.Exam_ID, e.Title AS Exam_Title, e.ExamData FROM Class_Exams ce JOIN Exams e ON e.Exam_ID = ce.Exam_ID
              WHERE ce.Course_ID = ? AND ce.Assessment_ID = ? ORDER BY ce.Created_At DESC LIMIT 1`
         ).bind(h.Course_ID, h.Assessment_ID).first();
         if (!ce) return json(corsHeaders, { error: 'This paper is not linked to an exam, so there is nothing to review.' }, 404);
         if (ce.Release !== 1) return json(corsHeaders, { error: 'Your lecturer has not released the answers yet.' }, 403);
 
         const questions = safeJson(ce.ExamData) || [];
-        const conv = convertSheet(scanContext(h, questions), h, questions);
+        const conv = convertSheet(scanContext(h, questions, ce.Exam_ID), h, questions);
         if (!conv) return json(corsHeaders, { error: 'The review is not available for this printed set of the paper.' }, 409);
         const adjustments = safeJson(ce.Adjustments) || {};
         const items = conv.order.map(o => {

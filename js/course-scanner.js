@@ -645,7 +645,7 @@ export const CourseScanner = {
         video.srcObject = stream;
         try { await video.play(); } catch (e) { /* autoplay is already on */ }
 
-        Object.assign(live, { stream, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, replacing: null, vw: 0, vh: 0 });
+        Object.assign(live, { stream, prev: null, shot: null, steady: 0, steadySince: 0, armed: true, lost: 0, capturing: false, replacing: null, lastMsg: '', vw: 0, vh: 0 });
         CourseScanner.setAlert('');
         CourseScanner.liveMode('camera');
         $('scnLivePanel').classList.remove('hidden');
@@ -806,7 +806,7 @@ export const CourseScanner = {
                 live.armed = true;
             } else {
                 outline('#22c55e');
-                CourseScanner.setLiveStatus('Captured. Remove the sheet or show the next one.', 'green', 1);
+                CourseScanner.setLiveStatus(live.lastMsg || 'Captured. Remove the sheet or show the next one.', 'green', 1);
                 return;
             }
         }
@@ -857,17 +857,26 @@ export const CourseScanner = {
             // A recapture replaces the earlier capture it was started from.
             if (live.replacing) CourseScanner.dropRow(live.replacing);
             live.replacing = null;
+            // The same student read again (a duplicate) is a recapture: it replaces the earlier sheet that is not saved yet.
+            const replaced = row.ok && row.studentId
+                ? CourseScanner.rows.find(r => r.ok && r.studentId === row.studentId && ['', 'pending'].includes(r.saveState))
+                : null;
+            if (replaced) CourseScanner.dropRow(replaced);
             CourseScanner.rows.push(row);
             CourseScanner.renderRows();
             CourseScanner.markChange();
 
+            // The camera stays on for the next paper: wait for this sheet to leave the view (or move) before reading again.
             live.steady = 0;
+            live.armed = false;
+            live.shot = norm || null;
             if (navigator.vibrate) navigator.vibrate(60);
-
-            // One sheet per live session: the camera stops and that sheet is shown for checking.
-            await new Promise(r => setTimeout(r, 300));
-            CourseScanner.stopLive(true);
-            CourseScanner.showLiveReview(row);
+            const student = row.studentId ? CourseScanner.students.find(x => x.User_ID === row.studentId) : null;
+            const who = student ? student.Name : (row.ok ? 'Sheet (student not matched)' : 'Sheet');
+            const score = row.ok ? ` ${fmt(CourseScanner.scoreRow(row, CourseScanner.cfg.cap).final)}/${fmt(CourseScanner.cfg.cap)}` : '';
+            const count = CourseScanner.rows.filter(r => r.ok).length;
+            live.lastMsg = `${replaced ? 'Recaptured' : 'Captured'}: ${who}${score}. ${count} scanned. Show the next paper.`;
+            CourseScanner.setLiveStatus(live.lastMsg, 'green', 1);
         } catch (err) {
             console.error(err);
             CourseScanner.setLiveStatus('Could not read the sheet. Try again.', 'red', 0);

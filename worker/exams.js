@@ -589,7 +589,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         await ensureAccessibleExamTables(env);
 
         const ce = await env.DB.prepare(
-            `SELECT ce.Class_Exam_ID, ce.Course_ID, ce.Assessment_ID, ce.Time_Limit, ce.Adjustments, ce.Release, e.Title as Exam_Title, e.ExamData
+            `SELECT ce.Class_Exam_ID, ce.Course_ID, ce.Exam_ID, ce.Assessment_ID, ce.Time_Limit, ce.Adjustments, ce.Release, e.Title as Exam_Title, e.ExamData
              FROM Class_Exams ce JOIN Exams e ON ce.Exam_ID = e.Exam_ID WHERE ce.Class_Exam_ID = ? AND ${EXAM_FITS_CLASS_SQL}`
         ).bind(classExamId).first();
         if (!ce) {
@@ -615,7 +615,7 @@ export async function handleExams(request, env, path, url, corsHeaders) {
         // Scanned answer sheets of the same class exam count with the online submissions (a student who has both
         // keeps the online one).
         const doneIds = new Set(done.map(r => r.Student_ID));
-        const scanned = (await scannedResults(env, ce.Course_ID, ce.Assessment_ID, questions)).filter(s => !doneIds.has(s.studentId));
+        const scanned = (await scannedResults(env, ce.Course_ID, ce.Assessment_ID, questions, ce.Exam_ID)).filter(s => !doneIds.has(s.studentId));
         const scannedAnalysed = scanned.filter(s => s.answers);
 
         const answerSets = done.map(r => { const a = safeJson(r.Answers_JSON); return Array.isArray(a) ? a : []; })

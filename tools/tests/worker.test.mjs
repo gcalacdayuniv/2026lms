@@ -701,6 +701,26 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('a wrong shaded answer is shown as such', rw.j.questions[0].answer === 'Rome' && rw.j.questions[0].earned === 0 && rw.j.questions[1].earned === 0);
   const rp = await rv(t2, mc.aid, 'S2');
   ok('plain paper review', rp.s === 200 && rp.j.questions[0].answer === 'Rome' && rp.j.questions[0].correct === 'Paris' && rp.j.questions[1].earned === 1, JSON.stringify(rp.j).slice(0, 300));
+  // Printed sets B and C of an all-multiple-choice paper: questions and choices were shuffled, the review must still work
+  {
+    const jsSets = await import('../../js/exam-sets.js'), wSets = await import('../../worker/exam-sets.js');
+    const rows = [[1, 'Capital of France?', ['Paris', 'Rome', 'Oslo', 'Bern'], 'Paris', '', false], [1, 'Pick B', ['A', 'B', 'C', 'D'], 'B', '', false], [1, 'Largest animal?', ['Ox', 'Whale', 'Cat', 'Dog'], 'Whale', '', false]];
+    ok('Worker set builder gives the same sets as the site', JSON.stringify(jsSets.buildSets(jsSets.scannableItems(JSON.stringify(rows), 5), { seed: 'E1', count: 4 })) === JSON.stringify(wSets.buildSets(wSets.scannableItems(rows, 5), { seed: 'E1', count: 4 })));
+    let built;
+    const ms = await link('Scan Sets', rows, (examId) => {
+      built = wSets.buildSets(wSets.scannableItems(rows, 5), { seed: examId, count: 3 });
+      const wrong = built[2].key.map((k, i) => (i === 0 ? (k + 1) % 4 : k));
+      return { numQuestions: 3, numChoices: 4, answerKey: built[0].key, bonus: built[0].bonus, setKeys: built.map(x => ({ key: x.key, bonus: x.bonus, order: x.order })),
+        sheets: [{ studentId: 'S1', answers: built[1].key, set: 1 }, { studentId: 'S2', answers: wrong, set: 2 }] };
+    });
+    ok('sheets of sets B and C saved', ms.sv.s === 200 || ms.sv.s === 201, JSON.stringify(ms.sv));
+    await call('POST', '/api/exam-release', { token: L1, body: { classExamId: ms.classExamId, release: true } });
+    const rb = await rv(t1, ms.aid, 'S1');
+    ok('set B review: questions in the printed order, all right', rb.s === 200 && rb.j.questions.length === 3 && rb.j.questions.every(q => q.earned > 0 && q.answer === q.correct) && rb.j.questions[0].question === built[1].items[0].text, JSON.stringify(rb.j).slice(0, 400));
+    const rc = await rv(t2, ms.aid, 'S2');
+    ok('set C review: the wrong answer is shown against the right one', rc.s === 200 && rc.j.questions[0].earned === 0 && rc.j.questions[0].answer !== rc.j.questions[0].correct && rc.j.questions.slice(1).every(q => q.earned > 0), JSON.stringify(rc.j).slice(0, 400));
+    ok('exam results analyse the shuffled sets too', (await call('GET', '/api/exam-results?classExamId=' + ms.classExamId, { token: L1 })).j.scannedNotAnalysed === 0);
+  }
   ok('a student cannot review another student\'s paper', (await call('GET', `/api/student-sheet-review?sheetId=${sheetOf(mx.aid, 'S1')}&studentId=S1`, { token: t2 })).s === 403);
   ok('summary shows the review button after release', (await call('GET', '/api/student-summary?courseId=C1&studentId=S1', { token: t1 })).j.assessments.some(r => r.Review_Sheet_ID === sheetOf(mx.aid, 'S1')));
   ok('an exam with no scans is unchanged', (await call('GET', '/api/exam-results?classExamId=' + ce.j.classExamId, { token: L1 })).j.scanned === 0);
