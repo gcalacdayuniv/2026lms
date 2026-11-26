@@ -9,7 +9,7 @@ import { json } from './http.js';
 import { callGas } from './gas.js';
 import { ensureClassModes } from './schema.js';
 
-const PROOF_MAX_B64 = 2000000;     // about 1.5 MB; the app sends a picture shrunk to 1280 px
+const PROOF_MAX_B64 = 1500000;     // about 1.1 MB, under the 2 MB the auth gate reads to check the course owner; the app sends a picture shrunk to 1280 px
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
 
 export async function handleClassModes(request, env, path, url, corsHeaders) {

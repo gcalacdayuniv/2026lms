@@ -34,6 +34,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 | groups.js | group sets: `/api/group-sets`, `group-set(-create/-rename/-delete/-save)`, `student-groups`; `groupNameIn()` used by uploads |
 | attendance.js | attendance dates, no-class days, attendance records, participation points |
 | class-modes.js | online/onsite class days + proof picture (Drive), `Class_Modes` |
+| course-plan.js | syllabus file (Drive) + learning plan topics + date→topic links (`Course_Syllabus`, `Plan_Topics`, `Plan_Day_Links`) |
 | scores.js | assessments, scores (capped at max, extra credit), `/api/student-summary`, `/api/class-summary` |
 | uploads.js | submissions: upload (single + chunked), grade, `update-submission`, `default-upload-term`, uploader checks |
 | exams.js, exam-session.js, exam-photos.js, exam-scan-results.js, exam-sets.js (Worker copy of js/exam-sets.js; keep in sync) | exams, class exams, attempts, secure mode, photos, scan results merged into exam results |
@@ -44,7 +45,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 ## Front-end map (`js/`; `app.js` initialises modules, `router.js` hash routes, `components*.js` = HTML templates)
 - Auth/profile: auth.js, components-auth.js, forgot-password.js, password-requests.js, profile-edit.js, edit-student.js, terms-consent.js.
 - Dashboard / class list: course-dashboard.js (course cards, **upload form logic**), components-dashboard.js (dashboard + student summary + submit/history/My Groups modals), dash-nav.js, card-more.js (menu shortcuts), duplicate-course.js, year-advance.js, current-term.js.
-- Class screen (lecturer): course.js (main click handlers, student summary open), course-class.js (roster, **submission history cards**), components-class.js (class template, Course Actions menu tiles, Record Scores/Groups/Edit-upload modals), course-attendance*.js, class-mode.js (online/onsite row on the attendance screen), course-recitation.js, course-roster-tools.js, lecturer-notes.js, class-invite.js.
+- Class screen (lecturer): course.js (main click handlers, student summary open), course-class.js (roster, **submission history cards**), components-class.js (class template, Course Actions menu tiles, Record Scores/Groups/Edit-upload modals), course-attendance*.js, class-mode.js (online/onsite row on the attendance screen), course-plan.js (Course Plan page + "Topics today" row), course-recitation.js, course-roster-tools.js, lecturer-notes.js, class-invite.js.
 - Scores/grades: course-scores.js (Record Scores, group fill), course-summary.js (Class Summary), grade-base.js (`onBase`, used only by the export), class-grade-export.js + class-grade-template.js (ExcelJS), participation.js.
 - Seat Plan: course-seats.js (modal in components-class.js, tile in the Course Actions menu and card-more.js); seat-map.js (classroom floor plan: student view = own seat only; lecturer view = landscape photo boxes + attendance taking).
 - Groups/uploads: course-groups.js (lecturer Groups screen), my-groups.js (student screen), submission-edit.js (lecturer edits an upload).

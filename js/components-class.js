@@ -127,6 +127,10 @@ const ClassUI = {
                             <span class="menu-tile-icon bg-orange-100 text-orange-700"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i></span>
                             <span class="menu-tile-label">No Class Days</span>
                         </button>
+                        <button type="button" id="openCoursePlanBtn" class="menu-tile">
+                            <span class="menu-tile-icon bg-emerald-100 text-emerald-700"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span>
+                            <span class="menu-tile-label">Course Plan</span>
+                        </button>
                         </div>
                     </section>
                 </div>
@@ -1119,6 +1123,7 @@ export const ClassComponents = {
                 </div>
 
                 <div id="classModeBar" class="mb-3 mx-2 sm:mx-0"></div>
+                <div id="planDayBar" class="mb-3 mx-2 sm:mx-0"></div>
                 <div id="noClassBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-bold bg-orange-100 text-orange-800 border border-orange-200 uppercase tracking-wider flex items-center justify-center">
                     <i class="fa-solid fa-triangle-exclamation mr-2 text-lg"></i> This date is marked as No Class
                 </div>

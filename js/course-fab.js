@@ -17,6 +17,7 @@ const TAB_PAGES = {
 const SUB_PAGES = [
     { page: 'attendanceDatesModal', close: 'closeAttendanceDatesBtn', tab: 'openCourseMenuBtn' },
     { page: 'noClassModal', close: 'closeNoClassModalBtn', tab: 'openCourseMenuBtn' },
+    { page: 'coursePlanModal', close: 'closeCoursePlanBtn', tab: 'openCourseMenuBtn' },
     { page: 'classSummaryModal', close: 'closeClassSummaryBtn', tab: 'openCourseMenuBtn' }
 ];
 

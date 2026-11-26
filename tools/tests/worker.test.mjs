@@ -934,5 +934,46 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   delete env.GAS_WEBHOOK_URL;
 }
 
+// ---- Course plan: syllabus file, learning plan topics, links to days (0, 1 or many; a topic on many days)
+{
+  const realFetch = globalThis.fetch;
+  env.GAS_WEBHOOK_URL = 'https://gas.test/exec';
+  const gasBodies = [];
+  globalThis.fetch = async (u, init) => { gasBodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ success: true, fileId: 'SYL1', base64: 'QUJD' }), { status: 200 }); };
+  const stuTok = await signToken(env, 'P1');
+  const plan = (token, c = 'SP') => call('GET', `/api/course-plan?courseId=${c}`, { token });
+  ok('empty plan at first', (await plan(L1)).j.topics.length === 0 && (await plan(L1)).j.syllabus === null);
+  const t1 = await call('POST', '/api/plan-topic', { token: L1, body: { courseId: 'SP', time: 'Week 2 / 3 hours', contents: 'Introduction to Capital Markets', questions: 'What is a financial system?', refs: 'Lopez-Mariano (2017)' } });
+  ok('add a topic', t1.s === 201 && !!t1.j.topicId, JSON.stringify(t1.j));
+  const qa = await call('POST', '/api/plan-quick-add', { token: L1, body: { courseId: 'SP', lines: [{ time: 'Week 3 & 4', contents: 'Financial Intermediaries' }, { time: 'Week 7', contents: 'Time Value of Money' }, { time: '', contents: '' }] } });
+  ok('quick add keeps order and skips empty lines', qa.s === 201 && qa.j.added === 2 && (await plan(L1)).j.topics.map(t => t.time).join('|') === 'Week 2 / 3 hours|Week 3 & 4|Week 7');
+  const ids = (await plan(L1)).j.topics.map(t => t.topicId);
+  ok('a topic needs a time or contents', (await call('POST', '/api/plan-topic', { token: L1, body: { courseId: 'SP', questions: 'x' } })).s === 400);
+  ok('edit a topic', (await call('POST', '/api/plan-topic', { token: L1, body: { courseId: 'SP', topicId: ids[0], time: 'Week 2', contents: 'Intro' } })).s === 200 && (await plan(L1)).j.topics[0].time === 'Week 2');
+  await call('POST', '/api/plan-topic-move', { token: L1, body: { courseId: 'SP', topicId: ids[2], dir: -1 } });
+  ok('move a topic up', (await plan(L1)).j.topics.map(t => t.topicId).join() === [ids[0], ids[2], ids[1]].join());
+  // days: one day with two topics, one day with one, the same topic on two days, a quiz day with none
+  ok('link two topics to a day', (await call('POST', '/api/plan-day', { token: L1, body: { courseId: 'SP', date: '2026-03-02', topicIds: [ids[0], ids[1]] } })).j.linked === 2);
+  ok('the same topic on another day', (await call('POST', '/api/plan-day', { token: L1, body: { courseId: 'SP', date: '2026-03-09', topicIds: [ids[1]] } })).s === 200);
+  const linked = (await plan(L1)).j.topics.find(t => t.topicId === ids[1]);
+  ok('a topic lists every day it is taught', linked.dates.join() === '2026-03-02,2026-03-09');
+  ok('an empty list clears a day', (await call('POST', '/api/plan-day', { token: L1, body: { courseId: 'SP', date: '2026-03-09', topicIds: [] } })).s === 200 && (await plan(L1)).j.topics.find(t => t.topicId === ids[1]).dates.join() === '2026-03-02');
+  ok('a topic from another class is refused', (await call('POST', '/api/plan-day', { token: L1, body: { courseId: 'C1', date: '2026-03-02', topicIds: [ids[0]] } })).s === 404);
+  ok('a student cannot read or change the plan', (await plan(stuTok)).s === 403 && (await call('POST', '/api/plan-topic', { token: stuTok, body: { courseId: 'SP', contents: 'x' } })).s === 403);
+  ok('another lecturer cannot touch my plan', (await plan(l2.j.token)).s === 403 && (await call('POST', '/api/plan-topic-delete', { token: l2.j.token, body: { courseId: 'SP', topicId: ids[0] } })).s === 403);
+  // syllabus
+  const syl = await call('POST', '/api/course-syllabus', { token: L1, body: { courseId: 'SP', base64: 'A'.repeat(300), fileName: 'FINMAN 7.pdf', mimeType: 'application/pdf' } });
+  ok('syllabus goes to Drive under the class', syl.s === 201 && gasBodies[0].pathParts.join('/') === 'Syllabus/SP', JSON.stringify(syl.j));
+  ok('the plan shows the syllabus name', (await plan(L1)).j.syllabus.name === 'FINMAN 7.pdf');
+  ok('a wrong file type is refused', (await call('POST', '/api/course-syllabus', { token: L1, body: { courseId: 'SP', base64: 'A'.repeat(300), fileName: 'x.exe', mimeType: 'application/x-msdownload' } })).s === 400);
+  ok('another lecturer cannot read the syllabus', (await call('GET', '/api/course-syllabus?courseId=SP', { token: l2.j.token })).s === 403);
+  const got = await call('GET', '/api/course-syllabus?courseId=SP', { token: L1 });
+  ok('lecturer reads the syllabus back', got.s === 200 && got.j.base64 === 'QUJD' && got.j.mimeType === 'application/pdf');
+  ok('remove the syllabus', (await call('POST', '/api/course-syllabus-delete', { token: L1, body: { courseId: 'SP' } })).s === 200 && (await plan(L1)).j.syllabus === null);
+  ok('deleting a topic removes its day links', (await call('POST', '/api/plan-topic-delete', { token: L1, body: { courseId: 'SP', topicId: ids[1] } })).s === 200 && sql.prepare("select count(*) n from Plan_Day_Links where Topic_ID=?").get(ids[1]).n === 0);
+  globalThis.fetch = realFetch;
+  delete env.GAS_WEBHOOK_URL;
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

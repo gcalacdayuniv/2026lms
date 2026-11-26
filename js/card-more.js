@@ -41,7 +41,8 @@ const open = (d) => {
                     go('fa-solid fa-file-contract', 'bg-indigo-100 text-indigo-700', 'Manage Exams', 'openExamManagerBtn')])}
                 ${section('Calendar', [
                     go('fa-solid fa-calendar-check', 'bg-sky-100 text-sky-700', 'Attendance Dates', 'openAttendanceDatesBtn'),
-                    go('fa-solid fa-calendar-xmark', 'bg-orange-100 text-orange-700', 'No Class Days', 'openNoClassModalBtn')])}
+                    go('fa-solid fa-calendar-xmark', 'bg-orange-100 text-orange-700', 'No Class Days', 'openNoClassModalBtn'),
+                    go('fa-solid fa-book-open', 'bg-emerald-100 text-emerald-700', 'Course Plan', 'openCoursePlanBtn')])}
                 ${section('This class', [
                     tile('fa-solid fa-copy', 'bg-indigo-100 text-indigo-700', 'Copy to another term', { cls: 'duplicate-course-btn', data: `data-course-id="${escapeHtml(d.courseId)}" data-term="${escapeHtml(d.term)}"` }),
                     tile(archived ? 'fa-solid fa-box-open' : 'fa-solid fa-box-archive', 'bg-gray-200 text-gray-800', archived ? 'Restore class' : 'Archive class', { cls: 'archive-course-btn', data: `data-course-id="${escapeHtml(d.courseId)}" data-archive="${archived ? '0' : '1'}"` })])}

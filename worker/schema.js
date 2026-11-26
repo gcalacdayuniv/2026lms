@@ -337,3 +337,14 @@ export async function ensureClassModes(env) {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Class_Modes (Course_ID TEXT NOT NULL, Date TEXT NOT NULL, Mode TEXT NOT NULL, Proof_File_ID TEXT, Updated_At TEXT, PRIMARY KEY (Course_ID, Date))").run();
     classModesReady = true;
 }
+
+// Course syllabus file (kept in Google Drive), learning plan topics and the date -> topic links (many to many).
+let coursePlanReady = false;
+export async function ensureCoursePlan(env) {
+    if (coursePlanReady) return;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Course_Syllabus (Course_ID TEXT PRIMARY KEY, File_ID TEXT, File_Name TEXT, Mime_Type TEXT, Updated_At TEXT)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Plan_Topics (Topic_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Sort_Order INTEGER, Time_Allot TEXT, Contents TEXT, Questions TEXT, Outcomes TEXT, Activities TEXT, Assessments TEXT, Refs TEXT, Updated_At TEXT)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_plan_topics_course ON Plan_Topics (Course_ID, Sort_Order)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Plan_Day_Links (Course_ID TEXT NOT NULL, Date TEXT NOT NULL, Topic_ID TEXT NOT NULL, PRIMARY KEY (Course_ID, Date, Topic_ID))").run();
+    coursePlanReady = true;
+}
