@@ -562,7 +562,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
             FROM Enrollments e
             JOIN Users u ON e.Student_ID = u.User_ID
             LEFT JOIN Attendance a ON e.Student_ID = a.Student_ID AND e.Course_ID = a.Course_ID
-            WHERE e.Course_ID = ?
+            WHERE e.Course_ID = ? AND LOWER(TRIM(COALESCE(u.account_status, 'Active'))) NOT IN ('ud', 'dropped')
             GROUP BY u.User_ID, u.Name, u.Avatar, e.Seat_Number
         `).bind(courseId).all();
 

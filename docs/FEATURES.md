@@ -570,3 +570,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Syllabus View: open the tab inside the tap
 - View now opens the new tab immediately (phones block a tab opened after the download finishes) and points it at the file; if the browser refuses, the file is saved instead. A PDF cannot be shown in an in-page frame because the CSP has no `frame-src`/`object-src` for blobs. sw.js v119.
+
+## UD / Dropped are always absent; absent and excused students are not called
+- Attendance: students whose account status is UD or Dropped are Absent automatically: on the attendance screen their row is set to Absent with 0 points, locked and tagged "Absent automatically (UD / Dropped)" (`data-auto-absent`, `CourseAttendance.applyAutoAbsent`). The Worker enforces it too: `POST /api/attendance` and `/api/attendance/single` store Absent / 0 for them whatever is sent, and `/api/add-participation-points` refuses them (400).
+- Student caller: `/api/recitation-pool` leaves out UD and Dropped students; the wheel and the spin also skip anyone marked Absent or Excused in the list for the chosen date (the list on screen is the source, so it follows changes before saving). If nobody is left the wheel says "No present students to call...".
+- Tests: "UD and Dropped students are always absent" block. Deploy: Worker + site files (sw.js v120).

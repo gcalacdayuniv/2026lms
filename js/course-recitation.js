@@ -26,6 +26,16 @@ const getStudentRow = (userId) => {
     return document.querySelector(`.student-row[data-student-id="${safeId}"]`);
 };
 
+// Students marked Absent or Excused in the list for the chosen date (and UD / Dropped students, who are always absent) are not called.
+const isOut = (userId) => {
+    const row = getStudentRow(userId);
+    if (!row) return false;
+    if (row.hasAttribute('data-auto-absent')) return true;
+    const status = row.querySelector('.attendance-btn[data-selected="true"]')?.dataset.status;
+    return status === 'Absent' || status === 'Excused';
+};
+const poolNow = () => CourseRecitation.students.filter(s => !isOut(s.User_ID));
+
 export const CourseRecitation = {
     students: [],
     isSpinning: false,
@@ -342,14 +352,14 @@ export const CourseRecitation = {
         const mode = document.querySelector('input[name="callerMode"]:checked').value;
         const calledToday = readCalled(getCalledKey());
 
-        let availableStudents = CourseRecitation.students;
+        let availableStudents = poolNow();
         if (mode === '2') {
-            availableStudents = CourseRecitation.students.filter(s => !calledToday.includes(s.User_ID));
+            availableStudents = availableStudents.filter(s => !calledToday.includes(s.User_ID));
         }
 
         const total = availableStudents.length;
         if (total === 0) {
-            wheel.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-500 font-bold text-center px-4">All students called for today.</div>';
+            wheel.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-gray-500 font-bold text-center px-4">${poolNow().length ? 'All students called for today.' : 'No present students to call. Absent and excused students are skipped.'}</div>`;
             document.getElementById('spinWheelBtn').disabled = true;
             return;
         }
@@ -412,9 +422,9 @@ export const CourseRecitation = {
             calledToday = readCalled(calledKey);
         }
 
-        let availableStudents = CourseRecitation.students;
+        let availableStudents = poolNow();
         if (mode === '2') {
-            availableStudents = CourseRecitation.students.filter(s => !calledToday.includes(s.User_ID));
+            availableStudents = availableStudents.filter(s => !calledToday.includes(s.User_ID));
         }
 
         if (CourseRecitation.isSpinning || availableStudents.length === 0) return;

@@ -14,6 +14,15 @@ const STATUS_PRIORITY = { Absent: 4, Late: 3, Excused: 2, Present: 1 };
 const pickStatus = (a, b) =>
     (STATUS_PRIORITY[a] || 0) >= (STATUS_PRIORITY[b] || 0) ? a : b;
 
+// Students whose account status is UD or Dropped are always Absent (no points); the same rule is on the attendance screen.
+export const AUTO_ABSENT = new Set(['ud', 'dropped']);
+export async function autoAbsentIds(env, ids) {
+    const list = [...new Set((ids || []).map(String))];
+    if (!list.length) return new Set();
+    const rows = await env.DB.prepare("SELECT User_ID, account_status FROM Users WHERE User_ID IN (SELECT value FROM json_each(?))").bind(JSON.stringify(list)).all();
+    return new Set((rows.results || []).filter(u => AUTO_ABSENT.has(String(u.account_status || '').trim().toLowerCase())).map(u => u.User_ID));
+}
+
 const insertStmt = (env, courseId, studentId, date, status, points) =>
     env.DB.prepare(
         "INSERT INTO Attendance (Attendance_ID, Course_ID, Student_ID, Date, Status, Performance_Points) VALUES (?, ?, ?, ?, ?, ?)"
@@ -231,6 +240,8 @@ export async function handleAttendance(request, env, path, url, corsHeaders) {
             // Per-student update-or-insert in one transaction: a failure leaves the saved day as it was,
             // and students that are not in the list are removed (the list is the whole day).
             const rows = records.filter(r => r && r.studentId);
+            const auto = await autoAbsentIds(env, rows.map(r => r.studentId));
+            for (const r of rows) if (auto.has(String(r.studentId))) { r.status = 'Absent'; r.points = 0; }
             const statements = [
                 env.DB.prepare("DELETE FROM Attendance WHERE Course_ID = ? AND Date = ? AND Student_ID NOT IN (SELECT value FROM json_each(?))")
                     .bind(courseId, date, JSON.stringify(rows.map(r => String(r.studentId))))
@@ -250,7 +261,8 @@ export async function handleAttendance(request, env, path, url, corsHeaders) {
             return new Response(JSON.stringify({ error: "Missing parameters" }), { status: 400, headers: corsHeaders });
         }
 
-        await env.DB.batch(upsertAttendance(env, courseId, studentId, date, status, points));
+        const isAuto = (await autoAbsentIds(env, [studentId])).has(String(studentId));
+        await env.DB.batch(upsertAttendance(env, courseId, studentId, date, isAuto ? 'Absent' : status, isAuto ? 0 : points));
 
         return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
     }
@@ -265,6 +277,10 @@ export async function handleAttendance(request, env, path, url, corsHeaders) {
 
         if (!Number.isFinite(points)) {
             return new Response(JSON.stringify({ error: "Invalid points" }), { status: 400, headers: corsHeaders });
+        }
+
+        if ((await autoAbsentIds(env, [studentId])).has(String(studentId))) {
+            return new Response(JSON.stringify({ error: "This student is UD or Dropped, so is always absent and earns no points." }), { status: 400, headers: corsHeaders });
         }
 
         // Add in one statement so two quick taps cannot overwrite each other.

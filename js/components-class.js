@@ -978,7 +978,7 @@ export const ClassComponents = {
                 : `<span class="text-gray-800">None</span>`;
 
             return `
-                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}" data-search="${escapeHtml([s.Name, s.Student_Number, s.Seat_Number, s.Group_Name, s.Assigned_Topic].filter(Boolean).join(' ').toLowerCase())}" data-eye="${escapeHtml(s.eye_condition || '')}" data-group="${escapeHtml(s.Group_Name || '')}" data-seat="${escapeHtml(s.Seat_Number || '')}" data-name="${escapeHtml(s.Name || '')}" data-number="${escapeHtml(s.Student_Number || '')}">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition student-row gap-4 lg:gap-2" data-student-id="${s.User_ID}"${['ud', 'dropped'].includes(String(s.account_status || '').trim().toLowerCase()) ? ' data-auto-absent="1"' : ''} data-search="${escapeHtml([s.Name, s.Student_Number, s.Seat_Number, s.Group_Name, s.Assigned_Topic].filter(Boolean).join(' ').toLowerCase())}" data-eye="${escapeHtml(s.eye_condition || '')}" data-group="${escapeHtml(s.Group_Name || '')}" data-seat="${escapeHtml(s.Seat_Number || '')}" data-name="${escapeHtml(s.Name || '')}" data-number="${escapeHtml(s.Student_Number || '')}">
 
                     <div class="flex items-start justify-between w-full lg:w-1/2">
                         <div class="flex items-center space-x-3 p-1.5 -ml-1.5 rounded-lg transition">

@@ -989,5 +989,23 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   delete env.GAS_WEBHOOK_URL;
 }
 
+// ---- UD and Dropped students are always absent and are never called
+{
+  sql.exec(`insert into Courses(Course_ID,CourseCode,CourseTitle,Lecturer_ID) values('UA1','UAC','Auto absent','L1')`);
+  for (const id of ['UAact', 'UAud', 'UAdrop']) sql.prepare("insert into Users(User_ID,Username,Name,role,account_status) values(?,?,?,?,?)").run(id, id, id, 'student', id === 'UAud' ? 'UD' : id === 'UAdrop' ? 'Dropped' : 'Active');
+  for (const id of ['UAact', 'UAud', 'UAdrop']) sql.prepare("insert into Enrollments(Course_ID,Student_ID) values('UA1',?)").run(id);
+  const save = await call('POST', '/api/attendance', { token: L1, body: { courseId: 'UA1', date: '2026-04-01', records: [{ studentId: 'UAact', status: 'Present', points: 2 }, { studentId: 'UAud', status: 'Present', points: 3 }, { studentId: 'UAdrop', status: 'Late', points: 1 }] } });
+  const day = (await call('GET', '/api/attendance?courseId=UA1&date=2026-04-01', { token: L1 })).j.records;
+  const get = (id) => day.find(r => r.Student_ID === id);
+  ok('saving a day forces UD and Dropped students to Absent with 0 points', save.s === 201 && get('UAud').Status === 'Absent' && get('UAud').Performance_Points === 0 && get('UAdrop').Status === 'Absent' && get('UAdrop').Performance_Points === 0, JSON.stringify(day));
+  ok('an Active student is saved as given', get('UAact').Status === 'Present' && get('UAact').Performance_Points === 2);
+  await call('POST', '/api/attendance/single', { token: L1, body: { courseId: 'UA1', studentId: 'UAud', date: '2026-04-02', status: 'Present', points: 5 } });
+  const one = sql.prepare("select Status s, Performance_Points p from Attendance where Student_ID='UAud' and Date='2026-04-02'").get();
+  ok('the single save also forces Absent', one.s === 'Absent' && one.p === 0);
+  ok('participation points are refused for a Dropped student', (await call('POST', '/api/add-participation-points', { token: L1, body: { courseId: 'UA1', studentId: 'UAdrop', date: '2026-04-03', points: 1 } })).s === 400);
+  const pool = (await call('GET', '/api/recitation-pool?courseId=UA1', { token: L1 })).j.students.map(x => x.User_ID);
+  ok('the student caller pool leaves out UD and Dropped students', pool.length === 1 && pool[0] === 'UAact', JSON.stringify(pool));
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

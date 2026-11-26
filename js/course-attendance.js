@@ -37,6 +37,7 @@ export const CourseAttendance = {
         if (!e.isTrusted) return;
 
         const statusBtn = e.target.closest('.attendance-btn');
+        if (statusBtn && statusBtn.closest('.student-row[data-auto-absent]')) return;
         if (statusBtn) {
             if (navigator.vibrate) navigator.vibrate(8);
             const row = statusBtn.closest('.student-row');
@@ -63,6 +64,33 @@ export const CourseAttendance = {
         if (!e.target.classList || !e.target.classList.contains('points-input')) return;
         const row = e.target.closest('.student-row');
         if (row) CourseAttendance.queueAutoSave(row.dataset.studentId, 700);
+    },
+
+    // Students with UD or Dropped status are always Absent with no points: the row is set, locked and tagged.
+    applyAutoAbsent: () => {
+        document.querySelectorAll('.student-row[data-auto-absent]').forEach(row => {
+            row.querySelectorAll('.attendance-btn').forEach(btn => {
+                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
+                btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                btn.removeAttribute('data-selected');
+                btn.disabled = true;
+            });
+            const absent = row.querySelector('.attendance-btn[data-status="Absent"]');
+            if (absent) {
+                absent.setAttribute('data-selected', 'true');
+                absent.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
+                absent.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
+            }
+            const pts = row.querySelector('.points-input');
+            if (pts) { pts.value = '0'; pts.disabled = true; }
+            row.querySelectorAll('.pts-step').forEach(b => { b.disabled = true; });
+            if (!row.querySelector('.auto-absent-tag')) {
+                const tag = document.createElement('span');
+                tag.className = 'auto-absent-tag inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200';
+                tag.textContent = 'Absent automatically (UD / Dropped)';
+                (row.querySelector('.attendance-btn')?.parentElement || row).appendChild(tag);
+            }
+        });
     },
 
     snapshotRow: (row) => {
@@ -611,6 +639,8 @@ export const CourseAttendance = {
                     }
                 });
             }
+
+            if (!data.isNoClass) CourseAttendance.applyAutoAbsent();
 
             // The saved state is now on screen; remember it before any local draft is applied.
             CourseAttendance.setBaseline();
