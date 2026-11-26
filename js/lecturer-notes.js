@@ -90,7 +90,7 @@ export const LecturerNotes = {
                     </span>
                 </div>
             </div>`).join('');
-        const compose = `<textarea id="lnText" rows="3" maxlength="4000" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="Write a note about this student...">${editing ? escapeHtml(editing.Body) : ''}</textarea>
+        const compose = `<textarea id="lnText" rows="3" maxlength="4000" style="min-height:40vh;font-size:16px" class="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="Write a note about this student...">${editing ? escapeHtml(editing.Body) : ''}</textarea>
                 <div class="flex items-center justify-between mt-1">
                     <span id="lnCount" class="text-[10px] text-gray-400">${editing ? editing.Body.length : 0}/4000</span>
                     <span class="flex gap-2">

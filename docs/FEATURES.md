@@ -538,3 +538,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Floor plan: standing colours, note button, opens without attendance
 - Absent and Excused keep their colour overlay when attendance checking is off (the day's records load when the plan opens); Present/Late show only while checking. The popover has a Lecturer note button above the points (opens the Lecturer's notes dialog, now z-[140] so it sits over the plan). The plan opened from the attendance row no longer starts in attendance mode; "Check attendance" must be switched on in the header. sw.js v111.
+
+## Lecturer note box: no iOS zoom, taller
+- The note textarea uses 16 px text (iOS Safari zooms into inputs below 16 px) and is at least 40% of the screen height. sw.js v112.
