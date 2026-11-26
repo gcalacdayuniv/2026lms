@@ -8,7 +8,7 @@ keep_vars = true
 
 [vars]
 ALLOWED_ORIGIN = "https://plv.workers.dev" 
-GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzr8skhGTi7Tn0IAvwOO_9UJopr7IGFpzRRGM762LyWH7FSh93I7rHw7_4pX0SI8VlM/exec"
+GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyLVOLVWNxFLcXHz6S77oGeAFUBGzHhek8XNB2HRwwhG6HU1Dnu3xdOxLj6n3yONHFj/exec"
 
 # Secrets set in the Cloudflare dashboard (Worker > Settings > Variables and Secrets), never in this file:
 #   SESSION_SECRET  signs login tokens (16+ random characters)
