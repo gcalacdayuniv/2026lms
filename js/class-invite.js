@@ -5,7 +5,7 @@ import { escapeHtml } from './html-utils.js';
 import { CourseDashboard } from './course-dashboard.js';
 
 const $ = (id) => document.getElementById(id);
-const closeDlg = () => { const m = $('invModal'); if (m) m.remove(); };
+const closeDlg = () => UI.closeOverlay('invModal');
 const BTN = 'px-4 min-h-[44px] text-sm font-bold rounded-md';
 
 // Date and time in GMT+8, e.g. "Dec 5, 2026, 8:34 PM (GMT+8)".
@@ -43,15 +43,7 @@ const openDialog = async (courseId) => {
     closeDlg();
     const menu = $('courseMenuModal');
     if (menu) menu.classList.add('hidden');
-    const m = document.createElement('div');
-    m.id = 'invModal';
-    m.dataset.courseId = courseId;
-    m.className = 'fixed inset-0 z-[70] flex items-center justify-center fade-in p-4';
-    m.setAttribute('role', 'dialog');
-    m.setAttribute('aria-modal', 'true');
-    m.setAttribute('aria-label', 'Class invite code');
-    m.innerHTML = `<div id="invBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-5 relative z-10 max-h-[92vh] overflow-y-auto">
+    const dlg = UI.overlay({ id: 'invModal', label: 'Class invite code', z: 70, panelClass: 'bg-white rounded-lg shadow-xl w-full max-w-md p-5 max-h-[92vh] overflow-y-auto', html: `
             <h3 class="text-lg font-bold text-gray-800 mb-1 text-center"><i class="fa-solid fa-key text-amber-600 mr-2" aria-hidden="true"></i>Class invite code</h3>
             <p class="text-xs text-gray-600 mb-3 text-center">Students use this code to register, to activate a deactivated account, or to join this class. It expires every 7 days.</p>
             <div id="invError" role="alert" class="hidden bg-red-100 text-red-700 p-2 rounded text-sm font-medium mb-3"></div>
@@ -68,8 +60,9 @@ const openDialog = async (courseId) => {
                 <button type="button" id="invCopyMsgBtn" class="${BTN} text-gray-700 bg-gray-100 hover:bg-gray-200">Copy message</button>
                 <button type="button" id="invShareBtn" class="${BTN} text-white bg-blue-600 hover:bg-blue-700"><i class="fa-solid fa-share-nodes mr-1.5" aria-hidden="true"></i>Share</button>
             </div>
-        </div>`;
-    document.body.appendChild(m);
+        ` });
+    const m = dlg.el;
+    m.dataset.courseId = courseId;
     try {
         showInvite(await apiFetch(`/api/class-invite?courseId=${encodeURIComponent(courseId)}&_t=${Date.now()}`));
     } catch (e) {
@@ -113,7 +106,7 @@ export const joinFormHtml = () => `
         <button type="button" id="openJoinBtn" class="${BTN} w-full sm:w-auto text-white bg-blue-600 hover:bg-blue-700">Enter class code</button>
     </section>`;
 
-const closeJoin = () => { const m = $('joinModal'); if (m) m.remove(); };
+const closeJoin = () => UI.closeOverlay('joinModal');
 const row = (label, value) => `<div class="flex justify-between gap-4 py-2 border-b border-gray-100 last:border-0"><dt class="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">${label}</dt><dd class="text-sm font-bold text-gray-800 text-right break-words min-w-0">${escapeHtml(value || 'Not set')}</dd></div>`;
 
 const stepCode = () => `
@@ -143,14 +136,9 @@ const stepConfirm = (c) => `
 
 const openJoin = (code = '') => {
     closeJoin();
-    const m = document.createElement('div');
-    m.id = 'joinModal';
-    m.className = 'fixed inset-0 z-[70] flex items-center justify-center fade-in p-4';
-    m.setAttribute('role', 'dialog');
-    m.setAttribute('aria-modal', 'true');
-    m.setAttribute('aria-label', 'Join a class');
-    m.innerHTML = `<div id="joinBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div><div id="joinBody" class="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 relative z-10"></div>`;
-    document.body.appendChild(m);
+    const dlg = UI.overlay({ id: 'joinModal', label: 'Join a class', z: 70, panelClass: 'bg-white rounded-lg shadow-xl w-full max-w-sm p-5', html: `` });
+    const m = dlg.el;
+    dlg.panel.id = 'joinBody';
     $('joinBody').innerHTML = stepCode();
     $('joinCode').value = code;
     $('joinCode').focus();
@@ -192,18 +180,17 @@ document.addEventListener('click', (e) => {
     if (direct) { openDialog(direct.dataset.courseId); return; }
     const open = e.target.closest('#openInviteBtn');
     if (open) { openDialog(window.location.hash.replace('#class-', '')); return; }
-    if (e.target.closest('#invCloseBtn') || e.target.id === 'invBg') { closeDlg(); return; }
+    if (e.target.closest('#invCloseBtn')) { closeDlg(); return; }
     if (e.target.closest('#invCopyBtn')) { copyText(($('invCode') || {}).textContent || '', 'Code copied'); return; }
     if (e.target.closest('#invCopyMsgBtn')) { copyText(($('invMessage') || {}).value || '', 'Message copied'); return; }
     if (e.target.closest('#invShareBtn')) { share(); return; }
     if (e.target.closest('#invRenewBtn')) { renew(); return; }
     if (e.target.closest('#openJoinBtn')) { openJoin(); return; }
-    if (e.target.closest('.joinCancel') || e.target.id === 'joinBg') { closeJoin(); return; }
+    if (e.target.closest('.joinCancel')) { closeJoin(); return; }
     if (e.target.closest('#joinBackBtn')) { openJoin(); return; }
     if (e.target.closest('#joinConfirmBtn')) confirmJoin();
 });
 // The student's bottom tab asks for this dialog.
 document.addEventListener('open-join-dialog', () => openJoin());
 document.addEventListener('submit', (e) => { if (e.target.id === 'joinLookupForm') { e.preventDefault(); lookup(); } });
-document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if ($('invModal')) closeDlg(); if ($('joinModal')) closeJoin(); });
 

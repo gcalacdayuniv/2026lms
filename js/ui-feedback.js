@@ -20,20 +20,21 @@ const MAX_TOASTS = 4;
 
 // ---- Shared overlay: a dialog above the page with a dimmed backdrop. Backdrop tap, Escape (the top-most overlay only), and any
 // element with data-overlay-close close it; focus goes in and returns to the button that opened it.
-//   const o = UI.overlay({ id, label, html, z, panelClass, backdropClass, onClose });   o.el, o.panel, o.close()
+//   const o = UI.overlay({ id, label, html, z, panelClass, backdropClass, padClass (default p-4; 'p-0 sm:p-4' for full-screen on phones), onClose });   o.el, o.panel, o.close()
 const overlayStack = [];
 const onOverlayKey = (e) => {
+    while (overlayStack.length && !overlayStack[overlayStack.length - 1].el.isConnected) overlayStack.pop();   // one removed by other code
     if (e.key !== 'Escape' || !overlayStack.length) return;
     e.stopPropagation();
     overlayStack[overlayStack.length - 1].close();
 };
 window.addEventListener('keydown', onOverlayKey, true);
 
-const overlay = ({ id, label = 'Dialog', html = '', z = 150, panelClass = 'bg-white sm:max-w-xl rounded-none sm:rounded-lg shadow-xl p-4', backdropClass = 'bg-gray-900 bg-opacity-60', onClose = null } = {}) => {
+const overlay = ({ id, label = 'Dialog', html = '', z = 150, panelClass = 'bg-white sm:max-w-xl rounded-none sm:rounded-lg shadow-xl p-4', backdropClass = 'bg-gray-900 bg-opacity-60', padClass = 'p-4', onClose = null } = {}) => {
     if (id) document.getElementById(id)?.remove();
     const root = document.createElement('div');
     if (id) root.id = id;
-    root.className = 'fixed inset-0 flex items-center justify-center fade-in p-0 sm:p-4';
+    root.className = `fixed inset-0 flex items-center justify-center fade-in ${padClass}`;
     root.style.zIndex = String(z);
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
@@ -44,10 +45,10 @@ const overlay = ({ id, label = 'Dialog', html = '', z = 150, panelClass = 'bg-wh
         el: root,
         panel: root.querySelector('[data-overlay-panel]'),
         close: () => {
-            if (!root.isConnected) return;
-            root.remove();
             const i = overlayStack.indexOf(api);
             if (i >= 0) overlayStack.splice(i, 1);
+            if (!root.isConnected) return;
+            root.remove();
             if (opener && opener.focus && document.contains(opener)) opener.focus();
             if (onClose) onClose();
         }
@@ -123,6 +124,7 @@ export const UI = {
     info: (message, duration) => UI.toast(message, 'info', duration),
 
     overlay,
+    closeOverlay: (id) => { const o = overlayStack.find(x => x.el.id === id); if (o) o.close(); else document.getElementById(id)?.remove(); },
 
     confirm: ({
         title = 'Please confirm',

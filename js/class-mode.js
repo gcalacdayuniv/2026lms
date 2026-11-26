@@ -98,7 +98,7 @@ export const ClassMode = {
             ClassMode.closeViewer();
             const mime = /^image\/(jpeg|png|webp)$/.test(r.mimeType) ? r.mimeType : 'image/jpeg';
             ClassMode.viewer = UI.overlay({
-                id: 'cmViewer', label: `Online class proof for ${ClassMode.date}`, z: 160,
+                id: 'cmViewer', label: `Online class proof for ${ClassMode.date}`, z: 160, padClass: 'p-0 sm:p-4',
                 backdropClass: 'bg-black bg-opacity-90', panelClass: 'flex flex-col items-center justify-center',
                 html: `<button type="button" data-overlay-close aria-label="Close" class="absolute top-3 right-3 w-11 h-11 rounded-full bg-white/90 text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
                     <p class="text-white text-sm font-bold mb-2">Online class, ${esc(ClassMode.date)}</p>

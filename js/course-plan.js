@@ -124,7 +124,7 @@ export const CoursePlan = {
     shell: (title, inner) => {
         CoursePlan.closeForm();
         CoursePlan.form = UI.overlay({
-            id: 'cpForm', label: title, z: 150,
+            id: 'cpForm', label: title, z: 150, padClass: 'p-0 sm:p-4',
             panelClass: 'bg-white sm:max-w-xl h-full sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-lg shadow-xl p-4 flex flex-col',
             html: `<div class="shrink-0 flex items-center gap-3 mb-3 border-b pb-3"><h3 class="flex-1 text-lg font-bold text-gray-800">${esc(title)}</h3><button type="button" data-overlay-close class="p-2 text-gray-500" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button></div>
                 <div class="flex-1 overflow-y-auto min-h-0">${inner}</div>`

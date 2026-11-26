@@ -20,7 +20,7 @@ const call = (body) => apiFetch('/api/advance-year-level', {
 });
 
 const $ = (id) => document.getElementById(id);
-const close = () => { const m = $('yaModal'); if (m) m.remove(); };
+const close = () => UI.closeOverlay('yaModal');
 
 // Programs whose highest year differs from the default (rows appear after Preview).
 const programMaxValues = () => {
@@ -88,14 +88,7 @@ const refreshLast = (last) => {
 
 const open = async () => {
     close();
-    const m = document.createElement('div');
-    m.id = 'yaModal';
-    m.className = 'fixed inset-0 z-[70] flex items-center justify-center fade-in p-0 sm:p-4';
-    m.setAttribute('role', 'dialog');
-    m.setAttribute('aria-modal', 'true');
-    m.setAttribute('aria-label', 'Advance year level');
-    m.innerHTML = `<div id="yaBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-        <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 relative z-10 max-h-full sm:max-h-[90vh] overflow-y-auto">
+    const dlg = UI.overlay({ id: 'yaModal', label: 'Advance year level', z: 70, padClass: 'p-0 sm:p-4', panelClass: 'bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-md h-full sm:h-auto p-4 sm:p-6 max-h-full sm:max-h-[90vh] overflow-y-auto', html: `
             <div class="flex items-center gap-3 mb-4 border-b pb-3">
                 <h3 class="min-w-0 flex-1 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-turn-up text-orange-600 mr-2" aria-hidden="true"></i>Advance Year Level</h3>
                 <button id="yaCloseBtn" type="button" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
@@ -115,8 +108,8 @@ const open = async () => {
                 <button type="button" id="yaApplyBtn" disabled class="w-full bg-orange-600 text-white py-2.5 px-4 rounded-md hover:bg-orange-700 shadow-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Advance all students</button>
                 <button type="button" id="yaUndoBtn" class="hidden w-full border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 py-2 px-4 rounded-md font-bold text-xs"></button>
             </div>
-        </div>`;
-    document.body.appendChild(m);
+        ` });
+    const m = dlg.el;
     try { refreshLast((await call({ mode: 'preview', ...values() })).last); } catch (e) { /* undo button stays hidden */ }
 };
 
@@ -156,7 +149,7 @@ const undo = async () => {
 
 document.addEventListener('click', (e) => {
     if (e.target.closest('#openYaModalBtn')) { open(); return; }
-    if (e.target.closest('#yaCloseBtn') || e.target.id === 'yaBg') { close(); return; }
+    if (e.target.closest('#yaCloseBtn')) { close(); return; }
     if (e.target.closest('#yaPreviewBtn')) { preview(); return; }
     if (e.target.closest('#yaApplyBtn')) { apply(); return; }
     if (e.target.closest('#yaUndoBtn')) undo();
@@ -165,6 +158,5 @@ document.addEventListener('change', (e) => {
     // Any change to the limits needs a fresh Preview before applying.
     if (e.target.id === 'yaMax' || e.target.closest('#yaPrograms') || e.target.id === 'yaAY') { const b = $('yaApplyBtn'); if (b) b.disabled = true; }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('yaModal')) close(); });
 
 export const YearAdvance = { open, close };

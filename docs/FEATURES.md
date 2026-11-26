@@ -588,3 +588,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Refactor: shared `UI.overlay`
 - `js/ui-feedback.js` now has `UI.overlay({ id, label, html, z, panelClass, backdropClass, onClose })` returning `{ el, panel, close }`: dimmed backdrop, tap-outside and any `[data-overlay-close]` close it, Escape closes only the top-most overlay (and is not passed on to other handlers), focus goes in and returns to the button that opened it. The Course Plan topic form / Quick add / day picker and the online-class proof viewer use it; `seat-map.js` (rotated on phones) and the older overlays still build their own and can move over one at a time. Use it for new dialogs. sw.js v123.
+
+## Refactor: more dialogs on `UI.overlay`
+- Class invite code, Join a class, Advance Year Level, Copy to another term and Current academic term now use `UI.overlay` (their own backdrop, Escape and remove code is gone; `UI.closeOverlay(id)` closes one by id). `UI.overlay` takes `padClass` (default `p-4`; `p-0 sm:p-4` for dialogs that go full screen on phones) and drops entries that other code removed from the Escape stack. Still hand-built: floor plan (`seat-map.js`), profile-edit picker and the older overlays. sw.js v124.

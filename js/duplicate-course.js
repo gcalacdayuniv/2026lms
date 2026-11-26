@@ -22,21 +22,13 @@ export const nextTerm = (ay, sem) => {
 };
 
 const $ = (id) => document.getElementById(id);
-const close = () => { const m = $('dcModal'); if (m) m.remove(); };
+const close = () => UI.closeOverlay('dcModal');
 
 const open = (courseId, term) => {
     close();
     const [ay, sem] = (term || '').split('|');
     const n = nextTerm(ay, sem);
-    const m = document.createElement('div');
-    m.id = 'dcModal';
-    m.dataset.courseId = courseId;
-    m.className = 'fixed inset-0 z-[70] flex items-center justify-center fade-in p-4';
-    m.setAttribute('role', 'dialog');
-    m.setAttribute('aria-modal', 'true');
-    m.setAttribute('aria-label', 'Copy class to another term');
-    m.innerHTML = `<div id="dcBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 relative z-10">
+    const dlg = UI.overlay({ id: 'dcModal', label: 'Copy class to another term', z: 70, panelClass: 'bg-white rounded-lg shadow-xl w-full max-w-sm p-5', html: `
             <h3 class="text-lg font-bold text-gray-800 mb-1"><i class="fa-solid fa-copy text-blue-600 mr-2" aria-hidden="true"></i>Copy to another term</h3>
             <p class="text-xs text-gray-600 mb-4">Copies the details, schedule, room and exams (switched off, dates cleared). Students, attendance and scores are not copied.</p>
             <div id="dcError" class="hidden bg-red-100 text-red-700 p-2 rounded text-sm font-medium mb-3"></div>
@@ -48,8 +40,9 @@ const open = (courseId, term) => {
                 <button type="button" id="dcCancel" class="px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-800">Cancel</button>
                 <button type="button" id="dcCopy" class="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold">Copy class</button>
             </div>
-        </div>`;
-    document.body.appendChild(m);
+        ` });
+    const m = dlg.el;
+    m.dataset.courseId = courseId;
 };
 
 const copy = async () => {
@@ -78,7 +71,6 @@ const copy = async () => {
 document.addEventListener('click', (e) => {
     const t = e.target.closest && e.target.closest('.duplicate-course-btn');
     if (t) { e.preventDefault(); open(t.dataset.courseId, t.dataset.term); return; }
-    if (e.target.closest && (e.target.closest('#dcCancel') || e.target.id === 'dcBg')) { close(); return; }
+    if (e.target.closest && (e.target.closest('#dcCancel'))) { close(); return; }
     if (e.target.closest && e.target.closest('#dcCopy')) copy();
 });
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && $('dcModal')) close(); });

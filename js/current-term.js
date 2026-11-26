@@ -43,7 +43,7 @@ export const loadTerm = async () => {
 
 // ---- the Admin tools dialog ----
 const $ = (id) => document.getElementById(id);
-const close = () => { const m = $('ctModal'); if (m) m.remove(); };
+const close = () => UI.closeOverlay('ctModal');
 const FIELD = 'w-full border border-gray-300 rounded-md p-2 text-base focus:ring-2 focus:ring-blue-500 outline-none';
 const LABEL = 'block text-xs font-bold text-gray-500 uppercase tracking-wider';
 
@@ -54,14 +54,7 @@ const note = (t) => t.source === 'set'
 const open = async () => {
     close();
     const t = await loadTerm();
-    const m = document.createElement('div');
-    m.id = 'ctModal';
-    m.className = 'fixed inset-0 z-[70] flex items-center justify-center fade-in p-4';
-    m.setAttribute('role', 'dialog');
-    m.setAttribute('aria-modal', 'true');
-    m.setAttribute('aria-label', 'Current academic term');
-    m.innerHTML = `<div id="ctBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 relative z-10">
+    const dlg = UI.overlay({ id: 'ctModal', label: 'Current academic term', z: 70, panelClass: 'bg-white rounded-lg shadow-xl w-full max-w-sm p-5', html: `
             <h3 class="text-lg font-bold text-gray-800 mb-1"><i class="fa-solid fa-calendar-check text-blue-600 mr-2" aria-hidden="true"></i>Current academic term</h3>
             <p class="text-xs text-gray-600 mb-4">Everyone sees this term as the current one: the class list filter, new classes and student re-activation.</p>
             <div id="ctError" role="alert" class="hidden bg-red-100 text-red-700 p-2 rounded text-sm font-medium mb-3"></div>
@@ -78,8 +71,8 @@ const open = async () => {
                 <button type="button" id="ctCloseBtn" class="px-3 py-2 min-h-[44px] text-sm font-bold text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Close</button>
                 <button type="button" id="ctSaveBtn" class="px-4 py-2 min-h-[44px] text-sm font-bold text-white bg-blue-600 rounded-md hover:bg-blue-700">Save</button>
             </div>
-        </div>`;
-    document.body.appendChild(m);
+        ` });
+    const m = dlg.el;
     $('ctAY').focus();
 };
 
@@ -99,10 +92,9 @@ const send = async (body) => {
 
 document.addEventListener('click', (e) => {
     if (e.target.closest('#openCtModalBtn')) { open(); return; }
-    if (e.target.closest('#ctCloseBtn') || e.target.id === 'ctBg') { close(); return; }
+    if (e.target.closest('#ctCloseBtn')) { close(); return; }
     if (e.target.closest('#ctSaveBtn')) { send({ ay: $('ctAY').value.trim(), sem: $('ctSem').value, endDate: $('ctEnd').value }); return; }
     if (e.target.closest('#ctResetBtn')) send({ reset: true });
 });
 // Changing the term clears the last-day date: it belongs to the term it was set for.
 document.addEventListener('change', (e) => { if ((e.target.id === 'ctAY' || e.target.id === 'ctSem') && $('ctEnd')) $('ctEnd').value = ''; });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('ctModal')) close(); });
