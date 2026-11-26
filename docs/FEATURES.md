@@ -585,3 +585,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Refactor: `apiPost` and `fileToBase64`
 - `js/globals.js` now exports `apiPost(endpoint, body, options)` (JSON POST through `apiFetch`) and `fileToBase64(blob)`. 35 hand-written `apiFetch(..., { method: 'POST', body: JSON.stringify(...) })` calls in 20 files use `apiPost`, and the six private base64 readers (auth, class-mode, course-plan, course-dashboard, course-scan-photos) use `fileToBase64`. Behaviour is unchanged. Use these two in new code. sw.js v122.
+
+## Refactor: shared `UI.overlay`
+- `js/ui-feedback.js` now has `UI.overlay({ id, label, html, z, panelClass, backdropClass, onClose })` returning `{ el, panel, close }`: dimmed backdrop, tap-outside and any `[data-overlay-close]` close it, Escape closes only the top-most overlay (and is not passed on to other handlers), focus goes in and returns to the button that opened it. The Course Plan topic form / Quick add / day picker and the online-class proof viewer use it; `seat-map.js` (rotated on phones) and the older overlays still build their own and can move over one at a time. Use it for new dialogs. sw.js v123.

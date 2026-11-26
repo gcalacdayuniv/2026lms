@@ -119,20 +119,18 @@ export const CoursePlan = {
     },
 
     // ---- topic form / quick add (own overlay above the page)
-    closeForm: () => { $('cpForm')?.remove(); },
+    closeForm: () => { if (CoursePlan.form) CoursePlan.form.close(); CoursePlan.form = null; },
 
     shell: (title, inner) => {
         CoursePlan.closeForm();
-        const m = document.createElement('div');
-        m.id = 'cpForm';
-        m.className = 'fixed inset-0 z-[150] flex items-center justify-center fade-in p-0 sm:p-4';
-        m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', title);
-        m.innerHTML = `<div class="absolute inset-0 bg-gray-900 bg-opacity-60" id="cpFormBg"></div>
-            <div class="relative z-10 bg-white w-full sm:max-w-xl h-full sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-lg shadow-xl p-4 flex flex-col" style="padding-top:max(1rem, env(safe-area-inset-top))">
-                <div class="shrink-0 flex items-center gap-3 mb-3 border-b pb-3"><h3 class="flex-1 text-lg font-bold text-gray-800">${esc(title)}</h3><button type="button" id="cpFormClose" class="p-2 text-gray-500" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button></div>
-                <div class="flex-1 overflow-y-auto min-h-0">${inner}</div></div>`;
-        document.body.appendChild(m);
-        return m;
+        CoursePlan.form = UI.overlay({
+            id: 'cpForm', label: title, z: 150,
+            panelClass: 'bg-white sm:max-w-xl h-full sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-lg shadow-xl p-4 flex flex-col',
+            html: `<div class="shrink-0 flex items-center gap-3 mb-3 border-b pb-3"><h3 class="flex-1 text-lg font-bold text-gray-800">${esc(title)}</h3><button type="button" data-overlay-close class="p-2 text-gray-500" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button></div>
+                <div class="flex-1 overflow-y-auto min-h-0">${inner}</div>`
+        });
+        CoursePlan.form.panel.style.paddingTop = 'max(1rem, env(safe-area-inset-top))';
+        return CoursePlan.form.el;
     },
 
     topicForm: (topic) => {
@@ -266,7 +264,6 @@ export const initCoursePlan = () => {
         if (!t.closest) return;
         if (t.closest('#openCoursePlanBtn')) { $('courseMenuModal')?.classList.add('hidden'); CoursePlan.open(); return; }
         if (t.closest('#closeCoursePlanBtn') || t.id === 'closeCoursePlanBg') { CoursePlan.close(); return; }
-        if (t.closest('#cpFormClose') || t.id === 'cpFormBg') { CoursePlan.closeForm(); return; }
         if (t.closest('#pdLink')) { PlanDay.picker(); return; }
         if (t.closest('#pdSave')) { await PlanDay.save(); return; }
         if (!$('coursePlanModal') || $('coursePlanModal').classList.contains('hidden')) return;
@@ -312,9 +309,9 @@ export const initCoursePlan = () => {
     document.addEventListener('change', (e) => {
         if (e.target && e.target.id === 'cpSylFile') { const f = e.target.files && e.target.files[0]; e.target.value = ''; CoursePlan.attach(f); }
     });
+    // Escape closes an open topic form first (UI.overlay handles that); otherwise the Course Plan page itself.
     document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
-        if ($('cpForm')) CoursePlan.closeForm(); else if ($('coursePlanModal') && !$('coursePlanModal').classList.contains('hidden')) CoursePlan.close();
+        if (e.key === 'Escape' && $('coursePlanModal') && !$('coursePlanModal').classList.contains('hidden')) CoursePlan.close();
     });
 };
 initCoursePlan();

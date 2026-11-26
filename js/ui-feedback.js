@@ -17,6 +17,50 @@ const COLORS = {
 
 const MAX_TOASTS = 4;
 
+
+// ---- Shared overlay: a dialog above the page with a dimmed backdrop. Backdrop tap, Escape (the top-most overlay only), and any
+// element with data-overlay-close close it; focus goes in and returns to the button that opened it.
+//   const o = UI.overlay({ id, label, html, z, panelClass, backdropClass, onClose });   o.el, o.panel, o.close()
+const overlayStack = [];
+const onOverlayKey = (e) => {
+    if (e.key !== 'Escape' || !overlayStack.length) return;
+    e.stopPropagation();
+    overlayStack[overlayStack.length - 1].close();
+};
+window.addEventListener('keydown', onOverlayKey, true);
+
+const overlay = ({ id, label = 'Dialog', html = '', z = 150, panelClass = 'bg-white sm:max-w-xl rounded-none sm:rounded-lg shadow-xl p-4', backdropClass = 'bg-gray-900 bg-opacity-60', onClose = null } = {}) => {
+    if (id) document.getElementById(id)?.remove();
+    const root = document.createElement('div');
+    if (id) root.id = id;
+    root.className = 'fixed inset-0 flex items-center justify-center fade-in p-0 sm:p-4';
+    root.style.zIndex = String(z);
+    root.setAttribute('role', 'dialog');
+    root.setAttribute('aria-modal', 'true');
+    root.setAttribute('aria-label', label);
+    root.innerHTML = `<div data-overlay-bg class="absolute inset-0 ${backdropClass}"></div><div data-overlay-panel class="relative z-10 w-full ${panelClass}">${html}</div>`;
+    const opener = document.activeElement;
+    const api = {
+        el: root,
+        panel: root.querySelector('[data-overlay-panel]'),
+        close: () => {
+            if (!root.isConnected) return;
+            root.remove();
+            const i = overlayStack.indexOf(api);
+            if (i >= 0) overlayStack.splice(i, 1);
+            if (opener && opener.focus && document.contains(opener)) opener.focus();
+            if (onClose) onClose();
+        }
+    };
+    root.querySelector('[data-overlay-bg]').addEventListener('click', api.close);
+    root.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('[data-overlay-close]')) api.close(); });
+    overlayStack.push(api);
+    document.body.appendChild(root);
+    const first = api.panel.querySelector('textarea, input:not([type="hidden"]), select, button');
+    if (first) first.focus();
+    return api;
+};
+
 export const UI = {
     host: null,
 
@@ -77,6 +121,8 @@ export const UI = {
     error: (message, duration = 5000) => UI.toast(message, 'error', duration),
     warning: (message, duration = 4500) => UI.toast(message, 'warning', duration),
     info: (message, duration) => UI.toast(message, 'info', duration),
+
+    overlay,
 
     confirm: ({
         title = 'Please confirm',

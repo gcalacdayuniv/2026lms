@@ -4,6 +4,7 @@
 import { apiFetch, apiPost, fileToBase64 } from './globals.js';
 const post = apiPost;
 import { UI } from './ui-feedback.js';
+import { escapeHtml as esc } from './html-utils.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -95,18 +96,18 @@ export const ClassMode = {
         try {
             const r = await apiFetch(`/api/class-mode-proof?courseId=${encodeURIComponent(ClassMode.courseId)}&date=${encodeURIComponent(ClassMode.date)}&_t=${Date.now()}`);
             ClassMode.closeViewer();
-            const m = document.createElement('div');
-            m.id = 'cmViewer';
-            m.className = 'fixed inset-0 z-[160] bg-black bg-opacity-90 flex flex-col items-center justify-center p-2';
-            m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', `Online class proof for ${ClassMode.date}`);
-            m.innerHTML = `<button type="button" id="cmViewerClose" aria-label="Close" class="absolute top-3 right-3 w-11 h-11 rounded-full bg-white/90 text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
-                <p class="text-white text-sm font-bold mb-2">Online class, ${ClassMode.date}</p>
-                <img alt="Screenshot of the online class on ${ClassMode.date}" class="max-w-full max-h-[85vh] object-contain rounded" src="data:${/^image\/(jpeg|png|webp)$/.test(r.mimeType) ? r.mimeType : 'image/jpeg'};base64,${r.base64}">`;
-            document.body.appendChild(m);
+            const mime = /^image\/(jpeg|png|webp)$/.test(r.mimeType) ? r.mimeType : 'image/jpeg';
+            ClassMode.viewer = UI.overlay({
+                id: 'cmViewer', label: `Online class proof for ${ClassMode.date}`, z: 160,
+                backdropClass: 'bg-black bg-opacity-90', panelClass: 'flex flex-col items-center justify-center',
+                html: `<button type="button" data-overlay-close aria-label="Close" class="absolute top-3 right-3 w-11 h-11 rounded-full bg-white/90 text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
+                    <p class="text-white text-sm font-bold mb-2">Online class, ${esc(ClassMode.date)}</p>
+                    <img alt="Screenshot of the online class on ${esc(ClassMode.date)}" class="max-w-full max-h-[85vh] object-contain rounded" src="data:${mime};base64,${r.base64}">`
+            });
         } catch (err) { UI.error(err.message || 'Could not open the picture.'); }
     },
 
-    closeViewer: () => { const v = $('cmViewer'); if (v) v.remove(); },
+    closeViewer: () => { if (ClassMode.viewer) ClassMode.viewer.close(); ClassMode.viewer = null; },
 
     init: () => {
         if (ClassMode.bound) return;
@@ -118,12 +119,10 @@ export const ClassMode = {
             if (m) { ClassMode.setMode(m.dataset.mode); return; }
             if (t.closest('#cmProofBtn')) { $('cmProofFile')?.click(); return; }
             if (t.closest('#cmViewProof')) { ClassMode.viewProof(); return; }
-            if (t.closest('#cmViewerClose') || t.id === 'cmViewer') ClassMode.closeViewer();
         });
         document.addEventListener('change', (e) => {
             if (e.target && e.target.id === 'cmProofFile') { const f = e.target.files && e.target.files[0]; e.target.value = ''; ClassMode.sendProof(f); }
         });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ClassMode.closeViewer(); });
     }
 };
 
