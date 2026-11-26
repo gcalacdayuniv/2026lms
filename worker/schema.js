@@ -4,9 +4,17 @@ import { ensureExamSecurity } from './exam-photos.js';
 // Worker start (a flag remembers it) and is called from worker.js before the routes that need that table.
 // The tables that already exist in D1 (Users, Courses, Enrollments, Attendance, Assessments and so on) are not created here.
 
-let scanTablesReady = false;
-export async function ensureScanTables(env) {
-    if (scanTablesReady) return;
+// Runs a table setup once per Worker instance: concurrent callers share one run, and a failed run is tried again next time.
+function once(setup) {
+    let done = false, running = null;
+    return async (env) => {
+        if (done) return;
+        if (!running) running = Promise.resolve(setup(env)).then(() => { done = true; }).finally(() => { running = null; });
+        await running;
+    };
+}
+
+export const ensureScanTables = once(async (env) => {
     await env.DB.batch([
         env.DB.prepare(`
             CREATE TABLE IF NOT EXISTS Scan_Sessions (
@@ -83,15 +91,11 @@ export async function ensureScanTables(env) {
             if (!/duplicate column/i.test(String(err && err.message))) throw err;
         }
     }
-    scanTablesReady = true;
-}
+});
 
-let loginTableReady = false;
-export async function ensureLoginTable(env) {
-    if (loginTableReady) return;
+export const ensureLoginTable = once(async (env) => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Login_Attempts (Attempt_Key TEXT PRIMARY KEY, Fails INTEGER NOT NULL, First_At INTEGER NOT NULL)").run();
-    loginTableReady = true;
-}
+});
 
 // Per-user settings that follow the person to any device (for now: the preferred paper size).
 export async function ensureUserPrefs(env) {
@@ -197,38 +201,29 @@ export async function ensureManualMarksColumn(env) {
 
 // Year-level advance: moves every student up one year level (Users.year, which drives class targeting, and
 // Program_Year). Each run is logged per student so the latest run can be undone.
-let yearAdvanceReady = false;
-export async function ensureYearAdvanceTables(env) {
-    if (yearAdvanceReady) return;
+export const ensureYearAdvanceTables = once(async (env) => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Year_Advance_Batches (Batch_ID TEXT PRIMARY KEY, Academic_Year TEXT, Max_Year INTEGER, Lecturer_ID TEXT, Advanced INTEGER, Applied_At TEXT, Undone INTEGER DEFAULT 0)").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Year_Advance_Log (Log_ID TEXT PRIMARY KEY, Batch_ID TEXT NOT NULL, User_ID TEXT NOT NULL, Old_Year TEXT, New_Year TEXT, Old_Program_Year TEXT, New_Program_Year TEXT)").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_year_log_batch ON Year_Advance_Log (Batch_ID)").run();
     for (const col of ["Old_Status TEXT", "New_Status TEXT"]) {
         try { await env.DB.prepare(`ALTER TABLE Year_Advance_Log ADD COLUMN ${col}`).run(); } catch (e) { /* already there */ }
     }
-    yearAdvanceReady = true;
-}
+});
 
 // Lecturer's private notes per student per class. Never returned by any student-facing route.
-let lecturerNotesReady = false;
-export async function ensureLecturerNotes(env) {
-    if (lecturerNotesReady) return;
+export const ensureLecturerNotes = once(async (env) => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Lecturer_Notes (Note_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Student_ID TEXT NOT NULL, Lecturer_ID TEXT, Body TEXT NOT NULL, Created_At TEXT DEFAULT CURRENT_TIMESTAMP, Updated_At TEXT DEFAULT CURRENT_TIMESTAMP)").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_lnotes_course_student ON Lecturer_Notes (Course_ID, Student_ID)").run();
-    lecturerNotesReady = true;
-}
+});
 
 // Students moved up by Advance Year Level are set Inactive until reactivated. These Users columns track that:
 //   Advanced_Term: the academic year they were advanced into; Reactivation_Until: last day they may request reactivation (optional);
 //   Reactivation_Requested: when they asked at the login screen. Only "Active" accounts can sign in.
-let reactivationReady = false;
-export async function ensureReactivationColumns(env) {
-    if (reactivationReady) return;
+export const ensureReactivationColumns = once(async (env) => {
     for (const col of ["Advanced_Term TEXT", "Reactivation_Until TEXT", "Reactivation_Requested TEXT"]) {
         try { await env.DB.prepare(`ALTER TABLE Users ADD COLUMN ${col}`).run(); } catch (e) { /* already there */ }
     }
-    reactivationReady = true;
-}
+});
 
 // Invite code a lecturer gives students so they can join a class themselves.
 // Letters and digits that are hard to mix up (no 0/O, 1/I).
@@ -253,9 +248,7 @@ export async function setInviteCode(env, courseId, avoid = "") {
 }
 
 // Adds the column once and gives EVERY class that has no code one (existing classes included).
-let inviteReady = false;
-export async function ensureInviteCode(env) {
-    if (inviteReady) return;
+export const ensureInviteCode = once(async (env) => {
     try { await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Invite_Code TEXT").run(); } catch (e) { /* already there */ }
     try { await env.DB.prepare("ALTER TABLE Courses ADD COLUMN Invite_Expires TEXT").run(); } catch (e) { /* already there */ }
     await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_invite ON Courses (Invite_Code)").run();
@@ -263,8 +256,7 @@ export async function ensureInviteCode(env) {
     await env.DB.prepare("UPDATE Courses SET Invite_Expires = ? WHERE Invite_Code IS NOT NULL AND Invite_Expires IS NULL").bind(inviteExpiryIso()).run();
     const missing = (await env.DB.prepare("SELECT Course_ID FROM Courses WHERE Invite_Code IS NULL OR TRIM(Invite_Code) = ''").all()).results || [];
     for (const r of missing) await setInviteCode(env, r.Course_ID);
-    inviteReady = true;
-}
+});
 
 // Indexes for the tables every class screen reads. Created once per Worker start; a table that does not exist yet
 // (some are created on first use) is skipped and tried again on the next start. Plain indexes only, so existing data is never rejected.
@@ -295,9 +287,7 @@ export async function ensureCoreIndexes(env) {
 }
 
 // Room = the classroom the class meets in. Added to an existing Courses table the first time it is needed.
-let courseRoomReady = false;
-export async function ensureCourseRoom(env) {
-    if (courseRoomReady) return;
+export const ensureCourseRoom = once(async (env) => {
     // Archived = 1: the lecturer put the class away (hidden from the main list, nothing deleted).
     for (const col of ["Room TEXT", "Archived INTEGER", "AcademicYear TEXT", "Semester TEXT"]) {
         try {
@@ -306,45 +296,32 @@ export async function ensureCourseRoom(env) {
             if (!/duplicate column/i.test(String(err && err.message))) throw err;
         }
     }
-    courseRoomReady = true;
-}
+});
 
 // Group sets: several named sets of groups per class (for different activities). The "Reporting" set is not stored here;
 // it is the existing Enrollments.Group_Name / Assigned_Topic. Every other set keeps one row per student in Group_Members.
-let groupTablesReady = false;
-export async function ensureGroupTables(env) {
-    if (groupTablesReady) return;
+export const ensureGroupTables = once(async (env) => {
     await env.DB.batch([
         env.DB.prepare("CREATE TABLE IF NOT EXISTS Group_Sets (Set_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Name TEXT NOT NULL, Created_At DATETIME DEFAULT CURRENT_TIMESTAMP)"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_group_sets_course ON Group_Sets (Course_ID)"),
         env.DB.prepare("CREATE TABLE IF NOT EXISTS Group_Members (Set_ID TEXT NOT NULL, Student_ID TEXT NOT NULL, Group_Name TEXT NOT NULL, Topic TEXT, PRIMARY KEY (Set_ID, Student_ID))")
     ]);
-    groupTablesReady = true;
-}
+});
 
 // A locked seat is skipped by auto-assignment (Seat Plan).
-let seatLockReady = false;
-export async function ensureSeatLock(env) {
-    if (seatLockReady) return;
+export const ensureSeatLock = once(async (env) => {
     try { await env.DB.prepare("ALTER TABLE Enrollments ADD COLUMN Seat_Locked INTEGER DEFAULT 0").run(); } catch (e) { /* already there */ }
-    seatLockReady = true;
-}
+});
 
 // Online class days (the default is Onsite, no row): one row per course and date, with an optional proof picture kept in Google Drive.
-let classModesReady = false;
-export async function ensureClassModes(env) {
-    if (classModesReady) return;
+export const ensureClassModes = once(async (env) => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Class_Modes (Course_ID TEXT NOT NULL, Date TEXT NOT NULL, Mode TEXT NOT NULL, Proof_File_ID TEXT, Updated_At TEXT, PRIMARY KEY (Course_ID, Date))").run();
-    classModesReady = true;
-}
+});
 
 // Course syllabus file (kept in Google Drive), learning plan topics and the date -> topic links (many to many).
-let coursePlanReady = false;
-export async function ensureCoursePlan(env) {
-    if (coursePlanReady) return;
+export const ensureCoursePlan = once(async (env) => {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Course_Syllabus (Course_ID TEXT PRIMARY KEY, File_ID TEXT, File_Name TEXT, Mime_Type TEXT, Updated_At TEXT)").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Plan_Topics (Topic_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Sort_Order INTEGER, Time_Allot TEXT, Contents TEXT, Questions TEXT, Outcomes TEXT, Activities TEXT, Assessments TEXT, Refs TEXT, Updated_At TEXT)").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_plan_topics_course ON Plan_Topics (Course_ID, Sort_Order)").run();
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS Plan_Day_Links (Course_ID TEXT NOT NULL, Date TEXT NOT NULL, Topic_ID TEXT NOT NULL, PRIMARY KEY (Course_ID, Date, Topic_ID))").run();
-    coursePlanReady = true;
-}
+});

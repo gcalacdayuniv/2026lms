@@ -579,3 +579,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 ## Refactor: one status painter for attendance rows, shared UD / Dropped rules
 - `course-attendance.js`: the five copies of the Present/Late/Absent/Excused button colours (default load, saved records, local draft, undo restore, automatic absent) are one `paintRowStatus(row, status)`. Behaviour is unchanged.
 - The UD / Dropped / Graduated rules live in `worker/constants.js` (`statusKey`, `AUTO_ABSENT_STATUSES`, `NO_SEAT_STATUSES`; used by seats.js and attendance.js) and `js/student-status.js` (`isAutoAbsent`, `hasNoSeat`; used by the class list). The two files must stay in sync. sw.js v121.
+
+## Refactor: `once()` for table setups
+- `worker/schema.js`: eleven `ensure*` functions repeated a module-level "ready" flag; they are now `export const ensureX = once(async (env) => {...})`. Concurrent callers share one run and a failed run is retried on the next request. `ensureCoreIndexes` keeps its own flag because it only counts as done when every index was created. New table setups should use `once`. Worker only (no site files, no cache bump).
