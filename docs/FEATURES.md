@@ -562,3 +562,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 ## Floor plan: four rows per screen, compact popover
 - Lecturer plan shows four rows at a time (equal height); a fifth row onward scrolls inside the plan, which opens at row 1 (nearest the lecturer). The eye-condition colour guide and status legend are removed (ring colours stay; the attendance buttons show the status colours), the Lecturer bar is thin, and "n students have no seat" moved under the title.
 - The participation popover is one compact row (Note, minus, number, plus) kept inside the visible plan (above or below the tapped box, never clipped). sw.js v117.
+
+## Syllabus fix (PDF reading) and sharing between classes of the same course code
+- Fix: viewing an attached syllabus failed with "Something went wrong" because the Apps Script `read` action only returned pictures. It now accepts `anyType: true` (used for the syllabus, limit 5 MB). **Deploy: paste the updated `gas/Code.gs` into Apps Script and redeploy the web app (Manage deployments > edit > New version).** Until then, Attach works but View fails.
+- Same course code: the Course Plan page has a "Same course code" card listing the lecturer's other classes with the same `CourseCode`, each with Use theirs / Send mine. `POST /api/plan-copy {courseId (source), toCourseIds}` shares the syllabus (same Drive file) and copies plan topics (new ids, no calendar links) only into a class that has no topics yet. Only the lecturer's own classes with the same code are allowed (403 otherwise).
+- Tests: extended "Course plan" block. Deploy: Worker + site files (sw.js v118) + Apps Script.

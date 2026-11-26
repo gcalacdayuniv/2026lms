@@ -971,6 +971,20 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('lecturer reads the syllabus back', got.s === 200 && got.j.base64 === 'QUJD' && got.j.mimeType === 'application/pdf');
   ok('remove the syllabus', (await call('POST', '/api/course-syllabus-delete', { token: L1, body: { courseId: 'SP' } })).s === 200 && (await plan(L1)).j.syllabus === null);
   ok('deleting a topic removes its day links', (await call('POST', '/api/plan-topic-delete', { token: L1, body: { courseId: 'SP', topicId: ids[1] } })).s === 200 && sql.prepare("select count(*) n from Plan_Day_Links where Topic_ID=?").get(ids[1]).n === 0);
+  // same course code: share the syllabus and plan between a lecturer's classes
+  sql.exec(`insert into Courses(Course_ID,CourseCode,CourseTitle,Lecturer_ID) values('PX1','PXC','Plan A','L1'),('PX2','PXC','Plan B','L1'),('PX3','PXC','Plan C','L2'),('PX4','PXD','Other code','L1')`);
+  await call('POST', '/api/course-syllabus', { token: L1, body: { courseId: 'PX1', base64: 'A'.repeat(300), fileName: 'finman.pdf', mimeType: 'application/pdf' } });
+  await call('POST', '/api/plan-quick-add', { token: L1, body: { courseId: 'PX1', lines: [{ time: 'Week 1', contents: 'Syllabus' }, { time: 'Week 2', contents: 'Intro' }] } });
+  const same = (await plan(L1, 'PX2')).j.sameCode;
+  ok('same course code lists only my classes with that code', same.length === 1 && same[0].courseId === 'PX1' && same[0].hasSyllabus && same[0].topics === 2, JSON.stringify(same));
+  const cp = await call('POST', '/api/plan-copy', { token: L1, body: { courseId: 'PX1', toCourseIds: ['PX2'] } });
+  ok('copy syllabus and plan to the other class', cp.s === 200 && cp.j.syllabusCopied === 1 && cp.j.planCopied === 1 && (await plan(L1, 'PX2')).j.topics.length === 2 && (await plan(L1, 'PX2')).j.syllabus.name === 'finman.pdf', JSON.stringify(cp.j));
+  const cp2 = await call('POST', '/api/plan-copy', { token: L1, body: { courseId: 'PX1', toCourseIds: ['PX2'] } });
+  ok('a class that already has topics keeps its plan', cp2.j.planSkipped === 1 && (await plan(L1, 'PX2')).j.topics.length === 2);
+  ok('cannot copy to another lecturer or another course code', (await call('POST', '/api/plan-copy', { token: L1, body: { courseId: 'PX1', toCourseIds: ['PX3'] } })).s === 403 && (await call('POST', '/api/plan-copy', { token: L1, body: { courseId: 'PX1', toCourseIds: ['PX4'] } })).s === 403);
+  ok('cannot copy from another lecturer\'s class', (await call('POST', '/api/plan-copy', { token: l2.j.token, body: { courseId: 'PX1', toCourseIds: ['PX3'] } })).s === 403);
+  await call('GET', '/api/course-syllabus?courseId=PX2', { token: L1 });
+  ok('the syllabus is read from Drive as any file type', JSON.parse(JSON.stringify(gasBodies[gasBodies.length - 1])).anyType === true);
   globalThis.fetch = realFetch;
   delete env.GAS_WEBHOOK_URL;
 }

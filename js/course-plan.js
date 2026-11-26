@@ -33,7 +33,7 @@ const FIELD_DEFS = [
 
 export const CoursePlan = {
     courseId: '',
-    data: { syllabus: null, topics: [] },
+    data: { syllabus: null, topics: [], sameCode: [] },
     day: { date: '', ids: [] },
     token: 0,
 
@@ -42,7 +42,7 @@ export const CoursePlan = {
         const mine = ++CoursePlan.token;
         const r = await apiFetch(`/api/course-plan?courseId=${encodeURIComponent(courseId)}&_t=${Date.now()}`);
         if (mine !== CoursePlan.token) return false;
-        CoursePlan.data = { syllabus: r.syllabus || null, topics: r.topics || [] };
+        CoursePlan.data = { syllabus: r.syllabus || null, topics: r.topics || [], sameCode: r.sameCode || [] };
         return true;
     },
 
@@ -89,6 +89,15 @@ export const CoursePlan = {
                 ${syllabus ? `<button type="button" id="cpSylView" class="${btn} border-emerald-300 bg-white text-emerald-700"><i class="fa-regular fa-eye mr-1" aria-hidden="true"></i>View</button><button type="button" id="cpSylRemove" class="${btn} border-red-300 bg-white text-red-700">Remove</button>` : ''}
                 <input type="file" id="cpSylFile" accept=".pdf,.docx,image/png,image/jpeg,application/pdf" class="hidden">
             </div></section>`;
+        const mineHas = !!syllabus || topics.length > 0;
+        const sameCode = CoursePlan.data.sameCode;
+        const share = sameCode.length ? `<section class="mb-5 p-3 rounded-lg border border-indigo-200 bg-indigo-50">
+            <h4 class="text-xs font-bold uppercase tracking-wide text-indigo-800 mb-1"><i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Same course code</h4>
+            <p class="text-[11px] text-gray-600 mb-2">Use one syllabus and plan for your other classes of this course. Topics are copied only into a class that has none yet; calendar links are not copied.</p>
+            ${sameCode.map(o => `<div class="flex items-center gap-2 py-1 border-t border-indigo-100" data-other="${esc(o.courseId)}">
+                <div class="flex-1 min-w-0"><p class="text-sm font-bold text-gray-800 truncate">${esc(o.title || 'Class')}</p><p class="text-[11px] text-gray-500 truncate">${esc([o.day, o.time].filter(Boolean).join(' ') || 'No schedule')} · ${o.hasSyllabus ? 'syllabus' : 'no syllabus'} · ${o.topics} topic${o.topics === 1 ? '' : 's'}</p></div>
+                <button type="button" class="cp-get ${btn} border-indigo-300 bg-white text-indigo-700 disabled:opacity-40" ${o.hasSyllabus || o.topics ? '' : 'disabled'}>Use theirs</button>
+                <button type="button" class="cp-send ${btn} border-indigo-600 bg-indigo-600 text-white disabled:opacity-40" ${mineHas ? '' : 'disabled'}>Send mine</button></div>`).join('')}</section>` : '';
         const card = (t, i) => `<article class="mb-3 p-3 rounded-lg border border-gray-200 bg-white" data-topic="${esc(t.topicId)}">
             <div class="flex items-start gap-2">
                 <div class="flex-1 min-w-0">
@@ -107,7 +116,7 @@ export const CoursePlan = {
                 <button type="button" class="cp-edit ${btn} border-gray-300 bg-white text-gray-700"><i class="fa-solid fa-pen mr-1" aria-hidden="true"></i>Edit</button>
                 <button type="button" class="cp-del ${btn} border-red-300 bg-white text-red-700"><i class="fa-regular fa-trash-can mr-1" aria-hidden="true"></i>Delete</button>
             </div></article>`;
-        body.innerHTML = `${syl}
+        body.innerHTML = `${syl}${share}
             <div class="flex items-center gap-2 mb-2">
                 <h4 class="flex-1 text-sm font-bold text-gray-800">Course learning plan <span class="text-gray-400 font-medium">(${topics.length})</span></h4>
                 <button type="button" id="cpQuick" class="${btn} border-emerald-300 bg-white text-emerald-700">Quick add</button>
@@ -266,6 +275,20 @@ export const initCoursePlan = () => {
         if (t.closest('#cpSylRemove')) {
             if (!(await UI.confirm({ title: 'Remove the syllabus?', message: 'It is unlinked from this class. The topics stay.', confirmText: 'Remove' }))) return;
             try { await post('/api/course-syllabus-delete', { courseId: CoursePlan.courseId }); await CoursePlan.load(CoursePlan.courseId); CoursePlan.paint(); } catch (err) { UI.error(err.message); }
+            return;
+        }
+        const other = t.closest('[data-other]');
+        if (other && (t.closest('.cp-get') || t.closest('.cp-send'))) {
+            const get = !!t.closest('.cp-get');
+            const row = CoursePlan.data.sameCode.find(o => o.courseId === other.dataset.other);
+            const name = (row && row.title) || 'that class';
+            const msg = get ? `Copy the syllabus${row && row.topics ? ' and plan' : ''} of ${name} into this class? ${CoursePlan.data.topics.length && row && row.topics ? 'This class already has topics, so its plan is kept.' : ''}` : `Copy this class's syllabus${CoursePlan.data.topics.length ? ' and plan' : ''} into ${name}? ${row && row.topics ? 'It already has topics, so its plan is kept.' : ''}`;
+            if (!(await UI.confirm({ title: get ? 'Use their syllabus?' : 'Send to that class?', message: msg.trim(), confirmText: 'Copy' }))) return;
+            try {
+                const r = await post('/api/plan-copy', get ? { courseId: other.dataset.other, toCourseIds: [CoursePlan.courseId] } : { courseId: CoursePlan.courseId, toCourseIds: [other.dataset.other] });
+                await CoursePlan.load(CoursePlan.courseId); CoursePlan.paint();
+                UI.success(`Copied${r.syllabusCopied ? ' syllabus' : ''}${r.planCopied ? (r.syllabusCopied ? ' and plan' : ' plan') : ''}${r.planSkipped ? ' (plan kept: the class already has topics)' : ''}.`);
+            } catch (err) { UI.error(err.message || 'Could not copy.'); }
             return;
         }
         const card = t.closest('article[data-topic]');

@@ -3,7 +3,7 @@
 //   1. Direct upload (no "action"): whole file in one request (small files, profile pictures).
 //   2. action "chunk":  stores one piece of a large upload in a temporary Drive folder.
 //   3. action "finish": joins the pieces, saves the final file, deletes the temporary pieces.
-//   4. action "read":   returns one stored picture (base64) so the app can show a saved answer sheet.
+//   4. action "read":   returns one stored picture (base64) so the app can show a saved answer sheet (anyType:true also allows a syllabus PDF / Word file).
 //   5. action "email":  sends one plain-text email (used for password resets). Needs the Mail permission: after pasting
 //      this file, run any function once in the editor and accept the new permission, then deploy a new version.
 
@@ -116,9 +116,10 @@ function handleRead(payload) {
   var file = DriveApp.getFileById(fileId);
   var blob = file.getBlob();
   var mime = String(blob.getContentType() || "");
-  if (mime.indexOf("image/") !== 0) throw new Error("This file is not a picture.");
+  // Pictures by default; a course syllabus (PDF / Word) is read with anyType:true and may be a little larger.
+  if (!payload.anyType && mime.indexOf("image/") !== 0) throw new Error("This file is not a picture.");
   var bytes = blob.getBytes();
-  if (bytes.length > MAX_READ_BYTES) throw new Error("This picture is too large to read here.");
+  if (bytes.length > (payload.anyType ? 5 * 1024 * 1024 : MAX_READ_BYTES)) throw new Error("This file is too large to read here.");
   return { success: true, mimeType: mime, base64: Utilities.base64Encode(bytes) };
 }
 

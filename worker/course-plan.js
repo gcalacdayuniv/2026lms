@@ -13,7 +13,7 @@ const FIELDS = [['time', 'Time_Allot', 120], ['contents', 'Contents', 4000], ['q
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''));
 const clean = (v, max) => String(v == null ? '' : v).replace(/\r\n/g, '\n').trim().slice(0, max);
 
-const ROUTES = new Set(['/api/course-plan', '/api/plan-topic', '/api/plan-topic-delete', '/api/plan-topic-move', '/api/plan-quick-add', '/api/plan-day', '/api/course-syllabus', '/api/course-syllabus-delete']);
+const ROUTES = new Set(['/api/course-plan', '/api/plan-topic', '/api/plan-topic-delete', '/api/plan-topic-move', '/api/plan-quick-add', '/api/plan-day', '/api/course-syllabus', '/api/course-syllabus-delete', '/api/plan-copy']);
 
 export async function handleCoursePlan(request, env, path, url, corsHeaders, user) {
     if (!ROUTES.has(path)) return null;
@@ -35,8 +35,15 @@ export async function handleCoursePlan(request, env, path, url, corsHeaders, use
         const syl = await env.DB.prepare("SELECT File_Name, Mime_Type, Updated_At FROM Course_Syllabus WHERE Course_ID = ?").bind(courseId).first();
         const byTopic = new Map();
         (links.results || []).forEach(l => { if (!byTopic.has(l.Topic_ID)) byTopic.set(l.Topic_ID, []); byTopic.get(l.Topic_ID).push(l.Date); });
+        // The lecturer's other classes with the same course code (a syllabus and plan are usually shared by them).
+        const others = await env.DB.prepare(`SELECT c.Course_ID, c.CourseTitle, c.ScheduleDay, c.TimePeriod,
+                (SELECT COUNT(*) FROM Course_Syllabus s WHERE s.Course_ID = c.Course_ID) AS Has_Syl,
+                (SELECT COUNT(*) FROM Plan_Topics t WHERE t.Course_ID = c.Course_ID) AS Topic_Count
+            FROM Courses c WHERE c.CourseCode = (SELECT CourseCode FROM Courses WHERE Course_ID = ?) AND c.Lecturer_ID = ? AND c.Course_ID != ? ORDER BY c.CourseTitle, c.ScheduleDay`)
+            .bind(courseId, course.Lecturer_ID, courseId).all();
         return json(corsHeaders, {
             success: true,
+            sameCode: (others.results || []).map(o => ({ courseId: o.Course_ID, title: o.CourseTitle || '', day: o.ScheduleDay || '', time: o.TimePeriod || '', hasSyllabus: !!o.Has_Syl, topics: o.Topic_Count || 0 })),
             syllabus: syl ? { name: syl.File_Name, mimeType: syl.Mime_Type, updatedAt: syl.Updated_At } : null,
             topics: (topics.results || []).map(t => ({
                 topicId: t.Topic_ID, time: t.Time_Allot || '', contents: t.Contents || '', questions: t.Questions || '', outcomes: t.Outcomes || '',
@@ -107,6 +114,36 @@ export async function handleCoursePlan(request, env, path, url, corsHeaders, use
         return json(corsHeaders, { success: true, linked: ids.length });
     }
 
+    // Copies this class's syllabus and learning plan to other classes of the same lecturer with the same course code.
+    // The syllabus file is shared (same Drive file); plan topics are copied without their calendar links, and only into a class that has no topics yet.
+    if (request.method === 'POST' && path === '/api/plan-copy') {
+        const targets = [...new Set((Array.isArray(body.toCourseIds) ? body.toCourseIds : []).map(String))].filter(id => id !== courseId).slice(0, 30);
+        if (!targets.length) return json(corsHeaders, { error: 'Pick a class to copy to.' }, 400);
+        const src = await env.DB.prepare("SELECT CourseCode FROM Courses WHERE Course_ID = ?").bind(courseId).first();
+        const syl = await env.DB.prepare("SELECT File_ID, File_Name, Mime_Type FROM Course_Syllabus WHERE Course_ID = ?").bind(courseId).first();
+        const topics = (await env.DB.prepare("SELECT * FROM Plan_Topics WHERE Course_ID = ? ORDER BY Sort_Order, Topic_ID").bind(courseId).all()).results || [];
+        if (!syl && !topics.length) return json(corsHeaders, { error: 'This class has no syllabus or plan to copy yet.' }, 400);
+        const now = new Date().toISOString();
+        let syllabusCopied = 0, planCopied = 0, planSkipped = 0;
+        for (const to of targets) {
+            const t = await env.DB.prepare("SELECT CourseCode, Lecturer_ID FROM Courses WHERE Course_ID = ?").bind(to).first();
+            if (!t || t.Lecturer_ID !== course.Lecturer_ID || t.CourseCode !== src.CourseCode) return json(corsHeaders, { error: 'You can only copy to your own classes with the same course code.' }, 403);
+            if (syl) {
+                await env.DB.prepare("INSERT INTO Course_Syllabus (Course_ID, File_ID, File_Name, Mime_Type, Updated_At) VALUES (?, ?, ?, ?, ?) ON CONFLICT(Course_ID) DO UPDATE SET File_ID = excluded.File_ID, File_Name = excluded.File_Name, Mime_Type = excluded.Mime_Type, Updated_At = excluded.Updated_At")
+                    .bind(to, syl.File_ID, syl.File_Name, syl.Mime_Type, now).run();
+                syllabusCopied++;
+            }
+            if (topics.length) {
+                const has = await env.DB.prepare("SELECT COUNT(*) AS n FROM Plan_Topics WHERE Course_ID = ?").bind(to).first();
+                if (has.n > 0) { planSkipped++; continue; }
+                await env.DB.batch(topics.map((x, i) => env.DB.prepare("INSERT INTO Plan_Topics (Topic_ID, Course_ID, Sort_Order, Time_Allot, Contents, Questions, Outcomes, Activities, Assessments, Refs, Updated_At) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                    .bind(crypto.randomUUID(), to, i + 1, x.Time_Allot, x.Contents, x.Questions, x.Outcomes, x.Activities, x.Assessments, x.Refs, now)));
+                planCopied++;
+            }
+        }
+        return json(corsHeaders, { success: true, syllabusCopied, planCopied, planSkipped });
+    }
+
     if (request.method === 'POST' && path === '/api/course-syllabus') {
         const { base64, fileName, mimeType } = body;
         const ext = SYLLABUS_TYPES[String(mimeType || '')];
@@ -123,7 +160,7 @@ export async function handleCoursePlan(request, env, path, url, corsHeaders, use
     if (request.method === 'GET' && path === '/api/course-syllabus') {
         const row = await env.DB.prepare("SELECT File_ID, File_Name, Mime_Type FROM Course_Syllabus WHERE Course_ID = ?").bind(courseId).first();
         if (!row) return json(corsHeaders, { error: 'No syllabus is attached to this class.' }, 404);
-        const gas = await callGas(env, JSON.stringify({ action: 'read', fileId: row.File_ID }));
+        const gas = await callGas(env, JSON.stringify({ action: 'read', fileId: row.File_ID, anyType: true }));
         if (!gas.base64) throw new Error('Google Drive did not return the file.');
         return json(corsHeaders, { success: true, name: row.File_Name, mimeType: row.Mime_Type, base64: gas.base64 });
     }
