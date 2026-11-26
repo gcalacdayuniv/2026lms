@@ -567,3 +567,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Fix: viewing an attached syllabus failed with "Something went wrong" because the Apps Script `read` action only returned pictures. It now accepts `anyType: true` (used for the syllabus, limit 5 MB). **Deploy: paste the updated `gas/Code.gs` into Apps Script and redeploy the web app (Manage deployments > edit > New version).** Until then, Attach works but View fails.
 - Same course code: the Course Plan page has a "Same course code" card listing the lecturer's other classes with the same `CourseCode`, each with Use theirs / Send mine. `POST /api/plan-copy {courseId (source), toCourseIds}` shares the syllabus (same Drive file) and copies plan topics (new ids, no calendar links) only into a class that has no topics yet. Only the lecturer's own classes with the same code are allowed (403 otherwise).
 - Tests: extended "Course plan" block. Deploy: Worker + site files (sw.js v118) + Apps Script.
+
+## Syllabus View: open the tab inside the tap
+- View now opens the new tab immediately (phones block a tab opened after the download finishes) and points it at the file; if the browser refuses, the file is saved instead. A PDF cannot be shown in an in-page frame because the CSP has no `frame-src`/`object-src` for blobs. sw.js v119.

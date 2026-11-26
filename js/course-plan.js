@@ -191,15 +191,26 @@ Weeks 11-12 | Swaps, Caps and Floors Markets</pre>
         CoursePlan.paint();
     },
 
+    // A PDF opens in a new tab. The tab is opened right away, inside the tap (phones block a tab opened after the download),
+    // then pointed at the file; if the browser still refuses, the file is saved instead.
     viewSyllabus: async () => {
+        const tab = window.open('', '_blank');
+        if (tab) { try { tab.document.title = 'Syllabus'; tab.document.body.textContent = 'Opening the syllabus...'; } catch (e) { /* ignore */ } }
         try {
             const r = await apiFetch(`/api/course-syllabus?courseId=${encodeURIComponent(CoursePlan.courseId)}&_t=${Date.now()}`);
             const bytes = Uint8Array.from(atob(r.base64), c => c.charCodeAt(0));
             const url = URL.createObjectURL(new Blob([bytes], { type: r.mimeType }));
-            if (r.mimeType === 'application/pdf' || r.mimeType.startsWith('image/')) { if (!window.open(url, '_blank')) UI.info('Your browser blocked the new tab. Allow pop-ups and try again.'); }
-            else { const a = document.createElement('a'); a.href = url; a.download = r.name || 'syllabus'; document.body.appendChild(a); a.click(); a.remove(); }
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-        } catch (err) { UI.error(err.message || 'Could not open the syllabus.'); }
+            const viewable = r.mimeType === 'application/pdf' || r.mimeType.startsWith('image/');
+            if (tab && viewable) tab.location.href = url;
+            else {
+                if (tab) tab.close();
+                const a = document.createElement('a'); a.href = url; a.download = r.name || 'syllabus'; document.body.appendChild(a); a.click(); a.remove();
+            }
+            setTimeout(() => URL.revokeObjectURL(url), 120000);
+        } catch (err) {
+            if (tab) tab.close();
+            UI.error(err.message || 'Could not open the syllabus.');
+        }
     }
 };
 
