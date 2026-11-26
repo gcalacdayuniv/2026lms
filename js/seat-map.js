@@ -11,6 +11,7 @@ import { escapeHtml as esc, safeUrl } from './html-utils.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
 import { CourseClass } from './course-class.js';
+import { LecturerNotes } from './lecturer-notes.js';
 
 const PER_COLUMN = 5;
 const PER_ROW = PER_COLUMN * 2;
@@ -83,6 +84,7 @@ export const SeatMap = {
             att: { on: false, date: opts.date || byId('attendanceDate')?.value || todayManila(), records: new Map(), brush: 'Present', noClass: false, dirty: false }
         });
         if (opts.attendance) await SeatMap.attendanceOn(true);
+        else { await SeatMap.loadAttendance(); SeatMap.render(); }      // Absent / Excused colours show even when not checking attendance
     },
 
     // Student: only their own seat is marked. The server returns the student's seat and the highest seat number, nothing else.
@@ -238,8 +240,9 @@ export const SeatMap = {
         }
         const info = st.seats.get(n);
         const a = st.att;
-        const rec = a.on && info ? a.records.get(info.id) : null;
-        const stat = rec ? statusOf(rec.status) : null;
+        const rec = info ? a.records.get(info.id) : null;
+        let stat = rec ? statusOf(rec.status) : null;
+        if (!a.on && stat && !['Absent', 'Excused'].includes(stat.key)) stat = null;      // not checking: only Absent / Excused stay coloured
         if (!info) {
             return `<div class="min-w-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-start p-1" style="flex:1 1 0" aria-label="Seat ${n}, empty"><span class="text-[11px] font-black text-gray-400">${n}</span></div>`;
         }
@@ -343,6 +346,7 @@ export const SeatMap = {
     popHtml: (pop) => `<div id="smPop" role="dialog" aria-label="Participation for ${esc(pop.info.name)}" class="absolute z-20 w-52 rounded-lg bg-white border border-gray-300 shadow-xl p-2" style="visibility:hidden;top:0;left:0">
         <div class="flex items-center gap-1 mb-1.5"><p class="flex-1 min-w-0 text-xs font-bold text-gray-800 truncate">${esc(pop.info.name)}</p>
             <button type="button" id="smPopClose" aria-label="Close" class="w-8 h-8 shrink-0 text-gray-500"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+        <button type="button" id="smPopNote" class="w-full min-h-[44px] mb-2 px-2 rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-sm font-bold"><i class="fa-solid fa-note-sticky mr-1" aria-hidden="true"></i>Lecturer note</button>
         <p class="text-[11px] text-gray-500 mb-1">Participation points</p>
         <div class="flex items-center gap-1">
             <button type="button" class="sm-pop-step min-h-[44px] min-w-[44px] rounded-md border border-red-300 text-red-700 font-black text-lg bg-white" data-step="-1" aria-label="Minus one point">&minus;</button>
@@ -384,7 +388,7 @@ export const SeatMap = {
         document.addEventListener('click', async (e) => {
             if (e.target.closest('#attendanceFloorBtn')) {
                 const courseId = window.location.hash.replace('#class-', '');
-                await SeatMap.openLecturer(CourseClass.currentStudents, { courseId, attendance: true, onDirty: () => CourseClass.loadClassScreen(courseId, true) });
+                await SeatMap.openLecturer(CourseClass.currentStudents, { courseId, attendance: false, onDirty: () => CourseClass.loadClassScreen(courseId, true) });
                 return;
             }
             if (e.target.closest('#seatMapClose') || e.target.id === 'seatMapBg') { SeatMap.close(); return; }
@@ -392,6 +396,7 @@ export const SeatMap = {
             if (!st || !byId('seatMapModal') || byId('seatMapModal').classList.contains('hidden')) return;
             if (e.target.closest('#smAttToggle')) { await SeatMap.attendanceOn(!st.att.on); return; }
             if (e.target.closest('#smPopClose')) { SeatMap.closePop(); return; }
+            if (e.target.closest('#smPopNote') && st.pop) { LecturerNotes.openModal(st.courseId, st.pop.info.id, st.pop.info.name); return; }
             const step = e.target.closest('.sm-pop-step');
             if (step && st.pop) {
                 st.pop.value = Math.round((st.pop.value + Number(step.dataset.step)) * 100) / 100;

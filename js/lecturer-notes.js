@@ -32,7 +32,7 @@ export const LecturerNotes = {
         LecturerNotes.closeModal();
         const m = document.createElement('div');
         m.id = 'lnModal';
-        m.className = 'fixed inset-0 z-[70] flex items-start sm:items-center justify-center fade-in';
+        m.className = 'fixed inset-0 z-[140] flex items-start sm:items-center justify-center fade-in';
         m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', `Lecturer notes for ${name || 'student'}`);
         m.innerHTML = `<div id="lnBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
             <div class="relative z-10 bg-white w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-lg shadow-xl p-4 flex flex-col" style="padding-top:max(1rem, env(safe-area-inset-top))">

@@ -535,3 +535,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Floor plan: fit to screen (lecturer)
 - All rows and both columns now fit the full-screen lecturer plan without scrolling: rows share the height, boxes stretch (no longer forced square). Only Absent and Excused keep the colour overlay; Present and Late show the ring and letter badge only. sw.js v110.
+
+## Floor plan: standing colours, note button, opens without attendance
+- Absent and Excused keep their colour overlay when attendance checking is off (the day's records load when the plan opens); Present/Late show only while checking. The popover has a Lecturer note button above the points (opens the Lecturer's notes dialog, now z-[140] so it sits over the plan). The plan opened from the attendance row no longer starts in attendance mode; "Check attendance" must be switched on in the header. sw.js v111.
