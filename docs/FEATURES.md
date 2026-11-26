@@ -541,3 +541,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Lecturer note box: no iOS zoom, taller
 - The note textarea uses 16 px text (iOS Safari zooms into inputs below 16 px) and is at least 40% of the screen height. sw.js v112.
+
+## Student seat button moved into the class heading; note box grows on focus
+- The long green "View seating arrangement" button is removed from the student's class card (a card with no seat still says "Unassigned"). The seat button lives in the class heading (`#ssSeatBtn`) and is now a solid blue button matching the heading. The Lecturer note box is normal size until tapped, then grows to two thirds of the visible screen (capped so Add note stays above the keyboard) and shrinks back when left. sw.js v113.

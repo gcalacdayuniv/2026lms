@@ -615,7 +615,7 @@ const DashboardUI = {
                     </div>
                 </div>
                 <div id="ssEnrollmentInfo" class="hidden ss-info-grid max-w-4xl mx-auto px-4 sm:px-6 pb-3">
-                    <button type="button" id="ssSeatBtn" class="ss-info-cell seat-map-trigger text-left rounded-lg px-2 py-1.5 -mx-2 -my-1 disabled:cursor-default enabled:hover:bg-white/10 enabled:bg-white/10" disabled aria-label="Seat, show the floor plan"><div class="ss-info-label"><i class="fa-solid fa-chair" aria-hidden="true"></i> Seat</div><div class="ss-info-val"><span id="ssSeat">-</span><i id="ssSeatIcon" class="fa-solid fa-table-cells hidden ml-1.5 text-[10px]" aria-hidden="true"></i></div></button>
+                    <button type="button" id="ssSeatBtn" class="ss-info-cell seat-map-trigger text-left rounded-lg px-2 py-1.5 -mx-2 -my-1 disabled:cursor-default enabled:bg-blue-600 enabled:hover:bg-blue-500 enabled:border enabled:border-white/40 enabled:shadow" disabled aria-label="Seat, show the floor plan"><div class="ss-info-label"><i class="fa-solid fa-chair" aria-hidden="true"></i> Seat</div><div class="ss-info-val"><span id="ssSeat">-</span><i id="ssSeatIcon" class="fa-solid fa-table-cells hidden ml-1.5 text-[10px]" aria-hidden="true"></i></div></button>
                 </div>
                 <div id="ssTermTabs" class="ss-tabs max-w-4xl mx-auto" role="tablist" aria-label="Term">
                     <button type="button" role="tab" class="ss-term-tab is-active" data-term="midterm" aria-selected="true">Mid Term</button>
