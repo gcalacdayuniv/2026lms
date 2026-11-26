@@ -1,6 +1,7 @@
 // worker/worker.js
 import { authorize } from './auth.js';
 import { handleAttendance } from './attendance.js';
+import { handleClassModes } from './class-modes.js';
 import { handleScores } from './scores.js';
 import { handleGroups } from './groups.js';
 import { handleSeats } from './seats.js';
@@ -99,6 +100,9 @@ export default {
 
             const coursesResponse = await handleCourses(request, env, path, url, corsHeaders);
             if (coursesResponse) return coursesResponse;
+
+            const classModesResponse = await handleClassModes(request, env, path, url, corsHeaders);
+            if (classModesResponse) return classModesResponse;
 
             const attendanceResponse = await handleAttendance(request, env, path, url, corsHeaders);
             if (attendanceResponse) return attendanceResponse;

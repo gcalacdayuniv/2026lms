@@ -547,3 +547,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Student heading: full-width seat button
 - The class heading's seat button (`#ssSeatBtn`) spans the screen width: "Seat N" on the left, "View my seat >" on the right (blue, opens the floor plan). sw.js v114.
+
+## Online / onsite class days with proof picture
+- What: the attendance screen (lecturer) has a "Class mode" row under the date bar: Onsite (default, no stored row) or Online. An online day can have one proof picture (screenshot of the video meeting): Add / Replace proof (shrunk to 1280 px JPEG on the phone) and View proof (full-screen viewer). Marking a day onsite again removes the online row and the link to the picture (the Drive file stays).
+- Rules: table `Class_Modes (Course_ID, Date, Mode, Proof_File_ID, Updated_At)` created lazily by `ensureClassModes`. Routes in `worker/class-modes.js`: `GET /api/class-modes` (lecturer or enrolled student: dates + hasProof only), `POST /api/class-mode`, `POST/GET /api/class-mode-proof` (lecturer of the class only; routes not in `RULES` are owner-checked). The picture lives in Drive under "Online Class Proof/<courseId>" via the existing Apps Script upload/read (no Apps Script change). Students never receive the file.
+- Tests: "Class mode" block in worker.test.mjs. Deploy: Worker + site files (sw.js v115); no Apps Script or secret change.

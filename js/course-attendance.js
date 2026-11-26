@@ -1,4 +1,5 @@
 // js/course-attendance.js
+import { ClassMode } from './class-mode.js';
 import { escapeHtml } from './html-utils.js';
 import { apiFetch } from './globals.js';
 import { CourseScores } from './course-scores.js';
@@ -533,6 +534,8 @@ export const CourseAttendance = {
         try {
             const ts = new Date().getTime();
             const data = await apiFetch(`/api/attendance?courseId=${courseId}&date=${date}&_t=${ts}`);
+
+            ClassMode.load(courseId, date);
 
             // Remember whether this date is already saved on the server (drives the new-date confirmation).
             CourseAttendance.dateHasRecords = !!(data.records && data.records.length > 0) && !data.isNoClass;

@@ -908,5 +908,31 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('clearing a seat also clears the lock', (await set('P1', '', true)).s === 200 && sql.prepare("select Seat_Locked l from Enrollments where Student_ID='P1' and Course_ID='SP'").get().l === 0);
 }
 
+// ---- Class mode: onsite (default) or online with a proof picture only the lecturer can open
+{
+  const realFetch = globalThis.fetch;
+  env.GAS_WEBHOOK_URL = 'https://gas.test/exec';
+  let gasBodies = [];
+  globalThis.fetch = async (u, init) => { gasBodies.push(JSON.parse(init.body)); return new Response(JSON.stringify({ success: true, fileId: 'PF1', base64: 'QUJD', mimeType: 'image/jpeg' }), { status: 200 }); };
+  const modes = (token) => call('GET', '/api/class-modes?courseId=SP', { token });
+  const stuTok = await signToken(env, 'P1');
+  ok('a day is onsite by default', (await modes(L1)).j.modes.length === 0);
+  ok('lecturer marks a day online', (await call('POST', '/api/class-mode', { token: L1, body: { courseId: 'SP', date: '2026-03-02', mode: 'online' } })).s === 200);
+  ok('a bad mode is refused', (await call('POST', '/api/class-mode', { token: L1, body: { courseId: 'SP', date: '2026-03-02', mode: 'cloud' } })).s === 400);
+  const up = await call('POST', '/api/class-mode-proof', { token: L1, body: { courseId: 'SP', date: '2026-03-02', base64: 'A'.repeat(400), mimeType: 'image/jpeg' } });
+  ok('proof picture is stored in Drive and linked', up.s === 201 && gasBodies[0].pathParts.join('/') === 'Online Class Proof/SP' && sql.prepare("select Proof_File_ID f from Class_Modes where Course_ID='SP' and Date='2026-03-02'").get().f === 'PF1', JSON.stringify(up.j));
+  const sm = await modes(stuTok);
+  ok('an enrolled student sees online + hasProof but never the file', sm.s === 200 && sm.j.modes.length === 1 && sm.j.modes[0].hasProof === true && !JSON.stringify(sm.j).includes('PF1'));
+  ok('a student cannot open the proof', (await call('GET', '/api/class-mode-proof?courseId=SP&date=2026-03-02', { token: stuTok })).s === 403);
+  ok('a student cannot change the mode', (await call('POST', '/api/class-mode', { token: stuTok, body: { courseId: 'SP', date: '2026-03-03', mode: 'online' } })).s === 403);
+  ok('another lecturer cannot touch my class', (await call('POST', '/api/class-mode', { token: l2.j.token, body: { courseId: 'SP', date: '2026-03-03', mode: 'online' } })).s === 403 && (await call('GET', '/api/class-mode-proof?courseId=SP&date=2026-03-02', { token: l2.j.token })).s === 403);
+  const view = await call('GET', '/api/class-mode-proof?courseId=SP&date=2026-03-02', { token: L1 });
+  ok('lecturer opens the proof', view.s === 200 && view.j.base64 === 'QUJD');
+  ok('marking onsite removes the online row', (await call('POST', '/api/class-mode', { token: L1, body: { courseId: 'SP', date: '2026-03-02', mode: 'onsite' } })).s === 200 && (await modes(L1)).j.modes.length === 0);
+  ok('too small or missing picture is refused', (await call('POST', '/api/class-mode-proof', { token: L1, body: { courseId: 'SP', date: '2026-03-02', base64: 'x' } })).s === 400);
+  globalThis.fetch = realFetch;
+  delete env.GAS_WEBHOOK_URL;
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

@@ -329,3 +329,11 @@ export async function ensureSeatLock(env) {
     try { await env.DB.prepare("ALTER TABLE Enrollments ADD COLUMN Seat_Locked INTEGER DEFAULT 0").run(); } catch (e) { /* already there */ }
     seatLockReady = true;
 }
+
+// Online class days (the default is Onsite, no row): one row per course and date, with an optional proof picture kept in Google Drive.
+let classModesReady = false;
+export async function ensureClassModes(env) {
+    if (classModesReady) return;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS Class_Modes (Course_ID TEXT NOT NULL, Date TEXT NOT NULL, Mode TEXT NOT NULL, Proof_File_ID TEXT, Updated_At TEXT, PRIMARY KEY (Course_ID, Date))").run();
+    classModesReady = true;
+}
