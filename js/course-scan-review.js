@@ -3,7 +3,7 @@
 // Every question is one row in two columns: on the left the photo of that question's row cut out of the
 // student's sheet, on the right the choices to correct the answer by hand. Only the photo of the student on
 // screen is downloaded (and kept on the device for 7 days, see PhotoCache), never the whole class.
-import { apiFetch } from './globals.js';
+import { apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { PhotoCache, ScanPhotos } from './course-scan-photos.js';
@@ -459,7 +459,7 @@ export const CourseScanReview = {
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>';
         try {
-            const res = await apiFetch('/api/scan-sheets/correct', { method: 'POST', body: JSON.stringify({ sheetId: sheet.Sheet_ID, answers: draft, marks: sess.Layout ? marks : undefined }) });
+            const res = await apiPost('/api/scan-sheets/correct', { sheetId: sheet.Sheet_ID, answers: draft, marks: sess.Layout ? marks : undefined });
             sheet.Answers = draft.slice();
             sheet.Marks = { ...marks };
             delete CourseScanReview.markDrafts[sheet.Sheet_ID];

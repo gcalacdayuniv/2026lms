@@ -3,23 +3,16 @@
 //  - Course Actions > Course Plan opens a full-screen page: syllabus (attach / view / remove) and the plan topics
 //    (time allotment, contents, essential questions, learning outcomes, activities, assessment tasks, references).
 //  - On the attendance screen, "Topics for this day" links 0, 1 or several topics to the chosen date; a topic can be taught on several days.
-import { apiFetch } from './globals.js';
+import { apiFetch, apiPost, fileToBase64 } from './globals.js';
+const post = apiPost;
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 
 const $ = (id) => document.getElementById(id);
-const post = (path, body) => apiFetch(path, { method: 'POST', body: JSON.stringify(body) });
 const courseIdNow = () => window.location.hash.replace('#class-', '');
 const first = (text) => String(text || '').split('\n').map(s => s.trim()).find(Boolean) || '';
 const niceDate = (d) => { const t = new Date(`${d}T00:00:00`); return Number.isNaN(t.getTime()) ? d : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
 const FILE_TYPES = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
-
-const toBase64 = (file) => new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(',')[1]);
-    r.onerror = reject;
-    r.readAsDataURL(file);
-});
 
 const FIELD_DEFS = [
     ['time', 'Time allotment', 'Week 3 & 4 / 3 hours', 1],
@@ -185,7 +178,7 @@ Weeks 11-12 | Swaps, Caps and Floors Markets</pre>
         if (file.size > 4 * 1024 * 1024) { UI.error('The file is larger than 4 MB. Compress it first.'); return; }
         const b = $('cpSylAttach'); if (b) { b.disabled = true; b.textContent = 'Uploading...'; }
         try {
-            await post('/api/course-syllabus', { courseId: CoursePlan.courseId, base64: await toBase64(file), fileName: file.name, mimeType });
+            await post('/api/course-syllabus', { courseId: CoursePlan.courseId, base64: await fileToBase64(file), fileName: file.name, mimeType });
             await CoursePlan.load(CoursePlan.courseId); UI.success('Syllabus attached.');
         } catch (err) { UI.error(err.message || 'Could not attach the file.'); }
         CoursePlan.paint();

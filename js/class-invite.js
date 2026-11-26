@@ -1,5 +1,5 @@
 // Invite codes: a lecturer shows a class's code; a student joins a class by typing it.
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
 import { CourseDashboard } from './course-dashboard.js';
@@ -85,7 +85,7 @@ const renew = async () => {
     const ok = await UI.confirm({ title: 'Make a new code?', message: 'The old code will stop working and the new one is valid for 7 days. Students already enrolled stay enrolled.', confirmText: 'New code' });
     if (!ok) return;
     try {
-        showInvite(await apiFetch('/api/class-invite', { method: 'POST', body: JSON.stringify({ courseId: m.dataset.courseId, renew: true }) }));
+        showInvite(await apiPost('/api/class-invite', { courseId: m.dataset.courseId, renew: true }));
         UI.success('New code ready');
     } catch (e) { UI.error(e.message || 'Could not make a new code'); }
 };
@@ -163,7 +163,7 @@ const lookup = async () => {
     const code = $('joinCode').value;
     btn.disabled = true;
     try {
-        const r = await apiFetch('/api/join-class', { method: 'POST', body: JSON.stringify({ code, preview: true, studentId: AppState.user.User_ID }) });
+        const r = await apiPost('/api/join-class', { code, preview: true, studentId: AppState.user.User_ID });
         $('joinBody').dataset.code = code;
         $('joinBody').innerHTML = stepConfirm(r.course);
         $('joinConfirmBtn').focus();
@@ -177,7 +177,7 @@ const confirmJoin = async () => {
     const btn = $('joinConfirmBtn');
     btn.disabled = true;
     try {
-        const r = await apiFetch('/api/join-class', { method: 'POST', body: JSON.stringify({ code: $('joinBody').dataset.code, studentId: AppState.user.User_ID }) });
+        const r = await apiPost('/api/join-class', { code: $('joinBody').dataset.code, studentId: AppState.user.User_ID });
         closeJoin();
         UI.success(`Joined ${r.course ? r.course.CourseCode : 'the class'}`);
         await CourseDashboard.loadDashboardData('fresh');

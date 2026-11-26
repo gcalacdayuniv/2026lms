@@ -6,7 +6,8 @@
 //   bar and each row runs 10 ... 1. It is built for a wide (landscape) screen: ten large boxes across, each with the student's profile
 //   picture as its background. In Attendance mode a tap puts the chosen status (Present, Late, Absent, Excused) on that student and
 //   saves it at once (/api/attendance/single), so the plan doubles as an attendance sheet.
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
+const post = apiPost;
 import { escapeHtml as esc, safeUrl } from './html-utils.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
@@ -16,7 +17,6 @@ import { LecturerNotes } from './lecturer-notes.js';
 const PER_COLUMN = 5;
 const PER_ROW = PER_COLUMN * 2;
 const byId = (id) => document.getElementById(id);
-const post = (path, body) => apiFetch(path, { method: 'POST', body: JSON.stringify(body) });
 
 const STATUSES = [
     { key: 'Present', letter: 'P', ring: '#16a34a', fill: 'rgba(22,163,74,.38)', btn: 'bg-green-600 text-white border-green-600', idle: 'text-green-700 border-green-300' },

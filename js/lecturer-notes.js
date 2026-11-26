@@ -1,7 +1,7 @@
 // js/lecturer-notes.js
 // Lecturer's private notes per student per class (behaviour, participation, other written observations).
 // Opened in their own dialog from the class roster (note button beside the gear); the notes are never part of any student-facing response.
-import { apiFetch } from './globals.js';
+import { apiFetch, apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
 
@@ -122,7 +122,7 @@ export const LecturerNotes = {
         if (!t || !btn || !t.value.trim()) return;
         btn.disabled = true;
         try {
-            await apiFetch('/api/lecturer-notes', { method: 'POST', body: JSON.stringify({ courseId: LecturerNotes.courseId, studentId: LecturerNotes.studentId, noteId: LecturerNotes.editingId || undefined, body: t.value }) });
+            await apiPost('/api/lecturer-notes', { courseId: LecturerNotes.courseId, studentId: LecturerNotes.studentId, noteId: LecturerNotes.editingId || undefined, body: t.value });
             UI.success(LecturerNotes.editingId ? 'Note updated.' : 'Note added.');
             await LecturerNotes.open(LecturerNotes.courseId, LecturerNotes.studentId);
         } catch (err) {

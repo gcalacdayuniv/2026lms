@@ -1,7 +1,7 @@
 // js/site-icon.js
 // The site icon (favicon). Everyone gets the one the Admin chose (GET /api/site-icon, public), kept on the device so the tab
 // shows it at once; the Admin changes it in Admin tools > Site icon (a picture is cut to a 192 x 192 PNG here, then saved).
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { PWA, SITE_ICON_KEY } from './pwa.js';
 
@@ -97,7 +97,7 @@ export const SiteIcon = {
 
     save: async (icon) => {
         try {
-            await apiFetch('/api/site-icon', { method: 'POST', body: JSON.stringify({ icon }) });
+            await apiPost('/api/site-icon', { icon });
             setLinks(icon);
             PWA.useSiteIcon(icon);
             try { if (icon) localStorage.setItem(KEY, icon); else localStorage.removeItem(KEY); } catch (e) { /* storage blocked */ }

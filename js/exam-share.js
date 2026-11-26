@@ -1,6 +1,6 @@
 // js/exam-share.js
 // Share dialog: the owner of an exam picks which lecturers (who teach the same course code) may use it.
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 
@@ -62,7 +62,7 @@ export const ExamShare = {
             const ids = [...body.querySelectorAll('input[type="checkbox"]:checked')].map(i => i.value);
             save.disabled = true;
             try {
-                await apiFetch('/api/exams/share', { method: 'POST', body: JSON.stringify({ examId, lecturerId: AppState.user.User_ID, lecturerIds: ids }) });
+                await apiPost('/api/exams/share', { examId, lecturerId: AppState.user.User_ID, lecturerIds: ids });
                 UI.success(ids.length ? `Shared with ${ids.length} lecturer${ids.length === 1 ? '' : 's'}` : 'Sharing turned off');
                 close();
                 if (onDone) await onDone();

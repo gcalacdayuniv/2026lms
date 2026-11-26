@@ -1,5 +1,5 @@
 // js/course-dashboard.js
-import { apiFetch, AppState, CONFIG, handleSessionExpired } from './globals.js';
+import { apiFetch, AppState, CONFIG, handleSessionExpired, apiPost, fileToBase64 } from './globals.js';
 import { CourseExam } from './course-exam.js';
 import { UI } from './ui-feedback.js';
 import { Skeleton } from './skeletons.js';
@@ -435,7 +435,7 @@ document.addEventListener('click', async (e) => {
     if (!btn) return;
     const archive = btn.dataset.archive === '1';
     try {
-        await apiFetch('/api/archive-course', { method: 'POST', body: JSON.stringify({ courseId: btn.dataset.courseId, lecturerId: AppState.user.User_ID, archived: archive }) });
+        await apiPost('/api/archive-course', { courseId: btn.dataset.courseId, lecturerId: AppState.user.User_ID, archived: archive });
         const course = CourseDashboard.lecturerData && CourseDashboard.lecturerData.courses.find(c => c.Course_ID === btn.dataset.courseId);
         if (course) course.Archived = archive ? 1 : 0;
         UI.success(archive ? 'Class archived' : 'Class restored');
@@ -609,12 +609,7 @@ export const CourseDashboard = {
                 const ext = file.name.split('.').pop();
                 finalFilename = `${baseFilename}.${ext}`;
 
-                base64Data = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result.split(',')[1]);
-                    reader.onerror = error => reject(error);
-                    reader.readAsDataURL(file);
-                });
+                base64Data = await fileToBase64(file);
             } else {
                 const urlLink = document.getElementById('submitUrlInput').value.trim();
                 if (!urlLink) throw new Error("Please enter a URL link.");
@@ -709,7 +704,7 @@ export const CourseDashboard = {
         };
 
         try {
-            await apiFetch('/api/programs', { method: 'POST', body: JSON.stringify(payload) });
+            await apiPost('/api/programs', payload);
             UI.success('Added to registration list');
             successDiv.textContent = "Added to Registration List successfully!";
             successDiv.classList.remove('hidden');
@@ -750,7 +745,7 @@ export const CourseDashboard = {
         };
 
         try {
-            await apiFetch('/api/courses', { method: 'POST', body: JSON.stringify(payload) });
+            await apiPost('/api/courses', payload);
             document.getElementById('addCourseForm').reset();
             document.getElementById('ccModal').classList.add('hidden');
             UI.success('Course created');

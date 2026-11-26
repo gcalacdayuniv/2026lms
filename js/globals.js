@@ -126,3 +126,14 @@ export const apiFetch = async (endpoint, options = {}) => {
         clearTimeout(timer);
     }
 };
+
+// POST a JSON body to the Worker API (same errors as apiFetch).
+export const apiPost = (endpoint, body, options = {}) => apiFetch(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) });
+
+// The base64 text of a file or picture (without the "data:...;base64," prefix).
+export const fileToBase64 = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(new Error('Could not read the file.'));
+    reader.readAsDataURL(blob);
+});

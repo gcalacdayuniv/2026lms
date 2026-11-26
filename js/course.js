@@ -1,5 +1,5 @@
 // js/course.js
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 import { CourseDashboard } from './course-dashboard.js';
 import { CourseClass } from './course-class.js';
 import { CourseAttendance } from './course-attendance.js';
@@ -524,7 +524,7 @@ export const CourseModule = {
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
             try {
-                const res = await apiFetch('/api/update-student-details', { method: 'POST', body: JSON.stringify(payload) });
+                const res = await apiPost('/api/update-student-details', payload);
                 const stu = (CourseClass.currentStudents || []).find(x => x.User_ID === studentId);
                 if (stu && res.student) {
                     stu.Name = res.student.Name;

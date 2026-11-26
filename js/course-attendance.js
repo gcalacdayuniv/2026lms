@@ -2,7 +2,7 @@
 import { ClassMode } from './class-mode.js';
 import { PlanDay } from './course-plan.js';
 import { escapeHtml } from './html-utils.js';
-import { apiFetch } from './globals.js';
+import { apiFetch, apiPost } from './globals.js';
 import { CourseScores } from './course-scores.js';
 import { UI } from './ui-feedback.js';
 import { termPoints } from './participation.js';
@@ -534,7 +534,7 @@ export const CourseAttendance = {
                 records: attendanceData
             };
 
-            await apiFetch('/api/attendance', { method: 'POST', body: JSON.stringify(payload) });
+            await apiPost('/api/attendance', payload);
 
             CourseAttendance.clearDraft(courseId, dateVal);
             CourseAttendance.setBaseline();

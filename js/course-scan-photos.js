@@ -3,7 +3,7 @@
 // another device. The photo is shrunk on the phone (about 100 to 200 KB), kept in IndexedDB until the sheet
 // itself is confirmed saved, then sent to the Worker, which stores it in Google Drive. It is deleted from the
 // phone only after the server confirms. A failed or offline upload never blocks saving the scores.
-import { apiFetch } from './globals.js';
+import { apiFetch, fileToBase64 } from './globals.js';
 import { rectify, RECT_LAYOUT } from './omr-crop.js';
 
 const DB_NAME = 'omr_photos_v1';
@@ -65,13 +65,6 @@ export const makeLowRes = async (url) => {
     return blob;
 };
 
-const toBase64 = (blob) => new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
-    fr.onerror = () => reject(new Error('photo'));
-    fr.readAsDataURL(blob);
-});
-
 export const driveImageUrl = (fileId, size = 1200) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${size}`;
 export const driveViewUrl = (fileId) => `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`;
 
@@ -122,7 +115,7 @@ export const ScanPhotos = {
                         timeoutMs: 60000,
                         body: JSON.stringify({
                             courseId: entry.ref.courseId, assessmentId: entry.ref.assessmentId,
-                            studentId: entry.ref.studentId, scanId: entry.scanId, layout: entry.layout || undefined, base64: await toBase64(entry.blob)
+                            studentId: entry.ref.studentId, scanId: entry.scanId, layout: entry.layout || undefined, base64: await fileToBase64(entry.blob)
                         })
                     });
                     // Confirmed in Drive, or the sheet was replaced and no longer needs this photo.

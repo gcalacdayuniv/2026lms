@@ -1,11 +1,11 @@
 // js/class-mode.js
 // Lecturer: mark the attendance date as an Onsite (default) or Online class. An online day can carry a proof picture
 // (a screenshot of the video meeting); it is shrunk on the phone, kept in Google Drive and only the lecturer can open it.
-import { apiFetch } from './globals.js';
+import { apiFetch, apiPost, fileToBase64 } from './globals.js';
+const post = apiPost;
 import { UI } from './ui-feedback.js';
 
 const $ = (id) => document.getElementById(id);
-const post = (path, body) => apiFetch(path, { method: 'POST', body: JSON.stringify(body) });
 
 // Shrinks a picture to at most 1280 px on the long side (JPEG) so a phone screenshot of several MB becomes a few hundred KB.
 const shrink = async (file) => {
@@ -18,12 +18,7 @@ const shrink = async (file) => {
     if (bitmap.close) bitmap.close();
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
     if (!blob) throw new Error('Could not read the picture.');
-    return await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result).split(',')[1]);
-        r.onerror = reject;
-        r.readAsDataURL(blob);
-    });
+    return await fileToBase64(blob);
 };
 
 export const ClassMode = {

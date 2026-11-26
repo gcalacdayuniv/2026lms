@@ -1,6 +1,6 @@
 // Sign-in screen: "Forgot password?" opens a modal. A student either gets a new password by email (four details must match)
 // or asks their lecturer in a second modal (one field: username, student number, email or contact number).
-import { apiFetch } from './globals.js';
+import { apiPost } from './globals.js';
 
 const $ = (id) => document.getElementById(id);
 const open = (id, focusId) => { $(id)?.classList.remove('hidden'); setTimeout(() => $(focusId)?.focus(), 50); };
@@ -44,7 +44,7 @@ document.addEventListener('submit', async (e) => {
         const send = $('fpSendBtn');
         send.disabled = true;
         try {
-            const r = await apiFetch('/api/forgot-password', { method: 'POST', body: JSON.stringify(body) });
+            const r = await apiPost('/api/forgot-password', body);
             show('forgotMsg', `${r.message} Check your inbox (and spam). If nothing arrives, ask your lecturer.`, true);
         } catch (err) {
             show('forgotMsg', err.message || 'Could not send the request.', false);
@@ -58,7 +58,7 @@ document.addEventListener('submit', async (e) => {
         const send = $('lrSendBtn');
         send.disabled = true;
         try {
-            const r = await apiFetch('/api/request-password-reset', { method: 'POST', body: JSON.stringify({ identifier }) });
+            const r = await apiPost('/api/request-password-reset', { identifier });
             show('lecturerResetMsg', `${r.message} Your lecturer will give you a temporary password. Change it after you sign in.`, true);
         } catch (err) {
             show('lecturerResetMsg', err.message || 'Could not send the request.', false);

@@ -1,6 +1,6 @@
 // The current academic term (Academic Year + Semester). An admin lecturer sets it by hand from Admin tools;
 // until one is set it follows the calendar in GMT+8. The value is cached so screens can read it at once.
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
 
@@ -87,7 +87,7 @@ const send = async (body) => {
     const err = $('ctError');
     err.classList.add('hidden');
     try {
-        const r = await apiFetch('/api/current-term', { method: 'POST', body: JSON.stringify({ ...body, userId: AppState.user && AppState.user.User_ID }) });
+        const r = await apiPost('/api/current-term', { ...body, userId: AppState.user && AppState.user.User_ID });
         apply(r);
         $('ctAY').value = r.ay; $('ctSem').value = r.sem; $('ctEnd').value = r.endDate || ''; $('ctNote').innerHTML = note(r);
         UI.success(`Current term: AY ${r.ay}, ${r.sem}`);

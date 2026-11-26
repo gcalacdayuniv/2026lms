@@ -1,5 +1,5 @@
 // Students who forgot their password ask their lecturer; the lecturer sees the requests in Manage Users.
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
 
@@ -58,7 +58,7 @@ document.addEventListener('click', async (e) => {
         if (!(await UI.confirm({ title: 'Reset password', message: "Reset this student's password? A temporary password will be emailed to the student (shown to you only if the email cannot be sent).", confirmText: 'Reset', danger: true }))) return;
         reset.disabled = true;
         try {
-            const res = await apiFetch('/api/reset-student-password', { method: 'POST', body: JSON.stringify({ studentId: id }) });
+            const res = await apiPost('/api/reset-student-password', { studentId: id });
             drop(id);
             if (res.emailed) UI.success(`New password emailed to ${res.email}.`);
                     else await UI.confirm({ title: 'Temporary password', message: `The email could not be sent (no email on file or mail not set up).\n\nNew password: ${res.tempPassword}\n\nGive it to the student now; it is not shown again. They should change it after signing in.`, confirmText: 'Done' });
@@ -67,7 +67,7 @@ document.addEventListener('click', async (e) => {
     }
     const dismiss = e.target.closest('.pr-dismiss');
     if (dismiss) {
-        try { await apiFetch('/api/dismiss-password-request', { method: 'POST', body: JSON.stringify({ studentId: dismiss.dataset.id }) }); drop(dismiss.dataset.id); }
+        try { await apiPost('/api/dismiss-password-request', { studentId: dismiss.dataset.id }); drop(dismiss.dataset.id); }
         catch (err) { UI.error(err.message || 'Could not dismiss'); }
     }
 });

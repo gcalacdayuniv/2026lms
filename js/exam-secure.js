@@ -7,7 +7,7 @@
 // The notice has one Start exam button. A device that already allowed the camera goes straight in; otherwise the face verification screen asks for the camera and a photo inside an oval.
 // Students flagged Legally Blind are exempt unless their lecturer turns it on (the server decides: student.secure).
 // Lecturers review the photos in js/exam-photo-review.js (Manage Exams > Results > Photos, or Manage Student > Exam photos).
-import { apiFetch } from './globals.js';
+import { apiFetch, apiPost } from './globals.js';
 import { escapeHtml } from './html-utils.js';
 
 const PHOTO_EVERY_MS = 30000;
@@ -317,7 +317,7 @@ export const ExamSecure = {
         const shot = ExamSecure.verifyShot, c = ExamSecure.ctx;
         ExamSecure.verifyShot = null;
         if (!shot || !c) return ExamSecure.capture('start');
-        try { await apiFetch('/api/exam-photo', { method: 'POST', body: JSON.stringify({ assignmentId: c.assignmentId, studentId: c.studentId, kind: 'start', base64: shot }) }); }
+        try { await apiPost('/api/exam-photo', { assignmentId: c.assignmentId, studentId: c.studentId, kind: 'start', base64: shot }); }
         catch (e) { ExamSecure.capture('start'); }
     },
 
@@ -330,7 +330,7 @@ export const ExamSecure = {
             canvas.height = Math.round(PHOTO_WIDTH * v.videoHeight / v.videoWidth);
             canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
             const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
-            await apiFetch('/api/exam-photo', { method: 'POST', body: JSON.stringify({ assignmentId: c.assignmentId, studentId: c.studentId, kind, base64 }) });
+            await apiPost('/api/exam-photo', { assignmentId: c.assignmentId, studentId: c.studentId, kind, base64 });
         } catch (e) { /* a missed photo must never interrupt the exam */ }
     },
 

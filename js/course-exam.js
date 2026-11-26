@@ -1,5 +1,5 @@
 // js/course-exam.js
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 import { CourseClass } from './course-class.js';
 import { UI } from './ui-feedback.js';
 import { ExamBuilder } from './exam-builder.js';
@@ -392,7 +392,7 @@ export const CourseExam = {
         if (e.target.classList && e.target.classList.contains('list-secure-sel')) {
             const sel = e.target;
             try {
-                await apiFetch('/api/exam-secure-setting', { method: 'POST', body: JSON.stringify({ classExamId: sel.dataset.classExamId, studentId: sel.dataset.studentId, examSecure: sel.value }) });
+                await apiPost('/api/exam-secure-setting', { classExamId: sel.dataset.classExamId, studentId: sel.dataset.studentId, examSecure: sel.value });
                 const rec = (CourseExam.classAssignments || []).find(a => a.Class_Exam_ID === sel.dataset.classExamId && a.Student_ID === sel.dataset.studentId);
                 if (rec) rec.Exam_Secure = sel.value || null;
                 UI.success('Secure exam setting saved.');
@@ -402,7 +402,7 @@ export const CourseExam = {
         if (e.target.id === 'erReleaseToggle' && CourseExam.resultsData) {
             const on = e.target.checked;
             try {
-                const res = await apiFetch('/api/exam-release', { method: 'POST', body: JSON.stringify({ classExamId: CourseExam.resultsData.classExamId, release: on }) });
+                const res = await apiPost('/api/exam-release', { classExamId: CourseExam.resultsData.classExamId, release: on });
                 if (!res.success) throw new Error(res.error || 'Could not change this.');
                 CourseExam.resultsData.release = on;
                 UI.success(on ? 'Students can now review their answers.' : 'Answers are hidden from students.');
@@ -1018,7 +1018,7 @@ export const CourseExam = {
         const ok = await UI.confirm({ title: 'Let student continue', message: `Re-open the exam for ${studentName}? Their saved answers come back and they continue with the time they had left. The submitted score is removed until they submit again.`, confirmText: 'Let continue' });
         if (!ok) return;
         try {
-            await apiFetch('/api/exam-continue', { method: 'POST', body: JSON.stringify({ classExamId, studentId }) });
+            await apiPost('/api/exam-continue', { classExamId, studentId });
             UI.success(`${studentName} can continue the exam.`);
             if (fromList) {
                 const courseId = window.location.hash.replace('#class-', '');
@@ -1041,7 +1041,7 @@ export const CourseExam = {
         const ok = await UI.confirm({ title: 'Let everyone continue', message: `Re-open the exam for all ${d.continuable} students that were submitted automatically? Their saved answers come back and each continues with the time they had left. Their submitted scores are removed until they submit again.`, confirmText: 'Let all continue' });
         if (!ok) return;
         try {
-            const r = await apiFetch('/api/exam-continue-all', { method: 'POST', body: JSON.stringify({ classExamId: d.classExamId }) });
+            const r = await apiPost('/api/exam-continue-all', { classExamId: d.classExamId });
             UI.success(`${r.count} student${r.count === 1 ? '' : 's'} can continue the exam.`);
             await CourseExam.openResultsView(d.classExamId, d.title);
         } catch (err) {
@@ -1109,7 +1109,7 @@ export const CourseExam = {
             if (!ok) return;
         }
         try {
-            const res = await apiFetch('/api/exam-adjust', { method: 'POST', body: JSON.stringify({ classExamId: d.classExamId, index: Number(index), action }) });
+            const res = await apiPost('/api/exam-adjust', { classExamId: d.classExamId, index: Number(index), action });
             if (!res.success) throw new Error(res.error || 'Could not change the question.');
             UI.success(`Scores recalculated (${res.regraded}).`);
             await CourseExam.openResultsView(d.classExamId, d.title);
@@ -1684,7 +1684,7 @@ export const CourseExam = {
 
     archiveExam: async (examId, archived) => {
         try {
-            await apiFetch('/api/exams/archive', { method: 'POST', body: JSON.stringify({ examId, lecturerId: AppState.user.User_ID, archived }) });
+            await apiPost('/api/exams/archive', { examId, lecturerId: AppState.user.User_ID, archived });
             UI.success(archived ? 'Exam archived' : 'Exam restored');
             await CourseExam.loadExams();
         } catch (err) {
@@ -1706,7 +1706,7 @@ export const CourseExam = {
         });
         if (!ok) return;
         try {
-            await apiFetch('/api/exams/delete', { method: 'POST', body: JSON.stringify({ examId, lecturerId: AppState.user.User_ID, force: used }) });
+            await apiPost('/api/exams/delete', { examId, lecturerId: AppState.user.User_ID, force: used });
             UI.success('Exam deleted');
             await CourseExam.loadExams();
         } catch (err) {

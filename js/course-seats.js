@@ -3,7 +3,8 @@
 // seat numbers follow the new order; a "+" seats a student who has none (in their eye-condition group, or after the last seat);
 // a padlock keeps a seat out of every automatic change; "Reassign all seats" seats everybody again by eye condition then last name.
 // Students who are UD, Dropped or Graduated get no seat. Saved with /api/set-seat, /api/seat-order, /api/seat-insert, /api/auto-seat.
-import { apiFetch } from './globals.js';
+import { apiPost } from './globals.js';
+const post = apiPost;
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 import { CourseClass } from './course-class.js';
@@ -11,7 +12,6 @@ import { SeatMap } from './seat-map.js';
 
 const getCourseId = () => window.location.hash.replace('#class-', '');
 const byId = (id) => document.getElementById(id);
-const post = (path, body) => apiFetch(path, { method: 'POST', body: JSON.stringify(body) });
 
 const NO_SEAT = ['ud', 'dropped', 'graduated'];
 const seatable = (s) => !NO_SEAT.includes(String(s.account_status || 'Active').trim().toLowerCase());

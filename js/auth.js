@@ -1,7 +1,7 @@
 // js/auth.js
 import './terms-consent.js';
 import { clearClassCache } from './course-class.js';
-import { apiFetch, AppState, getDeviceId } from './globals.js';
+import { apiFetch, AppState, getDeviceId, apiPost, fileToBase64 } from './globals.js';
 import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml, safeUrl } from './html-utils.js';
@@ -12,12 +12,6 @@ export const AuthModule = {
     // Shrinks a profile photo to at most 1024 px on the long side (JPEG) so a phone photo of several MB becomes about 150 KB.
     // If the browser cannot decode or draw it, the original file is sent.
     photoToBase64: async (file) => {
-        const readAsBase64 = (blob) => new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1]);
-            reader.onerror = error => reject(error);
-            reader.readAsDataURL(blob);
-        });
         try {
             const bitmap = await createImageBitmap(file);
             const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
@@ -27,9 +21,9 @@ export const AuthModule = {
             canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
             if (bitmap.close) bitmap.close();
             const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-            if (blob && blob.size > 0 && blob.size < file.size) return await readAsBase64(blob);
+            if (blob && blob.size > 0 && blob.size < file.size) return await fileToBase64(blob);
         } catch (err) { /* fall back to the original file */ }
-        return readAsBase64(file);
+        return fileToBase64(file);
     },
 
     usersList: [],
@@ -64,7 +58,7 @@ export const AuthModule = {
                 };
                 let data;
                 try {
-                    data = await apiFetch('/api/login', { method: 'POST', body: JSON.stringify(loginBody) });
+                    data = await apiPost('/api/login', loginBody);
                 } catch (first) {
                     // Signed in on another device: ask before signing that one out.
                     if (!(first.data && first.data.code === 'already-logged-in')) throw first;
@@ -77,7 +71,7 @@ export const AuthModule = {
                         danger: true
                     });
                     if (!go) { btn.disabled = false; btn.innerHTML = 'Sign In'; return; }
-                    data = await apiFetch('/api/login', { method: 'POST', body: JSON.stringify({ ...loginBody, takeover: true }) });
+                    data = await apiPost('/api/login', { ...loginBody, takeover: true });
                 }
                 
                 AppState.setUser(data.user);
@@ -348,7 +342,7 @@ export const AuthModule = {
         });
         if (!ok) { if (select) select.value = before; return; }
         try {
-            await apiFetch('/api/update-user-role', { method: 'POST', body: JSON.stringify({ userId, role }) });
+            await apiPost('/api/update-user-role', { userId, role });
             user.role = role === 'admin' ? 'Admin' : role;
             AuthModule.renderManageUsers();
             UI.success(`${user.Name.split(',')[0]}: ${label}`);

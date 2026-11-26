@@ -2,7 +2,7 @@
 // The paper size a lecturer prints on. A4 unless they chose otherwise. The choice is saved on the server (per user),
 // so it follows them to any phone or computer; this device also keeps a copy so the dialog opens instantly and
 // still works offline.
-import { apiFetch, AppState } from './globals.js';
+import { apiFetch, AppState, apiPost } from './globals.js';
 
 const KEY = 'lms_print_paper';
 const VALID = ['a4', 'letter', 'legal'];
@@ -37,7 +37,7 @@ export const savePaper = (paper) => {
     try { localStorage.setItem(KEY, paper); } catch (e) { /* storage unavailable */ }
     const uid = AppState.user && AppState.user.User_ID;
     if (!uid) return;
-    apiFetch('/api/my-prefs', { method: 'POST', body: JSON.stringify({ userId: uid, paper }) }).catch(() => { /* retried next time it is changed */ });
+    apiPost('/api/my-prefs', { userId: uid, paper }).catch(() => { /* retried next time it is changed */ });
 };
 
 // Wires a <select> to the preference: shows the saved choice, saves on change.

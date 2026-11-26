@@ -1,13 +1,13 @@
 // js/course-groups.js
 // Lecturer tool: several sets of groups per class (Reporting, Lab 1, Quiz teams ...). A student is in one group per set.
 // Groups can get a topic, and a set can be filled by a random, balanced split. Saved with /api/group-set-save.
-import { apiFetch } from './globals.js';
+import { apiFetch, apiPost } from './globals.js';
+const post = apiPost;
 import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 
 const getCourseId = () => window.location.hash.replace('#class-', '');
 const byId = (id) => document.getElementById(id);
-const post = (path, body) => apiFetch(path, { method: 'POST', body: JSON.stringify(body) });
 
 export const CourseGroups = {
     courseId: null,

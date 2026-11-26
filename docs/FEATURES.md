@@ -582,3 +582,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Refactor: `once()` for table setups
 - `worker/schema.js`: eleven `ensure*` functions repeated a module-level "ready" flag; they are now `export const ensureX = once(async (env) => {...})`. Concurrent callers share one run and a failed run is retried on the next request. `ensureCoreIndexes` keeps its own flag because it only counts as done when every index was created. New table setups should use `once`. Worker only (no site files, no cache bump).
+
+## Refactor: `apiPost` and `fileToBase64`
+- `js/globals.js` now exports `apiPost(endpoint, body, options)` (JSON POST through `apiFetch`) and `fileToBase64(blob)`. 35 hand-written `apiFetch(..., { method: 'POST', body: JSON.stringify(...) })` calls in 20 files use `apiPost`, and the six private base64 readers (auth, class-mode, course-plan, course-dashboard, course-scan-photos) use `fileToBase64`. Behaviour is unchanged. Use these two in new code. sw.js v122.
