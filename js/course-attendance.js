@@ -8,6 +8,29 @@ import { UI } from './ui-feedback.js';
 import { termPoints } from './participation.js';
 import { parseLocalDate, getWeekdayName, matchesScheduleDay } from './date-utils.js';
 
+// ---- one place that paints a status on a student row (Present / Late / Absent / Excused, or null = nothing selected)
+const STATUS_CLASSES = {
+    Present: ['bg-green-100', 'text-green-800', 'border-green-400'],
+    Late: ['bg-yellow-100', 'text-yellow-800', 'border-yellow-400'],
+    Absent: ['bg-red-100', 'text-red-800', 'border-red-400'],
+    Excused: ['bg-purple-100', 'text-purple-800', 'border-purple-400']
+};
+const IDLE_CLASSES = ['bg-gray-50', 'text-gray-600', 'border-gray-200'];
+const ALL_STATUS_CLASSES = Object.values(STATUS_CLASSES).flat();
+export const paintRowStatus = (row, status) => {
+    row.querySelectorAll('.attendance-btn').forEach(btn => {
+        btn.classList.remove(...ALL_STATUS_CLASSES);
+        btn.classList.add(...IDLE_CLASSES);
+        btn.removeAttribute('data-selected');
+    });
+    const btn = status ? row.querySelector(`.attendance-btn[data-status="${status}"]`) : null;
+    if (btn && STATUS_CLASSES[status]) {
+        btn.setAttribute('data-selected', 'true');
+        btn.classList.remove(...IDLE_CLASSES);
+        btn.classList.add(...STATUS_CLASSES[status]);
+    }
+};
+
 const getCourseId = () => window.location.hash.replace('#class-', '');
 const getDate = () => document.getElementById('attendanceDate')?.value || '';
 const dateKey = (courseId, date) => `${courseId}_${date}`;
@@ -69,18 +92,8 @@ export const CourseAttendance = {
     // Students with UD or Dropped status are always Absent with no points: the row is set, locked and tagged.
     applyAutoAbsent: () => {
         document.querySelectorAll('.student-row[data-auto-absent]').forEach(row => {
-            row.querySelectorAll('.attendance-btn').forEach(btn => {
-                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
-                btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                btn.removeAttribute('data-selected');
-                btn.disabled = true;
-            });
-            const absent = row.querySelector('.attendance-btn[data-status="Absent"]');
-            if (absent) {
-                absent.setAttribute('data-selected', 'true');
-                absent.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                absent.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
-            }
+            paintRowStatus(row, 'Absent');
+            row.querySelectorAll('.attendance-btn').forEach(btn => { btn.disabled = true; });
             const pts = row.querySelector('.points-input');
             if (pts) { pts.value = '0'; pts.disabled = true; }
             row.querySelectorAll('.pts-step').forEach(b => { b.disabled = true; });
@@ -136,26 +149,12 @@ export const CourseAttendance = {
 
     // Puts the rows back to a snapshot() taken earlier, then saves each changed row (a cleared row is removed on the server).
     restoreSnapshot: (snap) => {
-        const colors = { Present: ['bg-green-100', 'text-green-800', 'border-green-400'], Late: ['bg-yellow-100', 'text-yellow-800', 'border-yellow-400'], Absent: ['bg-red-100', 'text-red-800', 'border-red-400'], Excused: ['bg-purple-100', 'text-purple-800', 'border-purple-400'] };
-        const all = ['bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400'];
         document.querySelectorAll('.student-row').forEach(row => {
             const want = snap[row.dataset.studentId];
             if (!want) return;
             const cur = CourseAttendance.snapshotRow(row);
             if (cur.status === want.status && cur.points === want.points) return;
-            row.querySelectorAll('.attendance-btn').forEach(b => {
-                b.classList.remove(...all);
-                b.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                b.removeAttribute('data-selected');
-            });
-            if (want.status) {
-                const btn = row.querySelector(`.attendance-btn[data-status="${want.status}"]`);
-                if (btn) {
-                    btn.setAttribute('data-selected', 'true');
-                    btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                    btn.classList.add(...colors[want.status]);
-                }
-            }
+            paintRowStatus(row, want.status);
             const pts = row.querySelector('.points-input');
             if (pts) pts.value = String(want.points || 0);
             CourseAttendance.queueAutoSave(row.dataset.studentId, 0);
@@ -588,55 +587,21 @@ export const CourseAttendance = {
                 if(markAllBtn) markAllBtn.disabled = false;
             }
 
+            // Everyone starts Present (nothing on a no-class day); then the saved records replace that.
+            const hasSaved = !!(data.records && data.records.length > 0) && !data.isNoClass;
             document.querySelectorAll('.student-row').forEach(row => {
-                const buttons = row.querySelectorAll('.attendance-btn');
-                buttons.forEach(btn => {
-                    btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
-                    btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                    btn.removeAttribute('data-selected');
-                });
+                paintRowStatus(row, data.isNoClass || hasSaved ? null : 'Present');
                 const pointsInput = row.querySelector('.points-input');
                 if (pointsInput) pointsInput.value = '0';
-
-                const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
-                if (presentBtn && !data.isNoClass) {
-                    presentBtn.setAttribute('data-selected', 'true');
-                    presentBtn.classList.replace('bg-gray-50', 'bg-green-100');
-                    presentBtn.classList.replace('text-gray-600', 'text-green-800');
-                    presentBtn.classList.replace('border-gray-200', 'border-green-400');
-                }
             });
 
-            if (data.records && data.records.length > 0 && !data.isNoClass) {
-                document.querySelectorAll('.student-row').forEach(row => {
-                     const presentBtn = row.querySelector('.attendance-btn[data-status="Present"]');
-                     if(presentBtn) {
-                         presentBtn.removeAttribute('data-selected');
-                         presentBtn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400');
-                         presentBtn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                     }
-                });
-
+            if (hasSaved) {
                 data.records.forEach(record => {
                     const row = document.querySelector(`.student-row[data-student-id="${record.Student_ID}"]`);
-                    if (row) {
-                        const btn = row.querySelector(`.attendance-btn[data-status="${record.Status}"]`);
-                        if (btn) {
-                            btn.setAttribute('data-selected', 'true');
-                            btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                            if (record.Status === 'Present') {
-                                btn.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
-                            } else if (record.Status === 'Late') {
-                                btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
-                            } else if (record.Status === 'Absent') {
-                                btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
-                            } else if (record.Status === 'Excused') {
-                                btn.classList.add('bg-purple-100', 'text-purple-800', 'border-purple-400');
-                            }
-                        }
-                        const pointsInput = row.querySelector('.points-input');
-                        if (pointsInput) pointsInput.value = record.Performance_Points || '0';
-                    }
+                    if (!row) return;
+                    paintRowStatus(row, record.Status);
+                    const pointsInput = row.querySelector('.points-input');
+                    if (pointsInput) pointsInput.value = record.Performance_Points || '0';
                 });
             }
 
@@ -658,29 +623,7 @@ export const CourseAttendance = {
                             hasDraftChanges = true;
 
                             const r = draft[studentId];
-                            const buttons = row.querySelectorAll('.attendance-btn');
-                            buttons.forEach(btn => {
-                                btn.classList.remove('bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400', 'bg-red-100', 'text-red-800', 'border-red-400', 'bg-purple-100', 'text-purple-800', 'border-purple-400');
-                                btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                                btn.removeAttribute('data-selected');
-                            });
-
-                            if (r.status) {
-                                const btn = row.querySelector(`.attendance-btn[data-status="${r.status}"]`);
-                                if (btn) {
-                                    btn.setAttribute('data-selected', 'true');
-                                    btn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
-                                    if (r.status === 'Present') {
-                                        btn.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
-                                    } else if (r.status === 'Late') {
-                                        btn.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
-                                    } else if (r.status === 'Absent') {
-                                        btn.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
-                                    } else if (r.status === 'Excused') {
-                                        btn.classList.add('bg-purple-100', 'text-purple-800', 'border-purple-400');
-                                    }
-                                }
-                            }
+                            paintRowStatus(row, r.status || null);
 
                             const pointsInput = row.querySelector('.points-input');
                             if (pointsInput) pointsInput.value = r.points || '0';

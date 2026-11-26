@@ -575,3 +575,7 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Attendance: students whose account status is UD or Dropped are Absent automatically: on the attendance screen their row is set to Absent with 0 points, locked and tagged "Absent automatically (UD / Dropped)" (`data-auto-absent`, `CourseAttendance.applyAutoAbsent`). The Worker enforces it too: `POST /api/attendance` and `/api/attendance/single` store Absent / 0 for them whatever is sent, and `/api/add-participation-points` refuses them (400).
 - Student caller: `/api/recitation-pool` leaves out UD and Dropped students; the wheel and the spin also skip anyone marked Absent or Excused in the list for the chosen date (the list on screen is the source, so it follows changes before saving). If nobody is left the wheel says "No present students to call...".
 - Tests: "UD and Dropped students are always absent" block. Deploy: Worker + site files (sw.js v120).
+
+## Refactor: one status painter for attendance rows, shared UD / Dropped rules
+- `course-attendance.js`: the five copies of the Present/Late/Absent/Excused button colours (default load, saved records, local draft, undo restore, automatic absent) are one `paintRowStatus(row, status)`. Behaviour is unchanged.
+- The UD / Dropped / Graduated rules live in `worker/constants.js` (`statusKey`, `AUTO_ABSENT_STATUSES`, `NO_SEAT_STATUSES`; used by seats.js and attendance.js) and `js/student-status.js` (`isAutoAbsent`, `hasNoSeat`; used by the class list). The two files must stay in sync. sw.js v121.

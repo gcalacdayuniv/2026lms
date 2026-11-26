@@ -5,13 +5,13 @@
 // Lecturer-only routes (courseId is ownership-checked in auth.js).
 // worker.js calls handleSeats() after the permission check; it returns a Response for its own paths and null otherwise.
 
+import { NO_SEAT_STATUSES, statusKey } from './constants.js';
 import { ensureSeatLock } from './schema.js';
 
 const json = (data, status, corsHeaders) => new Response(JSON.stringify(data), { status, headers: corsHeaders });
 export const seatKey = (v) => String(v == null ? '' : v).trim().toLowerCase();
 
-const NO_SEAT = new Set(['ud', 'dropped', 'graduated']);
-export const isSeatable = (s) => !NO_SEAT.has(String(s.account_status || 'Active').trim().toLowerCase());
+export const isSeatable = (s) => !NO_SEAT_STATUSES.has(statusKey(s.account_status));
 
 // Front seats first: Legally Blind, Near Sighted, no condition, then Far Sighted.
 export const eyeRank = (eye) => {

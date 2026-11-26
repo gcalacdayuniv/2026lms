@@ -5,6 +5,7 @@
 // the path is one of these routes, or null so worker.js carries on with the other routes.
 
 import { json } from './http.js';
+import { AUTO_ABSENT_STATUSES, statusKey } from './constants.js';
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -15,12 +16,11 @@ const pickStatus = (a, b) =>
     (STATUS_PRIORITY[a] || 0) >= (STATUS_PRIORITY[b] || 0) ? a : b;
 
 // Students whose account status is UD or Dropped are always Absent (no points); the same rule is on the attendance screen.
-export const AUTO_ABSENT = new Set(['ud', 'dropped']);
 export async function autoAbsentIds(env, ids) {
     const list = [...new Set((ids || []).map(String))];
     if (!list.length) return new Set();
     const rows = await env.DB.prepare("SELECT User_ID, account_status FROM Users WHERE User_ID IN (SELECT value FROM json_each(?))").bind(JSON.stringify(list)).all();
-    return new Set((rows.results || []).filter(u => AUTO_ABSENT.has(String(u.account_status || '').trim().toLowerCase())).map(u => u.User_ID));
+    return new Set((rows.results || []).filter(u => AUTO_ABSENT_STATUSES.has(statusKey(u.account_status))).map(u => u.User_ID));
 }
 
 const insertStmt = (env, courseId, studentId, date, status, points) =>
