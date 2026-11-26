@@ -532,3 +532,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - What: the lecturer floor plan is a full-screen overlay (no margins, corners or width limit). The floating floor plan button on the class screen is removed (the header button and the Seat Plan modal already open it). "Check attendance" is in the plan's header; the "Tap a seat..." note is gone (only a no-class warning remains in attendance mode).
 - Participation: with attendance checking OFF, tapping a student box opens a small popover on that box (above it, or below when there is no room): name, minus / number / plus (44 px), close. Changes save through `/api/add-participation-points` (the difference is added; date = the plan's attendance date; a student with no record that day gets a Present row, as in the Student Caller). With attendance ON a tap still sets the status.
 - Tests: tools/tests run-tests.sh, phone-check.cjs. Deploy: site files only (sw.js v109).
+
+## Floor plan: fit to screen (lecturer)
+- All rows and both columns now fit the full-screen lecturer plan without scrolling: rows share the height, boxes stretch (no longer forced square). Only Absent and Excused keep the colour overlay; Present and Late show the ring and letter badge only. sw.js v110.

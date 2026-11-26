@@ -59,7 +59,7 @@ export const SeatMap = {
                 </div>
                 <div id="smTools" class="hidden mb-1.5"></div>
                 <div id="smInfo" role="status" class="mb-2 px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sm text-sky-900 min-h-[36px]"></div>
-                <div id="smPlan" class="overflow-auto flex-1 relative"></div>
+                <div id="smPlan" class="overflow-auto flex-1 min-h-0 relative"></div>
             </div>`;
         document.body.appendChild(el);
     },
@@ -241,15 +241,15 @@ export const SeatMap = {
         const rec = a.on && info ? a.records.get(info.id) : null;
         const stat = rec ? statusOf(rec.status) : null;
         if (!info) {
-            return `<div class="min-w-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-start p-1" style="flex:1 1 0;aspect-ratio:1/1" aria-label="Seat ${n}, empty"><span class="text-[11px] font-black text-gray-400">${n}</span></div>`;
+            return `<div class="min-w-0 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-start p-1" style="flex:1 1 0" aria-label="Seat ${n}, empty"><span class="text-[11px] font-black text-gray-400">${n}</span></div>`;
         }
         const pic = info.pic ? `background-image:url('${safeUrl(info.pic)}');background-size:cover;background-position:center top;` : '';
         const ring = stat ? stat.ring : eyeRing(info.eye);
         const last = esc(String(info.name).split(',')[0]);
         const picked = st.picked === n ? 'outline:3px solid #0284c7;outline-offset:1px;' : '';
-        return `<button type="button" class="sm-seat relative min-w-0 rounded-lg overflow-hidden text-left bg-gray-200" data-seat="${n}" style="flex:1 1 0;aspect-ratio:1/1;border:3px solid ${ring};${pic}${picked}" aria-label="Seat ${n}, ${esc(info.name)}${stat ? ', ' + stat.key : ''}">
+        return `<button type="button" class="sm-seat relative min-w-0 rounded-lg overflow-hidden text-left bg-gray-200" data-seat="${n}" style="flex:1 1 0;border:3px solid ${ring};${pic}${picked}" aria-label="Seat ${n}, ${esc(info.name)}${stat ? ', ' + stat.key : ''}">
             ${info.pic ? '' : '<i class="fa-solid fa-user absolute inset-0 m-auto w-4 h-4 text-gray-400 pointer-events-none" aria-hidden="true"></i>'}
-            ${stat ? `<span class="absolute inset-0 pointer-events-none" style="background:${stat.fill}"></span><span class="absolute top-0 right-0 px-1.5 py-0.5 text-[11px] font-black text-white rounded-bl-md" style="background:${stat.ring}">${stat.letter}</span>` : ''}
+            ${stat ? `${['Absent', 'Excused'].includes(stat.key) ? `<span class="absolute inset-0 pointer-events-none" style="background:${stat.fill}"></span>` : ''}<span class="absolute top-0 right-0 px-1.5 py-0.5 text-[11px] font-black text-white rounded-bl-md" style="background:${stat.ring}">${stat.letter}</span>` : ''}
             <span class="absolute top-0 left-0 px-1.5 py-0.5 text-[11px] font-black bg-white/90 text-gray-800 rounded-br-md">${n}${info.locked ? ' <i class="fa-solid fa-lock text-[8px] text-sky-600" aria-hidden="true"></i>' : ''}</span>
             <span class="absolute bottom-0 inset-x-0 px-1 py-0.5 text-[10px] sm:text-[11px] font-bold text-white truncate" style="background:linear-gradient(transparent,rgba(0,0,0,.75))">${last}</span>
         </button>`;
@@ -270,7 +270,7 @@ export const SeatMap = {
             let nums = Array.from({ length: PER_ROW }, (_, i) => r * PER_ROW + i + 1);
             if (lecturerPov) nums = nums.reverse();
             const left = nums.slice(0, PER_COLUMN), right = nums.slice(PER_COLUMN);
-            return `<div class="flex items-center gap-1.5 min-w-0">
+            return `<div class="flex ${lecturerPov ? 'items-stretch min-h-0' : 'items-center'} gap-1.5 min-w-0" ${lecturerPov ? 'style="flex:1 1 0"' : ''}>
                 <span class="w-4 shrink-0 text-[10px] font-bold text-gray-400 text-center" aria-hidden="true">${r + 1}</span>
                 <div class="flex min-w-0 gap-1.5" style="flex:1 1 0">${left.map(n => SeatMap.seatCell(n, st)).join('')}</div>
                 <div class="w-3 sm:w-6 shrink-0" aria-hidden="true"></div>
@@ -278,7 +278,7 @@ export const SeatMap = {
             </div>`;
         }).join('');
 
-        const bar = (icon, label, color) => `<div class="mx-auto my-2 w-3/4 text-center text-[11px] font-bold tracking-widest uppercase rounded ${color} text-white py-1.5"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</div>`;
+        const bar = (icon, label, color) => `<div class="mx-auto my-1 w-3/4 shrink-0 text-center text-[11px] font-bold tracking-widest uppercase rounded ${color} text-white py-1"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</div>`;
         const note = lecturerPov
             ? '<p class="text-[11px] text-gray-500 text-center">Seen from the lecturer, facing the class: row 1 is nearest you and seat 10 is on your left.</p>'
             : '<p class="text-[11px] text-gray-500 text-center">Seen from a student facing the board: row 1 is at the front, seats count from left to right.</p>';
@@ -289,7 +289,8 @@ export const SeatMap = {
             : '';
         const extras = st.extras.length ? `<p class="text-[11px] text-gray-500 mt-1 text-center">Other seat labels: ${st.extras.map(x => esc(x.seat) + ' (' + esc(x.name) + ')').join(', ')}</p>` : '';
 
-        plan.innerHTML = `${lecturerPov ? '' : bar('fa-chalkboard', 'Board', 'bg-gray-800')}<div class="space-y-1.5" role="group" aria-label="Seats">${rowHtml}</div>${lecturerPov ? bar('fa-chalkboard-user', 'Lecturer', 'bg-sky-700') : ''}${note}${legend}${extras}`;
+        plan.classList.toggle('overflow-hidden', lecturerPov);
+        plan.innerHTML = `${lecturerPov ? '<div class="flex flex-col h-full min-h-0">' : ''}${lecturerPov ? '' : bar('fa-chalkboard', 'Board', 'bg-gray-800')}<div class="${lecturerPov ? 'flex flex-col gap-1 flex-1 min-h-0' : 'space-y-1.5'}" role="group" aria-label="Seats">${rowHtml}</div>${lecturerPov ? bar('fa-chalkboard-user', 'Lecturer', 'bg-sky-700') : note}${legend}${extras}${lecturerPov ? '</div>' : ''}`;
         if (st.pop) { plan.insertAdjacentHTML('beforeend', SeatMap.popHtml(st.pop)); SeatMap.popPlace(); }
         SeatMap.info();
         SeatMap.counts();
