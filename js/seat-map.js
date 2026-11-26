@@ -101,6 +101,7 @@ export const SeatMap = {
     show: (state) => {
         SeatMap.ensureModal();
         SeatMap.state = state;
+        if (byId('smPlan')) byId('smPlan').innerHTML = '';
         const lecturer = state.pov === 'lecturer';
         // Lecturer: a true full-screen overlay (no margin, corners or width limit). Student: the small centred card.
         const panel = byId('seatMapPanel'), root = byId('seatMapModal');
@@ -273,7 +274,7 @@ export const SeatMap = {
             let nums = Array.from({ length: PER_ROW }, (_, i) => r * PER_ROW + i + 1);
             if (lecturerPov) nums = nums.reverse();
             const left = nums.slice(0, PER_COLUMN), right = nums.slice(PER_COLUMN);
-            return `<div class="flex ${lecturerPov ? 'items-stretch min-h-0' : 'items-center'} gap-1.5 min-w-0" ${lecturerPov ? 'style="flex:1 1 0"' : ''}>
+            return `<div class="flex ${lecturerPov ? 'items-stretch min-h-0' : 'items-center'} gap-1.5 min-w-0" ${lecturerPov ? 'style="flex:1 1 0;min-height:60px"' : ''}>
                 <span class="w-4 shrink-0 text-[10px] font-bold text-gray-400 text-center" aria-hidden="true">${r + 1}</span>
                 <div class="flex min-w-0 gap-1.5" style="flex:1 1 0">${left.map(n => SeatMap.seatCell(n, st)).join('')}</div>
                 <div class="w-3 sm:w-6 shrink-0" aria-hidden="true"></div>
@@ -281,20 +282,32 @@ export const SeatMap = {
             </div>`;
         }).join('');
 
-        const bar = (icon, label, color) => `<div class="mx-auto my-1 w-3/4 shrink-0 text-center text-[11px] font-bold tracking-widest uppercase rounded ${color} text-white py-1"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</div>`;
-        const note = lecturerPov
-            ? '<p class="text-[11px] text-gray-500 text-center">Seen from the lecturer, facing the class: row 1 is nearest you and seat 10 is on your left.</p>'
-            : '<p class="text-[11px] text-gray-500 text-center">Seen from a student facing the board: row 1 is at the front, seats count from left to right.</p>';
-        const legend = lecturerPov
-            ? `<div class="flex flex-wrap gap-x-3 gap-y-1 justify-center text-[10px] text-gray-600 mt-1">
-                ${st.att.on ? STATUSES.map(s => `<span><i class="fa-solid fa-square" style="color:${s.ring}"></i> ${s.key}</span>`).join('') : `<span><i class="fa-solid fa-square text-amber-400"></i> Legally Blind</span><span><i class="fa-solid fa-square text-violet-400"></i> Near Sighted</span><span><i class="fa-solid fa-square text-teal-400"></i> Far Sighted</span><span><i class="fa-solid fa-lock text-sky-600"></i> Locked</span>`}</div>
-               ${st.unseated ? `<p class="text-[11px] text-amber-700 text-center mt-1">${st.unseated} student${st.unseated === 1 ? ' has' : 's have'} no seat and ${st.unseated === 1 ? 'is' : 'are'} not shown here.</p>` : ''}`
-            : '';
+        const bar = (icon, label, color) => `<div class="mx-auto ${lecturerPov ? 'mt-1 mb-0 w-1/2 py-0.5 text-[10px]' : 'my-2 w-3/4 py-1 text-[11px]'} shrink-0 text-center font-bold tracking-widest uppercase rounded ${color} text-white"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</div>`;
+        const note = lecturerPov ? '' : '<p class="text-[11px] text-gray-500 text-center">Seen from a student facing the board: row 1 is at the front, seats count from left to right.</p>';
         const extras = st.extras.length ? `<p class="text-[11px] text-gray-500 mt-1 text-center">Other seat labels: ${st.extras.map(x => esc(x.seat) + ' (' + esc(x.name) + ')').join(', ')}</p>` : '';
 
+        const hadRows = !!byId('smRows');
+        const prevScroll = hadRows ? byId('smRows').scrollTop : 0;
+        plan.classList.toggle('flex', lecturerPov);
+        plan.classList.toggle('flex-col', lecturerPov);
         plan.classList.toggle('overflow-hidden', lecturerPov);
-        plan.innerHTML = `${lecturerPov ? '<div class="flex flex-col h-full min-h-0">' : ''}${lecturerPov ? '' : bar('fa-chalkboard', 'Board', 'bg-gray-800')}<div class="${lecturerPov ? 'flex flex-col gap-1 flex-1 min-h-0' : 'space-y-1.5'}" role="group" aria-label="Seats">${rowHtml}</div>${lecturerPov ? bar('fa-chalkboard-user', 'Lecturer', 'bg-sky-700') : note}${legend}${extras}${lecturerPov ? '</div>' : ''}`;
-        if (st.pop) { plan.insertAdjacentHTML('beforeend', SeatMap.popHtml(st.pop)); SeatMap.popPlace(); }
+        plan.classList.toggle('overflow-auto', !lecturerPov);
+        if (lecturerPov) {
+            // Only four rows fit the screen at a time; more rows scroll inside the plan, above the thin Lecturer bar.
+            plan.innerHTML = `<div id="smRows" class="flex-1 min-h-0 overflow-y-auto relative"><div id="smRowList" class="flex flex-col gap-1 ${rows <= 4 ? 'h-full' : ''}" role="group" aria-label="Seats">${rowHtml}</div></div>${bar('fa-chalkboard-user', 'Lecturer', 'bg-sky-700')}${extras}`;
+            const list = byId('smRowList'), box = byId('smRows');
+            if (rows > 4) {
+                const h = Math.floor((box.clientHeight - 3 * 4) / 4);
+                list.querySelectorAll(':scope > div').forEach(r => { r.style.flex = '0 0 auto'; r.style.height = `${Math.max(60, h)}px`; });
+                box.scrollTop = hadRows ? prevScroll : box.scrollHeight;      // opens at row 1, the row nearest the lecturer
+            }
+        } else {
+            plan.innerHTML = `${bar('fa-chalkboard', 'Board', 'bg-gray-800')}<div class="space-y-1.5" role="group" aria-label="Seats">${rowHtml}</div>${note}${extras}`;
+        }
+        byId('seatMapSub').textContent = lecturerPov && st.unseated ? `${st.unseated} student${st.unseated === 1 ? ' has' : 's have'} no seat and ${st.unseated === 1 ? 'is' : 'are'} not shown.` : '';
+        byId('seatMapSub').classList.toggle('hidden', !(lecturerPov && st.unseated));
+        const rowsEl = byId('smRows');
+        if (st.pop && rowsEl) { rowsEl.insertAdjacentHTML('beforeend', SeatMap.popHtml(st.pop)); SeatMap.popPlace(); }
         SeatMap.info();
         SeatMap.counts();
     },
@@ -330,30 +343,31 @@ export const SeatMap = {
     },
 
     popPlace: () => {
-        const st = SeatMap.state, plan = byId('smPlan'), pop = byId('smPop');
-        if (!st || !st.pop || !plan || !pop) return;
-        const seat = plan.querySelector(`button.sm-seat[data-seat="${st.pop.n}"]`);
+        const st = SeatMap.state, box = byId('smRows'), pop = byId('smPop');
+        if (!st || !st.pop || !box || !pop) return;
+        const seat = box.querySelector(`button.sm-seat[data-seat="${st.pop.n}"]`);
         if (!seat) return;
         const w = pop.offsetWidth, h = pop.offsetHeight;
+        // Above the box, else below it; always kept inside the visible part of the plan.
         let top = seat.offsetTop - h - 6;
-        if (top < plan.scrollTop) top = seat.offsetTop + seat.offsetHeight + 6;      // no room above: sit below the box
-        const left = Math.max(2, Math.min(seat.offsetLeft + seat.offsetWidth / 2 - w / 2, plan.scrollWidth - w - 2));
+        if (top < box.scrollTop) top = seat.offsetTop + seat.offsetHeight + 6;
+        top = Math.max(box.scrollTop + 2, Math.min(top, box.scrollTop + box.clientHeight - h - 2));
+        const left = Math.max(2, Math.min(seat.offsetLeft + seat.offsetWidth / 2 - w / 2, box.clientWidth - w - 2));
         pop.style.top = `${top}px`;
         pop.style.left = `${left}px`;
         pop.style.visibility = 'visible';
     },
 
-    popHtml: (pop) => `<div id="smPop" role="dialog" aria-label="Participation for ${esc(pop.info.name)}" class="absolute z-20 w-52 rounded-lg bg-white border border-gray-300 shadow-xl p-2" style="visibility:hidden;top:0;left:0">
-        <div class="flex items-center gap-1 mb-1.5"><p class="flex-1 min-w-0 text-xs font-bold text-gray-800 truncate">${esc(pop.info.name)}</p>
+    popHtml: (pop) => `<div id="smPop" role="dialog" aria-label="Participation for ${esc(pop.info.name)}" class="absolute z-20 w-72 max-w-full rounded-lg bg-white border border-gray-300 shadow-xl p-2" style="visibility:hidden;top:0;left:0">
+        <div class="flex items-center gap-1"><p class="flex-1 min-w-0 text-xs font-bold text-gray-800 truncate">${esc(pop.info.name)}</p>
             <button type="button" id="smPopClose" aria-label="Close" class="w-8 h-8 shrink-0 text-gray-500"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
-        <button type="button" id="smPopNote" class="w-full min-h-[44px] mb-2 px-2 rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-sm font-bold"><i class="fa-solid fa-note-sticky mr-1" aria-hidden="true"></i>Lecturer note</button>
-        <p class="text-[11px] text-gray-500 mb-1">Participation points</p>
-        <div class="flex items-center gap-1">
-            <button type="button" class="sm-pop-step min-h-[44px] min-w-[44px] rounded-md border border-red-300 text-red-700 font-black text-lg bg-white" data-step="-1" aria-label="Minus one point">&minus;</button>
-            <input type="number" id="smPopVal" step="1" value="${pop.value}" aria-label="Participation points" class="min-h-[44px] min-w-0 flex-1 w-full text-center border border-gray-300 rounded-md font-bold">
-            <button type="button" class="sm-pop-step min-h-[44px] min-w-[44px] rounded-md border border-green-300 text-green-700 font-black text-lg bg-white" data-step="1" aria-label="Plus one point">+</button>
+        <div class="flex items-center gap-1 mt-1">
+            <button type="button" id="smPopNote" class="min-h-[44px] px-2 shrink-0 rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-xs font-bold" aria-label="Lecturer note"><i class="fa-solid fa-note-sticky mr-1" aria-hidden="true"></i>Note</button>
+            <button type="button" class="sm-pop-step min-h-[44px] min-w-[44px] shrink-0 rounded-md border border-red-300 text-red-700 font-black text-lg bg-white" data-step="-1" aria-label="Minus one point">&minus;</button>
+            <input type="number" id="smPopVal" step="1" value="${pop.value}" aria-label="Participation points" class="min-h-[44px] min-w-0 flex-1 w-full text-center border border-gray-300 rounded-md font-bold" style="font-size:16px">
+            <button type="button" class="sm-pop-step min-h-[44px] min-w-[44px] shrink-0 rounded-md border border-green-300 text-green-700 font-black text-lg bg-white" data-step="1" aria-label="Plus one point">+</button>
         </div>
-        <p id="smPopStatus" class="text-[11px] text-gray-500 mt-1 min-h-[14px]" role="status"></p>
+        <p id="smPopStatus" class="text-[11px] text-gray-500 min-h-[14px]" role="status">Participation points</p>
     </div>`,
 
     savePop: () => {

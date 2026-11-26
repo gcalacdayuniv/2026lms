@@ -558,3 +558,7 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Days: the attendance screen has a "Topics today" row under Class mode. "Link topics" ticks 0, 1 or several topics for the selected date (none = activity, quiz or exam day); a topic can be taught on several dates (each plan card lists "Taught: ..." dates). Saving replaces that date's links.
 - Rules: tables `Course_Syllabus`, `Plan_Topics`, `Plan_Day_Links` created lazily (`ensureCoursePlan`). Routes in `worker/course-plan.js` are lecturer-only; every body carries `courseId` (gate-checked) and the handler checks the owner again because the gate only reads bodies up to 2 MB; topics must belong to that class. Students have no access yet.
 - Tests: "Course plan" block in worker.test.mjs. Deploy: Worker + site files (sw.js v116); no Apps Script or secret change. Also: the online-class proof upload limit was lowered to 1.5 MB base64 so the owner check always sees its body.
+
+## Floor plan: four rows per screen, compact popover
+- Lecturer plan shows four rows at a time (equal height); a fifth row onward scrolls inside the plan, which opens at row 1 (nearest the lecturer). The eye-condition colour guide and status legend are removed (ring colours stay; the attendance buttons show the status colours), the Lecturer bar is thin, and "n students have no seat" moved under the title.
+- The participation popover is one compact row (Note, minus, number, plus) kept inside the visible plan (above or below the tapped box, never clipped). sw.js v117.
