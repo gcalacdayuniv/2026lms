@@ -544,3 +544,6 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Student seat button moved into the class heading; note box grows on focus
 - The long green "View seating arrangement" button is removed from the student's class card (a card with no seat still says "Unassigned"). The seat button lives in the class heading (`#ssSeatBtn`) and is now a solid blue button matching the heading. The Lecturer note box is normal size until tapped, then grows to two thirds of the visible screen (capped so Add note stays above the keyboard) and shrinks back when left. sw.js v113.
+
+## Student heading: full-width seat button
+- The class heading's seat button (`#ssSeatBtn`) spans the screen width: "Seat N" on the left, "View my seat >" on the right (blue, opens the floor plan). sw.js v114.
