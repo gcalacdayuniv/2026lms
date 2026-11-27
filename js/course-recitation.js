@@ -46,7 +46,13 @@ export const CourseRecitation = {
     saveTimer: null,
     saveChain: Promise.resolve(),
 
-    openModal: async (courseId) => {
+    drag: { dx: 0, dy: 0 },
+
+    // above: true when it opens over the full-screen floor plan
+    openModal: async (courseId, above = false) => {
+        CourseRecitation.initDrag();
+        CourseRecitation.placeCard(0, 0);
+        document.getElementById('recitationModal').style.zIndex = above ? '150' : '';
         document.getElementById('recitationModal').classList.remove('hidden');
         CourseRecitation.showWheelOnly();
         document.getElementById('spinWheelBtn').disabled = false;
@@ -73,9 +79,50 @@ export const CourseRecitation = {
         }
     },
 
+    // The card can be dragged by its title bar. Once moved, the dim backdrop is released so the class screen behind stays usable.
+    placeCard: (dx, dy) => {
+        const card = document.getElementById('recitationCard'), root = document.getElementById('recitationModal');
+        if (!card || !root) return;
+        const moved = dx !== 0 || dy !== 0;
+        CourseRecitation.drag.dx = dx; CourseRecitation.drag.dy = dy;
+        card.style.translate = moved ? `${dx}px ${dy}px` : '';
+        card.classList.toggle('ring-2', moved);
+        card.classList.toggle('ring-purple-400', moved);
+        root.classList.toggle('pointer-events-none', moved);
+        card.classList.toggle('pointer-events-auto', moved);
+        document.getElementById('recitationModalOverlay')?.classList.toggle('hidden', moved);
+    },
+
+    initDrag: () => {
+        if (CourseRecitation.dragBound) return;
+        CourseRecitation.dragBound = true;
+        let start = null;
+        document.addEventListener('pointerdown', (e) => {
+            const bar = e.target.closest && e.target.closest('#recitationDragBar');
+            if (!bar || e.target.closest('#closeRecitationModalBtn')) return;
+            const card = document.getElementById('recitationCard');
+            const r = card.getBoundingClientRect();
+            start = { x: e.clientX, y: e.clientY, dx: CourseRecitation.drag.dx, dy: CourseRecitation.drag.dy, left: r.left - CourseRecitation.drag.dx, right: r.right - CourseRecitation.drag.dx, top: r.top - CourseRecitation.drag.dy, id: e.pointerId };
+            try { bar.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+            bar.classList.replace('cursor-grab', 'cursor-grabbing');
+        });
+        document.addEventListener('pointermove', (e) => {
+            if (!start || e.pointerId !== start.id) return;
+            const keep = 80, vw = window.innerWidth, vh = window.innerHeight;
+            const dx = Math.min(Math.max(start.dx + e.clientX - start.x, keep - start.right), vw - keep - start.left);
+            const dy = Math.min(Math.max(start.dy + e.clientY - start.y, -start.top), vh - 64 - start.top);
+            CourseRecitation.placeCard(dx, dy);
+        });
+        const end = () => { start = null; document.getElementById('recitationDragBar')?.classList.replace('cursor-grabbing', 'cursor-grab'); };
+        document.addEventListener('pointerup', end);
+        document.addEventListener('pointercancel', end);
+    },
+
     closeModal: () => {
         if (CourseRecitation.isSpinning) return;
         CourseRecitation.flushPoints();
+        CourseRecitation.placeCard(0, 0);
+        document.getElementById('recitationModal').style.zIndex = '';
         document.getElementById('recitationModal').classList.add('hidden');
         CourseRecitation.showWheelOnly();
         document.getElementById('calledListModal')?.classList.add('hidden');

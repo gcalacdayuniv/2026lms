@@ -601,3 +601,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 ## Class mode and topics behind a button
 - What: the Class mode / Topics card on the attendance screen is hidden by default. A new button (chalkboard icon, `#attendanceDayBtn`) next to the floor-plan and ⋮ buttons shows or hides it (`#attendanceDayCard`). An indigo dot on the button shows the date is Online.
 - Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v126).
+
+## Floor plan as a view mode, draggable Student caller
+- What: the attendance bar has a List / Plan switch (`#attendanceViewToggle`; Plan = `#attendanceFloorBtn`) instead of a lone floor-plan icon. Plan opens the floor plan for the shown date; its header has List (back), Caller and Check attendance. The switch follows whether the plan is open.
+- Student caller: drag the title bar (`#recitationDragBar`) to move the card (CSS `translate`, kept on screen). Once moved the dim backdrop is released so the screen behind stays usable; position resets on close. Opened from the plan it sits above it (z 150).
+- Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v127).

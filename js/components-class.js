@@ -795,10 +795,10 @@ const ClassUI = {
     renderRecitationModal: () => `
         <div id="recitationModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center fade-in p-4">
             <div id="recitationModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm cursor-pointer"></div>
-            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 scale-up flex flex-col items-center">
-                <div class="w-full flex justify-between items-center mb-4 border-b pb-3">
-                    <h3 class="text-lg font-black text-gray-800"><i class="fa-solid fa-bullhorn text-purple-600 mr-2"></i>Student Caller</h3>
-                    <button id="closeRecitationModalBtn" class="text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
+            <div id="recitationCard" class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative z-10 scale-up flex flex-col items-center">
+                <div id="recitationDragBar" title="Drag to move" class="w-full flex justify-between items-center mb-4 border-b pb-3 cursor-grab select-none" style="touch-action:none">
+                    <h3 class="text-lg font-black text-gray-800"><i class="fa-solid fa-grip-vertical text-gray-300 mr-2" aria-hidden="true"></i><i class="fa-solid fa-bullhorn text-purple-600 mr-2"></i>Student Caller</h3>
+                    <button id="closeRecitationModalBtn" aria-label="Close" class="w-11 h-11 -mr-2 text-gray-400 hover:text-gray-800 focus:outline-none transition-colors">
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
                 </div>
@@ -1094,7 +1094,10 @@ export const ClassComponents = {
                 <div id="attendanceBar" data-dirty="false" class="sticky top-16 z-30 mb-4 px-2 sm:px-3 py-2 bg-gray-50/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
                     <div class="flex flex-wrap items-center gap-2">
                         <input type="date" id="attendanceDate" aria-label="Attendance date" data-schedule-day="${escapeHtml(course.ScheduleDay || '')}" class="flex-1 sm:flex-none min-w-[9.5rem] px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
-                        <button type="button" id="attendanceFloorBtn" aria-label="Check attendance on the classroom floor plan" title="Floor plan" class="flex-shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-md border border-gray-300 bg-white text-sky-700 hover:bg-sky-50"><i class="fa-solid fa-table-cells" aria-hidden="true"></i></button>
+                        <div id="attendanceViewToggle" class="flex flex-shrink-0" role="group" aria-label="View mode">
+                            <button type="button" class="att-view min-h-[44px] px-3 text-sm font-bold border rounded-l-md bg-sky-600 text-white border-sky-600" data-view="list" aria-pressed="true"><i class="fa-solid fa-list mr-1" aria-hidden="true"></i>List</button>
+                            <button type="button" id="attendanceFloorBtn" class="att-view min-h-[44px] px-3 text-sm font-bold border rounded-r-md -ml-px bg-white text-sky-700 border-sky-300" data-view="plan" aria-pressed="false" aria-label="Floor plan view" title="Floor plan view"><i class="fa-solid fa-table-cells mr-1" aria-hidden="true"></i>Plan</button>
+                        </div>
                         <span class="relative flex-shrink-0"><button type="button" id="attendanceDayBtn" aria-label="Class mode and topics for this date" title="Class mode and topics" aria-expanded="false" aria-controls="attendanceDayCard" class="w-11 h-11 inline-flex items-center justify-center rounded-md border border-gray-300 bg-white text-indigo-700 hover:bg-indigo-50"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i></button><span id="attendanceDayDot" aria-hidden="true" class="hidden absolute -top-1 -right-1 w-3 h-3 rounded-full bg-indigo-600 border-2 border-white pointer-events-none"></span></span>
                         <button type="button" id="attendanceMoreBtn" aria-label="Sort, filter and select students" aria-expanded="false" aria-controls="attendanceBarTools" class="sm:hidden flex-shrink-0 w-10 h-10 inline-flex items-center justify-center border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                         <div id="attendanceBarTools" class="hidden sm:flex items-center gap-2 w-full sm:w-auto order-last sm:order-none">

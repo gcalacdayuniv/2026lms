@@ -13,6 +13,7 @@ import { getLoadableAvatarSrc } from './components-utils.js';
 import { UI } from './ui-feedback.js';
 import { CourseClass } from './course-class.js';
 import { LecturerNotes } from './lecturer-notes.js';
+import { CourseRecitation } from './course-recitation.js';
 
 const PER_COLUMN = 5;
 const PER_ROW = PER_COLUMN * 2;
@@ -79,6 +80,7 @@ export const SeatMap = {
             if (/^\d+$/.test(seat) && Number(seat) > 0) seats.set(Number(seat), info); else extras.push({ seat, ...info });
         });
         SeatMap.onDirty = opts.onDirty || null;
+        SeatMap.syncViewToggle(true);
         SeatMap.show({
             pov: 'lecturer', seats, extras, unseated, courseId: opts.courseId || window.location.hash.replace('#class-', ''), picked: null,
             att: { on: false, date: opts.date || byId('attendanceDate')?.value || todayManila(), records: new Map(), brush: 'Present', noClass: false, dirty: false }
@@ -139,7 +141,18 @@ export const SeatMap = {
         }
     },
 
+    // The List / Plan switch on the attendance screen mirrors whether the plan is open.
+    syncViewToggle: (plan) => {
+        document.querySelectorAll('#attendanceViewToggle .att-view').forEach(b => {
+            const on = (b.dataset.view === 'plan') === plan;
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            b.classList.toggle('bg-sky-600', on); b.classList.toggle('text-white', on); b.classList.toggle('border-sky-600', on);
+            b.classList.toggle('bg-white', !on); b.classList.toggle('text-sky-700', !on); b.classList.toggle('border-sky-300', !on);
+        });
+    },
+
     close: () => {
+        SeatMap.syncViewToggle(false);
         byId('seatMapModal')?.classList.add('hidden');
         SeatMap.layout();
         try { screen.orientation?.unlock?.(); } catch (e) { /* ignore */ }
@@ -212,7 +225,7 @@ export const SeatMap = {
         const a = st.att;
         const head = byId('smHeadTools');
         head.classList.remove('hidden');
-        head.innerHTML = `<button type="button" id="smAttToggle" aria-pressed="${a.on}" class="min-h-[44px] px-3 rounded-md border text-sm font-bold ${a.on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-300'}"><i class="fa-solid fa-clipboard-user mr-1" aria-hidden="true"></i>${a.on ? 'Checking attendance' : 'Check attendance'}</button>`;
+        head.innerHTML = `<button type="button" id="smToList" class="min-h-[44px] px-3 mr-1 rounded-md border border-sky-300 bg-white text-sky-700 text-sm font-bold"><i class="fa-solid fa-list mr-1" aria-hidden="true"></i>List</button><button type="button" id="smCallBtn" class="min-h-[44px] px-3 mr-1 rounded-md border border-purple-300 bg-white text-purple-700 text-sm font-bold" title="Student caller"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i><span class="hidden sm:inline ml-1">Caller</span></button><button type="button" id="smAttToggle" aria-pressed="${a.on}" class="min-h-[44px] px-3 rounded-md border text-sm font-bold ${a.on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-300'}"><i class="fa-solid fa-clipboard-user mr-1" aria-hidden="true"></i>${a.on ? 'Checking attendance' : 'Check attendance'}</button>`;
         if (!a.on) { box.classList.add('hidden'); box.innerHTML = ''; return; }
         box.classList.remove('hidden');
         box.innerHTML = `<div class="flex flex-wrap items-center gap-2">
@@ -405,7 +418,9 @@ export const SeatMap = {
                 await SeatMap.openLecturer(CourseClass.currentStudents, { courseId, attendance: false, onDirty: () => CourseClass.loadClassScreen(courseId, true) });
                 return;
             }
-            if (e.target.closest('#seatMapClose') || e.target.id === 'seatMapBg') { SeatMap.close(); return; }
+            if (e.target.closest('#seatMapClose') || e.target.id === 'seatMapBg' || e.target.closest('#smToList')) { SeatMap.close(); return; }
+            if (e.target.closest('#smCallBtn')) { await CourseRecitation.openModal(SeatMap.state.courseId, true); return; }
+            if (e.target.closest('#attendanceViewToggle')) return;
             const st = SeatMap.state;
             if (!st || !byId('seatMapModal') || byId('seatMapModal').classList.contains('hidden')) return;
             if (e.target.closest('#smAttToggle')) { await SeatMap.attendanceOn(!st.att.on); return; }
