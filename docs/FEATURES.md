@@ -635,3 +635,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Not converted on purpose: modals that are markup in `components-*.js` toggled with `hidden` (about 30), the floor plan (rotated layout), exam secure/presentation screens and full-screen pages. Convert them one at a time when next touched.
 - `styles.css`: on screens under 768px every text field, select and textarea is 16px, so iPhone no longer zooms on focus.
 - Tests: `run-tests.sh`, `phone-check.cjs`, browser smoke test of the converted dialogs (open, Escape, close button). Deploy: site files only (sw.js v132).
+
+## One Escape closes one dialog (floor plan, Course Plan)
+- Finding: the ~30 dialogs that are markup in `components-*.js` already get Escape, focus trap, inert background, focus return, Back-button close and scroll lock from `js/a11y.js` (it works from the DOM, whatever opens them). Converting them to `UI.overlay` would add nothing, so they stay as they are. `UI.overlay` is for dialogs made in JS.
+- Fix: the floor plan and the Course Plan page had their own Escape handlers that closed the page even when a dialog sat above it (Student caller over the floor plan closed both on one Escape). They now close only when they are the top dialog (`A11y.openDialogs()`) and the key press was not already handled (`e.defaultPrevented`).
+- Rule: a new Escape handler must check `e.defaultPrevented` and `A11y.openDialogs()` top, or use `UI.overlay`.
+- Tests: `run-tests.sh`, `phone-check.cjs`, browser check (plan + caller: first Escape closes the caller, second the plan). Deploy: site files only (sw.js v133).

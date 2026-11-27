@@ -3,6 +3,7 @@
 //  - Course Actions > Course Plan opens a full-screen page: syllabus (attach / view / remove) and the plan topics
 //    (time allotment, contents, essential questions, learning outcomes, activities, assessment tasks, references).
 //  - On the attendance screen, "Topics for this day" links 0, 1 or several topics to the chosen date; a topic can be taught on several days.
+import { A11y } from './a11y.js';
 import { apiFetch, apiPost, fileToBase64 } from './globals.js';
 const post = apiPost;
 import { UI } from './ui-feedback.js';
@@ -315,7 +316,10 @@ export const initCoursePlan = () => {
     });
     // Escape closes an open topic form first (UI.overlay handles that); otherwise the Course Plan page itself.
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && $('coursePlanModal') && !$('coursePlanModal').classList.contains('hidden')) CoursePlan.close();
+        if (e.key !== 'Escape' || e.defaultPrevented || !$('coursePlanModal') || $('coursePlanModal').classList.contains('hidden')) return;
+        const top = A11y.openDialogs().pop();   // only the top-most dialog closes
+        if (top && top.id !== 'coursePlanModal') return;
+        CoursePlan.close();
     });
 };
 initCoursePlan();

@@ -15,6 +15,7 @@ import { CourseClass } from './course-class.js';
 import { LecturerNotes } from './lecturer-notes.js';
 import { CourseRecitation } from './course-recitation.js';
 import { ClassMode } from './class-mode.js';
+import { A11y } from './a11y.js';
 import { PlanDay } from './course-plan.js';
 
 const PER_COLUMN = 5;
@@ -485,6 +486,11 @@ export const SeatMap = {
         document.addEventListener('plan-day-changed', () => { if (SeatMap.state && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.header(); });
         window.addEventListener('resize', relayout);
         window.addEventListener('orientationchange', relayout);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.close(); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || e.defaultPrevented || !byId('seatMapModal') || byId('seatMapModal').classList.contains('hidden')) return;
+            const top = A11y.openDialogs().pop();   // only the top-most dialog closes (the Student caller can sit above the plan)
+            if (top && top.id !== 'seatMapModal') return;
+            SeatMap.close();
+        });
     }
 };

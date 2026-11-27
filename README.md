@@ -13,6 +13,7 @@ This section is the standing instruction for every task. Keep it current when a 
 - Update the docs in the same commit. Write the new feature's notes (what, rules, tests, deploy) as a section at the END of `docs/FEATURES.md`, and file notes in `docs/FRONTEND.md` if a front-end file changed role. Keep this README small: change it only for setup, deploy, environment, standing rules or architecture. It must still match the current setup, including the "Setup & Deploy" notes: required secrets and vars, tables created automatically vs. anything to run manually, deploy steps for the worker and the front end, and any one-time action after an update.
 
 **Code rules**
+- Dialogs: made in JS -> `UI.overlay`; markup in `components-*.js` -> toggle `hidden` (`js/a11y.js` gives them Escape, focus trap, Back button). A custom Escape handler must close only when its dialog is the top one (`A11y.openDialogs()`, `e.defaultPrevented`).
 - The site is static files. Besides `.html/.css/.js`, only `manifest.webmanifest` and `icons/*.png` are allowed (the installable Android app). Replace the PNGs to change the Android icon.
 - Keep existing element IDs. Escape all user text (`escapeHtml` / `safeUrl` in `js/html-utils.js`).
 - `SESSION_SECRET` is a Worker secret; `ALLOWED_ORIGIN` is in vars.
