@@ -591,3 +591,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 ## Refactor: more dialogs on `UI.overlay`
 - Class invite code, Join a class, Advance Year Level, Copy to another term and Current academic term now use `UI.overlay` (their own backdrop, Escape and remove code is gone; `UI.closeOverlay(id)` closes one by id). `UI.overlay` takes `padClass` (default `p-4`; `p-0 sm:p-4` for dialogs that go full screen on phones) and drops entries that other code removed from the Escape stack. Still hand-built: floor plan (`seat-map.js`), profile-edit picker and the older overlays. sw.js v124.
+
+## Compact class mode and topics rows
+- What: the attendance screen's Class mode and Topics today rows now sit in one small card. Row 1: full-width Onsite/Online toggle; when Online, a camera icon button (amber until a proof picture exists) and an image icon to view it. Row 2: one tappable Topics line (first topic, "+N" for more, or "None"/"Set up the course plan") that opens the topic picker.
+- Rules: element IDs unchanged (`classModeBar`, `planDayBar`, `cmProofBtn`, `cmViewProof`, `pdLink`). Icon buttons have aria-labels.
+- Tests: `run-tests.sh`, `phone-check.cjs`.
+- Deploy: site files only (sw.js v125).

@@ -51,12 +51,12 @@ export const ClassMode = {
         const box = $('classModeBar');
         if (!box) return;
         const on = ClassMode.mode === 'online';
-        const seg = (key, label, icon) => `<button type="button" class="cm-mode min-h-[44px] px-3 text-sm font-bold border ${key === 'online' ? 'rounded-r-md -ml-px' : 'rounded-l-md'} ${ClassMode.mode === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-300'}" data-mode="${key}" aria-pressed="${ClassMode.mode === key}"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</button>`;
-        box.innerHTML = `<div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs font-bold uppercase tracking-wide text-gray-500">Class mode</span>
-            <div class="flex" role="group" aria-label="Class mode for this date">${seg('onsite', 'Onsite', 'fa-school')}${seg('online', 'Online', 'fa-video')}</div>
-            ${on ? `<button type="button" id="cmProofBtn" class="min-h-[44px] px-3 rounded-md border border-indigo-300 bg-white text-indigo-700 text-sm font-bold"><i class="fa-solid fa-camera mr-1" aria-hidden="true"></i>${ClassMode.hasProof ? 'Replace proof' : 'Add proof'}</button>
-            ${ClassMode.hasProof ? '<button type="button" id="cmViewProof" class="min-h-[44px] px-3 rounded-md border border-gray-300 bg-white text-gray-700 text-sm font-bold"><i class="fa-regular fa-image mr-1" aria-hidden="true"></i>View proof</button>' : '<span class="text-xs text-amber-700 font-bold">No screenshot of the meeting yet</span>'}
+        const seg = (key, label, icon) => `<button type="button" class="cm-mode flex-1 min-h-[44px] px-3 text-sm font-bold border ${key === 'online' ? 'rounded-r-md -ml-px' : 'rounded-l-md'} ${ClassMode.mode === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-300'}" data-mode="${key}" aria-pressed="${ClassMode.mode === key}"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</button>`;
+        const proofCls = ClassMode.hasProof ? 'border-indigo-300 text-indigo-700' : 'border-amber-400 text-amber-700 bg-amber-50';
+        box.innerHTML = `<div class="flex items-center gap-2">
+            <div class="flex flex-1" role="group" aria-label="Class mode for this date">${seg('onsite', 'Onsite', 'fa-school')}${seg('online', 'Online', 'fa-video')}</div>
+            ${on ? `<button type="button" id="cmProofBtn" class="min-h-[44px] min-w-[44px] px-3 rounded-md border bg-white text-sm font-bold ${proofCls}" aria-label="${ClassMode.hasProof ? 'Replace proof picture' : 'Add proof picture (no screenshot of the meeting yet)'}"><i class="fa-solid fa-camera" aria-hidden="true"></i></button>
+            ${ClassMode.hasProof ? '<button type="button" id="cmViewProof" class="min-h-[44px] min-w-[44px] px-3 rounded-md border border-gray-300 bg-white text-gray-700 text-sm font-bold" aria-label="View proof picture"><i class="fa-regular fa-image" aria-hidden="true"></i></button>' : ''}
             <input type="file" id="cmProofFile" accept="image/*" class="hidden">` : ''}
         </div>`;
     },
@@ -81,7 +81,7 @@ export const ClassMode = {
         if (!file || ClassMode.busy) return;
         ClassMode.busy = true;
         const btn = $('cmProofBtn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Uploading...'; }
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>'; }
         try {
             const base64 = await shrink(file);
             await post('/api/class-mode-proof', { courseId: ClassMode.courseId, date: ClassMode.date, base64, mimeType: 'image/jpeg' });

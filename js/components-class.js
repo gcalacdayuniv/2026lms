@@ -1123,8 +1123,10 @@ export const ClassComponents = {
                     </div>
                 </div>
 
-                <div id="classModeBar" class="mb-3 mx-2 sm:mx-0"></div>
-                <div id="planDayBar" class="mb-3 mx-2 sm:mx-0"></div>
+                <div class="mb-3 mx-2 sm:mx-0 p-2 bg-white border border-gray-200 rounded-lg space-y-2">
+                    <div id="classModeBar"></div>
+                    <div id="planDayBar"></div>
+                </div>
                 <div id="noClassBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-bold bg-orange-100 text-orange-800 border border-orange-200 uppercase tracking-wider flex items-center justify-center">
                     <i class="fa-solid fa-triangle-exclamation mr-2 text-lg"></i> This date is marked as No Class
                 </div>

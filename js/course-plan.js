@@ -225,11 +225,14 @@ export const PlanDay = {
         if (!box) return;
         const topics = CoursePlan.data.topics;
         const chosen = topics.filter(t => t.dates.includes(PlanDay.date));
-        box.innerHTML = `<div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs font-bold uppercase tracking-wide text-gray-500">Topics today</span>
-            ${chosen.length ? chosen.map(t => `<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold max-w-[16rem] truncate" title="${esc(t.contents)}">${esc(t.time ? t.time + ': ' : '')}${esc(first(t.contents) || 'Topic')}</span>`).join('') : '<span class="text-xs text-gray-400">none (activity, quiz or exam day)</span>'}
-            <button type="button" id="pdLink" class="min-h-[44px] px-3 rounded-md border border-emerald-300 bg-white text-emerald-700 text-sm font-bold"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i>${topics.length ? 'Link topics' : 'Set up plan'}</button>
-        </div>`;
+        const text = chosen.length ? `${esc(first(chosen[0].contents) || 'Topic')}${chosen.length > 1 ? ` <span class="font-black text-emerald-700">+${chosen.length - 1}</span>` : ''}` : (topics.length ? '<span class="text-gray-400 font-normal">None (activity, quiz or exam day)</span>' : '<span class="text-emerald-700">Set up the course plan</span>');
+        const title = chosen.map(t => first(t.contents) || 'Topic').join('; ');
+        box.innerHTML = `<button type="button" id="pdLink" title="${esc(title)}" class="w-full min-h-[44px] flex items-center gap-2 px-3 rounded-md border border-emerald-300 bg-white text-left">
+            <i class="fa-solid fa-link text-emerald-700" aria-hidden="true"></i>
+            <span class="text-[11px] font-black uppercase tracking-wide text-gray-500 shrink-0">Topics</span>
+            <span class="flex-1 min-w-0 truncate text-sm font-bold text-gray-800">${text}</span>
+            <i class="fa-solid fa-chevron-right text-xs text-gray-400" aria-hidden="true"></i>
+        </button>`;
     },
 
     picker: () => {
