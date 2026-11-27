@@ -54,15 +54,9 @@ export const SiteIcon = {
         $('siteIconDlg')?.remove();
         SiteIcon.pending = null;
         const current = (() => { try { return localStorage.getItem(KEY); } catch (e) { return null; } })() || (document.getElementById('siteIcon') || {}).href || '';
-        const dlg = document.createElement('div');
-        dlg.id = 'siteIconDlg';
-        dlg.className = 'fixed inset-0 z-[120] flex items-center justify-center p-4 fade-in';
-        dlg.setAttribute('role', 'dialog'); dlg.setAttribute('aria-modal', 'true'); dlg.setAttribute('aria-labelledby', 'siteIconTitle');
-        dlg.innerHTML = `<div class="absolute inset-0 bg-gray-900 bg-opacity-60" data-si-close></div>
-            <div class="relative z-10 bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
-                <div class="flex items-center gap-3 mb-3 border-b pb-3">
+        UI.overlay({ id: 'siteIconDlg', label: 'Site icon', z: 120, panelClass: 'bg-white rounded-xl shadow-xl max-w-sm p-5', html: `<div class="flex items-center gap-3 mb-3 border-b pb-3">
                     <h3 id="siteIconTitle" class="flex-1 text-lg font-bold text-gray-800"><i class="fa-solid fa-image text-rose-600 mr-2" aria-hidden="true"></i>Site icon</h3>
-                    <button type="button" data-si-close class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
+                    <button type="button" data-overlay-close class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
                 </div>
                 <p class="text-sm text-gray-600 mb-3">The icon in the browser tab and on a phone's home screen. Choose a square picture; it is cut to the centre.</p>
                 <div class="flex items-center justify-center gap-4 mb-4">
@@ -77,9 +71,7 @@ export const SiteIcon = {
                 <div class="grid grid-cols-2 gap-2 mt-3">
                     <button type="button" id="siSave" disabled class="min-h-[44px] rounded-md bg-blue-600 text-white text-sm font-bold disabled:opacity-40">Save</button>
                     <button type="button" id="siReset" class="min-h-[44px] rounded-md border border-gray-300 text-sm font-bold text-gray-700 hover:bg-gray-50">Use default</button>
-                </div>
-            </div>`;
-        document.body.appendChild(dlg);
+                </div> `});
     },
 
     showErr: (t) => { const e = $('siErr'); if (e) { e.textContent = t || ''; e.classList.toggle('hidden', !t); } },
@@ -101,14 +93,13 @@ export const SiteIcon = {
             setLinks(icon);
             PWA.useSiteIcon(icon);
             try { if (icon) localStorage.setItem(KEY, icon); else localStorage.removeItem(KEY); } catch (e) { /* storage blocked */ }
-            $('siteIconDlg')?.remove();
+            UI.closeOverlay('siteIconDlg');
             UI.success(icon ? 'Site icon saved. Other devices pick it up the next time they open the app.' : 'Back to the default site icon.');
         } catch (err) { SiteIcon.showErr(err.message || 'Could not save the icon.'); }
     },
 
     onClick: (e) => {
         if (e.target.closest('#openSiteIconBtn')) { if (AppState.user && AppState.user.isAdmin) SiteIcon.open(); return; }
-        if (e.target.closest('[data-si-close]')) { $('siteIconDlg')?.remove(); return; }
         if (e.target.closest('#siSave') && SiteIcon.pending) SiteIcon.save(SiteIcon.pending);
         else if (e.target.closest('#siReset')) SiteIcon.save(null);
     }

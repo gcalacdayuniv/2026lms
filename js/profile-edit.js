@@ -27,35 +27,28 @@ const restore = () => {
 
 // Password prompt. Resolves with the password, or null when cancelled.
 const askPassword = () => new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'fixed inset-0 flex items-center justify-center p-4 fade-in';
-    overlay.style.zIndex = '330';   // inline: see UI.confirm for why
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Confirm with password');
-    overlay.innerHTML = `
-        <div class="absolute inset-0 bg-gray-900 bg-opacity-60" data-pw-cancel></div>
-        <form class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-4" autocomplete="off">
+    let value = null;
+    const dlg = UI.overlay({
+        id: 'pwPrompt', label: 'Confirm with password', z: 330, onClose: () => resolve(value),
+        panelClass: 'bg-white rounded-xl shadow-2xl max-w-sm p-5',
+        html: `<form class="space-y-4" autocomplete="off">
             <div>
                 <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-shield-halved text-blue-600 mr-2" aria-hidden="true"></i>Confirm your changes</h3>
                 <p class="text-xs text-gray-500 mt-1">Enter your current password to save.</p>
             </div>
-            <input type="password" id="udPasswordPrompt" required autocomplete="current-password" placeholder="Current password" class="block w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <label for="udPasswordPrompt" class="sr-only">Current password</label>
+            <input type="password" id="udPasswordPrompt" required autocomplete="current-password" placeholder="Current password" class="block w-full px-3 py-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-base">
             <div class="grid grid-cols-2 gap-3">
-                <button type="button" data-pw-cancel class="py-2.5 rounded-md border border-gray-300 text-sm font-bold text-gray-700 bg-white">Cancel</button>
-                <button type="submit" class="py-2.5 rounded-md text-sm font-bold text-white bg-blue-600">Save</button>
+                <button type="button" data-overlay-close class="min-h-[44px] rounded-md border border-gray-300 text-sm font-bold text-gray-700 bg-white">Cancel</button>
+                <button type="submit" class="min-h-[44px] rounded-md text-sm font-bold text-white bg-blue-600">Save</button>
             </div>
-        </form>`;
-    const done = (value) => { overlay.remove(); resolve(value); };
-    overlay.addEventListener('click', (e) => { if (e.target.closest('[data-pw-cancel]')) done(null); });
-    overlay.querySelector('form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const v = overlay.querySelector('input').value;
-        if (v) done(v);
+        </form>`
     });
-    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') done(null); });
-    document.body.appendChild(overlay);
-    setTimeout(() => overlay.querySelector('input')?.focus(), 50);
+    dlg.panel.querySelector('form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const v = dlg.panel.querySelector('input').value;
+        if (v) { value = v; dlg.close(); }
+    });
 });
 
 export const ProfileEdit = {

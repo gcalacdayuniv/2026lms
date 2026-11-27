@@ -6,34 +6,19 @@ import { escapeHtml as esc } from './html-utils.js';
 
 export const ExamShare = {
     open: async (examId, title, onDone) => {
-        const overlay = document.createElement('div');
-        overlay.className = 'fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4';
-        overlay.style.zIndex = '300';   // a11y.js ranks dialogs by inline z-index
-        overlay.setAttribute('role', 'dialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.setAttribute('aria-labelledby', 'examShareTitle');
-        overlay.innerHTML = `
-            <div class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-            <div class="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-xl shadow-xl flex flex-col max-h-[85vh]">
-                <div class="flex items-start gap-2 p-4 border-b border-gray-200">
+        const dlg = UI.overlay({ id: 'examShareDlg', label: 'Share this exam', z: 300, padClass: 'p-0 sm:p-4', alignClass: 'items-end sm:items-center', panelClass: 'bg-white sm:max-w-md rounded-t-2xl sm:rounded-xl shadow-xl flex flex-col max-h-[85vh]', html: `<div class="flex items-start gap-2 p-4 border-b border-gray-200">
                     <div class="min-w-0 flex-1">
                         <h3 id="examShareTitle" class="text-base font-black text-gray-800">Share this exam</h3>
                         <p class="text-xs text-gray-600 break-words">${esc(title || '')}</p>
                     </div>
-                    <button type="button" id="examShareClose" aria-label="Close" class="w-10 h-10 rounded text-gray-500 hover:bg-gray-100"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                    <button type="button" id="examShareClose" data-overlay-close aria-label="Close" class="w-10 h-10 rounded text-gray-500 hover:bg-gray-100"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 </div>
                 <div id="examShareBody" class="p-4 overflow-y-auto text-sm text-gray-600">Loading...</div>
                 <div class="p-3 border-t border-gray-200 flex gap-2 justify-end">
-                    <button type="button" id="examShareCancel" class="px-4 py-2 rounded-md border border-gray-300 text-sm font-bold text-gray-700">Cancel</button>
+                    <button type="button" id="examShareCancel" data-overlay-close class="px-4 py-2 rounded-md border border-gray-300 text-sm font-bold text-gray-700">Cancel</button>
                     <button type="button" id="examShareSave" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-bold disabled:opacity-50" disabled>Save</button>
-                </div>
-            </div>`;
-        document.body.appendChild(overlay);
-        const previous = document.activeElement;
-        const close = () => { overlay.remove(); try { previous && previous.focus(); } catch (e) { /* gone */ } };
-        overlay.querySelector('.bg-opacity-60').addEventListener('click', close);
-        overlay.querySelector('#examShareClose').addEventListener('click', close);
-        overlay.querySelector('#examShareCancel').addEventListener('click', close);
+                </div>` });
+        const overlay = dlg.el, close = dlg.close;
         const body = overlay.querySelector('#examShareBody');
         const save = overlay.querySelector('#examShareSave');
         overlay.querySelector('#examShareClose').focus();

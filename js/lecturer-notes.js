@@ -31,31 +31,23 @@ export const LecturerNotes = {
             }
         });
         document.addEventListener('focusout', (e) => { if (e.target && e.target.id === 'lnText') e.target.style.minHeight = ''; });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') LecturerNotes.closeModal(); });
         document.addEventListener('input', (e) => { if (e.target && e.target.id === 'lnText') LecturerNotes.syncCount(); });
     },
 
     // Own dialog (separate from the performance summary), opened from the note button beside a student's gear.
     openModal: (courseId, studentId, name) => {
         LecturerNotes.closeModal();
-        const m = document.createElement('div');
-        m.id = 'lnModal';
-        m.className = 'fixed inset-0 z-[140] flex items-start sm:items-center justify-center fade-in';
-        m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', `Lecturer notes for ${name || 'student'}`);
-        m.innerHTML = `<div id="lnBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-            <div class="relative z-10 bg-white w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-lg shadow-xl p-4 flex flex-col" style="padding-top:max(1rem, env(safe-area-inset-top))">
-                <div class="shrink-0 flex items-center gap-3 mb-3 border-b pb-3">
+        const dlg = UI.overlay({ id: 'lnModal', label: `Lecturer notes for ${name || 'student'}`, z: 140, padClass: 'p-0', alignClass: 'items-start sm:items-center', panelClass: 'bg-white sm:max-w-lg h-full sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-lg shadow-xl p-4 flex flex-col', html: `<div class="shrink-0 flex items-center gap-3 mb-3 border-b pb-3">
                     <div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-note-sticky text-amber-600 mr-2" aria-hidden="true"></i>Lecturer's notes</h3><p class="text-xs text-gray-500 truncate">${escapeHtml(name || '')} &middot; private, never shown to the student</p></div>
-                    <button type="button" id="lnClose" class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
+                    <button type="button" id="lnClose" data-overlay-close class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
                 </div>
-                <div id="lnPanel"></div>
-            </div>`;
-        document.body.appendChild(m);
+                <div id="lnPanel"></div>` });
+        dlg.panel.style.paddingTop = 'max(1rem, env(safe-area-inset-top))';
         LecturerNotes.open(courseId, studentId);
-        m.querySelector('#lnClose').focus();
+        dlg.panel.querySelector('#lnClose').focus();
     },
 
-    closeModal: () => { const m = $('lnModal'); if (m) m.remove(); },
+    closeModal: () => UI.closeOverlay('lnModal'),
 
     open: async (courseId, studentId) => {
         LecturerNotes.init();
@@ -148,7 +140,6 @@ export const LecturerNotes = {
         if (!t) return;
         const nb = t.closest('.student-notes-btn');
         if (nb) { LecturerNotes.openModal(window.location.hash.replace('#class-', ''), nb.dataset.studentId, nb.dataset.name); return; }
-        if (t.closest('#lnClose') || t.id === 'lnBg') { LecturerNotes.closeModal(); return; }
         if (t.closest('#lnSave')) { LecturerNotes.save(); return; }
         if (t.closest('#lnCancel')) { LecturerNotes.editingId = null; LecturerNotes.paint(); return; }
         const ed = t.closest('.ln-edit');

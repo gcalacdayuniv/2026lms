@@ -414,3 +414,12 @@ body.intent-mode main, body.intent-mode #classTabBar { visibility: hidden; }
 .ctl { height: 2.5rem; min-height: 2.5rem; box-sizing: border-box; padding-top: 0; padding-bottom: 0; line-height: 1.25rem; }
 input[type="date"].ctl, input[type="time"].ctl, input[type="datetime-local"].ctl { display: flex; align-items: center; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; text-align: left; }
 input[type="date"].ctl::-webkit-date-and-time-value, input[type="time"].ctl::-webkit-date-and-time-value, input[type="datetime-local"].ctl::-webkit-date-and-time-value { text-align: left; min-height: 1.25rem; }
+
+/* iPhone zooms the page when a field under 16px gets focus. On phones every text field, select and textarea is at least 16px. */
+@media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}

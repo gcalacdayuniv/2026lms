@@ -3,6 +3,7 @@
 // Moving the finger (a scroll or a swipe) cancels the hold, so it does not clash with swipe-to-mark.
 import { CourseSwipe } from './course-swipe.js';
 import { escapeHtml } from './html-utils.js';
+import { UI } from './ui-feedback.js';
 
 const HOLD_MS = 500;
 const MOVE_PX = 10;
@@ -19,39 +20,27 @@ let hold = null;
 const phone = () => window.innerWidth < 1024;
 const cancel = () => { if (hold) clearTimeout(hold.timer); hold = null; };
 
-const closeSheet = () => { document.getElementById('quickSheet')?.remove(); };
+const closeSheet = () => UI.closeOverlay('quickSheet');
 
 const openSheet = (row) => {
     closeSheet();
     const name = row.querySelector('.manage-student-btn')?.dataset.name || 'Student';
     const manage = row.querySelector('.manage-student-btn');
-    const overlay = document.createElement('div');
-    overlay.id = 'quickSheet';
-    overlay.className = 'fixed inset-0 flex items-end justify-center fade-in';
-    overlay.style.zIndex = '250';   // inline: a11y.js ranks dialogs by z-index and the Tailwind CDN builds classes late
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', `Quick actions for ${name}`);
-    overlay.innerHTML = `
-        <div class="absolute inset-0 bg-gray-900 bg-opacity-50" data-quick-close></div>
-        <div class="relative z-10 w-full max-w-md bg-white rounded-t-2xl p-4 sheet-panel" style="padding-bottom:max(1rem, env(safe-area-inset-bottom))">
-            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300"></div>
+    const dlg = UI.overlay({ id: 'quickSheet', label: `Quick actions for ${name}`, z: 250, padClass: 'p-0', alignClass: 'items-end', backdropClass: 'bg-gray-900 bg-opacity-50', panelClass: 'max-w-md bg-white rounded-t-2xl p-4 sheet-panel', html: `<div class="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300"></div>
             <div class="flex items-center justify-between mb-3">
                 <p class="font-black text-gray-900 truncate pr-2">${escapeHtml(name)}</p>
-                <button type="button" aria-label="Close" data-quick-close class="w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                <button type="button" aria-label="Close" data-overlay-close class="w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             </div>
             <div class="grid grid-cols-2 gap-2">
                 ${STATUSES.map(([s, icon, cls]) => `<button type="button" data-quick-status="${s}" class="min-h-[48px] rounded-xl border font-bold text-sm flex items-center justify-center gap-2 ${cls}"><i class="fa-solid ${icon}" aria-hidden="true"></i>${s}</button>`).join('')}
             </div>
-            ${manage ? `<button type="button" data-quick-manage class="mt-2 w-full min-h-[48px] rounded-xl border border-gray-300 bg-gray-50 font-bold text-sm text-gray-800"><i class="fa-solid fa-gear mr-2" aria-hidden="true"></i>Manage student</button>` : ''}
-        </div>`;
-    overlay.addEventListener('click', (e) => {
+            ${manage ? `<button type="button" data-quick-manage class="mt-2 w-full min-h-[48px] rounded-xl border border-gray-300 bg-gray-50 font-bold text-sm text-gray-800"><i class="fa-solid fa-gear mr-2" aria-hidden="true"></i>Manage student</button>` : ''}` });
+    dlg.panel.style.paddingBottom = 'max(1rem, env(safe-area-inset-bottom))';
+    dlg.el.addEventListener('click', (e) => {
         const st = e.target.closest('[data-quick-status]');
         if (st) { CourseSwipe.apply(row, st.dataset.quickStatus); closeSheet(); return; }
         if (e.target.closest('[data-quick-manage]')) { closeSheet(); manage.click(); return; }
-        if (e.target.closest('[data-quick-close]')) closeSheet();
     });
-    document.body.appendChild(overlay);
 };
 
 export const CourseQuick = {

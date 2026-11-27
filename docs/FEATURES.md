@@ -628,3 +628,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Rules: `js/pwa.js` no longer writes a manifest; it still makes the iPhone Home Screen icon and launch image from the Admin's site icon. Android uses the PNGs in `icons/`: replace them to change the Android icon (192x192, 512x512, 512x512 maskable), or redraw the built-in one with `node tools/make-icons.cjs`. The README rule "site files are only .html/.css/.js" is relaxed for exactly these files (agreed).
 - Note: remove the old shortcut from the Home Screen and install again; the phone keeps the old icon until then. `_headers` serves the manifest as `application/manifest+json`.
 - Tests: `phone-check.cjs`; verify with Chrome's Application > Manifest panel (installable). Deploy: site files only (sw.js v131).
+
+## More dialogs on UI.overlay, 16px fields on phones
+- Converted to `UI.overlay` (Escape closes only the top dialog, backdrop tap, focus returns to the opener): profile password prompt (`#pwPrompt`), Edit student (`#esModal`), Site icon (`#siteIconDlg`), file-ready share dialog (`#shareFileDlg`), Share exam (`#examShareDlg`), Course Actions sheet (`#cardMoreSheet`), quick status sheet (`#quickSheet`), field callout (`#ssCallout`), Lecturer's Notes (`#lnModal`), Edit class details (`#editClassModal`). Their own Escape/backdrop handlers were removed.
+- `UI.overlay` gained `alignClass` (default `items-center`; `items-end sm:items-center` makes a bottom sheet on phones).
+- Not converted on purpose: modals that are markup in `components-*.js` toggled with `hidden` (about 30), the floor plan (rotated layout), exam secure/presentation screens and full-screen pages. Convert them one at a time when next touched.
+- `styles.css`: on screens under 768px every text field, select and textarea is 16px, so iPhone no longer zooms on focus.
+- Tests: `run-tests.sh`, `phone-check.cjs`, browser smoke test of the converted dialogs (open, Escape, close button). Deploy: site files only (sw.js v132).

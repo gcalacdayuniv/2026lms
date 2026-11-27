@@ -2,6 +2,9 @@
 // App-style behaviour for the student's "My Course Summary" page: Mid/Final term switch (swipe too),
 // attendance bars and pills, and the bottom action bar. It only reads the numbers the existing code already
 // writes into the page, so the data flow in course.js / course-attendance.js is untouched.
+import { UI } from './ui-feedback.js';
+import { escapeHtml } from './html-utils.js';
+
 const $ = (id) => document.getElementById(id);
 const TERMS = ['midterm', 'finalterm'];
 const num = (id) => parseFloat(($(id)?.textContent || '').replace('%', '')) || 0;
@@ -43,37 +46,11 @@ export const StudentSummaryUI = {
 
     // Small pop-up with the complete text of a field that is cut off in its chip.
     callout: (label, text) => {
-        $('ssCallout')?.remove();
-        const wrap = document.createElement('div');
-        wrap.id = 'ssCallout';
-        wrap.setAttribute('role', 'dialog');
-        wrap.setAttribute('aria-modal', 'true');
-        wrap.setAttribute('aria-label', label);
-        wrap.className = 'fixed inset-0 flex items-end sm:items-center justify-center p-4';
-        wrap.style.cssText = 'z-index:340;background:rgba(15,23,42,.55)';
-        const card = document.createElement('div');
-        card.className = 'bg-white rounded-2xl shadow-xl w-full max-w-sm p-5';
-        card.style.paddingBottom = 'calc(1.25rem + env(safe-area-inset-bottom))';
-        const h = document.createElement('div');
-        h.className = 'text-xs font-bold uppercase tracking-wider text-blue-600 mb-2';
-        h.textContent = label;
-        const body = document.createElement('div');
-        body.className = 'text-gray-800 font-semibold text-base leading-relaxed whitespace-pre-wrap break-words';
-        body.style.maxHeight = '50vh'; body.style.overflowY = 'auto';
-        body.textContent = text;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'mt-4 w-full py-3 rounded-xl bg-blue-600 text-white font-bold';
-        btn.textContent = 'Close';
-        card.append(h, body, btn);
-        wrap.appendChild(card);
-        document.body.appendChild(wrap);
-        const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); $('ssTopicChip')?.focus(); };
-        const onKey = (e) => { if (e.key === 'Escape') close(); };
-        document.addEventListener('keydown', onKey);
-        btn.onclick = close;
-        wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
-        btn.focus();
+        const dlg = UI.overlay({ id: 'ssCallout', label, z: 340, padClass: 'p-4', alignClass: 'items-end sm:items-center', panelClass: 'bg-white rounded-2xl shadow-xl max-w-sm p-5',
+            html: `<div class="text-xs font-bold uppercase tracking-wider text-blue-600 mb-2">${escapeHtml(label)}</div>
+                <div class="text-gray-800 font-semibold text-base leading-relaxed whitespace-pre-wrap break-words" style="max-height:50vh;overflow-y:auto">${escapeHtml(text)}</div>
+                <button type="button" data-overlay-close class="mt-4 w-full min-h-[44px] rounded-xl bg-blue-600 text-white font-bold">Close</button>` });
+        dlg.panel.style.paddingBottom = 'calc(1.25rem + env(safe-area-inset-bottom))';
     },
 
     // A long group name or topic slides back and forth inside its box so it can be read in full.

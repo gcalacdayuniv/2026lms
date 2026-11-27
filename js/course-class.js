@@ -573,21 +573,13 @@ export const CourseClass = {
 const FIELD = 'w-full border border-gray-300 p-2 rounded-md mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm';
 const LABEL = 'block text-xs font-bold text-gray-500 uppercase tracking-wider';
 
-const closeEditClass = () => { const m = document.getElementById('editClassModal'); if (m) m.remove(); };
+const closeEditClass = () => UI.closeOverlay('editClassModal');
 
 const openEditClass = async (btn) => {
     closeEditClass();
     const d = btn.dataset;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const m = document.createElement('div');
-    m.id = 'editClassModal';
-    m.className = 'fixed inset-0 z-[70] flex items-center justify-center fade-in p-0 sm:p-4';
-    m.setAttribute('role', 'dialog');
-    m.setAttribute('aria-modal', 'true');
-    m.setAttribute('aria-label', 'Edit class details');
-    m.innerHTML = `<div id="closeEditClassBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-        <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-lg h-full sm:h-auto p-4 sm:p-6 relative z-10 max-h-full sm:max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center gap-3 mb-5 border-b pb-3">
+    UI.overlay({ id: 'editClassModal', label: 'Edit class details', z: 70, padClass: 'p-0 sm:p-4', panelClass: 'bg-white rounded-none sm:rounded-lg shadow-xl sm:max-w-lg h-full sm:h-auto p-4 sm:p-6 max-h-full sm:max-h-[90vh] overflow-y-auto', html: `<div class="flex items-center gap-3 mb-5 border-b pb-3">
                 <h3 class="min-w-0 flex-1 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-pen-to-square text-blue-600 mr-2"></i>Edit Class Details</h3>
                 <button id="closeEditClassBtn" type="button" aria-label="Back" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
             </div>
@@ -608,9 +600,7 @@ const openEditClass = async (btn) => {
                 <div><label class="${LABEL}" for="ecRoom">Classroom <span class="font-normal normal-case text-gray-400">(optional)</span></label><input type="text" id="ecRoom" maxlength="60" class="${FIELD}" value="${escapeHtml(d.room)}"></div>
                 ${classIdentityBlock({ course: 'ecTargetCourse', year: 'ecTargetYear', section: 'ecTargetSection' }, { course: d.targetCourse, year: d.targetYear, section: d.targetSection }, { field: FIELD, label: LABEL })}
                 <button type="submit" id="ecSaveBtn" data-course-id="${escapeHtml(d.courseId)}" class="w-full bg-blue-600 text-white py-2.5 px-4 rounded-md hover:bg-blue-700 shadow-sm font-bold transition-colors">Save changes</button>
-            </form>
-        </div>`;
-    document.body.appendChild(m);
+            </form>` });
     fillClassCourseOptions('ecTargetCourse', d.targetCourse || '');
 };
 
@@ -647,7 +637,7 @@ const saveEditClass = async (form) => {
 document.addEventListener('click', (e) => {
     const btn = e.target.closest('#editRoomBtn');
     if (btn) { openEditClass(btn); return; }
-    if (e.target.closest('#closeEditClassBtn') || e.target.id === 'closeEditClassBg') closeEditClass();
+    if (e.target.closest('#closeEditClassBtn')) closeEditClass();
 });
 document.addEventListener('submit', (e) => {
     if (e.target.id === 'editClassForm') { e.preventDefault(); saveEditClass(e.target); }
