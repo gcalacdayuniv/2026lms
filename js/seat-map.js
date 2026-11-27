@@ -62,6 +62,7 @@ export const SeatMap = {
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
                     </button>
                 </div>
+                <p id="smDetails" class="hidden mb-1 text-xs font-bold text-gray-600 truncate"></p>
                 <div id="smTools" class="hidden mb-1.5"></div>
                 <div id="smInfo" role="status" class="mb-2 px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sm text-sky-900 min-h-[36px]"></div>
                 <div id="smPlan" class="overflow-auto flex-1 min-h-0 relative"></div>
@@ -120,7 +121,7 @@ export const SeatMap = {
         root.classList.toggle('sm:p-4', !lecturer);
         byId('seatMapModal').classList.remove('hidden');
         SeatMap.header();
-        if (lecturer) ClassMode.load(state.courseId, state.att.date);
+        if (lecturer) ClassMode.load(state.courseId, state.att.date).then(() => { if (SeatMap.state === state) SeatMap.render(); });
         SeatMap.layout();
         SeatMap.tools();
         SeatMap.render();
@@ -143,23 +144,32 @@ export const SeatMap = {
         }
     },
 
+    // Exactly four rows fit the visible area; measured again once the layout has settled.
+    fitRows: () => {
+        const box = byId('smRows'), list = byId('smRowList');
+        if (!box || !list) return;
+        const h = Math.floor((box.clientHeight - 3 * 4) / 4);
+        list.querySelectorAll(':scope > div').forEach(r => { r.style.flex = '0 0 auto'; r.style.height = `${Math.max(44, h)}px`; });
+    },
+
     // Lecturer header: date, class details, topic of the day (left) and the class mode switch. Student: just "Your seat".
     header: () => {
         const st = SeatMap.state, title = byId('seatMapTitleText'), sub = byId('seatMapSub');
         if (!st || !title) return;
         byId('seatMapTitle').querySelector('i').className = st.pov === 'lecturer' ? 'hidden' : 'fa-solid fa-chair text-sky-600 mr-2';
-        if (st.pov !== 'lecturer') { title.className = ''; title.textContent = 'Your seat'; sub.textContent = ''; sub.classList.add('hidden'); return; }
+        if (st.pov !== 'lecturer') { title.className = ''; title.textContent = 'Your seat'; sub.textContent = ''; sub.classList.add('hidden'); byId('smDetails')?.classList.add('hidden'); return; }
         const c = CourseClass.currentCourse || {};
         const d = new Date(`${st.att.date}T00:00:00`);
         const nice = Number.isNaN(d.getTime()) ? st.att.date : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-        const details = [c.CourseCode, c.ScheduleDay, c.Room].filter(Boolean).join(' · ');
+        const prog = [c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' ');
+        const details = [c.CourseCode, prog, [c.ScheduleDay, c.TimePeriod].filter(Boolean).join(' '), c.Room || 'No room'].filter(Boolean).join(' · ');
         const topic = PlanDay.text(st.att.date);
         title.className = 'inline-flex items-baseline gap-2 max-w-[calc(100%-2rem)] align-bottom';
-        title.innerHTML = `<span class="whitespace-nowrap">${esc(nice)}</span>${details ? `<span class="truncate text-xs font-bold text-gray-500">${esc(details)}</span>` : ''}`;
-        sub.classList.remove('hidden');
-        const miss = st.unseated ? ` <span class="ml-2 font-bold text-amber-700">${st.unseated} without a seat not shown</span>` : '';
-        sub.innerHTML = (topic ? `<span class="font-bold text-emerald-700"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i>${esc(topic)}</span>` : '<span class="text-gray-400">No topic linked to this date</span>') + miss;
-        sub.className = 'text-xs truncate';
+        title.innerHTML = `<span class="whitespace-nowrap">${esc(nice)}</span>${topic ? `<span class="truncate text-xs font-bold text-emerald-700"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i>${esc(topic)}</span>` : '<span class="truncate text-xs text-gray-400">No topic</span>'}`;
+        const det = byId('smDetails');
+        det.textContent = details; det.title = details; det.classList.remove('hidden');
+        sub.innerHTML = st.unseated ? `<span class="font-bold text-amber-700">${st.unseated} without a seat not shown</span>` : '';
+        sub.classList.toggle('hidden', !st.unseated);
     },
 
     // The List / Plan switch on the attendance screen mirrors whether the plan is open.
@@ -311,7 +321,7 @@ export const SeatMap = {
             let nums = Array.from({ length: PER_ROW }, (_, i) => r * PER_ROW + i + 1);
             if (lecturerPov) nums = nums.reverse();
             const left = nums.slice(0, PER_COLUMN), right = nums.slice(PER_COLUMN);
-            return `<div class="flex ${lecturerPov ? 'items-stretch min-h-0' : 'items-center'} gap-1.5 min-w-0" ${lecturerPov ? 'style="flex:1 1 0;min-height:60px"' : ''}>
+            return `<div class="flex ${lecturerPov ? 'items-stretch min-h-0' : 'items-center'} gap-1.5 min-w-0" ${lecturerPov ? 'style="flex:1 1 0;min-height:40px"' : ''}>
                 <span class="w-4 shrink-0 text-[10px] font-bold text-gray-400 text-center" aria-hidden="true">${r + 1}</span>
                 <div class="flex min-w-0 gap-1.5" style="flex:1 1 0">${left.map(n => SeatMap.seatCell(n, st)).join('')}</div>
                 <div class="w-3 sm:w-6 shrink-0" aria-hidden="true"></div>
@@ -334,9 +344,9 @@ export const SeatMap = {
             plan.innerHTML = `<div id="smRows" class="flex-1 min-h-0 overflow-y-auto relative"><div id="smRowList" class="flex flex-col gap-1 ${rows <= 4 ? 'h-full' : ''}" role="group" aria-label="Seats">${rowHtml}</div></div>${bar('fa-chalkboard-user', 'Lecturer', 'bg-sky-700')}${extras}`;
             const list = byId('smRowList'), box = byId('smRows');
             if (rows > 4) {
-                const h = Math.floor((box.clientHeight - 3 * 4) / 4);
-                list.querySelectorAll(':scope > div').forEach(r => { r.style.flex = '0 0 auto'; r.style.height = `${Math.max(60, h)}px`; });
+                SeatMap.fitRows();
                 box.scrollTop = hadRows ? prevScroll : box.scrollHeight;      // opens at row 1, the row nearest the lecturer
+                requestAnimationFrame(() => { const wasBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 2; SeatMap.fitRows(); if (wasBottom) box.scrollTop = box.scrollHeight; });   // the layout settles after this frame
             }
         } else {
             plan.innerHTML = `${bar('fa-chalkboard', 'Board', 'bg-gray-800')}<div class="space-y-1.5" role="group" aria-label="Seats">${rowHtml}</div>${note}${extras}`;

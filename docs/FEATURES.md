@@ -611,3 +611,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - What: the roster header shows the topic of the day (`#rosterTopic`, tap to change; `PlanDay.text(date)` is the one source) and a live P / L / A / E count (`#rosterCounts`, refreshed from `paintRowStatus` via `refreshCounts`). The old Topics row is gone; the button card keeps only Class mode.
 - Floor plan header (lecturer): date + class details (`CourseClass.currentCourse`), topic of the day, and the Onsite/Online switch (`#smClassMode`, same `.cm-mode` handler as the list). Changing the plan date reloads class mode and topic; closing the plan restores the list screen's date.
 - Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v128).
+
+## Compact roster header, fuller floor plan header
+- Roster header is two tight rows: topic of the day + Expand/Collapse Status, then "N Enrolled" + live P/L/A/E + Mark All Present.
+- Floor plan header: date + topic on line 1; a full-width details line (`#smDetails`): course code, program year-section, day and time, room ("No room"). Rows keep exactly four visible (inline min height lowered to 40px, `SeatMap.fitRows` re-measures after layout).
+- Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v129).

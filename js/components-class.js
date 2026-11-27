@@ -1137,17 +1137,14 @@ export const ClassComponents = {
                 <div id="pendingSyncBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-medium bg-amber-50 text-amber-900 border border-amber-200" role="status" aria-live="polite"></div>
 
                 <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mx-0 sm:mx-0">
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                        <div class="min-w-0 flex-1 pr-2">
-                            <button type="button" id="rosterTopic" class="pd-open block max-w-full min-h-[28px] text-left text-sm font-bold text-emerald-700 truncate" aria-label="Topic of the day. Tap to change"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i><span>Topic of the day</span></button>
-                            <span class="block text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">${students.length} Enrolled Students</span>
-                            <span id="rosterCounts" class="flex flex-wrap gap-x-3 text-base font-black text-gray-800" role="status" aria-label="Attendance count for the date"></span>
-                        </div>
-                        <div class="space-x-2">
-                            <button type="button" id="toggleStatusButtons" aria-controls="rosterListContainer" aria-expanded="${isStatusCollapsed() ? 'false' : 'true'}" class="text-[10px] sm:text-xs font-bold text-gray-600 hover:text-gray-900 underline py-3 sm:py-1">
+                    <div class="bg-gray-50 px-4 py-1.5 border-b border-gray-200 flex justify-between items-center">
+                        <div class="w-full grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
+                            <button type="button" id="rosterTopic" class="pd-open min-w-0 min-h-[32px] text-left text-xs sm:text-sm font-bold text-emerald-700 truncate" aria-label="Topic of the day. Tap to change"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i><span>Topic of the day</span></button>
+                            <button type="button" id="toggleStatusButtons" aria-controls="rosterListContainer" aria-expanded="${isStatusCollapsed() ? 'false' : 'true'}" class="text-[10px] sm:text-xs font-bold text-gray-600 hover:text-gray-900 underline min-h-[32px]">
                                 <i class="fa-solid ${isStatusCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'} mr-1" aria-hidden="true"></i><span>${isStatusCollapsed() ? 'Expand Status' : 'Collapse Status'}</span>
                             </button>
-                            <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-700 hover:text-green-900 underline py-3 sm:py-1">Mark All Present</button>
+                            <span class="flex items-baseline gap-2 min-w-0"><span class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">${students.length} Enrolled</span><span id="rosterCounts" class="flex gap-x-2 text-sm font-black text-gray-800" role="status" aria-label="Attendance count for the date"></span></span>
+                            <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-700 hover:text-green-900 underline min-h-[32px]">Mark All Present</button>
                         </div>
                     </div>
                     ${students.length > 1 ? `
