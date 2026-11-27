@@ -144,6 +144,17 @@ export const AuthUI = {
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
+                            <label class="block text-sm font-medium text-gray-700">Middle Name</label>
+                            <input type="text" id="regMiddleName" autocomplete="additional-name" enterkeyhint="next" required maxlength="60" placeholder="Type N/A if none" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Barangay of Residence</label>
+                            <input type="text" id="regBarangay" autocomplete="address-level3" enterkeyhint="next" required maxlength="80" class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
                             <label class="block text-sm font-medium text-gray-700">Username</label>
                             <input type="text" id="regUsername" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
                         </div>

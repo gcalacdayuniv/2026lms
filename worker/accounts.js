@@ -78,7 +78,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         if (!body || typeof body.password !== 'string' || body.password.length < 6 || body.password.length > 200
             || tooLong(body.username, 60) || tooLong(body.name, 120) || tooLong(body.email, 120) || tooLong(body.contact_number, 30)
             || tooLong(body.course, 80) || tooLong(body.year, 40) || tooLong(body.section, 40) || tooLong(body.eye_condition, 120) || tooLong(body.invite_code, 20)
-            || tooLong(body.program_course, 80) || tooLong(body.program_year, 40) || tooLong(body.program_section, 40)) {
+            || tooLong(body.middle_name, 60) || tooLong(body.barangay, 80) || tooLong(body.program_course, 80) || tooLong(body.program_year, 40) || tooLong(body.program_section, 40)) {
             return new Response(JSON.stringify({ error: "Some details are missing or too long. Passwords need 6 to 200 characters." }), { status: 400, headers: corsHeaders });
         }
         if (body.avatarBase64 != null && (typeof body.avatarBase64 !== 'string' || body.avatarBase64.length > MAX_AVATAR_B64)) {
@@ -88,6 +88,10 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         // The student's own program is required; the class course/year/section below is for enrolling in classes.
         if (![body.program_course, body.program_year, body.program_section].every(v => typeof v === 'string' && v.trim())) {
             return new Response(JSON.stringify({ error: "Choose your program course, year and section." }), { status: 400, headers: corsHeaders });
+        }
+
+        if (![body.middle_name, body.barangay].every(v => typeof v === 'string' && v.trim())) {
+            return new Response(JSON.stringify({ error: "Middle name and barangay of residence are required. Type N/A if you have no middle name." }), { status: 400, headers: corsHeaders });
         }
 
         const studentNoFormat = /^\d{2}-\d{4}$/;
@@ -174,14 +178,16 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const userId = crypto.randomUUID();
         const hashedPassword = await hashPassword(body.password, env);
 
+        await ensureReactivationColumns(env);
         await env.DB.prepare(
-            `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, Program_Course, Program_Year, Program_Section, registration_timestamp)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+            `INSERT INTO Users (User_ID, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, Program_Course, Program_Year, Program_Section, Middle_Name, Barangay, registration_timestamp)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
         ).bind(
             userId, body.username, hashedPassword, body.name, finalAvatarUrl,
             body.email, body.contact_number, body.student_number,
             joinClass ? 'Active' : 'Inactive', null, null, null, body.eye_condition ? body.eye_condition.trim() : null, 'Student',
-            body.program_course.trim(), body.program_year.trim(), body.program_section.trim()
+            body.program_course.trim(), body.program_year.trim(), body.program_section.trim(),
+            body.middle_name.trim(), body.barangay.trim()
         ).run();
 
         if (joinClass) await ensureEnrolled(env, joinClass.Course_ID, userId);
@@ -196,9 +202,10 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const locked = await loginLockedFor(env, lk);
         if (locked) return tooManyTries(corsHeaders, locked);
 
+        await ensureReactivationColumns(env);
         const user = (id && body.password)
             ? await findUserByCredentials(env, id, body.password,
-                "User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition")
+                "User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, role, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, Middle_Name, Barangay")
             : null;
 
         if (!user) {
@@ -374,6 +381,11 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
     if (request.method === "POST" && path === "/api/update-details") {
         const body = await request.json();
         const { userId, password, name, username, email, contact, studentNumber, programCourse, programYear, programSection } = body;
+        const resid = (v) => v === undefined ? undefined : String(v == null ? "" : v).trim();
+        const middleName = resid(body.middleName), barangay = resid(body.barangay);
+        if ((middleName !== undefined && (!middleName || middleName.length > 60)) || (barangay !== undefined && (!barangay || barangay.length > 80))) {
+            return new Response(JSON.stringify({ error: "Middle name and barangay are required (type N/A if you have no middle name)." }), { status: 400, headers: corsHeaders });
+        }
 
         const studentNoFormat = /^\d{2}-\d{4}$/;
         if (!studentNoFormat.test(studentNumber)) {
@@ -409,6 +421,11 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             `UPDATE Users SET Name = ?, Username = ?, Email = ?, Contact_Number = ?, Student_Number = ? WHERE User_ID = ?`
         ).bind(name, username, email, contact, studentNumber, userId).run();
 
+        if (middleName !== undefined || barangay !== undefined) {
+            await ensureReactivationColumns(env);
+            await env.DB.prepare("UPDATE Users SET Middle_Name = ?, Barangay = ? WHERE User_ID = ?").bind(middleName ?? null, barangay ?? null, userId).run();
+        }
+
         // Optional: the student's own Program Course / Year / Section
         if (programCourse !== undefined || programYear !== undefined || programSection !== undefined) {
             const cleanProg = (v) => (v === undefined || v === null) ? null : (String(v).trim() || null);
@@ -430,7 +447,8 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         const clean = (v, max) => { const t = v == null ? "" : String(v).trim(); return t.length > max ? undefined : (t || null); };
         const f = {
             Name: clean(body.name, 120), Email: clean(body.email, 120), Contact_Number: clean(body.contact, 30), Student_Number: clean(body.studentNumber, 20),
-            Program_Course: clean(body.programCourse, 80), Program_Year: clean(body.programYear, 40), Program_Section: clean(body.programSection, 40)
+            Program_Course: clean(body.programCourse, 80), Program_Year: clean(body.programYear, 40), Program_Section: clean(body.programSection, 40),
+            Middle_Name: clean(body.middleName, 60), Barangay: clean(body.barangay, 80)
         };
         if (Object.values(f).includes(undefined)) {
             return new Response(JSON.stringify({ error: "Some details are too long." }), { status: 400, headers: corsHeaders });
@@ -462,8 +480,8 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
             await env.DB.prepare("UPDATE Users SET Exam_Secure = ? WHERE User_ID = ?").bind(body.examSecure === "" ? null : String(body.examSecure), stu.User_ID).run();
         }
         await env.DB.prepare(
-            `UPDATE Users SET Name = ?, Email = ?, Contact_Number = ?, Student_Number = ?, Program_Course = ?, Program_Year = ?, Program_Section = ?, eye_condition = ? WHERE User_ID = ?`
-        ).bind(f.Name, f.Email, f.Contact_Number, f.Student_Number, f.Program_Course, f.Program_Year, f.Program_Section, eye, stu.User_ID).run();
+            `UPDATE Users SET Name = ?, Email = ?, Contact_Number = ?, Student_Number = ?, Program_Course = ?, Program_Year = ?, Program_Section = ?, eye_condition = ?, Middle_Name = ?, Barangay = ? WHERE User_ID = ?`
+        ).bind(f.Name, f.Email, f.Contact_Number, f.Student_Number, f.Program_Course, f.Program_Year, f.Program_Section, eye, f.Middle_Name, f.Barangay, stu.User_ID).run();
         return new Response(JSON.stringify({ success: true, student: { User_ID: stu.User_ID, ...f, eye_condition: eye } }), { status: 200, headers: corsHeaders });
     }
 
@@ -684,7 +702,7 @@ export async function handleAccounts(request, env, path, url, corsHeaders) {
         await ensureReactivationColumns(env);
         await ensureExamSecurity(env);
         const users = await env.DB.prepare(
-            `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, Exam_Secure, role, registration_timestamp, Reactivation_Requested
+            `SELECT User_ID, Username, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, Program_Course, Program_Year, Program_Section, eye_condition, Exam_Secure, role, registration_timestamp, Reactivation_Requested, Middle_Name, Barangay
              FROM Users ORDER BY Name ASC`
         ).all();
         return new Response(JSON.stringify({ success: true, users: users.results }), { status: 200, headers: corsHeaders });

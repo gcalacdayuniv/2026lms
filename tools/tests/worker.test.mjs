@@ -23,7 +23,7 @@ const DB = {
   async batch(list) { const out = []; for (const s of list) out.push(await s.run()); return out; }
 };
 sql.exec(`
-create table Users(User_ID primary key, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, registration_timestamp, Program_Course, Program_Year, Program_Section);
+create table Users(User_ID primary key, Username, Password, Name, Avatar, Email, Contact_Number, Student_Number, account_status, course, year, section, eye_condition, role, registration_timestamp, Program_Course, Program_Year, Program_Section, Middle_Name, Barangay);
 create table Courses(Course_ID primary key, CourseCode, CourseTitle, ScheduleDay, TimePeriod, Lecturer_ID, Midterm_Start, Midterm_End, Final_Start, Final_End);
 create table Course_Sessions(Session_ID, Course_ID, Date, Is_No_Class);
 create table Enrollments(Course_ID, Student_ID, Seat_Number, Group_Name, Assigned_Topic);
@@ -335,15 +335,21 @@ ok('bad secure value rejected', (await setSec(L1, 'S2', 'maybe')).s === 400);
 await setSec(L1, 'S2', '');
 
 // ---- registration limits ----
-const reg = (sn, extra = {}, ip) => call('POST', '/api/register', { body: { username: 'new' + sn, password: 'secret12', name: 'N', email: 'n@x.com', student_number: sn, contact_number: '09', eye_condition: 'None', program_course: 'BSCS', program_year: '1', program_section: '1', ...extra } });
+const reg = (sn, extra = {}, ip) => call('POST', '/api/register', { body: { username: 'new' + sn, password: 'secret12', name: 'N', email: 'n@x.com', student_number: sn, contact_number: '09', eye_condition: 'None', program_course: 'BSCS', program_year: '1', program_section: '1', middle_name: 'Mid', barangay: 'Poblacion', ...extra } });
 const noProg = await reg('26-0090', { program_course: '' });
 ok('registration needs the program course', noProg.s === 400 && /program/i.test(noProg.j.error), JSON.stringify(noProg));
 const noProgYear = await reg('26-0091', { program_year: undefined });
 ok('registration needs the program year', noProgYear.s === 400, JSON.stringify(noProgYear));
+const noMid = await reg('26-0092', { middle_name: ' ' });
+ok('registration needs the middle name', noMid.s === 400 && /middle/i.test(noMid.j.error), JSON.stringify(noMid));
+const noBrgy = await reg('26-0093', { barangay: undefined });
+ok('registration needs the barangay', noBrgy.s === 400 && /barangay/i.test(noBrgy.j.error), JSON.stringify(noBrgy));
 const okReg = await reg('26-0095', { username: 'prog95', email: 'p95@x.com', contact_number: '0995', program_course: 'BSArch', program_year: '5', program_section: '3' });
 const prow = sql.prepare("select Program_Course c, Program_Year y, Program_Section s, course cc from Users where Student_Number='26-0095'").get();
 const clr = sql.prepare("select count(*) n from Users where course is not null or year is not null or section is not null").get().n;
 ok('login clears old class course/year/section once', clr === 0 || sql.prepare("select Value v from App_Settings where Key='class_fields_cleared'").get(), String(clr));
+const rres = sql.prepare("select Middle_Name m, Barangay b from Users where Student_Number='26-0095'").get();
+ok('registration saves middle name and barangay', rres && rres.m === 'Mid' && rres.b === 'Poblacion', JSON.stringify(rres));
 ok('registration saves the program only (no class fields)', okReg.s === 201 && prow && prow.c === 'BSArch' && prow.y === '5' && prow.s === '3' && prow.cc === null, JSON.stringify([okReg, prow]));
 sql.exec("delete from Users where Student_Number='26-0095'");
 const big = await reg('26-0001', { avatarBase64: 'A'.repeat(8000001) });

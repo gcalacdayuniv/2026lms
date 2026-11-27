@@ -27,6 +27,7 @@ const open = (userId) => {
                     ${input('esNo', 'Student number', u.Student_Number, 'placeholder="00-0000" inputmode="numeric" maxlength="7"')}
                     ${input('esContact', 'Contact number', u.Contact_Number, 'inputmode="tel"')}
                 </div>
+                <div class="grid grid-cols-2 gap-3">${input('esMiddle', 'Middle name', u.Middle_Name)}${input('esBarangay', 'Barangay', u.Barangay)}</div>
                 ${input('esEmail', 'Email', u.Email, 'inputmode="email"')}
                 <p class="text-xs font-bold text-gray-700 pt-1">Program</p>
                 <div class="grid grid-cols-3 gap-3">${input('esPCourse', 'Course', u.Program_Course)}${input('esPYear', 'Year', u.Program_Year)}${input('esPSection', 'Section', u.Program_Section)}</div>
@@ -53,7 +54,7 @@ const save = async () => {
         const r = await apiFetch('/api/admin-update-student', {
             method: 'POST',
             body: JSON.stringify({
-                studentId: m.dataset.userId, name: $('esName').value, studentNumber: $('esNo').value, contact: $('esContact').value, email: $('esEmail').value,
+                studentId: m.dataset.userId, name: $('esName').value, studentNumber: $('esNo').value, contact: $('esContact').value, email: $('esEmail').value, middleName: $('esMiddle').value, barangay: $('esBarangay').value,
                 
                 programCourse: $('esPCourse').value, programYear: $('esPYear').value, programSection: $('esPSection').value, eyeCondition: $('esEye').value, examSecure: $('esSecure').value
             })

@@ -218,9 +218,9 @@ export const ensureLecturerNotes = once(async (env) => {
 
 // Students moved up by Advance Year Level are set Inactive until reactivated. These Users columns track that:
 //   Advanced_Term: the academic year they were advanced into; Reactivation_Until: last day they may request reactivation (optional);
-//   Reactivation_Requested: when they asked at the login screen. Only "Active" accounts can sign in.
+//   Reactivation_Requested: when they asked at the login screen. Also Middle_Name and Barangay (of residence), asked at sign-up. Only "Active" accounts can sign in.
 export const ensureReactivationColumns = once(async (env) => {
-    for (const col of ["Advanced_Term TEXT", "Reactivation_Until TEXT", "Reactivation_Requested TEXT"]) {
+    for (const col of ["Advanced_Term TEXT", "Reactivation_Until TEXT", "Reactivation_Requested TEXT", "Middle_Name TEXT", "Barangay TEXT"]) {
         try { await env.DB.prepare(`ALTER TABLE Users ADD COLUMN ${col}`).run(); } catch (e) { /* already there */ }
     }
 });

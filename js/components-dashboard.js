@@ -343,6 +343,17 @@ const DashboardUI = {
                                 <input type="text" id="udUsername" readonly required value="${escapeHtml(user.Username || '')}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
                             </div>
                         </div>
+                        ${(user.role || '').toLowerCase() === 'student' ? `
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Middle Name</label>
+                                <input type="text" id="udMiddleName" readonly required maxlength="60" value="${escapeHtml(user.Middle_Name || '')}" placeholder="N/A if none" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Barangay of Residence</label>
+                                <input type="text" id="udBarangay" readonly required maxlength="80" value="${escapeHtml(user.Barangay || '')}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">
+                            </div>
+                        </div>` : ''}
                         <div>
                                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Email</label>
                                 <input type="email" id="udEmail" readonly required value="${escapeHtml(user.Email || '')}" class="ud-field ctl block w-full px-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-gray-50">

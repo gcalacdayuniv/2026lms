@@ -117,6 +117,8 @@ export const AuthModule = {
                     username: document.getElementById('regUsername').value.trim(),
                     password: pw,
                     name: `${document.getElementById('regLastName').value.trim()}, ${document.getElementById('regGivenName').value.trim()} ${document.getElementById('regSuffix').value.trim()}`.trim(),
+                    middle_name: document.getElementById('regMiddleName').value.trim(),
+                    barangay: document.getElementById('regBarangay').value.trim(),
                     email: document.getElementById('regEmail').value.trim(),
                     contact_number: document.getElementById('regContact').value.trim(),
                     student_number: document.getElementById('regStudentNo').value.trim(),
@@ -190,6 +192,10 @@ export const AuthModule = {
                 contact: document.getElementById('udContact').value.trim(),
                 studentNumber: document.getElementById('udStudentNumber').value.trim()
             };
+            if (document.getElementById('udMiddleName')) {
+                payload.middleName = document.getElementById('udMiddleName').value.trim();
+                payload.barangay = document.getElementById('udBarangay').value.trim();
+            }
 
             if (document.getElementById('udProgramCourse')) {
                 payload.programCourse = document.getElementById('udProgramCourse').value.trim();
@@ -208,6 +214,7 @@ export const AuthModule = {
                 AppState.user.Email = payload.email;
                 AppState.user.Contact_Number = payload.contact;
                 AppState.user.Student_Number = payload.studentNumber;
+                if (payload.middleName !== undefined) { AppState.user.Middle_Name = payload.middleName; AppState.user.Barangay = payload.barangay; }
                 if (payload.programCourse !== undefined) {
                     AppState.user.Program_Course = payload.programCourse || null;
                     AppState.user.Program_Year = payload.programYear || null;

@@ -656,3 +656,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rules:** new big work screens add `page-full`; never use native `alert/confirm`.
 - **Tests:** run-tests ALL CHECKS PASSED; phone-check clean; checked at 820x1180 and 1366x768.
 - **Deploy:** site files only (sw `portal-shell-v135`).
+
+## Middle name and barangay at sign-up
+
+- **What:** registration now asks for Middle Name (type N/A if none) and Barangay of Residence; both required. Stored in new `Users.Middle_Name` / `Users.Barangay` (added lazily by `ensureReactivationColumns`). `Name` stays "Last, Given Suffix" so sorting and the forgot-password last-name check are unchanged.
+- **Rules:** `/api/register` rejects a blank value (400). Students edit both on the profile Details form (blank not allowed once sent; older accounts fill them on their next save). A lecturer can edit them in Manage Users > Edit student. Login returns both fields.
+- **Tests:** register without middle name or barangay is refused; both are saved.
+- **Deploy:** Worker + site files (sw `portal-shell-v136`). No manual DB step.
