@@ -51,6 +51,7 @@ export const ClassMode = {
         const box = $('classModeBar');
         if (!box) return;
         const on = ClassMode.mode === 'online';
+        const dot = $('attendanceDayDot'); if (dot) dot.classList.toggle('hidden', !on);
         const seg = (key, label, icon) => `<button type="button" class="cm-mode flex-1 min-h-[44px] px-3 text-sm font-bold border ${key === 'online' ? 'rounded-r-md -ml-px' : 'rounded-l-md'} ${ClassMode.mode === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-300'}" data-mode="${key}" aria-pressed="${ClassMode.mode === key}"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</button>`;
         const proofCls = ClassMode.hasProof ? 'border-indigo-300 text-indigo-700' : 'border-amber-400 text-amber-700 bg-amber-50';
         box.innerHTML = `<div class="flex items-center gap-2">

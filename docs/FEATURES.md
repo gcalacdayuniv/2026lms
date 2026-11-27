@@ -597,3 +597,7 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Rules: element IDs unchanged (`classModeBar`, `planDayBar`, `cmProofBtn`, `cmViewProof`, `pdLink`). Icon buttons have aria-labels.
 - Tests: `run-tests.sh`, `phone-check.cjs`.
 - Deploy: site files only (sw.js v125).
+
+## Class mode and topics behind a button
+- What: the Class mode / Topics card on the attendance screen is hidden by default. A new button (chalkboard icon, `#attendanceDayBtn`) next to the floor-plan and ⋮ buttons shows or hides it (`#attendanceDayCard`). An indigo dot on the button shows the date is Online.
+- Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v126).

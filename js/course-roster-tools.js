@@ -214,6 +214,11 @@ export const RosterTools = {
 
     onClick: (e) => {
         const t = e.target;
+        if (t.closest('#attendanceDayBtn')) {
+            const open = !$('attendanceDayCard').classList.toggle('hidden');
+            $('attendanceDayBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+            return;
+        }
         if (t.closest('#attendanceMoreBtn')) {
             const open = $('attendanceBarTools').classList.toggle('att-tools-open');
             $('attendanceMoreBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
