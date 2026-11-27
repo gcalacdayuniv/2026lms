@@ -52,7 +52,7 @@ export async function secureFor(env, userId) {
 }
 
 export async function handleExamPhotos(request, env, path, url, corsHeaders, caller) {
-    if (path !== '/api/exam-photo' && path !== '/api/exam-photos' && path !== '/api/admin-exam-photos') return null;
+    if (path !== '/api/exam-photo' && path !== '/api/exam-photos' && path !== '/api/admin-exam-photos' && path !== '/api/admin-delete-exam-photos') return null;
     await ensureExamSecurity(env);
 
     // Admin tools > Exam Photos: every class with photos, then that class's exams (the photos themselves come from /api/exam-photos).
@@ -73,6 +73,31 @@ export async function handleExamPhotos(request, env, path, url, corsHeaders, cal
              GROUP BY c.Course_ID, c.CourseCode, c.CourseTitle, u.Name ORDER BY c.CourseCode`
         ).all();
         return json(corsHeaders, { success: true, classes: rows.results || [] });
+    }
+
+    // Admin: delete selected photos (Drive file to the bin first, then the rows; if Drive fails nothing is removed).
+    if (request.method === 'POST' && path === '/api/admin-delete-exam-photos') {
+        if (!caller || !caller.admin) return json(corsHeaders, { error: 'Only an Admin can do this.' }, 403);
+        const body = await request.json();
+        const ids = [...new Set(Array.isArray(body.photoIds) ? body.photoIds.map(String) : [])];
+        if (!ids.length || ids.length > 200) return json(corsHeaders, { error: 'Select between 1 and 200 photos.' }, 400);
+        const rows = [];
+        for (let i = 0; i < ids.length; i += 50) {
+            const part = ids.slice(i, i + 50);
+            const r = await env.DB.prepare(`SELECT Photo_ID, File_ID FROM Exam_Photos WHERE Photo_ID IN (${part.map(() => '?').join(',')})`).bind(...part).all();
+            rows.push(...(r.results || []));
+        }
+        if (!rows.length) return json(corsHeaders, { success: true, deleted: 0 });
+        const fileIds = rows.map(r => r.File_ID).filter(Boolean);
+        if (fileIds.length) {
+            try { await callGas(env, JSON.stringify({ action: 'trash', fileIds })); }
+            catch (err) { return json(corsHeaders, { error: 'The pictures could not be removed from Google Drive, so nothing was deleted. Update the Apps Script (it needs the "trash" action) and try again.' }, 502); }
+        }
+        for (let i = 0; i < rows.length; i += 50) {
+            const part = rows.slice(i, i + 50).map(r => r.Photo_ID);
+            await env.DB.prepare(`DELETE FROM Exam_Photos WHERE Photo_ID IN (${part.map(() => '?').join(',')})`).bind(...part).run();
+        }
+        return json(corsHeaders, { success: true, deleted: rows.length });
     }
 
     // A student's photo while the exam is in progress.

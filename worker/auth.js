@@ -136,6 +136,7 @@ export const RULES = {
     'GET /api/site-icon': { who: 'public' },   // the favicon is needed before sign-in
     'POST /api/site-icon': { who: 'lecturer' },   // the handler lets Admins only
     'GET /api/exam-photos': { who: 'lecturer', adminAny: true },   // an Admin may read any class's photos (the handler limits a lecturer to the initial photo)
+    'POST /api/admin-delete-exam-photos': { who: 'lecturer', adminAny: true },   // Admin tools > Exam Photos > Select > Delete (the handler refuses a lecturer)
     'GET /api/admin-exam-photos': { who: 'lecturer', adminAny: true },   // Admin tools > Exam Photos (the handler refuses a lecturer)
     'POST /api/exam-photo': { who: 'any', self: ['studentId'] },   // GET /api/exam-photos is lecturer-only (owner checked by classExamId / photoId)
     'GET /api/student-exam-review': { who: 'any', self: ['studentId'] },

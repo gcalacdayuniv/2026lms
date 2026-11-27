@@ -4,7 +4,9 @@
 //  - By exam: Manage Exams > Results > Photos.   By student: Manage Student > Exam photos.   Every class: Admin tools > Exam Photos (admins only).
 //  - Pictures are fetched from Drive one at a time (3 at most in parallel) and only for the group that is open.
 //  - Tap a picture to enlarge it; Previous / Next (or the arrow keys) move through every photo in the list.
-import { apiFetch, AppState } from './globals.js';
+//  - Admin only: Select turns on tick marks (tap pictures, Select all, or a whole student/exam), then Delete removes them from Drive and the list.
+import { apiFetch, apiPost, AppState } from './globals.js';
+import { UI } from './ui-feedback.js';
 import { escapeHtml as esc } from './html-utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -26,12 +28,17 @@ export const ExamPhotoReview = {
     queue: [],
     running: 0,
     mode: 'exam',
+    ctx: null,             // { all, byStudent, focusId } of the gallery on screen (Admin gallery only)
+    selecting: false,
+    selected: new Set(),   // Photo_IDs ticked
+    changed: false,        // something was deleted: the Admin lists behind refresh when this closes
 
     // opts: { classExamId, focusStudentId? } for one exam, or { courseId, studentId, name } for one student.
     open: async (opts) => {
         ExamPhotoReview.close();
         ExamPhotoReview.cache.clear();
         ExamPhotoReview.queue = []; ExamPhotoReview.running = 0;
+        ExamPhotoReview.ctx = null; ExamPhotoReview.selecting = false; ExamPhotoReview.selected = new Set(); ExamPhotoReview.changed = false;
         const byStudent = !!opts.studentId && !!opts.courseId;
         ExamPhotoReview.mode = byStudent ? 'student' : 'exam';
         const dlg = document.createElement('div');
@@ -46,6 +53,11 @@ export const ExamPhotoReview = {
                     <button type="button" data-ep-close class="p-2 text-gray-500 hover:text-gray-800" aria-label="Close"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>
                 </div>
                 <div id="epBody" class="flex-1 min-h-0 overflow-y-auto"><p class="text-sm text-gray-500">Loading...</p></div>
+                <div id="epSelBar" class="hidden shrink-0 border-t border-gray-200 pt-3 mt-3 flex items-center gap-2" style="padding-bottom:max(0rem, env(safe-area-inset-bottom))">
+                    <span id="epSelCount" class="flex-1 text-sm font-bold text-gray-800" role="status">0 selected</span>
+                    <button type="button" data-ep-select-all class="min-h-[44px] px-3 rounded-md border border-gray-300 text-sm font-bold text-gray-700">Select all</button>
+                    <button type="button" id="epDeleteBtn" data-ep-delete disabled class="min-h-[44px] px-4 rounded-md bg-red-600 text-white text-sm font-bold disabled:opacity-40"><i class="fa-solid fa-trash mr-1" aria-hidden="true"></i>Delete</button>
+                </div>
             </div>`;
         document.body.appendChild(dlg);
         dlg.addEventListener('click', ExamPhotoReview.onClick);
@@ -74,6 +86,7 @@ export const ExamPhotoReview = {
 
     // Groups: students (by exam) or exams (by student). Each group is a collapsible section; its pictures load when it opens.
     render: (body, all, byStudent, focusId) => {
+        ExamPhotoReview.ctx = { all, byStudent, focusId };
         const groups = [];
         const at = new Map();
         for (const p of all) {
@@ -84,7 +97,8 @@ export const ExamPhotoReview = {
         ExamPhotoReview.photos = groups.flatMap(g => g.photos.map(p => ({ ...p, group: g.title })));
         let n = 0;
         body.innerHTML = `<div class="flex items-center justify-between mb-2 text-xs text-gray-500"><span>${all.length} photo${all.length === 1 ? '' : 's'} &middot; ${groups.length} ${byStudent ? 'exam' : 'student'}${groups.length === 1 ? '' : 's'}</span>
-                ${groups.length > 1 ? '<button type="button" data-ep-toggle-all class="font-bold text-blue-700 hover:underline">Open all</button>' : ''}</div>
+                <span class="flex items-center gap-4">${groups.length > 1 ? '<button type="button" data-ep-toggle-all class="font-bold text-blue-700 hover:underline min-h-[32px]">Open all</button>' : ''}
+                <button type="button" data-ep-select-mode class="font-bold text-red-700 hover:underline min-h-[32px]">Select</button></span></div>
             <div class="space-y-2">${groups.map((g, gi) => {
                 const first = n; n += g.photos.length;
                 return `<section class="border border-gray-200 rounded-lg" data-ep-group="${gi}">
@@ -92,15 +106,69 @@ export const ExamPhotoReview = {
                         <span class="min-w-0"><span class="block text-sm font-bold text-gray-800 truncate">${esc(g.title)}</span>
                         <span class="block text-[11px] text-gray-500">${g.photos.length} photo${g.photos.length === 1 ? '' : 's'}</span></span>
                         <i class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform" aria-hidden="true"></i></button>
-                    <div class="hidden px-3 pb-3"><div class="grid grid-cols-3 sm:grid-cols-4 gap-2">${g.photos.map((p, i) => `
-                        <button type="button" data-ep-photo="${first + i}" class="text-left m-0 p-0 bg-transparent"><div class="aspect-[4/3] bg-gray-100 rounded overflow-hidden relative"><img data-photo-id="${esc(p.Photo_ID)}" alt="" class="w-full h-full object-cover"></div>
+                    <div class="hidden px-3 pb-3"><button type="button" data-ep-select-group="${gi}" class="hidden mb-2 min-h-[32px] text-xs font-bold text-red-700 hover:underline">Select all of ${esc(g.title)}</button>
+                    <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">${g.photos.map((p, i) => `
+                        <button type="button" data-ep-photo="${first + i}" data-ep-id="${esc(p.Photo_ID)}" class="text-left m-0 p-0 bg-transparent"><div class="aspect-[4/3] bg-gray-100 rounded overflow-hidden relative"><img data-photo-id="${esc(p.Photo_ID)}" alt="" class="w-full h-full object-cover"><span data-ep-check class="hidden absolute top-1 left-1 w-6 h-6 rounded-full border-2 border-white bg-black/40 text-white text-xs items-center justify-center shadow"><i class="fa-solid fa-check" aria-hidden="true"></i></span></div>
                         <span class="block text-[10px] text-gray-500 mt-0.5">${esc(fmtTime(p.Taken_At, byStudent))}${p.Kind === 'start' ? ' &middot; start' : ''}</span></button>`).join('')}</div></div>
                 </section>`;
             }).join('')}</div>`;
+        ExamPhotoReview.paintSelection();
         const heads = body.querySelectorAll('[data-ep-head]');
         const focusAt = focusId ? groups.findIndex(g => g.key === focusId) : -1;
         if (focusAt >= 0) { ExamPhotoReview.toggle(heads[focusAt], true); heads[focusAt].scrollIntoView({ block: 'nearest' }); }
         else if (groups.length === 1) ExamPhotoReview.toggle(heads[0], true);
+    },
+
+    // Ticks, counts and the bottom bar follow ExamPhotoReview.selecting / selected.
+    paintSelection: () => {
+        const dlg = $('examPhotosDlg'); if (!dlg) return;
+        const on = ExamPhotoReview.selecting, n = ExamPhotoReview.selected.size;
+        dlg.querySelector('#epSelBar')?.classList.toggle('hidden', !on);
+        const mode = dlg.querySelector('[data-ep-select-mode]'); if (mode) mode.textContent = on ? 'Done' : 'Select';
+        dlg.querySelectorAll('[data-ep-select-group]').forEach(b => b.classList.toggle('hidden', !on));
+        dlg.querySelectorAll('[data-ep-id]').forEach(b => {
+            const sel = on && ExamPhotoReview.selected.has(b.dataset.epId);
+            b.setAttribute('aria-pressed', on ? String(sel) : 'false');
+            const box = b.querySelector('div');
+            box.classList.toggle('ring-4', sel); box.classList.toggle('ring-red-500', sel);
+            const tick = b.querySelector('[data-ep-check]');
+            tick.classList.toggle('hidden', !on); tick.classList.toggle('flex', on);
+            tick.classList.toggle('bg-red-600', sel); tick.classList.toggle('bg-black/40', !sel);
+            tick.querySelector('i').classList.toggle('invisible', !sel);
+        });
+        const all = ExamPhotoReview.ctx ? ExamPhotoReview.ctx.all.length : 0;
+        const c = dlg.querySelector('#epSelCount'); if (c) c.textContent = `${n} selected`;
+        const sa = dlg.querySelector('[data-ep-select-all]'); if (sa) sa.textContent = n && n === all ? 'Clear' : 'Select all';
+        const del = dlg.querySelector('#epDeleteBtn'); if (del) del.disabled = n === 0;
+    },
+
+    deleteSelected: async () => {
+        const ids = [...ExamPhotoReview.selected];
+        if (!ids.length || !AppState.user || !AppState.user.isAdmin) return;
+        const ok = await UI.confirm({ title: `Delete ${ids.length} photo${ids.length === 1 ? '' : 's'}?`, message: 'They are removed from Google Drive and from the list. This cannot be undone.', confirmText: 'Delete', danger: true });
+        if (!ok) return;
+        const del = $('epDeleteBtn'); if (del) del.disabled = true;
+        try {
+            let deleted = 0;
+            for (let i = 0; i < ids.length; i += 200) {
+                const res = await apiPost('/api/admin-delete-exam-photos', { photoIds: ids.slice(i, i + 200) });
+                deleted += res.deleted || 0;
+            }
+            const gone = new Set(ids);
+            ids.forEach(id => ExamPhotoReview.cache.delete(id));
+            const ctx = ExamPhotoReview.ctx;
+            ctx.all = ctx.all.filter(p => !gone.has(p.Photo_ID));
+            ExamPhotoReview.selected = new Set(); ExamPhotoReview.selecting = false; ExamPhotoReview.changed = true;
+            const body = $('epBody');
+            if (body) {
+                if (ctx.all.length) ExamPhotoReview.render(body, ctx.all, ctx.byStudent, null);
+                else { ExamPhotoReview.photos = []; body.innerHTML = '<p class="text-sm text-gray-500">No photos left here.</p>'; ExamPhotoReview.paintSelection(); }
+            }
+            UI.success(`Deleted ${deleted} photo${deleted === 1 ? '' : 's'}`);
+        } catch (err) {
+            UI.error(err.message || 'Could not delete the photos.');
+            ExamPhotoReview.paintSelection();
+        }
     },
 
     toggle: (head, force) => {
@@ -144,7 +212,34 @@ export const ExamPhotoReview = {
             btn.textContent = opening ? 'Close all' : 'Open all';
             return;
         }
+        if (e.target.closest('[data-ep-select-mode]')) {
+            ExamPhotoReview.selecting = !ExamPhotoReview.selecting;
+            if (!ExamPhotoReview.selecting) ExamPhotoReview.selected = new Set();
+            ExamPhotoReview.paintSelection();
+            return;
+        }
+        if (e.target.closest('[data-ep-select-all]') && ExamPhotoReview.ctx) {
+            const everyone = ExamPhotoReview.ctx.all;
+            ExamPhotoReview.selected = ExamPhotoReview.selected.size === everyone.length ? new Set() : new Set(everyone.map(p => p.Photo_ID));
+            ExamPhotoReview.paintSelection();
+            return;
+        }
+        const grp = e.target.closest('[data-ep-select-group]');
+        if (grp) {
+            const ids = [...grp.closest('section').querySelectorAll('[data-ep-id]')].map(b => b.dataset.epId);
+            const allIn = ids.every(id => ExamPhotoReview.selected.has(id));
+            ids.forEach(id => allIn ? ExamPhotoReview.selected.delete(id) : ExamPhotoReview.selected.add(id));
+            ExamPhotoReview.paintSelection();
+            return;
+        }
+        if (e.target.closest('[data-ep-delete]')) { ExamPhotoReview.deleteSelected(); return; }
         const ph = e.target.closest('[data-ep-photo]');
+        if (ph && ExamPhotoReview.selecting) {
+            const id = ph.dataset.epId;
+            if (ExamPhotoReview.selected.has(id)) ExamPhotoReview.selected.delete(id); else ExamPhotoReview.selected.add(id);
+            ExamPhotoReview.paintSelection();
+            return;
+        }
         if (ph) ExamPhotoReview.show(Number(ph.dataset.epPhoto));
     },
 
@@ -195,7 +290,12 @@ export const ExamPhotoReview = {
     },
 
     closeLightbox: () => { $('examPhotoLightbox')?.remove(); },
-    close: () => { ExamPhotoReview.closeLightbox(); $('examPhotosDlg')?.remove(); ExamPhotoReview.queue = []; }
+    close: () => {
+        ExamPhotoReview.closeLightbox();
+        const had = !!$('examPhotosDlg');
+        $('examPhotosDlg')?.remove(); ExamPhotoReview.queue = [];
+        if (had && ExamPhotoReview.changed) { ExamPhotoReview.changed = false; adminDlg.refresh(); }   // the counts behind it are stale
+    }
 };
 
 // Admin tools > Exam Photos: every class that has photos, then its exams, then the gallery of the exam.
@@ -238,7 +338,10 @@ const adminDlg = {
         dlg.querySelector('#apBack').classList.toggle('hidden', !back);
         return true;
     },
+    view: null,
+    refresh: () => { const v = adminDlg.view; if (!$('adminPhotosDlg') || !v) return; if (v.courseId) adminDlg.exams(v.courseId, v.title); else adminDlg.classes(); },
     classes: async () => {
+        adminDlg.view = {};
         adminDlg.show('<p class="text-sm text-gray-500">Loading...</p>', 'All classes · Admin only', false);
         try {
             const res = await apiFetch('/api/admin-exam-photos');
@@ -251,6 +354,7 @@ const adminDlg = {
         } catch (e) { adminDlg.show(`<p class="text-sm text-red-700">${esc(e.message || 'Could not load.')}</p>`, 'All classes', false); }
     },
     exams: async (courseId, title) => {
+        adminDlg.view = { courseId, title };
         adminDlg.show('<p class="text-sm text-gray-500">Loading...</p>', title, true);
         try {
             const res = await apiFetch(`/api/admin-exam-photos?courseId=${encodeURIComponent(courseId)}`);

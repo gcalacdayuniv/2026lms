@@ -214,6 +214,29 @@ ok('/api/me returns a lecturer role without the admin flag', meLec.s === 200 && 
 sql.prepare("update Users set role='Admin' where User_ID='L1'").run();
 const meAdm = await call('GET', '/api/me', { token: L1 });
 ok('/api/me returns Lecturer with isAdmin for an Admin', meAdm.s === 200 && meAdm.j.role === 'Lecturer' && meAdm.j.isAdmin === true, JSON.stringify(meAdm));
+
+// ---- Admin deletes exam photos (select, then delete)
+{
+  const realFetch = globalThis.fetch;
+  const prevGas = env.GAS_WEBHOOK_URL;
+  const sent = [];
+  let gasOk = true;
+  globalThis.fetch = async (u, init) => { sent.push(JSON.parse(init.body)); return new Response(JSON.stringify(gasOk ? { success: true, trashed: 1 } : { success: false, error: 'boom' }), { status: 200 }); };
+  env.GAS_WEBHOOK_URL = 'https://gas.test/exec';
+  const nonAdm = await call('POST', '/api/admin-delete-exam-photos', { token: l2.j.token, body: { photoIds: ['PH1'] } });
+  ok('a lecturer cannot delete exam photos', nonAdm.s === 403, JSON.stringify(nonAdm));
+  const none = await call('POST', '/api/admin-delete-exam-photos', { token: L1, body: { photoIds: [] } });
+  ok('deleting nothing is refused', none.s === 400, JSON.stringify(none));
+  gasOk = false;
+  const failed = await call('POST', '/api/admin-delete-exam-photos', { token: L1, body: { photoIds: ['PH1', 'PH2'] } });
+  ok('if Drive fails nothing is deleted', failed.s === 502 && sql.prepare("select count(*) n from Exam_Photos where Photo_ID in ('PH1','PH2')").get().n === 2, JSON.stringify(failed));
+  gasOk = true; sent.length = 0;
+  const gone = await call('POST', '/api/admin-delete-exam-photos', { token: L1, body: { photoIds: ['PH1', 'PH2', 'PH2', 'missing'] } });
+  ok('an Admin deletes several photos at once', gone.s === 200 && gone.j.deleted === 2 && sql.prepare("select count(*) n from Exam_Photos where Photo_ID in ('PH1','PH2')").get().n === 0, JSON.stringify(gone));
+  ok('the Drive files are sent to the bin', sent.length === 1 && sent[0].action === 'trash' && sent[0].fileIds.length === 2, JSON.stringify(sent));
+  globalThis.fetch = realFetch;
+  env.GAS_WEBHOOK_URL = prevGas;
+}
 sql.prepare("update Users set role='lecturer' where User_ID='L1'").run();
 // ---- site icon ----
 const png1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

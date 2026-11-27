@@ -4,6 +4,7 @@
 //   2. action "chunk":  stores one piece of a large upload in a temporary Drive folder.
 //   3. action "finish": joins the pieces, saves the final file, deletes the temporary pieces.
 //   4. action "read":   returns one stored picture (base64) so the app can show a saved answer sheet (anyType:true also allows a syllabus PDF / Word file).
+//   6. action "trash":  moves stored files (exam photos an Admin deleted) to the Drive bin. Needs a redeploy.
 //   5. action "email":  sends one plain-text email (used for password resets). Needs the Mail permission: after pasting
 //      this file, run any function once in the editor and accept the new permission, then deploy a new version.
 
@@ -33,6 +34,7 @@ function doPost(e) {
     if (payload.action === "finish") return jsonOut(handleFinish(payload));
     if (payload.action === "read") return jsonOut(handleRead(payload));
     if (payload.action === "email") return jsonOut(handleEmail(payload));
+    if (payload.action === "trash") return jsonOut(handleTrash(payload));
     return jsonOut(handleDirect(payload));
 
   } catch (error) {
@@ -121,6 +123,21 @@ function handleRead(payload) {
   var bytes = blob.getBytes();
   if (bytes.length > (payload.anyType ? 5 * 1024 * 1024 : MAX_READ_BYTES)) throw new Error("This file is too large to read here.");
   return { success: true, mimeType: mime, base64: Utilities.base64Encode(bytes) };
+}
+
+// ---- Move stored files to the Drive bin (an Admin deleting exam photos) -------------
+// payload.fileIds: up to 200 ids. A file that is already gone counts as done.
+function handleTrash(payload) {
+  var ids = payload.fileIds || [];
+  if (!ids.length || ids.length > 200) throw new Error("Send between 1 and 200 file ids.");
+  var done = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var id = String(ids[i] || "");
+    if (!/^[A-Za-z0-9_-]{10,100}$/.test(id)) throw new Error("Invalid file id.");
+    try { DriveApp.getFileById(id).setTrashed(true); } catch (err) { /* already deleted */ }
+    done++;
+  }
+  return { success: true, trashed: done };
 }
 
 // ---- 2. One piece of a large upload ---------------------------------------------
