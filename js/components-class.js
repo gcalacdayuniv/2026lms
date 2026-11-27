@@ -1093,12 +1093,9 @@ export const ClassComponents = {
             <main class="pt-20 pb-36 sm:pb-28 px-2 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full fade-in relative">
                 <div id="attendanceBar" data-dirty="false" class="sticky top-16 z-30 mb-4 px-2 sm:px-3 py-2 bg-gray-50/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
                     <div class="flex flex-wrap items-center gap-2">
-                        <input type="date" id="attendanceDate" aria-label="Attendance date" data-schedule-day="${escapeHtml(course.ScheduleDay || '')}" class="flex-1 sm:flex-none min-w-[9.5rem] px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
-                        <div id="attendanceViewToggle" class="flex flex-shrink-0" role="group" aria-label="View mode">
-                            <button type="button" class="att-view min-h-[44px] px-3 text-sm font-bold border rounded-l-md bg-sky-600 text-white border-sky-600" data-view="list" aria-pressed="true"><i class="fa-solid fa-list mr-1" aria-hidden="true"></i>List</button>
-                            <button type="button" id="attendanceFloorBtn" class="att-view min-h-[44px] px-3 text-sm font-bold border rounded-r-md -ml-px bg-white text-sky-700 border-sky-300" data-view="plan" aria-pressed="false" aria-label="Floor plan view" title="Floor plan view"><i class="fa-solid fa-table-cells mr-1" aria-hidden="true"></i>Plan</button>
-                        </div>
-                        <span class="relative flex-shrink-0"><button type="button" id="attendanceDayBtn" aria-label="Class mode for this date" title="Class mode" aria-expanded="false" aria-controls="attendanceDayCard" class="w-11 h-11 inline-flex items-center justify-center rounded-md border border-gray-300 bg-white text-indigo-700 hover:bg-indigo-50"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i></button><span id="attendanceDayDot" aria-hidden="true" class="hidden absolute -top-1 -right-1 w-3 h-3 rounded-full bg-indigo-600 border-2 border-white pointer-events-none"></span></span>
+                        <input type="date" id="attendanceDate" aria-label="Attendance date" data-schedule-day="${escapeHtml(course.ScheduleDay || '')}" class="flex-1 min-w-0 sm:flex-none sm:min-w-[9.5rem] px-2 sm:px-3 py-2 border border-gray-300 rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none" value="${getLocalDateString()}">
+                        <button type="button" id="attendanceFloorBtn" aria-label="Floor plan view" title="Floor plan view" class="flex-shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-md border border-gray-300 bg-white text-sky-700 hover:bg-sky-50"><i class="fa-solid fa-table-cells" aria-hidden="true"></i></button>
+                        <button type="button" id="classModeBtn" class="cm-toggle flex-shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-md border border-gray-300 bg-white text-indigo-700" aria-label="Class mode" aria-pressed="false"><i class="fa-solid fa-school" aria-hidden="true"></i></button>
                         <button type="button" id="attendanceMoreBtn" aria-label="Sort, filter and select students" aria-expanded="false" aria-controls="attendanceBarTools" class="sm:hidden flex-shrink-0 w-10 h-10 inline-flex items-center justify-center border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 transition"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                         <div id="attendanceBarTools" class="hidden sm:flex items-center gap-2 w-full sm:w-auto order-last sm:order-none">
                         <select id="rosterSort" aria-label="Sort students" class="min-w-0 flex-1 sm:flex-none px-2 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 outline-none">
@@ -1113,11 +1110,11 @@ export const ClassComponents = {
                         </select>
                         <button type="button" id="rosterSelectToggle" aria-pressed="false" class="flex-shrink-0 px-3 py-2 border border-gray-300 rounded-md text-xs font-bold bg-white hover:bg-gray-50 text-gray-700 transition"><i class="fa-regular fa-square-check mr-1" aria-hidden="true"></i>Select</button>
                         </div>
-                        <span id="attendanceDirtyLabel" class="hidden ml-auto text-xs font-bold text-orange-600 whitespace-nowrap"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>Unsaved changes</span>
+                        <span id="attendanceDirtyLabel" class="hidden absolute right-2 -bottom-2.5 px-1.5 rounded-full bg-orange-50 border border-orange-200 text-[10px] font-bold text-orange-600 whitespace-nowrap"><i class="fa-solid fa-circle text-[6px] align-middle mr-1"></i>Unsaved changes</span>
                         <span id="attendanceDirtyStatus" class="sr-only" role="status"></span>
                         <div class="relative flex-shrink-0 sm:ml-0">
                             <button id="saveAttendanceBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm transition flex items-center justify-center whitespace-nowrap">
-                                <i class="fa-solid fa-floppy-disk mr-2"></i> Save All
+                                <i class="fa-solid fa-floppy-disk sm:mr-2"></i><span class="ml-1 sm:ml-0">Save<span class="hidden sm:inline"> All</span></span>
                             </button>
                             <span id="attendanceDirtyDot" title="Unsaved changes" aria-hidden="true" class="hidden absolute -top-1 -right-1 w-3 h-3 rounded-full bg-orange-400 border-2 border-white pointer-events-none"></span>
                         </div>
@@ -1127,9 +1124,6 @@ export const ClassComponents = {
                     </div>
                 </div>
 
-                <div id="attendanceDayCard" class="hidden mb-3 mx-2 sm:mx-0 p-2 bg-white border border-gray-200 rounded-lg">
-                    <div id="classModeBar"></div>
-                </div>
                 <div id="noClassBanner" class="hidden mb-4 mx-2 sm:mx-0 p-3 rounded-md text-sm font-bold bg-orange-100 text-orange-800 border border-orange-200 uppercase tracking-wider flex items-center justify-center">
                     <i class="fa-solid fa-triangle-exclamation mr-2 text-lg"></i> This date is marked as No Class
                 </div>
@@ -1143,7 +1137,7 @@ export const ClassComponents = {
                             <button type="button" id="toggleStatusButtons" aria-controls="rosterListContainer" aria-expanded="${isStatusCollapsed() ? 'false' : 'true'}" class="text-[10px] sm:text-xs font-bold text-gray-600 hover:text-gray-900 underline min-h-[32px]">
                                 <i class="fa-solid ${isStatusCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'} mr-1" aria-hidden="true"></i><span>${isStatusCollapsed() ? 'Expand Status' : 'Collapse Status'}</span>
                             </button>
-                            <span class="flex items-baseline gap-2 min-w-0"><span class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">${students.length} Enrolled</span><span id="rosterCounts" class="flex gap-x-2 text-sm font-black text-gray-800" role="status" aria-label="Attendance count for the date"></span></span>
+                            <span class="flex items-baseline gap-2 min-w-0"><span class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">${students.length} Enrolled</span><span id="rosterCounts" class="flex gap-x-2 text-sm font-black text-gray-800" role="status" aria-label="Attendance count for the date"></span><span id="cmProofSlot" class="flex items-center gap-1"></span></span>
                             <button type="button" id="markAllPresent" class="text-[10px] sm:text-xs font-bold text-green-700 hover:text-green-900 underline min-h-[32px]">Mark All Present</button>
                         </div>
                     </div>

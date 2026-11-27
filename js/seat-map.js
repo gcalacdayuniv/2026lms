@@ -84,7 +84,6 @@ export const SeatMap = {
             if (/^\d+$/.test(seat) && Number(seat) > 0) seats.set(Number(seat), info); else extras.push({ seat, ...info });
         });
         SeatMap.onDirty = opts.onDirty || null;
-        SeatMap.syncViewToggle(true);
         SeatMap.show({
             pov: 'lecturer', seats, extras, unseated, courseId: opts.courseId || window.location.hash.replace('#class-', ''), picked: null,
             att: { on: false, date: opts.date || byId('attendanceDate')?.value || todayManila(), records: new Map(), brush: 'Present', noClass: false, dirty: false }
@@ -172,18 +171,7 @@ export const SeatMap = {
         sub.classList.toggle('hidden', !st.unseated);
     },
 
-    // The List / Plan switch on the attendance screen mirrors whether the plan is open.
-    syncViewToggle: (plan) => {
-        document.querySelectorAll('#attendanceViewToggle .att-view').forEach(b => {
-            const on = (b.dataset.view === 'plan') === plan;
-            b.setAttribute('aria-pressed', on ? 'true' : 'false');
-            b.classList.toggle('bg-sky-600', on); b.classList.toggle('text-white', on); b.classList.toggle('border-sky-600', on);
-            b.classList.toggle('bg-white', !on); b.classList.toggle('text-sky-700', !on); b.classList.toggle('border-sky-300', !on);
-        });
-    },
-
     close: () => {
-        SeatMap.syncViewToggle(false);
         const wasLecturer = SeatMap.state && SeatMap.state.pov === 'lecturer' && !byId('seatMapModal')?.classList.contains('hidden');
         byId('seatMapModal')?.classList.add('hidden');
         byId('smClassMode')?.classList.add('hidden');
@@ -453,7 +441,6 @@ export const SeatMap = {
             }
             if (e.target.closest('#seatMapClose') || e.target.id === 'seatMapBg' || e.target.closest('#smToList')) { SeatMap.close(); return; }
             if (e.target.closest('#smCallBtn')) { await CourseRecitation.openModal(SeatMap.state.courseId, true); return; }
-            if (e.target.closest('#attendanceViewToggle')) return;
             const st = SeatMap.state;
             if (!st || !byId('seatMapModal') || byId('seatMapModal').classList.contains('hidden')) return;
             if (e.target.closest('#smAttToggle')) { await SeatMap.attendanceOn(!st.att.on); return; }

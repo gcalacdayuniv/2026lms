@@ -47,26 +47,25 @@ export const ClassMode = {
         ClassMode.paint();
     },
 
+    // One button per place (toolbar, floor plan header). A tap switches Onsite <-> Online; the button shows the current mode.
+    // The proof picture buttons sit in the roster header and appear only on an online day.
     paint: () => {
-        // the floor plan header carries the same switch (no proof buttons there)
+        const on = ClassMode.mode === 'online';
+        const label = on ? 'Online class. Tap to mark it onsite.' : 'Onsite class. Tap to mark it online.';
+        const icon = on ? 'fa-video' : 'fa-school';
+        const look = on ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-gray-300';
+        const tool = $('classModeBtn');
+        if (tool) { tool.className = `cm-toggle flex-shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-md border ${look}`; tool.setAttribute('aria-label', label); tool.title = label; tool.setAttribute('aria-pressed', String(on)); tool.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i>`; }
         const head = $('smClassMode');
         if (head) {
-            const hs = (key, label, icon) => `<button type="button" class="cm-mode min-h-[44px] px-3 text-sm font-bold border ${key === 'online' ? 'rounded-r-md -ml-px' : 'rounded-l-md'} ${ClassMode.mode === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-300'}" data-mode="${key}" aria-pressed="${ClassMode.mode === key}"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</button>`;
-            head.innerHTML = `<div class="flex" role="group" aria-label="Class mode for this date">${hs('onsite', 'Onsite', 'fa-school')}${hs('online', 'Online', 'fa-video')}</div>`;
+            head.innerHTML = `<button type="button" class="cm-toggle min-h-[44px] px-3 rounded-md border text-sm font-bold ${look}" aria-pressed="${on}" aria-label="${label}" title="${label}"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${on ? 'Online' : 'Onsite'}</button>`;
             head.classList.remove('hidden');
         }
-        const box = $('classModeBar');
-        if (!box) return;
-        const on = ClassMode.mode === 'online';
-        const dot = $('attendanceDayDot'); if (dot) dot.classList.toggle('hidden', !on);
-        const seg = (key, label, icon) => `<button type="button" class="cm-mode flex-1 min-h-[44px] px-3 text-sm font-bold border ${key === 'online' ? 'rounded-r-md -ml-px' : 'rounded-l-md'} ${ClassMode.mode === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-300'}" data-mode="${key}" aria-pressed="${ClassMode.mode === key}"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</button>`;
-        const proofCls = ClassMode.hasProof ? 'border-indigo-300 text-indigo-700' : 'border-amber-400 text-amber-700 bg-amber-50';
-        box.innerHTML = `<div class="flex items-center gap-2">
-            <div class="flex flex-1" role="group" aria-label="Class mode for this date">${seg('onsite', 'Onsite', 'fa-school')}${seg('online', 'Online', 'fa-video')}</div>
-            ${on ? `<button type="button" id="cmProofBtn" class="min-h-[44px] min-w-[44px] px-3 rounded-md border bg-white text-sm font-bold ${proofCls}" aria-label="${ClassMode.hasProof ? 'Replace proof picture' : 'Add proof picture (no screenshot of the meeting yet)'}"><i class="fa-solid fa-camera" aria-hidden="true"></i></button>
-            ${ClassMode.hasProof ? '<button type="button" id="cmViewProof" class="min-h-[44px] min-w-[44px] px-3 rounded-md border border-gray-300 bg-white text-gray-700 text-sm font-bold" aria-label="View proof picture"><i class="fa-regular fa-image" aria-hidden="true"></i></button>' : ''}
-            <input type="file" id="cmProofFile" accept="image/*" class="hidden">` : ''}
-        </div>`;
+        const slot = $('cmProofSlot');
+        if (slot) {
+            const cls = ClassMode.hasProof ? 'border-indigo-300 text-indigo-700' : 'border-amber-400 text-amber-700 bg-amber-50';
+            slot.innerHTML = on ? `<button type="button" id="cmProofBtn" class="min-h-[32px] min-w-[32px] px-2 rounded-md border bg-white text-xs ${cls}" aria-label="${ClassMode.hasProof ? 'Replace proof picture' : 'Add proof picture (no screenshot of the meeting yet)'}"><i class="fa-solid fa-camera" aria-hidden="true"></i></button>${ClassMode.hasProof ? '<button type="button" id="cmViewProof" class="min-h-[32px] min-w-[32px] px-2 rounded-md border border-gray-300 bg-white text-gray-700 text-xs" aria-label="View proof picture"><i class="fa-regular fa-image" aria-hidden="true"></i></button>' : ''}<input type="file" id="cmProofFile" accept="image/*" class="hidden">` : '';
+        }
     },
 
     setMode: async (mode) => {
@@ -123,8 +122,7 @@ export const ClassMode = {
         document.addEventListener('click', (e) => {
             const t = e.target;
             if (!t.closest) return;
-            const m = t.closest('.cm-mode');
-            if (m) { ClassMode.setMode(m.dataset.mode); return; }
+            if (t.closest('.cm-toggle')) { ClassMode.setMode(ClassMode.mode === 'online' ? 'onsite' : 'online'); return; }
             if (t.closest('#cmProofBtn')) { $('cmProofFile')?.click(); return; }
             if (t.closest('#cmViewProof')) { ClassMode.viewProof(); return; }
         });

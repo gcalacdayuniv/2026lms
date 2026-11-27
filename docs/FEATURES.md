@@ -616,3 +616,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Roster header is two tight rows: topic of the day + Expand/Collapse Status, then "N Enrolled" + live P/L/A/E + Mark All Present.
 - Floor plan header: date + topic on line 1; a full-width details line (`#smDetails`): course code, program year-section, day and time, room ("No room"). Rows keep exactly four visible (inline min height lowered to 40px, `SeatMap.fitRows` re-measures after layout).
 - Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v129).
+
+## One-line attendance toolbar, one-tap class mode
+- Toolbar stays on one line on phones: date, floor plan button (single icon, no List/Plan toggle; List lives in the plan header), class mode button, ⋮, Save (label "Save" on phones, "Save All" on larger screens; "(n)" unsaved count kept). The "Unsaved changes" label floats under the bar instead of taking room.
+- Class mode button (`#classModeBtn`, `.cm-toggle`): one tap switches Onsite <-> Online and the button shows the current mode (school icon / indigo video icon). The floor plan header has the same one-tap button (`#smClassMode`, with label). The expanding card is gone.
+- Proof picture buttons (camera, view) sit in the roster header (`#cmProofSlot`) and show only on an online day; the camera is amber until a picture exists.
+- Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v130).

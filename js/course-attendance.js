@@ -217,7 +217,7 @@ export const CourseAttendance = {
         const saveBtn = document.getElementById('saveAttendanceBtn');
         if (saveBtn && !saveBtn.disabled) {
             const n = dirty ? CourseAttendance.dirtyCount() : 0;
-            saveBtn.innerHTML = `<i class="fa-solid fa-floppy-disk mr-2"></i> Save All${n ? ` (${n})` : ''}`;
+            saveBtn.innerHTML = `<i class="fa-solid fa-floppy-disk sm:mr-2"></i><span class="ml-1 sm:ml-0">Save<span class="hidden sm:inline"> All</span>${n ? ` (${n})` : ''}</span>`;
         }
         return dirty;
     },
@@ -566,7 +566,7 @@ export const CourseAttendance = {
             alertBox.className = "mb-4 p-3 rounded-md text-sm font-medium bg-red-100 text-red-700 block fade-in";
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-2"></i> Save All';
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk sm:mr-2"></i><span class="ml-1 sm:ml-0">Save<span class="hidden sm:inline"> All</span></span>';
             setTimeout(() => { alertBox.classList.add('hidden'); }, 3000);
         }
     },
