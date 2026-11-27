@@ -62,7 +62,7 @@ export const ExamSecure = {
                 <div class="mx-auto mb-3 w-14 h-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-2xl"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
                 <h3 id="examSecureTitle" class="text-xl font-black text-gray-900 text-center mb-3">Secure exam</h3>
                 <ul class="text-sm text-gray-700 space-y-2 mb-4 list-disc pl-5">
-                    <li><b>If you leave the exam screen</b> (switch tab, app or window, or lock the phone) you have <b>only 5 seconds to come back</b>. After that your exam is submitted automatically.</li>
+                    <li><b>If you leave the exam screen</b> (switch tab, app or window, or lock the phone)</b>. your exam is submitted automatically.</li>
                     <li>Signing in to your account on another device also submits your exam. Put your phone on Do Not Disturb so calls and notifications do not pull you away.</li>
                 </ul>
                 <button type="button" id="examSecureGo" class="w-full min-h-[3.25rem] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-black">Start exam</button>
