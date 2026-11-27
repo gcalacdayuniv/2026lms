@@ -219,7 +219,7 @@ const DashboardUI = {
     renderManageUsersModal: () => `
         <div id="muModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center fade-in p-0 sm:p-4">
             <div id="muModalOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
-            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-4xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[90vh] flex flex-col">
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-4xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel page-full app-page max-h-full sm:max-h-[90vh] flex flex-col">
                 <div class="flex items-center gap-3 mb-4 border-b pb-3 app-page-header">
                     <h3 class="min-w-0 flex-1 truncate text-lg font-bold text-gray-800"><i class="fa-solid fa-users-gear text-green-600 mr-2"></i>Manage Users</h3>
                     <button id="closeMuModalBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">

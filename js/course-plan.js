@@ -48,7 +48,7 @@ export const CoursePlan = {
         el.className = 'hidden fixed inset-0 z-[70] flex items-center justify-center fade-in p-0 sm:p-4';
         el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'coursePlanTitle');
         el.innerHTML = `<div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm" id="closeCoursePlanBg"></div>
-            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-2xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel app-page max-h-full sm:max-h-[92vh] flex flex-col">
+            <div class="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-2xl h-full sm:h-auto p-4 sm:p-6 relative z-10 sheet-panel page-full app-page max-h-full sm:max-h-[92vh] flex flex-col">
                 <div class="flex items-center gap-3 mb-3 border-b pb-3 app-page-header">
                     <h3 id="coursePlanTitle" class="flex-1 min-w-0 text-lg font-bold text-gray-800"><i class="fa-solid fa-book-open text-emerald-600 mr-2" aria-hidden="true"></i>Course plan</h3>
                     <button id="closeCoursePlanBtn" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">

@@ -126,6 +126,25 @@ export const UI = {
     overlay,
     closeOverlay: (id) => { const o = overlayStack.find(x => x.el.id === id); if (o) o.close(); else document.getElementById(id)?.remove(); },
 
+    // A message the person must read and dismiss (a native alert() replacement). Resolves when it closes.
+    // UI.notice({ title, message, tone: 'info' | 'success' | 'warning' | 'error', buttonText })
+    noticeCount: 0,
+    notice: ({ title = 'Notice', message = '', tone = 'info', buttonText = 'OK' } = {}) => new Promise((resolve) => {
+        const icons = { success: 'fa-circle-check text-green-600', error: 'fa-circle-xmark text-red-600', warning: 'fa-triangle-exclamation text-orange-500', info: 'fa-circle-info text-blue-600' };
+        const dlg = UI.overlay({
+            id: `uiNotice${++UI.noticeCount}`, label: title, z: 300, onClose: () => resolve(),
+            panelClass: 'bg-white rounded-xl shadow-2xl max-w-md p-6 text-center',
+            html: `<i class="fa-solid ${icons[tone] || icons.info} text-4xl mb-3" aria-hidden="true"></i>
+                <h3 class="text-lg font-black text-gray-800 mb-2" data-notice-title></h3>
+                <p class="text-sm text-gray-600 whitespace-pre-line text-left sm:text-center max-h-[50vh] overflow-y-auto" data-notice-message></p>
+                <button type="button" data-overlay-close data-notice-button class="mt-5 w-full min-h-[44px] rounded-lg bg-blue-600 text-white font-bold"></button>`
+        });
+        dlg.panel.querySelector('[data-notice-title]').textContent = title;
+        dlg.panel.querySelector('[data-notice-message]').textContent = message;
+        const btn = dlg.panel.querySelector('[data-notice-button]');
+        btn.textContent = buttonText; btn.focus();
+    }),
+
     confirm: ({
         title = 'Please confirm',
         message = '',

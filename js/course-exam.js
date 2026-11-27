@@ -2004,7 +2004,7 @@ export const CourseExam = {
             if (!examObj.startedAt) {
                 const msg = `This exam has a time limit of ${examObj.timeLimit} minute${examObj.timeLimit === 1 ? '' : 's'}. The clock starts now and keeps running even if you leave. Start the exam?`;
                 CourseExam.speak(msg);
-                if (!window.confirm(msg)) { ExamSecure.release(); return; }
+                if (!(await UI.confirm({ title: 'Start the exam?', message: msg, confirmText: 'Start' }))) { ExamSecure.release(); return; }
             }
             try {
                 const res = await apiFetch('/api/start-accessible-exam', {
@@ -2068,11 +2068,11 @@ export const CourseExam = {
         CourseExam.startDraftSync();
     },
 
-    closeAccessibleExam: () => {
+    closeAccessibleExam: async () => {
         if (CourseExam.accExam && !CourseExam.accSubmitting) {
             const timed = CourseExam.timer ? ' The clock keeps running while you are away.' : '';
             ExamSecure.pause();
-            const confirmExit = window.confirm("Are you sure you want to exit the exam without submitting?" + timed);
+            const confirmExit = await UI.confirm({ title: 'Exit the exam?', message: 'Are you sure you want to exit the exam without submitting?' + timed, confirmText: 'Exit', cancelText: 'Stay', danger: true });
             ExamSecure.resume();
             if (!confirmExit) return;
         }
@@ -2103,7 +2103,7 @@ export const CourseExam = {
     stopDraftSync: () => { clearInterval(CourseExam.draftTimer); CourseExam.draftTimer = null; },
 
     // The server already submitted this attempt (away too long, or another device signed in).
-    submittedByServer: (reason) => {
+    submittedByServer: async (reason) => {
         if (!CourseExam.accExam) return;
         ExamSecure.end();
         CourseExam.stopDraftSync();
@@ -2114,7 +2114,7 @@ export const CourseExam = {
         const callback = CourseExam.accOnComplete;
         CourseExam.accExam = null;
         CourseExam.accSubmitting = false;
-        alert(reason === 'away' ? 'You were away from the exam for too long, so your exam was submitted automatically. Your lecturer can let you continue if this was a mistake.' : 'Your exam was already submitted.');
+        await UI.notice({ title: 'Exam submitted', tone: 'warning', message: reason === 'away' ? 'You were away from the exam for too long, so your exam was submitted automatically. Your lecturer can let you continue if this was a mistake.' : 'Your exam was already submitted.' });
         if (typeof callback === 'function') callback();
     },
 
@@ -2380,7 +2380,7 @@ export const CourseExam = {
 
         if (!force) CourseExam.speak(promptMsg);
         if (!force) ExamSecure.pause();
-        const confirmed = force ? true : window.confirm(promptMsg);
+        const confirmed = force ? true : await UI.confirm({ title: 'Submit your exam?', message: promptMsg, confirmText: 'Submit', cancelText: 'Keep working' });
         if (!force) ExamSecure.resume();
         if (!confirmed) {
             CourseExam.speak("Submission cancelled. You may continue reviewing your answers.");
@@ -2419,7 +2419,10 @@ export const CourseExam = {
             `;
             CourseExam.speak(resultSpeech);
 
-            alert((reason === 'focus-lost' ? 'You were away from the exam for too long, so your exam was submitted automatically.\n\n' : reason === 'camera-off' ? 'The camera was turned off, so your answers were submitted automatically.\n\n' : force ? 'Time is up. Your answers were submitted automatically.\n\n' : '') + resultSpeech);
+            await UI.notice({
+                title: force ? 'Exam submitted automatically' : 'Exam submitted', tone: 'success',
+                message: (reason === 'focus-lost' ? 'You were away from the exam for too long, so your exam was submitted automatically.\n\n' : reason === 'camera-off' ? 'The camera was turned off, so your answers were submitted automatically.\n\n' : force ? 'Time is up. Your answers were submitted automatically.\n\n' : '') + resultSpeech
+            });
 
             document.getElementById('accessibleExamOverlay').classList.add('hidden');
             const callback = CourseExam.accOnComplete;
@@ -2440,7 +2443,7 @@ export const CourseExam = {
             const errMsg = "Failed to submit exam: " + err.message;
             document.getElementById('accExamLiveFeedback').textContent = errMsg;
             CourseExam.speak(errMsg);
-            alert(errMsg);
+            await UI.notice({ title: 'Could not submit', message: errMsg, tone: 'error' });
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;

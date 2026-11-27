@@ -647,3 +647,12 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Route: `POST /api/admin-delete-exam-photos` `{ photoIds: [...] }` (1 to 200 per request, the app sends batches). Admin only (403 for a lecturer; `adminAny` in `worker/auth.js` RULES). The Worker asks Apps Script to move the Drive files to the bin (`action: "trash"`) first; if that fails nothing is deleted (502 with a message) so no row points at a missing file or a file is left orphaned. Then the `Exam_Photos` rows are deleted.
 - Deploy: Worker; site files (sw.js v134); **Apps Script: paste the updated `gas/Code.gs` and redeploy** (new `trash` action) - until then deleting shows the "could not be removed from Google Drive" message and keeps the photos.
 - Tests: `worker.test.mjs` block "Admin deletes exam photos" (lecturer 403, empty 400, Drive failure keeps rows, several at once, Drive trash payload); browser check of select / group select / delete.
+
+## No native dialogs in exams, full-screen work screens on tablet and PC
+
+- **What:** `UI.notice(title, message, tone)` (Promise, replaces `alert`) added to `js/ui-feedback.js`. All `window.confirm/alert` in `js/course-exam.js` (start, exit accessible exam, submit, auto-submit result, submit failure) now use `UI.confirm` / `UI.notice`.
+- **Full screen:** class `page-full` on the panel (styles.css, >=640px): the modal fills the screen, content kept to 72rem. Phones already use `app-page`. Applied to Seat Plan, Groups, Attendance dates, Record Scores, Class Summary, Add Student, Manage Users, Exam Manager, Scanner and Course Plan.
+- **Stays a small modal on purpose:** short forms and confirms (Current Term, Print exam, join code, etc.).
+- **Rules:** new big work screens add `page-full`; never use native `alert/confirm`.
+- **Tests:** run-tests ALL CHECKS PASSED; phone-check clean; checked at 820x1180 and 1366x768.
+- **Deploy:** site files only (sw `portal-shell-v135`).

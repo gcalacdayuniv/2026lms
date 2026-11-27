@@ -112,6 +112,16 @@ html.dialog-open body {
     .app-page-header h3 { font-size: 1.05rem; }
     .app-page-header p { display: none; }
 }
+/* Work screens (scores, groups, seat plan, users, exams, scanner, course plan, ...) are full screen on tablets and computers too,
+   with the content kept to a readable column (72rem). Phones already show them full screen. */
+@media (min-width: 640px) {
+    .fixed:has(> .sheet-panel.page-full) { padding: 0 !important; align-items: stretch !important; }
+    .sheet-panel.page-full {
+        max-width: none !important; width: 100% !important; height: 100% !important; max-height: none !important; border-radius: 0 !important;
+        padding-top: 1rem !important; padding-bottom: 1rem !important;
+        padding-left: max(1.5rem, calc((100% - 72rem) / 2)) !important; padding-right: max(1.5rem, calc((100% - 72rem) / 2)) !important;
+    }
+}
 @media (min-width: 640px) { .app-page-close { margin-left: 0; margin-right: -.5rem; } }
 @media (prefers-reduced-motion: reduce) { .fixed:not(.hidden) > .sheet-panel.app-page { animation: none; } }
 
