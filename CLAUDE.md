@@ -51,7 +51,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 - Groups/uploads: course-groups.js (lecturer Groups screen), my-groups.js (student screen), submission-edit.js (lecturer edits an upload).
 - Exams: exam-builder*.js, course-exam.js, components-exam.js, exam-secure.js, exam-sets.js, exam-share.js, exam-print.js, exam-review.js, exam-photo-review.js.
 - Scanner/OMR: course-scanner*.js, course-scan-*.js, omr-*.js, scan-*.js, sheet-print.js, student-sheet-viewer.js, components-scanner.js.
-- Shared: student-status.js (UD/Dropped/Graduated rules; mirrors worker/constants.js), globals.js, html-utils.js, ui-feedback.js, date-utils.js, a11y.js, theme.js, skeletons.js, pwa.js (+ `sw.js`).
+- Shared: student-status.js (UD/Dropped/Graduated rules; mirrors worker/constants.js), globals.js, html-utils.js, ui-feedback.js, date-utils.js, a11y.js, theme.js, skeletons.js, pwa.js (+ `sw.js`, static `manifest.webmanifest`, `icons/*.png`, `tools/make-icons.cjs`).
 
 ## Where to look for a feature (section of `docs/FEATURES.md` to read, then the files)
 - Group sets, Upload form/term default/edit uploads, Lecturer uploads, Password reset by email, Grade base 100, Extra credit, Scanned sheets in results, Student review of scan: the last sections of `docs/FEATURES.md`.

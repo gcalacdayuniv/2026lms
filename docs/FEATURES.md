@@ -622,3 +622,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Class mode button (`#classModeBtn`, `.cm-toggle`): one tap switches Onsite <-> Online and the button shows the current mode (school icon / indigo video icon). The floor plan header has the same one-tap button (`#smClassMode`, with label). The expanding card is gone.
 - Proof picture buttons (camera, view) sit in the roster header (`#cmProofSlot`) and show only on an online day; the camera is amber until a picture exists.
 - Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v130).
+
+## Installable Android app (static manifest and icons)
+- What: Android Chrome only installs a real app (WebAPK, no browser badge on the icon) from a manifest file it can fetch by URL. The old manifest was a blob made in `js/pwa.js`, so Android made a plain shortcut. Now `manifest.webmanifest` (linked in `index.html`) and `icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` are static site files.
+- Rules: `js/pwa.js` no longer writes a manifest; it still makes the iPhone Home Screen icon and launch image from the Admin's site icon. Android uses the PNGs in `icons/`: replace them to change the Android icon (192x192, 512x512, 512x512 maskable), or redraw the built-in one with `node tools/make-icons.cjs`. The README rule "site files are only .html/.css/.js" is relaxed for exactly these files (agreed).
+- Note: remove the old shortcut from the Home Screen and install again; the phone keeps the old icon until then. `_headers` serves the manifest as `application/manifest+json`.
+- Tests: `phone-check.cjs`; verify with Chrome's Application > Manifest panel (installable). Deploy: site files only (sw.js v131).

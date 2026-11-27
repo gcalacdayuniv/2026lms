@@ -1,6 +1,6 @@
 // js/pwa.js
-// Makes the portal installable as a phone app: manifest and icons are made here (the site only serves
-// .html/.css/.js files), the service worker (sw.js) keeps the last copy for a weak or missing connection,
+// Makes the portal installable as a phone app: the manifest is the static manifest.webmanifest (+ icons/*.png) so Android can
+// install a real app (WebAPK); the iPhone icon and launch image are made here from the Admin's site icon. The service worker (sw.js) keeps the last copy for a weak or missing connection,
 // and a small banner offers "Install" once the lecturer is logged in.
 import { AppState } from './globals.js';
 import { UI } from './ui-feedback.js';
@@ -19,7 +19,7 @@ const store = {
 };
 
 // Icon: blue rounded square with a white answer sheet and a check mark.
-const drawIcon = (size, maskable) => {
+export const drawIcon = (size, maskable) => {
     const c = document.createElement('canvas');
     c.width = c.height = size;
     const x = c.getContext('2d');
@@ -123,31 +123,10 @@ const addHead = (tag, attrs) => {
 export const PWA = {
     deferred: null,
 
-    // (Re)writes the manifest and the Home Screen icon. The manifest is a blob made here because the site only serves static files.
-    applyIcons: async (icon192, icon512, maskable) => {
+    // (Re)writes the iPhone Home Screen icon and launch image. The manifest is static (manifest.webmanifest): Android needs a real
+    // file to install the app, so Android keeps the icons in icons/ (replace those PNGs to change the Android icon).
+    applyIcons: async (icon192, icon512) => {
         const bg = await edgeColor(icon512);
-        const base = new URL('./', window.location.href).href;
-        const manifest = {
-            name: document.title || 'Online Portal',
-            short_name: 'Portal',
-            start_url: base,
-            scope: base,
-            display: 'standalone',
-            orientation: 'portrait',
-            background_color: bg,
-            theme_color: THEME,
-            icons: [
-                { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
-                { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
-                { src: maskable, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
-            ]
-        };
-        const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
-        let link = document.getElementById('pwaManifest');
-        const old = link ? link.getAttribute('href') : null;
-        if (!link) link = addHead('link', { id: 'pwaManifest', rel: 'manifest', href: url });
-        else link.setAttribute('href', url);
-        if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
         let apple = document.getElementById('appleIcon');
         if (apple) apple.setAttribute('href', icon192);
         else addHead('link', { id: 'appleIcon', rel: 'apple-touch-icon', href: icon192 });
@@ -157,15 +136,15 @@ export const PWA = {
     // The installed app uses the Admin's site icon (a null src goes back to the built-in icon).
     useSiteIcon: async (src) => {
         try {
-            if (!src) { PWA.applyIcons(drawIcon(192, false), drawIcon(512, false), drawIcon(512, true)); return; }
-            const [i192, i512, mask] = await Promise.all([pictureIcon(src, 192, false), pictureIcon(src, 512, false), pictureIcon(src, 512, true)]);
-            if (i192 && i512 && mask) PWA.applyIcons(i192, i512, mask);
+            if (!src) { PWA.applyIcons(drawIcon(192, false), drawIcon(512, false)); return; }
+            const [i192, i512] = await Promise.all([pictureIcon(src, 192, false), pictureIcon(src, 512, false)]);
+            if (i192 && i512) PWA.applyIcons(i192, i512);
         } catch (err) { console.warn('Site icon not applied to the app icon:', err); }
     },
 
     init: () => {
         try {
-            PWA.applyIcons(drawIcon(192, false), drawIcon(512, false), drawIcon(512, true));
+            PWA.applyIcons(drawIcon(192, false), drawIcon(512, false));
             addHead('meta', { name: 'theme-color', content: THEME });
             addHead('meta', { name: 'mobile-web-app-capable', content: 'yes' });
             addHead('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
