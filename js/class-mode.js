@@ -48,6 +48,13 @@ export const ClassMode = {
     },
 
     paint: () => {
+        // the floor plan header carries the same switch (no proof buttons there)
+        const head = $('smClassMode');
+        if (head) {
+            const hs = (key, label, icon) => `<button type="button" class="cm-mode min-h-[44px] px-3 text-sm font-bold border ${key === 'online' ? 'rounded-r-md -ml-px' : 'rounded-l-md'} ${ClassMode.mode === key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-300'}" data-mode="${key}" aria-pressed="${ClassMode.mode === key}"><i class="fa-solid ${icon} mr-1" aria-hidden="true"></i>${label}</button>`;
+            head.innerHTML = `<div class="flex" role="group" aria-label="Class mode for this date">${hs('onsite', 'Onsite', 'fa-school')}${hs('online', 'Online', 'fa-video')}</div>`;
+            head.classList.remove('hidden');
+        }
         const box = $('classModeBar');
         if (!box) return;
         const on = ClassMode.mode === 'online';

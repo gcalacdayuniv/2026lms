@@ -14,6 +14,8 @@ import { UI } from './ui-feedback.js';
 import { CourseClass } from './course-class.js';
 import { LecturerNotes } from './lecturer-notes.js';
 import { CourseRecitation } from './course-recitation.js';
+import { ClassMode } from './class-mode.js';
+import { PlanDay } from './course-plan.js';
 
 const PER_COLUMN = 5;
 const PER_ROW = PER_COLUMN * 2;
@@ -54,6 +56,7 @@ export const SeatMap = {
                         <h3 id="seatMapTitle" class="text-lg font-bold text-gray-800"><i class="fa-solid fa-chair text-sky-600 mr-2" aria-hidden="true"></i><span id="seatMapTitleText">Classroom floor plan</span></h3>
                         <p id="seatMapSub" class="text-xs text-gray-500"></p>
                     </div>
+                    <div id="smClassMode" class="hidden shrink-0"></div>
                     <div id="smHeadTools" class="hidden shrink-0"></div>
                     <button id="seatMapClose" type="button" aria-label="Back" class="app-page-close order-first sm:order-last text-gray-500 sm:text-gray-400 hover:text-gray-800 transition-colors focus:outline-none">
                         <i class="fa-solid fa-arrow-left text-xl sm:hidden" aria-hidden="true"></i><i class="fa-solid fa-xmark text-xl hidden sm:inline" aria-hidden="true"></i>
@@ -115,10 +118,9 @@ export const SeatMap = {
         panel.classList.toggle('rounded-none', lecturer);
         panel.classList.toggle('h-full', lecturer);
         root.classList.toggle('sm:p-4', !lecturer);
-        byId('seatMapTitleText').textContent = lecturer ? 'Classroom floor plan' : 'Your seat';
-        byId('seatMapSub').textContent = '';
-        byId('seatMapSub').classList.add('hidden');
         byId('seatMapModal').classList.remove('hidden');
+        SeatMap.header();
+        if (lecturer) ClassMode.load(state.courseId, state.att.date);
         SeatMap.layout();
         SeatMap.tools();
         SeatMap.render();
@@ -141,6 +143,25 @@ export const SeatMap = {
         }
     },
 
+    // Lecturer header: date, class details, topic of the day (left) and the class mode switch. Student: just "Your seat".
+    header: () => {
+        const st = SeatMap.state, title = byId('seatMapTitleText'), sub = byId('seatMapSub');
+        if (!st || !title) return;
+        byId('seatMapTitle').querySelector('i').className = st.pov === 'lecturer' ? 'hidden' : 'fa-solid fa-chair text-sky-600 mr-2';
+        if (st.pov !== 'lecturer') { title.className = ''; title.textContent = 'Your seat'; sub.textContent = ''; sub.classList.add('hidden'); return; }
+        const c = CourseClass.currentCourse || {};
+        const d = new Date(`${st.att.date}T00:00:00`);
+        const nice = Number.isNaN(d.getTime()) ? st.att.date : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        const details = [c.CourseCode, c.ScheduleDay, c.Room].filter(Boolean).join(' · ');
+        const topic = PlanDay.text(st.att.date);
+        title.className = 'inline-flex items-baseline gap-2 max-w-[calc(100%-2rem)] align-bottom';
+        title.innerHTML = `<span class="whitespace-nowrap">${esc(nice)}</span>${details ? `<span class="truncate text-xs font-bold text-gray-500">${esc(details)}</span>` : ''}`;
+        sub.classList.remove('hidden');
+        const miss = st.unseated ? ` <span class="ml-2 font-bold text-amber-700">${st.unseated} without a seat not shown</span>` : '';
+        sub.innerHTML = (topic ? `<span class="font-bold text-emerald-700"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i>${esc(topic)}</span>` : '<span class="text-gray-400">No topic linked to this date</span>') + miss;
+        sub.className = 'text-xs truncate';
+    },
+
     // The List / Plan switch on the attendance screen mirrors whether the plan is open.
     syncViewToggle: (plan) => {
         document.querySelectorAll('#attendanceViewToggle .att-view').forEach(b => {
@@ -153,7 +174,10 @@ export const SeatMap = {
 
     close: () => {
         SeatMap.syncViewToggle(false);
+        const wasLecturer = SeatMap.state && SeatMap.state.pov === 'lecturer' && !byId('seatMapModal')?.classList.contains('hidden');
         byId('seatMapModal')?.classList.add('hidden');
+        byId('smClassMode')?.classList.add('hidden');
+        if (wasLecturer && byId('attendanceDate')) ClassMode.load(SeatMap.state.courseId, byId('attendanceDate').value);
         SeatMap.layout();
         try { screen.orientation?.unlock?.(); } catch (e) { /* ignore */ }
         const st = SeatMap.state;
@@ -317,8 +341,7 @@ export const SeatMap = {
         } else {
             plan.innerHTML = `${bar('fa-chalkboard', 'Board', 'bg-gray-800')}<div class="space-y-1.5" role="group" aria-label="Seats">${rowHtml}</div>${note}${extras}`;
         }
-        byId('seatMapSub').textContent = lecturerPov && st.unseated ? `${st.unseated} student${st.unseated === 1 ? ' has' : 's have'} no seat and ${st.unseated === 1 ? 'is' : 'are'} not shown.` : '';
-        byId('seatMapSub').classList.toggle('hidden', !(lecturerPov && st.unseated));
+        SeatMap.header();
         const rowsEl = byId('smRows');
         if (st.pop && rowsEl) { rowsEl.insertAdjacentHTML('beforeend', SeatMap.popHtml(st.pop)); SeatMap.popPlace(); }
         SeatMap.info();
@@ -459,9 +482,10 @@ export const SeatMap = {
                 return;
             }
             if (e.target.id !== 'smAttDate' || !SeatMap.state) return;
-            if (e.target.value) { SeatMap.state.att.date = e.target.value; SeatMap.state.pop = null; await SeatMap.loadAttendance(); SeatMap.render(); }
+            if (e.target.value) { SeatMap.state.att.date = e.target.value; SeatMap.state.pop = null; SeatMap.header(); ClassMode.load(SeatMap.state.courseId, e.target.value); await SeatMap.loadAttendance(); SeatMap.render(); }
         });
         const relayout = () => setTimeout(() => { SeatMap.layout(); if (SeatMap.state && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.render(); }, 120);
+        document.addEventListener('plan-day-changed', () => { if (SeatMap.state && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.header(); });
         window.addEventListener('resize', relayout);
         window.addEventListener('orientationchange', relayout);
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && byId('seatMapModal') && !byId('seatMapModal').classList.contains('hidden')) SeatMap.close(); });

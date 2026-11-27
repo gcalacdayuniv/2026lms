@@ -34,6 +34,7 @@ const safeToRedraw = () => {
 export const CourseClass = {
     currentSummaryData: null,
     currentStudents: [],
+    currentCourse: null,
     fabIdleTimer: null,
     resetFabOpacity: null,
 
@@ -468,6 +469,7 @@ export const CourseClass = {
         let earlyAttendance = null;
         if (cached) {
             CourseClass.currentStudents = cached.students;
+            CourseClass.currentCourse = cached.course;
             root.innerHTML = Components.renderClassScreen(cached.course, cached.students);
             RosterTools.apply();
             const d = document.getElementById('attendanceDate');
@@ -492,6 +494,7 @@ export const CourseClass = {
             }
             if (redrawn) {
                 CourseClass.currentStudents = data.students;
+                CourseClass.currentCourse = data.course;
                 root.innerHTML = Components.renderClassScreen(data.course, data.students);
                 RosterTools.apply();
             }

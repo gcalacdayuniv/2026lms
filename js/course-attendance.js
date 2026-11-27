@@ -17,6 +17,20 @@ const STATUS_CLASSES = {
 };
 const IDLE_CLASSES = ['bg-gray-50', 'text-gray-600', 'border-gray-200'];
 const ALL_STATUS_CLASSES = Object.values(STATUS_CLASSES).flat();
+// Live P / L / A / E count for the date, shown in the roster header.
+const COUNT_COLORS = { Present: 'text-green-700', Late: 'text-yellow-700', Absent: 'text-red-700', Excused: 'text-purple-700' };
+let countFrame = 0;
+export const refreshCounts = () => {
+    if (countFrame) return;
+    countFrame = requestAnimationFrame(() => {
+        countFrame = 0;
+        const box = document.getElementById('rosterCounts');
+        if (!box) return;
+        const c = { Present: 0, Late: 0, Absent: 0, Excused: 0 };
+        document.querySelectorAll('.student-row .attendance-btn[data-selected="true"]').forEach(b => { if (c[b.dataset.status] !== undefined) c[b.dataset.status]++; });
+        box.innerHTML = Object.keys(c).map(k => `<span class="${COUNT_COLORS[k]}">${c[k]}${k[0]}</span>`).join('');
+    });
+};
 export const paintRowStatus = (row, status) => {
     row.querySelectorAll('.attendance-btn').forEach(btn => {
         btn.classList.remove(...ALL_STATUS_CLASSES);
@@ -29,6 +43,7 @@ export const paintRowStatus = (row, status) => {
         btn.classList.remove(...IDLE_CLASSES);
         btn.classList.add(...STATUS_CLASSES[status]);
     }
+    refreshCounts();
 };
 
 const getCourseId = () => window.location.hash.replace('#class-', '');

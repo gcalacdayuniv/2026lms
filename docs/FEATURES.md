@@ -606,3 +606,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - What: the attendance bar has a List / Plan switch (`#attendanceViewToggle`; Plan = `#attendanceFloorBtn`) instead of a lone floor-plan icon. Plan opens the floor plan for the shown date; its header has List (back), Caller and Check attendance. The switch follows whether the plan is open.
 - Student caller: drag the title bar (`#recitationDragBar`) to move the card (CSS `translate`, kept on screen). Once moved the dim backdrop is released so the screen behind stays usable; position resets on close. Opened from the plan it sits above it (z 150).
 - Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v127).
+
+## Topic and counts in the roster header, day info in the floor plan header
+- What: the roster header shows the topic of the day (`#rosterTopic`, tap to change; `PlanDay.text(date)` is the one source) and a live P / L / A / E count (`#rosterCounts`, refreshed from `paintRowStatus` via `refreshCounts`). The old Topics row is gone; the button card keeps only Class mode.
+- Floor plan header (lecturer): date + class details (`CourseClass.currentCourse`), topic of the day, and the Onsite/Online switch (`#smClassMode`, same `.cm-mode` handler as the list). Changing the plan date reloads class mode and topic; closing the plan restores the list screen's date.
+- Tests: `run-tests.sh`, `phone-check.cjs`. Deploy: site files only (sw.js v128).

@@ -220,19 +220,20 @@ export const PlanDay = {
         PlanDay.paint();
     },
 
+    // "First topic +2", or '' when no topic is linked to the date. Used by the roster header and the floor plan header.
+    text: (date) => {
+        const chosen = CoursePlan.data.topics.filter(t => t.dates.includes(date));
+        if (!chosen.length) return '';
+        return `${first(chosen[0].contents) || 'Topic'}${chosen.length > 1 ? ` +${chosen.length - 1}` : ''}`;
+    },
+
     paint: () => {
-        const box = $('planDayBar');
-        if (!box) return;
         const topics = CoursePlan.data.topics;
-        const chosen = topics.filter(t => t.dates.includes(PlanDay.date));
-        const text = chosen.length ? `${esc(first(chosen[0].contents) || 'Topic')}${chosen.length > 1 ? ` <span class="font-black text-emerald-700">+${chosen.length - 1}</span>` : ''}` : (topics.length ? '<span class="text-gray-400 font-normal">None (activity, quiz or exam day)</span>' : '<span class="text-emerald-700">Set up the course plan</span>');
-        const title = chosen.map(t => first(t.contents) || 'Topic').join('; ');
-        box.innerHTML = `<button type="button" id="pdLink" title="${esc(title)}" class="w-full min-h-[44px] flex items-center gap-2 px-3 rounded-md border border-emerald-300 bg-white text-left">
-            <i class="fa-solid fa-link text-emerald-700" aria-hidden="true"></i>
-            <span class="text-[11px] font-black uppercase tracking-wide text-gray-500 shrink-0">Topics</span>
-            <span class="flex-1 min-w-0 truncate text-sm font-bold text-gray-800">${text}</span>
-            <i class="fa-solid fa-chevron-right text-xs text-gray-400" aria-hidden="true"></i>
-        </button>`;
+        const t = PlanDay.text(PlanDay.date);
+        const label = t || (topics.length ? 'No topic today (activity, quiz or exam)' : 'Set up the course plan');
+        const btn = $('rosterTopic');
+        if (btn) { btn.querySelector('span').textContent = label; btn.classList.toggle('text-gray-400', !t && topics.length > 0); btn.classList.toggle('text-emerald-700', !!t || !topics.length); btn.title = label; }
+        document.dispatchEvent(new CustomEvent('plan-day-changed'));
     },
 
     picker: () => {
@@ -267,7 +268,7 @@ export const initCoursePlan = () => {
         if (!t.closest) return;
         if (t.closest('#openCoursePlanBtn')) { $('courseMenuModal')?.classList.add('hidden'); CoursePlan.open(); return; }
         if (t.closest('#closeCoursePlanBtn') || t.id === 'closeCoursePlanBg') { CoursePlan.close(); return; }
-        if (t.closest('#pdLink')) { PlanDay.picker(); return; }
+        if (t.closest('.pd-open')) { PlanDay.picker(); return; }
         if (t.closest('#pdSave')) { await PlanDay.save(); return; }
         if (!$('coursePlanModal') || $('coursePlanModal').classList.contains('hidden')) return;
         if (t.closest('#cpAdd')) { CoursePlan.topicForm(null); return; }
