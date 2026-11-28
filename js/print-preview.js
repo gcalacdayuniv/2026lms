@@ -97,7 +97,7 @@ export const showPrintPreview = (html, title = 'Print') => {
             <div class="flex-1 min-w-0 truncate text-sm font-black text-gray-800 text-center">${esc(title)}</div>
             <button type="button" id="printPreviewPrintBtn" class="px-3 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"><i class="fa-solid fa-print mr-1.5" aria-hidden="true"></i>Print</button>
         </div>
-        <div id="printPreviewScroll" class="flex-1 overflow-auto p-3"><div id="printPreviewSizer" class="mx-auto bg-white shadow-lg" style="width:816px;max-width:none;transform-origin:top left"><iframe id="printPreviewFrame" title="Print preview" style="width:816px;border:0;display:block;min-height:1056px"></iframe></div></div>`;
+        <div id="printPreviewScroll" class="flex-1 overflow-auto p-3"><div id="printPreviewSizer" class="mx-auto bg-white shadow-lg" style="width:816px;max-width:none;transform-origin:top left"><iframe id="printPreviewFrame" title="Print preview" sandbox="allow-same-origin allow-modals" style="width:816px;border:0;display:block;min-height:1056px"></iframe></div></div>`;
     document.body.appendChild(o);
     document.addEventListener('keydown', onKey);
 

@@ -669,3 +669,11 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **What:** `/api/students` (class roster) returns `Middle_Name` and `Barangay`. The printable class list has a Barangay column and the middle name under the student name; the student manage panel shows both read-only (edit them in Manage Users > Edit student).
 - **Privacy:** lecturer-only route, unchanged ownership rules.
 - **Deploy:** Worker + site files (sw `portal-shell-v137`).
+
+## HTML-injection audit of student text
+
+- **Checked:** every `js/*.js` template, `innerHTML`/`insertAdjacentHTML` site and string-concatenated HTML for student/lecturer text (names, email, contact, barangay, titles, topics, groups, notes, program fields). All shown values already go through `escapeHtml` / `esc` / `safeUrl`, or `textContent`; overlay labels use `setAttribute`. No holes found. GAS emails are plain text.
+- **Hardened:** the print preview iframe (`js/print-preview.js`) is now `sandbox="allow-same-origin allow-modals"`: scripts inside printed pages never run, even if a future builder forgets to escape. Print still works (parent calls `print()`).
+- **Rule:** new HTML built from user text must use `escapeHtml`; print pages must not need scripts.
+- **Tested:** browser check: `<img onerror>` and `<script>` in a print page do nothing; text renders. run-tests and phone-check pass.
+- **Deploy:** site files (sw `portal-shell-v138`).
