@@ -747,3 +747,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rules:** the release after a drag is ignored as a tap (`swallowUntil`); the list blocks text selection and the iOS image menu while selecting.
 - **Tests:** browser check: touch drag over 4 rows ticks them, the click after it is ignored, a tap on a row body ticks, a drag that starts on a ticked row unticks, a finger that moves before the hold selects nothing. run-tests and phone-check pass.
 - **Deploy:** site files (sw `portal-shell-v147`).
+
+## Secure exam: the camera permission prompt cannot submit the exam
+
+- **Check:** the first camera prompt (Start exam / face check, `ExamSecure.prepare`) happens before `begin()` while `active` is false, so it never counts as leaving. The only prompt during an exam is when the app comes back from the background and the stopped camera is started again (`restartCamera`, mostly iPhone). That prompt takes focus away and started the 5 s away timer: a student who needed more than 5 s to tap Allow was submitted with reason `focus-lost` (reproduced in a browser test).
+- **Fix:** `restartCamera` now pauses the away timer while it asks for the camera, capped at 30 s (`CAMERA_PROMPT_MAX_MS`) so a prompt left open cannot hide a student who walks away. Denying the camera or a failed restart still submits with `camera-off`, as before.
+- **Tests:** browser check with a fake camera that returns after 7 s and blur/focus events: before the fix `LEFT:focus-lost`, after it nothing. Really leaving for 6.5 s still submits.
+- **Deploy:** site files (sw `portal-shell-v148`). No Worker change.

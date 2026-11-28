@@ -15,6 +15,7 @@ const AWAY_GRACE_SECONDS = 5;    // the server uses the same number (worker/exam
 const PHOTO_WIDTH = 320;
 const CAMERA_OK_KEY = 'exam_camera_ok';
 const OVAL_RX = 0.34, OVAL_RY = 0.34;   // the verification oval, as a share of the picture (face check looks inside it)
+const CAMERA_PROMPT_MAX_MS = 30000;   // longest a camera permission prompt may stop the away timer
 const $ = (id) => document.getElementById(id);
 
 export const ExamSecure = {
@@ -297,7 +298,14 @@ export const ExamSecure = {
     },
     hideBanner: () => { clearInterval(ExamSecure.awayTimer); ExamSecure.awayTimer = null; $('examAwayBanner')?.remove(); },
 
+    // Starts the camera again after the app came back from the background. The browser may ask for the camera once more here
+    // (iPhone), and its prompt takes focus away: that must not count as leaving the exam (it used to submit the exam when the
+    // student needed more than the grace seconds to tap Allow). The pause is capped, so a prompt left open cannot hide a student who walks away.
     restartCamera: async () => {
+        ExamSecure.paused += 1;
+        let released = false;
+        const release = () => { if (!released) { released = true; ExamSecure.resume(); } };
+        const cap = setTimeout(release, CAMERA_PROMPT_MAX_MS);
         try {
             if (ExamSecure.stream) ExamSecure.stream.getTracks().forEach(t => t.stop());
             ExamSecure.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
@@ -307,6 +315,7 @@ export const ExamSecure = {
             if (h && t) { h.track = t; t.addEventListener('ended', h.onEnded); }
             return true;
         } catch (e) { return false; }
+        finally { clearTimeout(cap); release(); }
     },
 
     // Dialogs the app itself opens (confirm / alert) take focus away, so they must not count as leaving.
