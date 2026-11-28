@@ -164,10 +164,21 @@ export const SeatMap = {
         const prog = [c.Target_Course, [c.Target_Year, c.Target_Section].filter(Boolean).join('-')].filter(Boolean).join(' ');
         const details = [c.CourseCode, prog, [c.ScheduleDay, c.TimePeriod].filter(Boolean).join(' '), c.Room || 'No room'].filter(Boolean).join(' · ');
         const topic = PlanDay.text(st.att.date);
+        const a = st.att;
+        if (a.on) {
+            title.className = 'flex items-center gap-1.5 overflow-x-auto';
+            title.innerHTML = `<input type="date" id="smAttDate" value="${esc(a.date)}" aria-label="Attendance date" class="min-h-[44px] w-[7.25rem] px-1 border border-gray-300 rounded-md text-xs font-normal shrink-0">
+                <div class="flex gap-1 shrink-0" role="group" aria-label="Status to give">${STATUSES.map(s => `<button type="button" class="sm-brush min-h-[44px] min-w-[38px] px-1 rounded-md border text-sm font-bold ${a.brush === s.key ? s.btn : 'bg-white ' + s.idle}" data-status="${s.key}" aria-pressed="${a.brush === s.key}" title="${s.key}">${s.letter}</button>`).join('')}</div>
+                <button type="button" id="smAllPresent" class="min-h-[44px] px-2 rounded-md border border-green-300 text-green-700 text-xs font-bold bg-white shrink-0 whitespace-nowrap" title="Mark everyone with no status as present" aria-label="Mark the rest present"><i class="fa-solid fa-check-double mr-1" aria-hidden="true"></i>Rest</button>`;
+        } else {
         title.className = 'inline-flex items-baseline gap-2 max-w-[calc(100%-2rem)] align-bottom';
         title.innerHTML = `<span class="whitespace-nowrap">${esc(nice)}</span>${topic ? `<span class="truncate text-xs font-bold text-emerald-700"><i class="fa-solid fa-link mr-1" aria-hidden="true"></i>${esc(topic)}</span>` : '<span class="truncate text-xs text-gray-400">No topic</span>'}`;
+        }
         const det = byId('smDetails');
-        det.textContent = details; det.title = details; det.classList.remove('hidden');
+        det.title = details; det.classList.remove('hidden');
+        det.classList.toggle('flex', !!a.on); det.classList.toggle('justify-between', !!a.on); det.classList.toggle('gap-3', !!a.on);
+        if (a.on) det.innerHTML = `<span class="truncate">${esc(details)}</span><span id="smCounts" class="shrink-0 text-gray-700"></span>`; else det.textContent = details;
+        if (a.on) SeatMap.counts();
         sub.innerHTML = st.unseated ? `<span class="font-bold text-amber-700">${st.unseated} without a seat not shown</span>` : '';
         sub.classList.toggle('hidden', !st.unseated);
     },
@@ -248,15 +259,10 @@ export const SeatMap = {
         const a = st.att;
         const head = byId('smHeadTools');
         head.classList.remove('hidden');
-        head.innerHTML = `<button type="button" id="smToList" class="min-h-[44px] px-3 mr-1 rounded-md border border-sky-300 bg-white text-sky-700 text-sm font-bold"><i class="fa-solid fa-list mr-1" aria-hidden="true"></i>List</button><button type="button" id="smCallBtn" class="min-h-[44px] px-3 mr-1 rounded-md border border-purple-300 bg-white text-purple-700 text-sm font-bold" title="Student caller"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i><span class="hidden sm:inline ml-1">Caller</span></button><button type="button" id="smAttToggle" aria-pressed="${a.on}" class="min-h-[44px] px-3 rounded-md border text-sm font-bold ${a.on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-300'}"><i class="fa-solid fa-clipboard-user mr-1" aria-hidden="true"></i>${a.on ? 'Checking attendance' : 'Check attendance'}</button>`;
-        if (!a.on) { box.classList.add('hidden'); box.innerHTML = ''; return; }
-        box.classList.remove('hidden');
-        box.innerHTML = `<div class="flex flex-wrap items-center gap-2">
-            <input type="date" id="smAttDate" value="${esc(a.date)}" aria-label="Attendance date" class="min-h-[44px] px-2 border border-gray-300 rounded-md text-sm">
-            <div class="flex gap-1" role="group" aria-label="Status to give">${STATUSES.map(s => `<button type="button" class="sm-brush min-h-[44px] min-w-[44px] px-2 rounded-md border text-sm font-bold ${a.brush === s.key ? s.btn : 'bg-white ' + s.idle}" data-status="${s.key}" aria-pressed="${a.brush === s.key}" title="${s.key}">${s.letter}<span class="hidden lg:inline">${s.key.slice(1)}</span></button>`).join('')}</div>
-            <button type="button" id="smAllPresent" class="min-h-[44px] px-3 rounded-md border border-green-300 text-green-700 text-sm font-bold bg-white" title="Mark everyone with no status as present">Rest present</button>
-            <span id="smCounts" class="text-xs font-bold text-gray-600 sm:ml-auto"></span>
-        </div>`;
+        head.innerHTML = `<button type="button" id="smToList" class="min-h-[44px] px-3 mr-1 rounded-md border border-sky-300 bg-white text-sky-700 text-sm font-bold"><i class="fa-solid fa-list ${a.on ? '' : 'mr-1'}" aria-hidden="true"></i><span class="${a.on ? 'sr-only' : ''}">List</span></button><button type="button" id="smCallBtn" class="min-h-[44px] px-3 mr-1 rounded-md border border-purple-300 bg-white text-purple-700 text-sm font-bold" title="Student caller"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i><span class="${a.on ? 'sr-only' : 'hidden sm:inline ml-1'}">Caller</span></button><button type="button" id="smAttToggle" aria-pressed="${a.on}" class="min-h-[44px] px-3 rounded-md border text-sm font-bold ${a.on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-sky-700 border-sky-300'}"><i class="fa-solid fa-clipboard-user mr-1" aria-hidden="true"></i>${a.on ? 'Checking attendance' : 'Check attendance'}</button>`;
+        // While attendance is being checked the controls live in the heading (see header()), so no row is added and the plan does not move.
+        box.classList.add('hidden'); box.innerHTML = '';
+        SeatMap.header();
     },
 
     counts: () => {

@@ -698,3 +698,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rules:** the icon address in `index.html` and the manifest is the Worker URL (`API_URL` in `js/globals.js`); change both if the Worker moves.
 - **Tests:** PNG route returns the bytes with the right headers; redirect when none is saved.
 - **Deploy:** Worker + site files (sw `portal-shell-v140`). Android: remove the old shortcut and install again; link previews may stay cached for a while on WhatsApp/Messenger/Facebook (re-scrape in their debugger).
+
+## Floor plan: attendance controls in the heading
+
+- **What:** while "Checking attendance" is on, the heading's date + topic are replaced by the date picker, the P / L / A / E brush, and "Rest" (mark the rest present); List and Caller become icon-only. The P/L/A/E/none counts sit on the class details line. The extra row is gone, so the seat grid stays exactly where it was (tested: plan top and heading height identical on and off). Turning attendance off brings the date and topic back.
+- **Code:** `SeatMap.header()` draws both states; `SeatMap.tools()` only draws the right-hand buttons and calls `header()`. IDs kept: `smAttDate`, `.sm-brush`, `smAllPresent`, `smCounts`.
+- **Deploy:** site files (sw `portal-shell-v141`).
