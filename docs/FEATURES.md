@@ -689,3 +689,12 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 - **What:** the student's "Review your answers" screen (`js/exam-review.js`) is full height with a centred 56rem column on tablets and computers (was a 90vh centred box). Phones unchanged.
 - **Deploy:** site files (sw `portal-shell-v139`).
+
+## The uploaded site icon is the only icon (tab, Android install, link previews)
+
+- **Problem:** the Android install icon came from static `icons/*.png`, and `index.html` (what link previews and first paint read) pointed to an old Drive picture.
+- **What:** the Worker serves the Admin's icon as a real file at `GET /api/site-icon.png` (public, cached 5 min, `Cross-Origin-Resource-Policy: cross-origin`). With no icon saved it redirects to the site's built-in `icons/icon-512.png`. `index.html` (`icon`, `apple-touch-icon`, new `og:image`/`og:title`/`twitter:card`) and `manifest.webmanifest` (192 and 512 `any` icons) all point at that one address. The maskable icon was removed (an uploaded picture has no safe-zone padding). CSP `img-src` allows the API origin.
+- **Upload:** Admin tools > Site icon now cuts a 512 x 512 PNG (falls back to 384 / 256 if the picture is too detailed); Worker limit raised to 450 000 characters. An icon saved earlier is 192 x 192: upload it again for a sharp install icon.
+- **Rules:** the icon address in `index.html` and the manifest is the Worker URL (`API_URL` in `js/globals.js`); change both if the Worker moves.
+- **Tests:** PNG route returns the bytes with the right headers; redirect when none is saved.
+- **Deploy:** Worker + site files (sw `portal-shell-v140`). Android: remove the old shortcut and install again; link previews may stay cached for a while on WhatsApp/Messenger/Facebook (re-scrape in their debugger).

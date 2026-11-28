@@ -247,7 +247,17 @@ sql.prepare("update Users set role='Admin' where User_ID='L1'").run();
 ok('an Admin cannot save something that is not a PNG', (await call('POST', '/api/site-icon', { token: L1, body: { icon: 'data:text/html;base64,PGI+' } })).s === 400);
 ok('an Admin saves the site icon', (await call('POST', '/api/site-icon', { token: L1, body: { icon: png1 } })).s === 200);
 ok('everyone gets it', (await call('GET', '/api/site-icon', {})).j.icon === png1);
+{
+  const raw = (path) => worker.fetch(new Request('https://api.test' + path, { headers: { Origin: 'https://app.test' } }), env, ctx);
+  const r = await raw('/api/site-icon.png');
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  ok('the site icon is also served as a PNG file for tabs, Android install and link previews', r.status === 200 && r.headers.get('content-type') === 'image/png' && bytes[0] === 0x89 && bytes[1] === 0x50 && r.headers.get('cross-origin-resource-policy') === 'cross-origin', r.status + ' ' + r.headers.get('content-type'));
+}
 ok('an Admin goes back to the default', (await call('POST', '/api/site-icon', { token: L1, body: { icon: null } })).s === 200 && (await call('GET', '/api/site-icon', {})).j.icon === null);
+{
+  const r = await worker.fetch(new Request('https://api.test/api/site-icon.png', { headers: { Origin: 'https://app.test' } }), env, ctx);
+  ok('with no icon saved the PNG address sends the built-in icon', r.status === 302 && r.headers.get('location') === 'https://app.test/icons/icon-512.png', r.status + ' ' + r.headers.get('location'));
+}
 sql.prepare("update Users set role='lecturer' where User_ID='L1'").run();
 // ---- an Admin changes roles ----
 const roleOf = (id) => sql.prepare('select role from Users where User_ID=?').get(id).role;

@@ -133,6 +133,7 @@ export const RULES = {
     'POST /api/exam-away': { who: 'any', self: ['studentId'] },
     'POST /api/logout': { who: 'any', mine: ['userId'] },
     'GET /api/me': { who: 'any' },
+    'GET /api/site-icon.png': { who: 'public' },   // the same icon as a picture file (tab, install manifest, link previews)
     'GET /api/site-icon': { who: 'public' },   // the favicon is needed before sign-in
     'POST /api/site-icon': { who: 'lecturer' },   // the handler lets Admins only
     'GET /api/exam-photos': { who: 'lecturer', adminAny: true },   // an Admin may read any class's photos (the handler limits a lecturer to the initial photo)

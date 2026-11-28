@@ -1,12 +1,13 @@
 // js/site-icon.js
 // The site icon (favicon). Everyone gets the one the Admin chose (GET /api/site-icon, public), kept on the device so the tab
-// shows it at once; the Admin changes it in Admin tools > Site icon (a picture is cut to a 192 x 192 PNG here, then saved).
+// shows it at once; the Admin changes it in Admin tools > Site icon (a picture is cut to a 512 x 512 PNG here, then saved).
 import { apiFetch, AppState, apiPost } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { PWA, SITE_ICON_KEY } from './pwa.js';
 
 const KEY = SITE_ICON_KEY;
-const SIZE = 192;
+const SIZE = 512;   // Android needs a 512 icon to install; the same picture serves every smaller size
+const MAX_CHARS = 440000;
 const $ = (id) => document.getElementById(id);
 const defaults = {};
 
@@ -25,11 +26,16 @@ const cut = (file) => new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
         const side = Math.min(img.naturalWidth, img.naturalHeight);
-        const c = document.createElement('canvas');
-        c.width = c.height = SIZE;
-        c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, SIZE, SIZE);
+        let out = '';
+        for (const size of [SIZE, 384, 256]) {   // a very detailed picture gets a smaller square so it stays small enough to save
+            const c = document.createElement('canvas');
+            c.width = c.height = size;
+            c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+            out = c.toDataURL('image/png');
+            if (out.length <= MAX_CHARS) break;
+        }
         URL.revokeObjectURL(url);
-        resolve(c.toDataURL('image/png'));
+        resolve(out);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file is not a picture.')); };
     img.src = url;

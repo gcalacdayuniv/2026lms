@@ -10,8 +10,7 @@
   "background_color": "#2563eb",
   "theme_color": "#2563eb",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "https://2026-api.plv.workers.dev/api/site-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "https://2026-api.plv.workers.dev/api/site-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }

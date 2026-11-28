@@ -4,7 +4,7 @@
 //   POST /api/site-icon        Admins only  { icon: 'data:image/png;base64,...' }  or { icon: null } to go back to the default
 import { json } from './http.js';
 
-const ICON_MAX = 120000;                       // characters of the data URL (a 192 x 192 PNG is about 10-40 KB)
+const ICON_MAX = 450000;                       // characters of the data URL (a 512 x 512 PNG is about 20-250 KB)
 const ICON_RE = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
 
 const ensureSiteSettings = async (env) => {
@@ -12,8 +12,24 @@ const ensureSiteSettings = async (env) => {
 };
 
 export async function handleSiteSettings(request, env, path, url, corsHeaders, caller) {
-    if (path !== '/api/site-icon') return null;
+    if (path !== '/api/site-icon' && path !== '/api/site-icon.png') return null;
     await ensureSiteSettings(env);
+    // The icon as a real picture file: the one address used by the browser tab, the Home Screen icon, the Android install
+    // manifest and link previews (they cannot run JavaScript). No icon saved yet -> the built-in icon on the site.
+    if (path === '/api/site-icon.png') {
+        if (request.method !== 'GET') return null;
+        const row = await env.DB.prepare("SELECT Setting_Value FROM Site_Settings WHERE Setting_Key = 'site_icon'").first();
+        const m = row && row.Setting_Value ? /^data:image\/png;base64,(.+)$/.exec(row.Setting_Value) : null;
+        const headers = { ...corsHeaders, 'Cache-Control': 'public, max-age=300', 'Cross-Origin-Resource-Policy': 'cross-origin' };
+        if (!m) {
+            const site = String(env.ALLOWED_ORIGIN || '').split(',').map(o => o.trim()).filter(Boolean)[0];
+            return site ? new Response(null, { status: 302, headers: { ...headers, Location: `${site.replace(/\/$/, '')}/icons/icon-512.png` } }) : new Response('No icon', { status: 404, headers });
+        }
+        const bin = atob(m[1]);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new Response(bytes, { status: 200, headers: { ...headers, 'Content-Type': 'image/png' } });
+    }
     if (request.method === 'GET') {
         const row = await env.DB.prepare("SELECT Setting_Value, Updated_At FROM Site_Settings WHERE Setting_Key = 'site_icon'").first();
         return json(corsHeaders, { success: true, icon: row && row.Setting_Value ? row.Setting_Value : null, updatedAt: row ? row.Updated_At : null });
