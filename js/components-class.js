@@ -866,6 +866,7 @@ const ClassUI = {
                         </div>
                         <p id="recitationPointsHint" class="text-[11px] text-purple-700 mt-1.5 leading-snug min-h-[30px]"></p>
                         <p id="recitationPointsStatus" role="status" aria-live="polite" class="text-[11px] font-bold mt-1 min-h-[16px]"></p>
+                        <button type="button" id="recitationGradeBtn" class="mt-2 w-full min-h-[44px] rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"><i class="fa-solid fa-clipboard-check mr-1" aria-hidden="true"></i>Grade with timer</button>
                     </div>
                     </div>
                     </div>

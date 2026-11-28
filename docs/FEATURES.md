@@ -762,3 +762,12 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rules:** students must be enrolled; the assessment and the group set must belong to the class; scores 0 to 100000; notes (2000 chars) are lecturer-only and never sent to students.
 - **Tests:** 10 blocks in `worker.test.mjs` ("Practical grades").
 - **Deploy:** Worker. No site change yet (the screen and the group caller follow).
+
+## Practical grading screen (Student Caller > Grade with timer)
+
+- **What:** `js/course-practical.js` (`PracticalGrade`, started in `app.js`). The Student Caller result card has a **Grade with timer** button (`#recitationGradeBtn`) that opens a full-screen page (`page-full` overlay, z 200, above the caller and the floor plan).
+- **Timer:** the lecturer picks 5 / 10 / 15 / 20 / 30 min or types minutes (remembered per class). Start / Pause / Reset. It counts down on clock time (a sleeping phone does not lose time), turns amber in the last minute (or last 20%), beeps once at 1 minute left (activities over 2 min), beeps three times and buzzes at zero, then shows red `+m:ss` overtime. The screen is kept awake while it runs (Wake Lock, where the browser has it). Sound needs one tap first: Start is that tap.
+- **Grading:** activity name (remembered), highest score, grade and notes. For a group: **Grade as a group** (one grade and note copied to every member) or **Grade each member** (own grade and note each; what was typed stays when you switch). **Also save the grade as a score in** lists the class's assessments: choosing one copies the grade into Record Scores for only those students (Highest score fills from it if empty). The record keeps the timer length and the time used.
+- **Saves to:** `POST /api/practical-grade-save` (see the Worker section above). Empty grades are skipped; at least one grade is needed.
+- **Tests:** browser check with a fake clock: countdown 10:00 to 9:30, pause holds, custom minutes, overtime `+0:01` in red, group save sends 3 equal entries with the assessment and 62 s elapsed, each-member save sends separate grades and notes, no grade shows an error. Worker tests as before.
+- **Deploy:** site files (sw `portal-shell-v149`); Worker from the earlier commit.
