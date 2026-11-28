@@ -80,13 +80,24 @@ export const CourseGroups = {
             return;
         }
         if (e.target.closest('#cgDeleteSetBtn')) {
-            const ok = await UI.confirm({ title: 'Delete this set?', message: 'All its groups are removed. Scores and uploads are not affected.', confirmText: 'Delete', danger: true });
-            if (!ok) return;
-            try {
-                await post('/api/group-set-delete', { courseId: CourseGroups.courseId, setId: CourseGroups.setId });
-                CourseGroups.setId = 'reporting';
-                await CourseGroups.loadSets();
-            } catch (err) { CourseGroups.alert(err.message || 'Could not delete the set.'); }
+            // Gone from the screen at once; the server is only asked when the Undo window ends (scores and uploads are not affected).
+            const { courseId, setId } = CourseGroups, at = CourseGroups.sets.findIndex(x => x.Set_ID === setId);
+            if (at < 0 || setId === 'reporting') return;
+            const [gone] = CourseGroups.sets.splice(at, 1);
+            CourseGroups.setId = 'reporting';
+            CourseGroups.paintSets();
+            await CourseGroups.loadSet();
+            UI.deferred(`Set "${gone.Name}" deleted.`, {
+                ms: 8000,
+                restore: async () => {
+                    if (CourseGroups.courseId !== courseId || !byId('cgSetSelect')) return;
+                    CourseGroups.sets.splice(Math.min(at, CourseGroups.sets.length), 0, gone);
+                    CourseGroups.setId = setId;
+                    CourseGroups.paintSets();
+                    await CourseGroups.loadSet();
+                },
+                commit: () => post('/api/group-set-delete', { courseId, setId })
+            });
             return;
         }
         if (e.target.closest('#cgAddGroupBtn')) {
@@ -173,8 +184,16 @@ export const CourseGroups = {
         return g;
     },
 
+    // The set picker, from CourseGroups.sets.
+    paintSets: () => {
+        const sel = byId('cgSetSelect'); if (!sel) return;
+        sel.innerHTML = CourseGroups.sets.map(s => `<option value="${esc(s.Set_ID)}">${esc(s.Name)}</option>`).join('');
+        sel.value = CourseGroups.setId;
+    },
+
     loadSets: async () => {
         CourseGroups.alert('');
+        await UI.flushDeferred();   // a set waiting out its Undo window is deleted first, so the list read below is true
         try {
             const r = await apiFetch(`/api/group-sets?courseId=${CourseGroups.courseId}`);
             CourseGroups.sets = r.sets || [];

@@ -724,7 +724,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 
 - **What:** `UI.deferred(message, { commit, restore, ms })` in `js/ui-feedback.js`: the caller hides the item on screen, a toast with Undo shows for 7 s (8 s for photos), and only then does `commit()` talk to the server. Undo calls `restore()` and nothing is sent. If `commit()` fails the error shows and `restore()` runs. Leaving the page, switching tabs or `UI.flushDeferred()` commits at once, so a delete is never lost.
 - **Now with Undo (no confirm dialog):** lecturer note delete (`js/lecturer-notes.js`), a question deleted from an exam's question list (`CourseExam.deleteExamQuestion`: the whole list is saved at commit and again if a question is put back), Admin exam photo delete (closing the gallery commits at once, then the Admin lists refresh), and a question with content deleted in the exam builder (local draft: `UI.undo`).
-- **Still asks first (cannot be undone safely):** remove a student from a course, delete an exam, reset a password, advance year levels, delete a group set.
+- **Also:** deleting a group set (`CourseGroups`, 8 s): the set leaves the picker and the screen shows Reporting; Undo brings it back. `loadSets()` first flushes a waiting delete so the list it reads is true.
+- **Still asks first (cannot be undone safely):** remove a student from a course, delete an exam, reset a password, advance year levels.
 - **Rule:** use `UI.deferred` for a server delete, `UI.undo` for a change that only lives on the screen; keep `UI.confirm` for actions that touch other people or send emails.
 - **Tests:** browser check of the four paths: window ends (commit), Undo (restore, no commit), flush (commit now), failing commit (error + restore). run-tests and phone-check pass.
 - **Deploy:** site files (sw `portal-shell-v144`).
