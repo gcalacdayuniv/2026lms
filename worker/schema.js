@@ -314,6 +314,7 @@ export const ensurePracticals = once(async (env) => {
         env.DB.prepare("CREATE TABLE IF NOT EXISTS Practical_Grades (Grade_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Activity TEXT NOT NULL, Student_ID TEXT NOT NULL, Score REAL, Max_Score REAL, Notes TEXT, Set_ID TEXT, Group_Name TEXT, Timer_Seconds INTEGER, Elapsed_Seconds INTEGER, Assessment_ID TEXT, Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE (Course_ID, Activity, Student_ID))"),
         env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_practical_course ON Practical_Grades (Course_ID)")
     ]);
+    try { await env.DB.prepare("ALTER TABLE Practical_Grades ADD COLUMN Criteria TEXT").run(); } catch (e) { /* already there */ }   // JSON [{name,max,score}] per student
 });
 
 // A locked seat is skipped by auto-assignment (Seat Plan).

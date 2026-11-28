@@ -19,11 +19,12 @@ export async function handlePracticals(request, env, path, url, corsHeaders) {
         if (!courseId) return reply(corsHeaders, 400, { error: 'Missing courseId' });
         const activity = clean(url.searchParams.get('activity'), 80);
         const rows = await env.DB.prepare(
-            `SELECT p.Activity, p.Student_ID, u.Name, p.Score, p.Max_Score, p.Notes, p.Set_ID, p.Group_Name, p.Timer_Seconds, p.Elapsed_Seconds, p.Assessment_ID, p.Updated_At
+            `SELECT p.Activity, p.Student_ID, u.Name, p.Score, p.Max_Score, p.Notes, p.Criteria, p.Set_ID, p.Group_Name, p.Timer_Seconds, p.Elapsed_Seconds, p.Assessment_ID, p.Updated_At
              FROM Practical_Grades p LEFT JOIN Users u ON u.User_ID = p.Student_ID
              WHERE p.Course_ID = ? ${activity ? 'AND p.Activity = ?' : ''} ORDER BY p.Updated_At DESC LIMIT 500`
         ).bind(...(activity ? [courseId, activity] : [courseId])).all();
-        return reply(corsHeaders, 200, { success: true, grades: rows.results || [] });
+        const grades = (rows.results || []).map(g => { let criteria = []; try { criteria = JSON.parse(g.Criteria || '[]'); } catch (e) { /* none */ } return { ...g, Criteria: criteria }; });
+        return reply(corsHeaders, 200, { success: true, grades });
     }
 
     if (request.method === 'POST' && path === '/api/practical-grade-save') {
@@ -44,7 +45,20 @@ export async function handlePracticals(request, env, path, url, corsHeaders) {
             const score = e.score === '' || e.score == null ? null : Number(e.score);
             if (!enrolled.has(String(e.studentId))) return reply(corsHeaders, 400, { error: 'A student is not in this class.' });
             if (score !== null && (!Number.isFinite(score) || score < 0 || score > MAX_SCORE_ENTRY)) return reply(corsHeaders, 400, { error: `Invalid score. Scores must be 0 or more (up to ${MAX_SCORE_ENTRY}).` });
-            rows.push({ id: String(e.studentId), score, notes: clean(e.notes, 2000) });
+            // Criteria breakdown: [{ name, max, score }], each score 0..max; the total is checked against the score.
+            let parts = null;
+            if (Array.isArray(e.parts) && e.parts.length) {
+                if (e.parts.length > 20) return reply(corsHeaders, 400, { error: 'Up to 20 criteria.' });
+                parts = [];
+                for (const x of e.parts) {
+                    const pm = Number(x.max), ps = x.score === '' || x.score == null ? 0 : Number(x.score);
+                    if (!Number.isFinite(pm) || pm <= 0 || pm > MAX_SCORE_ENTRY || !Number.isFinite(ps) || ps < 0 || ps > pm) return reply(corsHeaders, 400, { error: 'A criterion score is outside its points.' });
+                    parts.push({ name: clean(x.name, 60), max: pm, score: ps });
+                }
+                const sum = parts.reduce((a, x) => a + x.score, 0);
+                if (score !== null && Math.abs(sum - score) > 0.01) return reply(corsHeaders, 400, { error: 'The grade does not match the criteria total.' });
+            }
+            rows.push({ id: String(e.studentId), score, notes: clean(e.notes, 2000), criteria: parts ? JSON.stringify(parts) : null });
         }
 
         const setId = clean(b.setId, 80) || null;
@@ -62,11 +76,11 @@ export async function handlePracticals(request, env, path, url, corsHeaders) {
         const st = [];
         for (const r of rows) {
             st.push(env.DB.prepare(
-                `INSERT INTO Practical_Grades (Grade_ID, Course_ID, Activity, Student_ID, Score, Max_Score, Notes, Set_ID, Group_Name, Timer_Seconds, Elapsed_Seconds, Assessment_ID, Updated_At)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                 ON CONFLICT (Course_ID, Activity, Student_ID) DO UPDATE SET Score = excluded.Score, Max_Score = excluded.Max_Score, Notes = excluded.Notes, Set_ID = excluded.Set_ID,
+                `INSERT INTO Practical_Grades (Grade_ID, Course_ID, Activity, Student_ID, Score, Max_Score, Notes, Criteria, Set_ID, Group_Name, Timer_Seconds, Elapsed_Seconds, Assessment_ID, Updated_At)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                 ON CONFLICT (Course_ID, Activity, Student_ID) DO UPDATE SET Score = excluded.Score, Max_Score = excluded.Max_Score, Notes = excluded.Notes, Criteria = excluded.Criteria, Set_ID = excluded.Set_ID,
                    Group_Name = excluded.Group_Name, Timer_Seconds = excluded.Timer_Seconds, Elapsed_Seconds = excluded.Elapsed_Seconds, Assessment_ID = excluded.Assessment_ID, Updated_At = CURRENT_TIMESTAMP`
-            ).bind(crypto.randomUUID(), courseId, activity, r.id, r.score, max, r.notes, setId, groupName, timer, elapsed, assessmentId));
+            ).bind(crypto.randomUUID(), courseId, activity, r.id, r.score, max, r.notes, r.criteria, setId, groupName, timer, elapsed, assessmentId));
             // Copy to the chosen assessment: only these students change, like Record Scores with "partial".
             if (assessmentId && r.score !== null) {
                 st.push(env.DB.prepare('DELETE FROM Assessment_Scores WHERE Assessment_ID = ? AND Student_ID = ?').bind(assessmentId, r.id));

@@ -1053,8 +1053,15 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('a lecturer saves practical grades for a group', save.s === 200 && save.j.saved === 2 && save.j.copied === 0, JSON.stringify(save));
   const list = await call('GET', '/api/practical-grades?courseId=C1&activity=Practical%201', { token: L1 });
   ok('the saved grades and notes come back', list.s === 200 && list.j.grades.length === 2 && list.j.grades.some(g => g.Student_ID === 'S1' && g.Score === 18 && g.Notes === 'Clean wiring' && g.Elapsed_Seconds === 540), JSON.stringify(list.j));
+  const parts = [{ name: 'Content', max: 10, score: 8 }, { name: 'Delivery', max: 10, score: 7 }];
+  const cr = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ activity: 'Practical 2', maxScore: 20, entries: [{ studentId: 'S1', score: 15, notes: '', parts }] }) });
+  const crl = await call('GET', '/api/practical-grades?courseId=C1&activity=Practical%202', { token: L1 });
+  ok('criteria and points are saved and come back for review', cr.s === 200 && crl.j.grades[0].Criteria.length === 2 && crl.j.grades[0].Criteria[0].score === 8, JSON.stringify(crl.j));
+  const crBad = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ activity: 'Practical 2', entries: [{ studentId: 'S1', score: 99, parts }] }) });
+  const crOver = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ activity: 'Practical 2', entries: [{ studentId: 'S1', score: 21, parts: [{ name: 'X', max: 10, score: 21 }] }] }) });
+  ok('a total that does not match, or a criterion over its points, is refused', crBad.s === 400 && crOver.s === 400, crBad.s + ' ' + crOver.s);
   const again = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ entries: [{ studentId: 'S1', score: 19, notes: 'Re-checked' }] }) });
-  const n1 = sql.prepare("select count(*) n, max(Score) s from Practical_Grades where Course_ID='C1' and Student_ID='S1'").get();
+  const n1 = sql.prepare("select count(*) n, max(Score) s from Practical_Grades where Course_ID='C1' and Student_ID='S1' and Activity='Practical 1'").get();
   ok('saving again replaces the grade (one per student per activity)', again.s === 200 && n1.n === 1 && n1.s === 19, JSON.stringify(n1));
   const cp = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ assessmentId: 'A1', entries: [{ studentId: 'S2', score: 17, notes: '' }] }) });
   const sc = sql.prepare("select Score from Assessment_Scores where Assessment_ID='A1' and Student_ID='S2'").get();

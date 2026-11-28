@@ -25,6 +25,7 @@ import { CourseAttendance } from './course-attendance.js';
 import { AttendanceOutbox } from './attendance-outbox.js';
 import { PracticalGrade } from './course-practical.js';
 import { GroupCaller } from './course-group-caller.js';
+import { PracticalReview } from './practical-review.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { CourseGroups } from './course-groups.js';
 import { CourseSeats } from './course-seats.js';
@@ -45,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     AttendanceOutbox.init();
     PracticalGrade.init();
     GroupCaller.init();
+    PracticalReview.init();
     CourseSummary.init();
     CourseScores.init();
     CourseExam.init();

@@ -785,3 +785,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Storage: no Worker change. The breakdown is written into the existing notes ("Content 8/10; Delivery 7/10"), lecturer-only as before.
 - Tests: `tools/tests/phone-check.cjs` (no notes in a group call, add criterion, total 20/25, saved payload).
 - Deploy: site files only (sw `portal-shell-v151`).
+
+## Saved practical grades (criteria and points, reviewable)
+- What: Grade with timer now saves each criterion with its points (`Practical_Grades.Criteria`, JSON `[{name,max,score}]`, column added lazily by `ensurePracticals`). A "Saved grades" button (Student Caller header and Group caller) opens `js/practical-review.js`: pick an activity and see each group or student with total / highest, every criterion with a bar, time used, date, notes and "copied to Record Scores". Members of a group saved together share one card. It refreshes after a save.
+- Rules: Worker refuses a criterion score outside 0..points, more than 20 criteria, or a grade that does not match the criteria total. Lecturer-only (not in RULES); data never reaches students. Saving the same activity again replaces the grade, so a grade can be corrected from the grading screen.
+- Tests: worker.test.mjs "Practical grades" (criteria saved and returned, mismatch/over-limit refused); phone-check.cjs (review card shows criteria).
+- Deploy: Worker (new column and route fields) + site files (sw `portal-shell-v152`).

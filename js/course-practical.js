@@ -252,15 +252,15 @@ export const PracticalGrade = {
             if (bad) return { error: `${bad.c.name}: enter 0 to ${bad.c.max}.` };
             const total = Math.round(parts.reduce((a, x) => a + (Number(x.v) || 0), 0) * 100) / 100;
             const line = parts.map(x => `${x.c.name} ${Number(x.v) || 0}/${x.c.max}`).join('; ');
-            return { score: total, notes: [line, note(id)].filter(Boolean).join('\n') };
+            return { score: total, notes: [line, note(id)].filter(Boolean).join('\n'), parts: parts.map(x => ({ name: x.c.name.trim(), max: Number(x.c.max), score: Number(x.v) || 0 })) };
         };
         const g = s.mode === 'each' ? null : grade('*');
         const per = s.mode === 'each' ? s.targets.map(t => grade(t.User_ID)) : null;
         const bad = (g && g.error) || (per && (per.find(x => x.error) || {}).error);
         if (bad) { fail(bad); return; }
         const entries = s.mode === 'each'
-            ? s.targets.map((t, i) => ({ studentId: t.User_ID, score: per[i].score, notes: per[i].notes }))
-            : s.targets.map(t => ({ studentId: t.User_ID, score: g.score, notes: g.notes }));
+            ? s.targets.map((t, i) => ({ studentId: t.User_ID, score: per[i].score, notes: per[i].notes, parts: per[i].parts }))
+            : s.targets.map(t => ({ studentId: t.User_ID, score: g.score, notes: g.notes, parts: g.parts }));
         if (!entries.some(e => e.score !== '' && e.score != null)) { fail('Enter a grade first.'); return; }
         const max = $('pgMax').value, assessmentId = $('pgAssessment').value;
         const btn = $('pgSave'); btn.disabled = true;

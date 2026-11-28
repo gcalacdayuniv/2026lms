@@ -20,6 +20,7 @@ const api = (url) => { const p = new URL(url).pathname;
     if (p === '/api/course-details') return { success: true, course: courses[0], students, enrolledCount: 8 };
     if (p === '/api/assessments') return { success: true, assessments: [{ Assessment_ID: 'A0', Course_ID: 'C1', Term: 'MidTerm', Category: 'Written', Title: 'Quiz 1', Max_Score: 20, Date: '2026-10-01' }] };
     if (p === '/api/exams') return { success: true, exams: [{ Exam_ID: 'E1', Title: 'Exam 1', Course: 'C1', questionCount: 10 }] };
+    if (p === '/api/practical-grades') return { success: true, grades: [0, 1].map(i => ({ Activity: 'Practical 1', Student_ID: 'S' + i, Name: 'Student Number ' + i, Score: 20, Max_Score: 25, Notes: 'Content 8/10', Criteria: [{ name: 'Content', max: 10, score: 8 }, { name: 'Teamwork', max: 5, score: 5 }], Group_Name: 'Group 1', Timer_Seconds: 600, Elapsed_Seconds: 540, Updated_At: '2026-11-28 10:00:00' })) };
     if (p === '/api/group-sets') return { success: true, sets: [{ Set_ID: 'reporting', Name: 'Reporting' }] };
     if (p === '/api/group-set') return { success: true, groups: [1, 2, 3].map(g => ({ name: 'Group ' + g, topic: 'Topic ' + g, members: [0, 1].map(k => ({ User_ID: 'S' + (g * 2 - 2 + k), Name: 'Student Number ' + (g * 2 - 2 + k), Student_Number: '', Seat_Number: '' })) })), unassigned: [] };
     return { success: true }; };
@@ -101,6 +102,10 @@ const UTILITY = /^((sm|md|lg|xl|hover|focus|dark|disabled|group-hover|active):)*
     const pgErr = await page.evaluate(() => document.getElementById('pgError')?.textContent); if (pgErr) errors.push('pgError: ' + pgErr);
     let body = null; try { body = JSON.parse(posted); } catch (e) { /* not sent */ }
     if (!body || body.entries.length !== 2 || body.entries[0].score !== 20 || body.maxScore !== '25' || !/Content 8\/10; Delivery 7\/10; Teamwork 5\/5/.test(body.entries[0].notes)) errors.push('criteria save payload wrong: ' + posted);
+    // Review: the saved criteria and points can be opened again.
+    await page.evaluate(() => document.getElementById('gcReview')?.click()); await page.waitForTimeout(700); await look('practical review');
+    const rev = await page.evaluate(() => { const t = document.getElementById('prvList')?.textContent || ''; return { has: t.includes('Content') && t.includes('8 / 10') && t.includes('Teamwork') && t.includes('Group 1'), one: document.querySelectorAll('#prvList article').length }; });
+    if (!rev.has || rev.one !== 1) errors.push('review did not show the saved criteria in one group card: ' + JSON.stringify(rev));
     const violations = await page.evaluate(() => window.__csp);
     const missing = await page.evaluate((classes) => { const css = [...document.styleSheets].map(ss => { try { return [...ss.cssRules].map(r => r.cssText).join('\n'); } catch (e) { return ''; } }).join('\n'); return classes.filter(c => !css.includes('.' + CSS.escape(c))); }, [...seen]);
     const NO_RULE_EVER = ['scale-up', 'sm:scale-up'];   // used in index.html but never had a style (not even with the old CDN)

@@ -52,6 +52,7 @@ export const GroupCaller = {
 
                 <div class="flex flex-wrap gap-2 mt-3">
                     <button type="button" id="gcCall" class="flex-1 min-w-[10rem] min-h-[52px] rounded-lg bg-purple-600 text-white font-black text-lg hover:bg-purple-700 disabled:opacity-50"><i class="fa-solid fa-shuffle mr-2" aria-hidden="true"></i>Call a group</button>
+                    <button type="button" id="gcReview" class="min-h-[52px] px-4 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold hover:bg-emerald-50"><i class="fa-solid fa-list-check mr-2" aria-hidden="true"></i>Saved grades</button>
                     <button type="button" id="gcGrade" disabled class="flex-1 min-w-[10rem] min-h-[52px] rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-40"><i class="fa-solid fa-clipboard-check mr-2" aria-hidden="true"></i>Grade with timer</button>
                 </div>
 
