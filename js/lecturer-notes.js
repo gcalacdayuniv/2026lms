@@ -123,16 +123,17 @@ export const LecturerNotes = {
         }
     },
 
-    remove: async (id) => {
-        const ok = await UI.confirm({ title: 'Delete this note?', message: 'This cannot be undone.', confirmText: 'Delete', danger: true });
-        if (!ok) return;
-        try {
-            await apiFetch('/api/lecturer-notes', { method: 'DELETE', body: JSON.stringify({ courseId: LecturerNotes.courseId, noteId: id }) });
-            UI.success('Note deleted.');
-            await LecturerNotes.open(LecturerNotes.courseId, LecturerNotes.studentId);
-        } catch (err) {
-            UI.error(err.message || 'Failed to delete the note.');
-        }
+    remove: (id) => {
+        const at = LecturerNotes.notes.findIndex(n => n.Note_ID === id);
+        if (at < 0) return;
+        const [note] = LecturerNotes.notes.splice(at, 1);
+        if (LecturerNotes.editingId === id) LecturerNotes.editingId = null;
+        LecturerNotes.paint();
+        const courseId = LecturerNotes.courseId;
+        UI.deferred('Note deleted.', {
+            restore: () => { LecturerNotes.notes.splice(Math.min(at, LecturerNotes.notes.length), 0, note); LecturerNotes.paint(); },
+            commit: () => apiFetch('/api/lecturer-notes', { method: 'DELETE', body: JSON.stringify({ courseId, noteId: id }) })
+        });
     },
 
     onClick: (e) => {

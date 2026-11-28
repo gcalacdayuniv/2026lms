@@ -1522,22 +1522,20 @@ export const CourseExam = {
     },
 
     deleteExamQuestion: async (idx) => {
-        const ok = await UI.confirm({ title: 'Delete question', message: `Delete Question #${idx + 1} from this exam?`, confirmText: 'Delete', danger: true });
-        if (!ok) return;
-        CourseExam.activeBonusData.splice(idx, 1);
-
-        try {
-            await apiFetch('/api/exams/update', {
-                method: 'POST',
-                body: JSON.stringify({
-                    examId: CourseExam.activeBonusExamId,
-                    examData: CourseExam.activeBonusData
-                })
-            });
-            CourseExam.renderBonusQuestionsList();
-        } catch (err) {
-            UI.error('Failed to delete question: ' + err.message);
-        }
+        const data = CourseExam.activeBonusData, examId = CourseExam.activeBonusExamId;
+        if (idx < 0 || idx >= data.length) return;
+        // The whole question list is saved at the end of the Undo window (and again if Undo puts one back), so server and screen stay equal.
+        const save = () => apiFetch('/api/exams/update', { method: 'POST', body: JSON.stringify({ examId, examData: data }) });
+        const [removed] = data.splice(idx, 1);
+        CourseExam.renderBonusQuestionsList();
+        UI.deferred(`Question #${idx + 1} deleted.`, {
+            restore: () => {
+                data.splice(Math.min(idx, data.length), 0, removed);
+                if (CourseExam.activeBonusData === data) CourseExam.renderBonusQuestionsList();
+                save().catch(err => UI.error('Could not save the restored question: ' + err.message));
+            },
+            commit: save
+        });
     },
 
     exportExamCsv: (examId) => {

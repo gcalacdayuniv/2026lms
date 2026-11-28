@@ -62,6 +62,7 @@ const overlay = ({ id, label = 'Dialog', html = '', z = 150, panelClass = 'bg-wh
     return api;
 };
 
+const deferredJobs = new Set();   // deletes waiting out their Undo window (UI.deferred)
 export const UI = {
     host: null,
 
@@ -117,6 +118,26 @@ export const UI = {
 
     // A toast with an Undo button (stays 7 s).
     undo: (message, onUndo, duration = 7000) => UI.toast(message, 'success', duration, { label: 'Undo', onClick: onUndo }),
+
+    // Delete with a chance to change your mind. The caller has ALREADY hidden the thing on screen; nothing is sent to the server
+    // until the Undo window (ms) ends. Undo -> restore() puts it back on screen and nothing is sent. Window over -> commit() runs
+    // (it may be async; if it throws, the error is shown and restore() is called). Leaving the page or calling
+    // UI.flushDeferred() commits at once, so a delete is never lost and never silently dropped.
+    deferred: (message, { commit, restore, ms = 7000 }) => {
+        const job = { done: false, t: null };
+        const finish = () => { job.done = true; clearTimeout(job.t); deferredJobs.delete(job); };
+        job.run = async () => {
+            if (job.done) return;
+            finish();
+            try { await commit(); }
+            catch (err) { UI.error((err && err.message) || 'Could not finish the delete.'); try { restore && restore(); } catch (e) { /* screen is gone */ } }
+        };
+        deferredJobs.add(job);
+        job.t = setTimeout(job.run, ms);
+        UI.toast(message, 'success', ms, { label: 'Undo', onClick: () => { if (job.done) return; finish(); try { restore && restore(); } catch (e) { /* screen is gone */ } } });
+        return job;
+    },
+    flushDeferred: () => Promise.all([...deferredJobs].map(j => j.run())),
 
     success: (message, duration) => UI.toast(message, 'success', duration),
     error: (message, duration = 5000) => UI.toast(message, 'error', duration),
@@ -245,3 +266,7 @@ export const UI = {
         (danger ? cancelBtn : okBtn).focus();
     })
 };
+
+// Leaving the page or switching away commits the waiting deletes at once.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') UI.flushDeferred(); });
+window.addEventListener('pagehide', () => { UI.flushDeferred(); });

@@ -695,9 +695,12 @@ export const ExamBuilder = {
             const act = actBtn.dataset.act;
             if (act === 'del') {
                 const hasContent = q.text.trim() || q.answer.trim() || q.options.some(o => o.trim()) || q.items.some(o => o.trim()) || q.pairs.some(p => p.l.trim() || p.r.trim());
-                if (hasContent && !(await UI.confirm({ title: 'Delete question', message: `Delete question ${i + 1}?`, confirmText: 'Delete', danger: true }))) return;
                 ExamBuilder.finishRender();
                 s.questions.splice(i, 1);
+                if (hasContent) UI.undo(`Question ${i + 1} deleted.`, () => {
+                    s.questions.splice(Math.min(i, s.questions.length), 0, q);
+                    ExamBuilder.touch(); ExamBuilder.renderBody();
+                });
                 ExamBuilder.touch();
                 const card = s.view === 'form' ? ExamBuilder.root.querySelector(`#ebCards .eb-card[data-qid="${q.id}"]`) : null;
                 if (card && s.questions.length) { card.remove(); ExamBuilder.numberCards(); ExamBuilder.updateCount(); }

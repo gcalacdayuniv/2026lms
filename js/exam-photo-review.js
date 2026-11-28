@@ -156,33 +156,31 @@ export const ExamPhotoReview = {
         const del = dlg.querySelector('#epDeleteBtn'); if (del) del.disabled = n === 0;
     },
 
-    deleteSelected: async () => {
+    // Draws the gallery again from ctx.all (after a delete or an Undo).
+    redraw: () => {
+        const ctx = ExamPhotoReview.ctx, body = $('epBody');
+        if (!ctx || !body) return;
+        if (ctx.all.length) ExamPhotoReview.render(body, ctx.all, ctx.byStudent, null);
+        else { ExamPhotoReview.photos = []; body.innerHTML = '<p class="text-sm text-gray-500">No photos left here.</p>'; ExamPhotoReview.paintSelection(); }
+    },
+
+    // The pictures leave the screen at once; Drive and the list are only touched when the Undo window ends (or the gallery closes).
+    deleteSelected: () => {
         const ids = [...ExamPhotoReview.selected];
-        if (!ids.length || !AppState.user || !AppState.user.isAdmin) return;
-        const ok = await UI.confirm({ title: `Delete ${ids.length} photo${ids.length === 1 ? '' : 's'}?`, message: 'They are removed from Google Drive and from the list. This cannot be undone.', confirmText: 'Delete', danger: true });
-        if (!ok) return;
-        const del = $('epDeleteBtn'); if (del) del.disabled = true;
-        try {
-            let deleted = 0;
-            for (let i = 0; i < ids.length; i += 200) {
-                const res = await apiPost('/api/admin-delete-exam-photos', { photoIds: ids.slice(i, i + 200) });
-                deleted += res.deleted || 0;
+        const ctx = ExamPhotoReview.ctx;
+        if (!ids.length || !ctx || !AppState.user || !AppState.user.isAdmin) return;
+        const before = ctx.all, gone = new Set(ids);
+        ctx.all = before.filter(p => !gone.has(p.Photo_ID));
+        ExamPhotoReview.selected = new Set(); ExamPhotoReview.selecting = false; ExamPhotoReview.changed = true;
+        ExamPhotoReview.redraw();
+        UI.deferred(`${ids.length} photo${ids.length === 1 ? '' : 's'} deleted.`, {
+            ms: 8000,
+            restore: () => { if (ExamPhotoReview.ctx === ctx) { ctx.all = before; ExamPhotoReview.redraw(); } },
+            commit: async () => {
+                for (let i = 0; i < ids.length; i += 200) await apiPost('/api/admin-delete-exam-photos', { photoIds: ids.slice(i, i + 200) });
+                ids.forEach(id => ExamPhotoReview.cache.delete(id));
             }
-            const gone = new Set(ids);
-            ids.forEach(id => ExamPhotoReview.cache.delete(id));
-            const ctx = ExamPhotoReview.ctx;
-            ctx.all = ctx.all.filter(p => !gone.has(p.Photo_ID));
-            ExamPhotoReview.selected = new Set(); ExamPhotoReview.selecting = false; ExamPhotoReview.changed = true;
-            const body = $('epBody');
-            if (body) {
-                if (ctx.all.length) ExamPhotoReview.render(body, ctx.all, ctx.byStudent, null);
-                else { ExamPhotoReview.photos = []; body.innerHTML = '<p class="text-sm text-gray-500">No photos left here.</p>'; ExamPhotoReview.paintSelection(); }
-            }
-            UI.success(`Deleted ${deleted} photo${deleted === 1 ? '' : 's'}`);
-        } catch (err) {
-            UI.error(err.message || 'Could not delete the photos.');
-            ExamPhotoReview.paintSelection();
-        }
+        });
     },
 
     toggle: (head, force) => {
@@ -383,7 +381,7 @@ export const ExamPhotoReview = {
         ExamPhotoReview.closeLightbox();
         const had = !!$('examPhotosDlg');
         $('examPhotosDlg')?.remove(); ExamPhotoReview.queue = [];
-        if (had && ExamPhotoReview.changed) { ExamPhotoReview.changed = false; adminDlg.refresh(); }   // the counts behind it are stale
+        if (had && ExamPhotoReview.changed) { ExamPhotoReview.changed = false; UI.flushDeferred().then(() => adminDlg.refresh()); }   // the counts behind it are stale
     }
 };
 
