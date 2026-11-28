@@ -4,6 +4,7 @@ import { handleAttendance } from './attendance.js';
 import { handleClassModes } from './class-modes.js';
 import { handleCoursePlan } from './course-plan.js';
 import { handleScores } from './scores.js';
+import { handlePracticals } from './practicals.js';
 import { handleGroups } from './groups.js';
 import { handleSeats } from './seats.js';
 import { handleExams } from './exams.js';
@@ -116,6 +117,9 @@ export default {
 
             const scoresResponse = await handleScores(request, env, path, url, corsHeaders);
             if (scoresResponse) return scoresResponse;
+
+            const practicalsResponse = await handlePracticals(request, env, path, url, corsHeaders);
+            if (practicalsResponse) return practicalsResponse;
 
             return new Response(JSON.stringify({ error: "Not Found" }), { status: 404, headers: corsHeaders });
 

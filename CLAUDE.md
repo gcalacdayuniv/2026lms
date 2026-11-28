@@ -36,6 +36,7 @@ Cloudflare LMS: vanilla JS front end (`js/`, ES modules, Tailwind built to `tail
 | class-modes.js | online/onsite class days + proof picture (Drive), `Class_Modes` |
 | course-plan.js | syllabus file (Drive) + learning plan topics + date→topic links (`Course_Syllabus`, `Plan_Topics`, `Plan_Day_Links`) |
 | scores.js | assessments, scores (capped at max, extra credit), `/api/student-summary`, `/api/class-summary` |
+| practicals.js | practical / major-term activity grades with notes + timer (`Practical_Grades`), optional copy to an assessment; lecturer-only |
 | uploads.js | submissions: upload (single + chunked), grade, `update-submission`, `default-upload-term`, uploader checks |
 | exams.js, exam-session.js, exam-photos.js, exam-scan-results.js, exam-sets.js (Worker copy of js/exam-sets.js; keep in sync) | exams, class exams, attempts, secure mode, photos, scan results merged into exam results |
 | scan-sheets.js, scan-grade.js, grading.js | scanned answer sheets, sessions, grading, student sheet review |

@@ -754,3 +754,11 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Fix:** `restartCamera` now pauses the away timer while it asks for the camera, capped at 30 s (`CAMERA_PROMPT_MAX_MS`) so a prompt left open cannot hide a student who walks away. Denying the camera or a failed restart still submits with `camera-off`, as before.
 - **Tests:** browser check with a fake camera that returns after 7 s and blur/focus events: before the fix `LEFT:focus-lost`, after it nothing. Really leaving for 6.5 s still submits.
 - **Deploy:** site files (sw `portal-shell-v148`). No Worker change.
+
+## Practical grading (Student Caller > Grade) - Worker part
+
+- **What:** `worker/practicals.js`, table `Practical_Grades` (`ensurePracticals`, one row per student per activity: Score, Max_Score, Notes, Set_ID, Group_Name, Timer_Seconds, Elapsed_Seconds, Assessment_ID).
+- **Routes (lecturer-only, not in `RULES`, so `courseId` / `assessmentId` must be the lecturer's):** `GET /api/practical-grades?courseId=&activity=`; `POST /api/practical-grade-save { courseId, activity, maxScore, timerSeconds, elapsedSeconds, setId, groupName, assessmentId, entries: [{ studentId, score, notes }] }`. Saving again for the same student and activity replaces it. With `assessmentId` the score is also copied into `Assessment_Scores` for only those students (same as Record Scores "partial").
+- **Rules:** students must be enrolled; the assessment and the group set must belong to the class; scores 0 to 100000; notes (2000 chars) are lecturer-only and never sent to students.
+- **Tests:** 10 blocks in `worker.test.mjs` ("Practical grades").
+- **Deploy:** Worker. No site change yet (the screen and the group caller follow).

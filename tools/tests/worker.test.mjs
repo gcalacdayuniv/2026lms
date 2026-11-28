@@ -1046,5 +1046,33 @@ ok(`all ${routes.size} routes in the source are reachable`, routes.size > 55 && 
   ok('the student caller pool leaves out UD and Dropped students', pool.length === 1 && pool[0] === 'UAact', JSON.stringify(pool));
 }
 
+// ---- Practical grades (Student Caller > Grade)
+{
+  const body = (o) => ({ courseId: 'C1', activity: 'Practical 1', ...o });
+  const save = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ maxScore: 20, timerSeconds: 600, elapsedSeconds: 540, groupName: 'Group A', entries: [{ studentId: 'S1', score: 18, notes: 'Clean wiring' }, { studentId: 'S2', score: 15, notes: 'Late start' }] }) });
+  ok('a lecturer saves practical grades for a group', save.s === 200 && save.j.saved === 2 && save.j.copied === 0, JSON.stringify(save));
+  const list = await call('GET', '/api/practical-grades?courseId=C1&activity=Practical%201', { token: L1 });
+  ok('the saved grades and notes come back', list.s === 200 && list.j.grades.length === 2 && list.j.grades.some(g => g.Student_ID === 'S1' && g.Score === 18 && g.Notes === 'Clean wiring' && g.Elapsed_Seconds === 540), JSON.stringify(list.j));
+  const again = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ entries: [{ studentId: 'S1', score: 19, notes: 'Re-checked' }] }) });
+  const n1 = sql.prepare("select count(*) n, max(Score) s from Practical_Grades where Course_ID='C1' and Student_ID='S1'").get();
+  ok('saving again replaces the grade (one per student per activity)', again.s === 200 && n1.n === 1 && n1.s === 19, JSON.stringify(n1));
+  const cp = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ assessmentId: 'A1', entries: [{ studentId: 'S2', score: 17, notes: '' }] }) });
+  const sc = sql.prepare("select Score from Assessment_Scores where Assessment_ID='A1' and Student_ID='S2'").get();
+  const keep = sql.prepare("select Score from Assessment_Scores where Assessment_ID='A1' and Student_ID='S1'").get();
+  ok('a grade can also be copied to an assessment (only that student changes)', cp.s === 200 && cp.j.copied === 1 && sc && sc.Score === 17 && keep && keep.Score === 8, JSON.stringify({ cp, sc, keep }));
+  const other = await call('POST', '/api/practical-grade-save', { token: l2.j.token, body: body({ entries: [{ studentId: 'S1', score: 1 }] }) });
+  ok('another lecturer cannot grade in this class', other.s === 403, String(other.s));
+  const readOther = await call('GET', '/api/practical-grades?courseId=C1', { token: l2.j.token });
+  ok('another lecturer cannot read the grades or notes', readOther.s === 403, String(readOther.s));
+  const badAs = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ assessmentId: 'A-OTHER', entries: [{ studentId: 'S1', score: 1 }] }) });
+  ok('an unknown assessment is refused', badAs.s >= 400, String(badAs.s));
+  const notIn = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ entries: [{ studentId: 'NOPE', score: 1 }] }) });
+  ok('a student who is not in the class is refused', notIn.s === 400, String(notIn.s));
+  const neg = await call('POST', '/api/practical-grade-save', { token: L1, body: body({ entries: [{ studentId: 'S1', score: -2 }] }) });
+  ok('a negative score is refused', neg.s === 400, String(neg.s));
+  const stu = await call('GET', '/api/practical-grades?courseId=C1', { token: await signToken(env, 'S1') });
+  ok('a student cannot read practical grades', stu.s === 403, String(stu.s));
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

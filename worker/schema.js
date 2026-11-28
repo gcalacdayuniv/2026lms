@@ -308,6 +308,14 @@ export const ensureGroupTables = once(async (env) => {
     ]);
 });
 
+// Practical / major-term activity grades (one row per student per activity). Lecturer-only, notes included.
+export const ensurePracticals = once(async (env) => {
+    await env.DB.batch([
+        env.DB.prepare("CREATE TABLE IF NOT EXISTS Practical_Grades (Grade_ID TEXT PRIMARY KEY, Course_ID TEXT NOT NULL, Activity TEXT NOT NULL, Student_ID TEXT NOT NULL, Score REAL, Max_Score REAL, Notes TEXT, Set_ID TEXT, Group_Name TEXT, Timer_Seconds INTEGER, Elapsed_Seconds INTEGER, Assessment_ID TEXT, Updated_At DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE (Course_ID, Activity, Student_ID))"),
+        env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_practical_course ON Practical_Grades (Course_ID)")
+    ]);
+});
+
 // A locked seat is skipped by auto-assignment (Seat Plan).
 export const ensureSeatLock = once(async (env) => {
     try { await env.DB.prepare("ALTER TABLE Enrollments ADD COLUMN Seat_Locked INTEGER DEFAULT 0").run(); } catch (e) { /* already there */ }
