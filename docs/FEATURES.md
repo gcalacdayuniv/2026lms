@@ -712,3 +712,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rules:** the release after a drag is not counted as a tap (`swallowClickUntil`); photo buttons block the iOS image menu and text selection.
 - **Tests:** browser check with 25 mock photos: 10 load, +5 on Load more; a touch drag over 5 pictures selects 5, the click after it is ignored, a later tap adds one. run-tests and phone-check pass.
 - **Deploy:** site files (sw `portal-shell-v142`).
+
+## Exam photos: Select shown (not everything)
+
+- **What:** the bar button is now "Select shown" / "Clear shown". It ticks only the pictures on screen: inside an open group and already loaded. Closed groups and pictures not yet loaded ("Load more") are never ticked or cleared. "Select all of <student>" on a group still selects that student's pictures (the Admin chose that group on purpose).
+- **Why:** an Admin must see what is being deleted.
+- **Tested:** 2 students (20 + 5 photos), one group open with 10 loaded: Select shown = 10, Clear shown = 0.
+- **Deploy:** site files (sw `portal-shell-v143`).

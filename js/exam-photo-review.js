@@ -62,7 +62,7 @@ export const ExamPhotoReview = {
                 <div id="epBody" class="flex-1 min-h-0 overflow-y-auto"><p class="text-sm text-gray-500">Loading...</p></div>
                 <div id="epSelBar" class="hidden shrink-0 border-t border-gray-200 pt-3 mt-3 flex items-center gap-2" style="padding-bottom:max(0rem, env(safe-area-inset-bottom))">
                     <span id="epSelCount" class="flex-1 text-sm font-bold text-gray-800" role="status">0 selected</span>
-                    <button type="button" data-ep-select-all class="min-h-[44px] px-3 rounded-md border border-gray-300 text-sm font-bold text-gray-700">Select all</button>
+                    <button type="button" data-ep-select-all class="min-h-[44px] px-3 rounded-md border border-gray-300 text-sm font-bold text-gray-700">Select shown</button>
                     <button type="button" id="epDeleteBtn" data-ep-delete disabled class="min-h-[44px] px-4 rounded-md bg-red-600 text-white text-sm font-bold disabled:opacity-40"><i class="fa-solid fa-trash mr-1" aria-hidden="true"></i>Delete</button>
                 </div>
             </div>`;
@@ -150,9 +150,9 @@ export const ExamPhotoReview = {
             tick.classList.toggle('bg-red-600', sel); tick.classList.toggle('bg-black/40', !sel);
             tick.querySelector('i').classList.toggle('invisible', !sel);
         });
-        const all = ExamPhotoReview.ctx ? ExamPhotoReview.ctx.all.length : 0;
         const c = dlg.querySelector('#epSelCount'); if (c) c.textContent = `${n} selected`;
-        const sa = dlg.querySelector('[data-ep-select-all]'); if (sa) sa.textContent = n && n === all ? 'Clear' : 'Select all';
+        const shown = ExamPhotoReview.shownIds();
+        const sa = dlg.querySelector('[data-ep-select-all]'); if (sa) sa.textContent = shown.length && shown.every(id => ExamPhotoReview.selected.has(id)) ? 'Clear shown' : 'Select shown';
         const del = dlg.querySelector('#epDeleteBtn'); if (del) del.disabled = n === 0;
     },
 
@@ -194,6 +194,9 @@ export const ExamPhotoReview = {
         if (open) ExamPhotoReview.fill();
         else ExamPhotoReview.updateMore();
     },
+
+    // Photo_IDs of the pictures on screen: inside an open group and loaded.
+    shownIds: () => [...document.querySelectorAll('#epBody [data-ep-id]')].filter(b => !b.closest('.hidden') && b.querySelector('img')?.getAttribute('src')).map(b => b.dataset.epId),
 
     // ---- paged loading: 10 pictures first, then 5 more each time "Load more" is tapped (only pictures in open groups count)
     moreHtml: () => '<div id="epMore" class="hidden mt-3 text-center"><button type="button" data-ep-more class="min-h-[44px] px-4 text-sm font-bold text-blue-700 hover:underline"></button></div>',
@@ -302,8 +305,10 @@ export const ExamPhotoReview = {
             return;
         }
         if (e.target.closest('[data-ep-select-all]') && ExamPhotoReview.ctx) {
-            const everyone = ExamPhotoReview.ctx.all;
-            ExamPhotoReview.selected = ExamPhotoReview.selected.size === everyone.length ? new Set() : new Set(everyone.map(p => p.Photo_ID));
+            // Only the pictures on screen: in open groups and already loaded. Closed groups and not-yet-loaded pictures are never touched.
+            const ids = ExamPhotoReview.shownIds();
+            const allIn = ids.length > 0 && ids.every(id => ExamPhotoReview.selected.has(id));
+            ids.forEach(id => allIn ? ExamPhotoReview.selected.delete(id) : ExamPhotoReview.selected.add(id));
             ExamPhotoReview.paintSelection();
             return;
         }
