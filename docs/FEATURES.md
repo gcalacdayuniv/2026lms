@@ -738,3 +738,12 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Limit:** last write wins. If another device changed the same student and date meanwhile, the late mark overwrites it. The Worker is unchanged.
 - **Tests:** browser check: offline send queues; two marks for one student coalesce (2 waiting, not 3); overlay shows them; coming back online sends only the newest and hides the pill; a 403 throws and is not queued. run-tests and phone-check pass.
 - **Deploy:** site files (sw `portal-shell-v146`). No Worker or Apps Script change.
+
+## Roster: drag to select (bulk attendance)
+
+- **What:** in the class roster's **Select** mode (`js/course-roster-tools.js`) you can now drag across rows. On a phone: hold a row about 0.3 s (it buzzes), then drag over the others in one continuous touch. With a mouse: press and drag. Starting on an unticked row ticks everything dragged over; starting on a ticked row unticks. Near the top or bottom edge the page scrolls. A quick swipe still scrolls the page. A tap on the empty part of a row now ticks it too (the 20 px checkbox is no longer the only target); buttons, names, avatars and the points box keep their own taps.
+- **Then:** the existing bulk bar applies Present / Late / Absent / Excused (saved once, like Mark All Present) or exam access to the ticked rows. Filtering still limits the drag to shown rows.
+- **Not changed:** student status (UD / Dropped) stays a per-student change in the manage panel; it has server rules per student.
+- **Rules:** the release after a drag is ignored as a tap (`swallowUntil`); the list blocks text selection and the iOS image menu while selecting.
+- **Tests:** browser check: touch drag over 4 rows ticks them, the click after it is ignored, a tap on a row body ticks, a drag that starts on a ticked row unticks, a finger that moves before the hold selects nothing. run-tests and phone-check pass.
+- **Deploy:** site files (sw `portal-shell-v147`).
