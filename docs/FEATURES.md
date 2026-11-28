@@ -663,3 +663,9 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rules:** `/api/register` rejects a blank value (400). Students edit both on the profile Details form (blank not allowed once sent; older accounts fill them on their next save). A lecturer can edit them in Manage Users > Edit student. Login returns both fields.
 - **Tests:** register without middle name or barangay is refused; both are saved.
 - **Deploy:** Worker + site files (sw `portal-shell-v136`). No manual DB step.
+
+## Barangay and middle name in the class roster
+
+- **What:** `/api/students` (class roster) returns `Middle_Name` and `Barangay`. The printable class list has a Barangay column and the middle name under the student name; the student manage panel shows both read-only (edit them in Manage Users > Edit student).
+- **Privacy:** lecturer-only route, unchanged ownership rules.
+- **Deploy:** Worker + site files (sw `portal-shell-v137`).

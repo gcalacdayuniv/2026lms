@@ -325,6 +325,7 @@ export const CourseClass = {
                                 <th>Group Name</th>
                                 <th>Assigned Topic</th>
                                 <th>Contact</th>
+                                <th>Barangay</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -336,12 +337,13 @@ export const CourseClass = {
                                     <td class="photo-cell">${imgTag}</td>
                                     <td class="center"><strong>${escapeHtml(s.Seat_Number || '')}</strong></td>
                                     <td>${escapeHtml(s.Student_Number)}</td>
-                                    <td><strong>${escapeHtml(s.Name)}</strong></td>
+                                    <td><strong>${escapeHtml(s.Name)}</strong>${s.Middle_Name ? `<br><span style="font-size:8pt;color:#555">Middle: ${escapeHtml(s.Middle_Name)}</span>` : ''}</td>
                                     <td>${escapeHtml(`${s.Program_Course || ''} ${s.Program_Year || ''} ${s.Program_Section ? '- ' + s.Program_Section : ''}`.trim())}</td>
                                     <td><a href="mailto:${escapeHtml(s.Email)}" style="color: #000; text-decoration: none;">${escapeHtml(s.Email)}</a></td>
                                     <td>${escapeHtml(s.Group_Name)}</td>
                                     <td>${escapeHtml(s.Assigned_Topic || '')}</td>
                                     <td>${escapeHtml(s.Contact_Number || '')}</td>
+                                    <td>${escapeHtml(s.Barangay || '')}</td>
                                 </tr>
                                 `;
                             }).join('')}

@@ -545,6 +545,7 @@ const ClassUI = {
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
                             <input type="text" id="manageEmailInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">
                         </div>
+                        <p id="manageResidence" class="text-xs text-gray-600"></p>
                         <div>
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Contact Number</label>
                             <input type="text" id="manageContactInput" class="w-full px-2 py-2 text-xs border border-gray-300 rounded focus:ring-blue-500 outline-none bg-gray-50 focus:bg-white transition" placeholder="">

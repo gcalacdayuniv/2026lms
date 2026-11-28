@@ -492,6 +492,8 @@ export const CourseModule = {
             setVal('manageStudentNumberInput', stuData.Student_Number);
             setVal('manageEmailInput', stuData.Email);
             setVal('manageContactInput', stuData.Contact_Number);
+            const resEl = document.getElementById('manageResidence');
+            if (resEl) resEl.textContent = [stuData.Middle_Name && `Middle name: ${stuData.Middle_Name}`, stuData.Barangay && `Barangay: ${stuData.Barangay}`].filter(Boolean).join(' · ');
             const detailsBox = document.getElementById('manageDetailsBox');
             if (detailsBox) detailsBox.open = false;
 

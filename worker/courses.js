@@ -356,7 +356,7 @@ export async function handleCourses(request, env, path, url, corsHeaders) {
         await ensureExamSecurity(env);
         await ensureSeatLock(env);
         const students = await env.DB.prepare(
-            `SELECT u.User_ID, u.Name, u.Avatar, u.Exam_Secure, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.eye_condition, u.account_status, u.Reactivation_Requested, COALESCE(e.Seat_Locked, 0) AS Seat_Locked, e.Seat_Number, e.Group_Name, e.Assigned_Topic
+            `SELECT u.User_ID, u.Name, u.Avatar, u.Exam_Secure, u.Student_Number, u.course, u.year, u.section, u.Program_Course, u.Program_Year, u.Program_Section, u.Email, u.Contact_Number, u.Middle_Name, u.Barangay, u.eye_condition, u.account_status, u.Reactivation_Requested, COALESCE(e.Seat_Locked, 0) AS Seat_Locked, e.Seat_Number, e.Group_Name, e.Assigned_Topic
              FROM Enrollments e
              JOIN Users u ON e.Student_ID = u.User_ID
              WHERE e.Course_ID = ?`
