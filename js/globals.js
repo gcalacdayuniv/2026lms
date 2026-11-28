@@ -116,10 +116,10 @@ export const apiFetch = async (endpoint, options = {}) => {
     } catch (error) {
         console.error(`API Error (${endpoint}):`, error);
         if (error.name === 'AbortError') {
-            throw new Error('The request took too long. Please check your connection and try again.');
+            const slow = new Error('The request took too long. Please check your connection and try again.'); slow.network = true; throw slow;
         }
         if (error instanceof TypeError) {
-            throw new Error(navigator.onLine === false ? 'You are offline. Connect to the internet and try again.' : 'Could not reach the server. Please check your connection and try again.');
+            const down = new Error(navigator.onLine === false ? 'You are offline. Connect to the internet and try again.' : 'Could not reach the server. Please check your connection and try again.'); down.network = true; throw down;
         }
         throw error;
     } finally {

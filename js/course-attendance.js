@@ -7,6 +7,7 @@ import { CourseScores } from './course-scores.js';
 import { UI } from './ui-feedback.js';
 import { termPoints } from './participation.js';
 import { parseLocalDate, getWeekdayName, matchesScheduleDay } from './date-utils.js';
+import { AttendanceOutbox } from './attendance-outbox.js';
 
 // ---- one place that paints a status on a student row (Present / Late / Absent / Excused, or null = nothing selected)
 const STATUS_CLASSES = {
@@ -352,10 +353,8 @@ export const CourseAttendance = {
             if (!row) return;
             const snap = CourseAttendance.snapshotRow(row);
             try {
-                await apiFetch('/api/attendance/single', {
-                    method: 'POST',
-                    body: JSON.stringify({ courseId, studentId, date, status: snap.status, points: snap.points })
-                });
+                const how = await AttendanceOutbox.send({ courseId, studentId, date, status: snap.status, points: snap.points });
+                if (how === 'queued') UI.warning('No signal: saved on this phone, it will sync by itself.', 2500);
                 CourseAttendance.baseline[studentId] = snap;
                 CourseAttendance.baselineReady = true;
                 if (snap.status) {

@@ -22,6 +22,7 @@ import { Theme } from './theme.js';
 import { ProfileEdit } from './profile-edit.js';
 import { CoursePending } from './course-pending.js';
 import { CourseAttendance } from './course-attendance.js';
+import { AttendanceOutbox } from './attendance-outbox.js';
 import { CourseAttendanceDates } from './course-attendance-dates.js';
 import { CourseGroups } from './course-groups.js';
 import { CourseSeats } from './course-seats.js';
@@ -39,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     CourseModule.init();
     // Must come after CourseModule.init(): the row is updated first, then saved.
     CourseAttendance.init();
+    AttendanceOutbox.init();
     CourseSummary.init();
     CourseScores.init();
     CourseExam.init();

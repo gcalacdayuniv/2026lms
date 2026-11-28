@@ -729,3 +729,12 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rule:** use `UI.deferred` for a server delete, `UI.undo` for a change that only lives on the screen; keep `UI.confirm` for actions that touch other people or send emails.
 - **Tests:** browser check of the four paths: window ends (commit), Undo (restore, no commit), flush (commit now), failing commit (error + restore). run-tests and phone-check pass.
 - **Deploy:** site files (sw `portal-shell-v144`).
+
+## Offline attendance (marks wait on the phone, then sync)
+
+- **What:** when the signal drops while taking attendance, the mark stays on screen and is saved on the phone (`localStorage` `att_outbox_v1`, module `js/attendance-outbox.js`). A small amber pill "N marks waiting to sync" shows at the bottom left; tap it to try now. Marks are sent by themselves when the `online` event fires, every 15 s, when the app comes back to the front, and shortly after the app opens (marks left from last time). A toast says "Synced N attendance marks".
+- **Rules:** one waiting mark per student per date (the newest wins, so Present then Late sends only Late). A mark is kept only for a network failure (`err.network`, set by `apiFetch` for no connection and timeouts); a server refusal (not your class, bad data) is shown at once and never retried. Waiting marks belong to the lecturer who made them. After a reload while offline the floor plan lays the waiting marks over the server data (`overlay`).
+- **Covers:** floor plan taps and "Rest" (sent as single marks), and the list view's one-row saves. **Not covered:** the list view's "save the whole day" button, other writes (scores, uploads), and the list view screen after a reload (it shows server data until the sync finishes).
+- **Limit:** last write wins. If another device changed the same student and date meanwhile, the late mark overwrites it. The Worker is unchanged.
+- **Tests:** browser check: offline send queues; two marks for one student coalesce (2 waiting, not 3); overlay shows them; coming back online sends only the newest and hides the pill; a 403 throws and is not queued. run-tests and phone-check pass.
+- **Deploy:** site files (sw `portal-shell-v146`). No Worker or Apps Script change.

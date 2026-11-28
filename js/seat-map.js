@@ -17,6 +17,7 @@ import { CourseRecitation } from './course-recitation.js';
 import { ClassMode } from './class-mode.js';
 import { A11y } from './a11y.js';
 import { PlanDay } from './course-plan.js';
+import { AttendanceOutbox } from './attendance-outbox.js';
 
 const PER_COLUMN = 5;
 const PER_ROW = PER_COLUMN * 2;
@@ -210,11 +211,11 @@ export const SeatMap = {
         const st = SeatMap.state, a = st.att;
         try {
             const r = await apiFetch(`/api/attendance?courseId=${encodeURIComponent(st.courseId)}&date=${encodeURIComponent(a.date)}&_t=${Date.now()}`);
-            a.records = new Map((r.records || []).map(x => [x.Student_ID, { status: x.Status || '', points: Number(x.Performance_Points) || 0 }]));
+            a.records = AttendanceOutbox.overlay(st.courseId, a.date, new Map((r.records || []).map(x => [x.Student_ID, { status: x.Status || '', points: Number(x.Performance_Points) || 0 }])));
             a.noClass = !!r.isNoClass;
             a.loadedDate = a.date;
         } catch (err) {
-            a.records = new Map(); a.noClass = false;
+            a.records = AttendanceOutbox.overlay(st.courseId, a.date, new Map()); a.noClass = false;
             UI.error(err.message || 'Could not load attendance.');
         }
     },
@@ -226,8 +227,9 @@ export const SeatMap = {
         if (status) a.records.set(info.id, { status, points }); else a.records.delete(info.id);
         SeatMap.render();
         try {
-            await post('/api/attendance/single', { courseId: st.courseId, studentId: info.id, date: a.date, status, points });
+            const how = await AttendanceOutbox.send({ courseId: st.courseId, studentId: info.id, date: a.date, status, points });
             a.dirty = true;
+            if (how === 'queued') SeatMap.info();
         } catch (err) {
             if (before) a.records.set(info.id, before); else a.records.delete(info.id);
             SeatMap.render();
@@ -248,7 +250,13 @@ export const SeatMap = {
             await post('/api/attendance', { courseId: st.courseId, date: a.date, records: [...next].map(([studentId, r]) => ({ studentId, status: r.status, points: r.points })) });
             a.records = next; a.dirty = true;
             SeatMap.render();
-        } catch (err) { UI.error(err.message || 'Not saved.'); }
+        } catch (err) {
+            if (!err || !err.network) { UI.error(err.message || 'Not saved.'); return; }
+            // No signal: keep each new mark on this phone; they are sent one by one when the signal is back.
+            people.forEach(i => AttendanceOutbox.queue({ courseId: st.courseId, studentId: i.id, date: a.date, status: 'Present', points: (a.records.get(i.id) || {}).points || 0 }));
+            a.records = next; a.dirty = true;
+            SeatMap.render();
+        }
     },
 
     tools: () => {
