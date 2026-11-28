@@ -50,7 +50,7 @@ export const ExamReview = {
         m.setAttribute('aria-modal', 'true');
         m.setAttribute('aria-label', 'Review your answers');
         m.innerHTML = `<div id="closeExamReviewBg" class="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
-            <div class="relative bg-gray-50 w-full sm:max-w-2xl h-full sm:h-[90vh] sm:rounded-lg shadow-xl flex flex-col">
+            <div class="relative bg-gray-50 w-full h-full sm:max-w-4xl sm:mx-auto shadow-xl flex flex-col">
                 <div class="flex items-center justify-between px-4 py-3 border-b bg-white sm:rounded-t-lg">
                     <div><div class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Review</div><h4 id="examReviewTitle" class="font-black text-gray-800"></h4></div>
                     <button type="button" id="closeExamReviewBtn" aria-label="Close" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i></button>

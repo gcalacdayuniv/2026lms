@@ -684,3 +684,8 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **If it fails:** wrap the value in `escapeHtml(...)`. Only add a name to the allowed list after checking that the helper escapes; a line can carry `// escape-ok: why`.
 - **Limit:** pattern check on known field names, not a full taint analysis; new field names go in `FIELD` at the top of the script.
 - **Deploy:** none (tests only).
+
+## Exam answer review fills the screen on tablet and PC
+
+- **What:** the student's "Review your answers" screen (`js/exam-review.js`) is full height with a centred 56rem column on tablets and computers (was a 90vh centred box). Phones unchanged.
+- **Deploy:** site files (sw `portal-shell-v139`).
