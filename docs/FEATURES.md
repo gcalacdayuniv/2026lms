@@ -677,3 +677,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Rule:** new HTML built from user text must use `escapeHtml`; print pages must not need scripts.
 - **Tested:** browser check: `<img onerror>` and `<script>` in a print page do nothing; text renders. run-tests and phone-check pass.
 - **Deploy:** site files (sw `portal-shell-v138`).
+
+## Escaping check in the test run
+
+- **What:** `tools/tests/escape-check.mjs` (run by `run-tests.sh`) fails when a JS template that contains HTML inserts a user-text field (Name, Email, Barangay, Middle_Name, Student_Number, program fields, Title ...) without `escapeHtml` / `esc` / `safeUrl`. Text set with `textContent`, toasts, and the helpers `row()` / `input()` (they escape inside) are allowed.
+- **If it fails:** wrap the value in `escapeHtml(...)`. Only add a name to the allowed list after checking that the helper escapes; a line can carry `// escape-ok: why`.
+- **Limit:** pattern check on known field names, not a full taint analysis; new field names go in `FIELD` at the top of the script.
+- **Deploy:** none (tests only).

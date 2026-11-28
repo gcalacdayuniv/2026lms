@@ -15,7 +15,7 @@ This section is the standing instruction for every task. Keep it current when a 
 **Code rules**
 - Dialogs: made in JS -> `UI.overlay`; markup in `components-*.js` -> toggle `hidden` (`js/a11y.js` gives them Escape, focus trap, Back button). A custom Escape handler must close only when its dialog is the top one (`A11y.openDialogs()`, `e.defaultPrevented`).
 - The site is static files. Besides `.html/.css/.js`, only `manifest.webmanifest` and `icons/*.png` are allowed (the installable Android app). Replace the PNGs to change the Android icon.
-- Keep existing element IDs. Escape all user text (`escapeHtml` / `safeUrl` in `js/html-utils.js`).
+- Keep existing element IDs. Escape all user text (`escapeHtml` / `safeUrl` in `js/html-utils.js`). `tools/tests/escape-check.mjs` (part of run-tests.sh) fails the run on unescaped user text in HTML templates; print pages run in a sandboxed iframe and must not need scripts.
 - `SESSION_SECRET` is a Worker secret; `ALLOWED_ORIGIN` is in vars.
 - Routes not listed in `auth.js` RULES are lecturer-only, and `courseId` must belong to the signed-in lecturer.
 - New D1 tables and columns are created by the worker (`ensure…` functions); no manual database step.
