@@ -704,3 +704,11 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **What:** while "Checking attendance" is on, the heading's date + topic are replaced by the date picker, the P / L / A / E brush, and "Rest" (mark the rest present); List and Caller become icon-only. The P/L/A/E/none counts sit on the class details line. The extra row is gone, so the seat grid stays exactly where it was (tested: plan top and heading height identical on and off). Turning attendance off brings the date and topic back.
 - **Code:** `SeatMap.header()` draws both states; `SeatMap.tools()` only draws the right-hand buttons and calls `header()`. IDs kept: `smAttDate`, `.sm-brush`, `smAllPresent`, `smCounts`.
 - **Deploy:** site files (sw `portal-shell-v141`).
+
+## Exam photos: load 10 then 5 more, drag to select
+
+- **Load faster:** the gallery fetches only 10 pictures when it opens (counting only the groups that are open); a "Load 5 more (N not loaded)" link fetches the next 5 each time. Pictures already fetched cost nothing when a group is reopened. Applies to the Admin/lecturer gallery and the lecturer's initial-photo view (`ExamPhotoReview.budget`, `fill()`, constants `FIRST_PAGE`, `NEXT_PAGE`).
+- **Drag to select (Admin, Select mode):** hold a picture about 0.3 s (the phone buzzes), then drag across others in one continuous touch. The first picture decides the action: starting on an unticked one ticks everything dragged over, starting on a ticked one unticks. Holding near the top or bottom edge scrolls the list. A quick vertical swipe still scrolls; a quick tap still ticks one. With a mouse, press and drag across pictures at once.
+- **Rules:** the release after a drag is not counted as a tap (`swallowClickUntil`); photo buttons block the iOS image menu and text selection.
+- **Tests:** browser check with 25 mock photos: 10 load, +5 on Load more; a touch drag over 5 pictures selects 5, the click after it is ignored, a later tap adds one. run-tests and phone-check pass.
+- **Deploy:** site files (sw `portal-shell-v142`).

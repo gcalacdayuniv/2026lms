@@ -11,6 +11,9 @@ import { escapeHtml as esc } from './html-utils.js';
 
 const $ = (id) => document.getElementById(id);
 const PARALLEL = 3;
+const FIRST_PAGE = 10;   // pictures loaded when the gallery opens
+const NEXT_PAGE = 5;     // pictures added by each "Load more"
+const LONG_PRESS = 280;  // ms of holding a picture before a finger drag starts selecting
 const fmtTime = (iso, withDate) => {
     const d = new Date(iso);
     if (isNaN(d)) return '';
@@ -32,12 +35,16 @@ export const ExamPhotoReview = {
     selecting: false,
     selected: new Set(),   // Photo_IDs ticked
     changed: false,        // something was deleted: the Admin lists behind refresh when this closes
+    budget: FIRST_PAGE,    // how many more pictures may be fetched now: 10 at first, +5 for each "Load more"
+    paint: null,           // drag-select in progress: { mode: 'add' | 'remove', last, timer, pointerId }
+    swallowClickUntil: 0,
 
     // opts: { classExamId, focusStudentId? } for one exam, or { courseId, studentId, name } for one student.
     open: async (opts) => {
         ExamPhotoReview.close();
         ExamPhotoReview.cache.clear();
         ExamPhotoReview.queue = []; ExamPhotoReview.running = 0;
+        ExamPhotoReview.budget = FIRST_PAGE; ExamPhotoReview.paint = null;
         ExamPhotoReview.ctx = null; ExamPhotoReview.selecting = false; ExamPhotoReview.selected = new Set(); ExamPhotoReview.changed = false;
         const byStudent = !!opts.studentId && !!opts.courseId;
         ExamPhotoReview.mode = byStudent ? 'student' : 'exam';
@@ -61,6 +68,11 @@ export const ExamPhotoReview = {
             </div>`;
         document.body.appendChild(dlg);
         dlg.addEventListener('click', ExamPhotoReview.onClick);
+        dlg.addEventListener('pointerdown', ExamPhotoReview.onDown);
+        dlg.addEventListener('pointermove', ExamPhotoReview.onMove);
+        dlg.addEventListener('pointerup', ExamPhotoReview.onUp);
+        dlg.addEventListener('pointercancel', ExamPhotoReview.onUp);
+        dlg.addEventListener('touchmove', (ev) => { if (ExamPhotoReview.paint && ExamPhotoReview.paint.on) ev.preventDefault(); }, { passive: false });   // a drag that is selecting must not scroll the page
         const body = dlg.querySelector('#epBody');
         try {
             const q = byStudent ? `courseId=${encodeURIComponent(opts.courseId)}&studentId=${encodeURIComponent(opts.studentId)}` : `classExamId=${encodeURIComponent(opts.classExamId)}`;
@@ -81,7 +93,8 @@ export const ExamPhotoReview = {
             <figure class="m-0"><div class="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden"><img data-photo-id="${esc(p.Photo_ID)}" alt="Face verification photo of ${esc(p.Name || 'student')}" class="w-full h-full object-cover"></div>
             <figcaption class="mt-1"><span class="block text-xs font-bold text-gray-800 truncate">${esc(byStudent ? (p.Exam_Title || 'Exam') : (p.Name || 'Student'))}</span>
             <span class="block text-[11px] text-gray-500">${esc(fmtTime(p.Taken_At, true))}</span></figcaption></figure>`).join('')}</div>`;
-        body.querySelectorAll('img[data-photo-id]').forEach(img => ExamPhotoReview.want(img.dataset.photoId, (src) => { if (src) img.src = src; else img.alt = 'Could not load'; }));
+        body.insertAdjacentHTML('beforeend', ExamPhotoReview.moreHtml());
+        ExamPhotoReview.fill();
     },
 
     // Groups: students (by exam) or exams (by student). Each group is a collapsible section; its pictures load when it opens.
@@ -108,15 +121,16 @@ export const ExamPhotoReview = {
                         <i class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform" aria-hidden="true"></i></button>
                     <div class="hidden px-3 pb-3"><button type="button" data-ep-select-group="${gi}" class="hidden mb-2 min-h-[32px] text-xs font-bold text-red-700 hover:underline">Select all of ${esc(g.title)}</button>
                     <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">${g.photos.map((p, i) => `
-                        <button type="button" data-ep-photo="${first + i}" data-ep-id="${esc(p.Photo_ID)}" class="text-left m-0 p-0 bg-transparent"><div class="aspect-[4/3] bg-gray-100 rounded overflow-hidden relative"><img data-photo-id="${esc(p.Photo_ID)}" alt="" class="w-full h-full object-cover"><span data-ep-check class="hidden absolute top-1 left-1 w-6 h-6 rounded-full border-2 border-white bg-black/40 text-white text-xs items-center justify-center shadow"><i class="fa-solid fa-check" aria-hidden="true"></i></span></div>
+                        <button type="button" data-ep-photo="${first + i}" data-ep-id="${esc(p.Photo_ID)}" class="text-left m-0 p-0 bg-transparent" style="-webkit-touch-callout:none;-webkit-user-select:none;user-select:none"><div class="aspect-[4/3] bg-gray-100 rounded overflow-hidden relative"><img data-photo-id="${esc(p.Photo_ID)}" alt="" draggable="false" class="w-full h-full object-cover pointer-events-none"><span data-ep-check class="hidden absolute top-1 left-1 w-6 h-6 rounded-full border-2 border-white bg-black/40 text-white text-xs items-center justify-center shadow"><i class="fa-solid fa-check" aria-hidden="true"></i></span></div>
                         <span class="block text-[10px] text-gray-500 mt-0.5">${esc(fmtTime(p.Taken_At, byStudent))}${p.Kind === 'start' ? ' &middot; start' : ''}</span></button>`).join('')}</div></div>
                 </section>`;
-            }).join('')}</div>`;
+            }).join('')}</div>${ExamPhotoReview.moreHtml()}`;
         ExamPhotoReview.paintSelection();
         const heads = body.querySelectorAll('[data-ep-head]');
         const focusAt = focusId ? groups.findIndex(g => g.key === focusId) : -1;
         if (focusAt >= 0) { ExamPhotoReview.toggle(heads[focusAt], true); heads[focusAt].scrollIntoView({ block: 'nearest' }); }
         else if (groups.length === 1) ExamPhotoReview.toggle(heads[0], true);
+        ExamPhotoReview.updateMore();
     },
 
     // Ticks, counts and the bottom bar follow ExamPhotoReview.selecting / selected.
@@ -177,7 +191,75 @@ export const ExamPhotoReview = {
         panel.classList.toggle('hidden', !open);
         head.setAttribute('aria-expanded', open ? 'true' : 'false');
         head.querySelector('i').style.transform = open ? 'rotate(180deg)' : '';
-        if (open) panel.querySelectorAll('img[data-photo-id]').forEach(img => ExamPhotoReview.want(img.dataset.photoId, (src) => { if (src) img.src = src; else img.alt = 'Could not load'; }));
+        if (open) ExamPhotoReview.fill();
+        else ExamPhotoReview.updateMore();
+    },
+
+    // ---- paged loading: 10 pictures first, then 5 more each time "Load more" is tapped (only pictures in open groups count)
+    moreHtml: () => '<div id="epMore" class="hidden mt-3 text-center"><button type="button" data-ep-more class="min-h-[44px] px-4 text-sm font-bold text-blue-700 hover:underline"></button></div>',
+    waiting: () => [...document.querySelectorAll('#epBody img[data-photo-id]')].filter(img => !img.getAttribute('src') && !img.dataset.req && !img.closest('.hidden')),
+    fill: () => {
+        for (const img of ExamPhotoReview.waiting()) {
+            const id = img.dataset.photoId;
+            const cached = ExamPhotoReview.cache.get(id);
+            if (!cached && ExamPhotoReview.budget <= 0) break;
+            if (!cached) ExamPhotoReview.budget--;
+            img.dataset.req = '1';
+            ExamPhotoReview.want(id, (src) => { if (src) img.src = src; else { img.alt = 'Could not load'; delete img.dataset.req; } });
+        }
+        ExamPhotoReview.updateMore();
+    },
+    updateMore: () => {
+        const box = $('epMore'); if (!box) return;
+        const left = ExamPhotoReview.waiting().length;
+        box.classList.toggle('hidden', left === 0);
+        const b = box.querySelector('button'); if (b) b.textContent = `Load ${Math.min(NEXT_PAGE, left)} more (${left} not loaded)`;
+    },
+
+    // ---- drag to select (Select mode): hold a picture ~0.3 s and drag across others; a quick drag with a mouse works at once
+    itemAt: (x, y) => { const el = document.elementFromPoint(x, y); return el ? el.closest('#examPhotosDlg [data-ep-id]') : null; },
+    apply: (item) => {
+        const P = ExamPhotoReview.paint; if (!P || !item || item === P.last) return;
+        P.last = item;
+        const id = item.dataset.epId, has = ExamPhotoReview.selected.has(id);
+        if (P.mode === 'add' && !has) ExamPhotoReview.selected.add(id);
+        else if (P.mode === 'remove' && has) ExamPhotoReview.selected.delete(id);
+        else return;
+        P.dirty = true;
+    },
+    onDown: (e) => {
+        if (!ExamPhotoReview.selecting || (e.pointerType === 'mouse' && e.button !== 0)) return;
+        const item = e.target.closest('[data-ep-id]'); if (!item) return;
+        const P = ExamPhotoReview.paint = { id: e.pointerId, start: item, last: null, on: false, dirty: false, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, mode: ExamPhotoReview.selected.has(item.dataset.epId) ? 'remove' : 'add', touch: e.pointerType !== 'mouse', timer: null };
+        const begin = () => { P.on = true; P.last = null; ExamPhotoReview.apply(P.start); ExamPhotoReview.paintSelection(); try { navigator.vibrate && navigator.vibrate(12); } catch (err) { /* no vibration */ } ExamPhotoReview.edgeScroll(); };
+        P.begin = begin;
+        if (P.touch) P.timer = setTimeout(begin, LONG_PRESS);
+    },
+    onMove: (e) => {
+        const P = ExamPhotoReview.paint; if (!P || e.pointerId !== P.id) return;
+        P.x = e.clientX; P.y = e.clientY;
+        if (!P.on) {
+            if (P.touch) { if (Math.abs(e.clientX - P.sx) + Math.abs(e.clientY - P.sy) > 14) clearTimeout(P.timer); return; }   // a finger that moves before the hold is a scroll
+            const over = ExamPhotoReview.itemAt(e.clientX, e.clientY);
+            if (over && over !== P.start) P.begin();   // mouse: dragging onto another picture starts selecting
+            else return;
+        }
+        ExamPhotoReview.apply(ExamPhotoReview.itemAt(e.clientX, e.clientY));
+        if (P.dirty) { P.dirty = false; ExamPhotoReview.paintSelection(); }
+    },
+    onUp: (e) => {
+        const P = ExamPhotoReview.paint; if (!P) return;
+        clearTimeout(P.timer); cancelAnimationFrame(P.raf);
+        if (P.on) ExamPhotoReview.swallowClickUntil = Date.now() + 500;   // the release must not also count as a tap
+        ExamPhotoReview.paint = null;
+    },
+    // Holding a finger near the top or bottom edge scrolls the list so a long drag can reach more pictures.
+    edgeScroll: () => {
+        const P = ExamPhotoReview.paint, body = $('epBody'); if (!P || !P.on || !body) return;
+        const r = body.getBoundingClientRect(), zone = 56;
+        const dy = P.y < r.top + zone ? -10 : P.y > r.bottom - zone ? 10 : 0;
+        if (dy) { body.scrollTop += dy; ExamPhotoReview.apply(ExamPhotoReview.itemAt(P.x, P.y)); if (P.dirty) { P.dirty = false; ExamPhotoReview.paintSelection(); } }
+        P.raf = requestAnimationFrame(ExamPhotoReview.edgeScroll);
     },
 
     // Fetch one picture (cached), at most PARALLEL at a time.
@@ -203,6 +285,7 @@ export const ExamPhotoReview = {
 
     onClick: (e) => {
         if (e.target.closest('[data-ep-close]')) { ExamPhotoReview.close(); return; }
+        if (e.target.closest('[data-ep-more]')) { ExamPhotoReview.budget += NEXT_PAGE; ExamPhotoReview.fill(); return; }
         const head = e.target.closest('[data-ep-head]');
         if (head) { ExamPhotoReview.toggle(head); return; }
         if (e.target.closest('[data-ep-toggle-all]')) {
@@ -235,6 +318,7 @@ export const ExamPhotoReview = {
         if (e.target.closest('[data-ep-delete]')) { ExamPhotoReview.deleteSelected(); return; }
         const ph = e.target.closest('[data-ep-photo]');
         if (ph && ExamPhotoReview.selecting) {
+            if (Date.now() < ExamPhotoReview.swallowClickUntil) return;   // the end of a drag-select
             const id = ph.dataset.epId;
             if (ExamPhotoReview.selected.has(id)) ExamPhotoReview.selected.delete(id); else ExamPhotoReview.selected.add(id);
             ExamPhotoReview.paintSelection();
