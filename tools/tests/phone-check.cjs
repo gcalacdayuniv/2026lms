@@ -20,6 +20,8 @@ const api = (url) => { const p = new URL(url).pathname;
     if (p === '/api/course-details') return { success: true, course: courses[0], students, enrolledCount: 8 };
     if (p === '/api/assessments') return { success: true, assessments: [{ Assessment_ID: 'A0', Course_ID: 'C1', Term: 'MidTerm', Category: 'Written', Title: 'Quiz 1', Max_Score: 20, Date: '2026-10-01' }] };
     if (p === '/api/exams') return { success: true, exams: [{ Exam_ID: 'E1', Title: 'Exam 1', Course: 'C1', questionCount: 10 }] };
+    if (p === '/api/group-sets') return { success: true, sets: [{ Set_ID: 'reporting', Name: 'Reporting' }] };
+    if (p === '/api/group-set') return { success: true, groups: [1, 2, 3].map(g => ({ name: 'Group ' + g, topic: 'Topic ' + g, members: [0, 1].map(k => ({ User_ID: 'S' + (g * 2 - 2 + k), Name: 'Student Number ' + (g * 2 - 2 + k), Student_Number: '', Seat_Number: '' })) })), unassigned: [] };
     return { success: true }; };
 const UTILITY = /^((sm|md|lg|xl|hover|focus|dark|disabled|group-hover|active):)*-?(bg|text|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|w|h|min-w|min-h|max-w|max-h|border|rounded|shadow|gap|space-x|space-y|items|justify|font|overflow|z|top|left|right|bottom|inset|grid|col|row|opacity|flex|translate|scale|tracking|leading|ring|object|cursor|transition|duration)(-|$)/;
 (async () => {
@@ -71,6 +73,18 @@ const UTILITY = /^((sm|md|lg|xl|hover|focus|dark|disabled|group-hover|active):)*
     if (!extra.shown || !extra.flagged) errors.push('over-max score was not flagged as extra credit: ' + JSON.stringify(extra));
     await page.evaluate(() => history.back()); await page.waitForTimeout(300);
     await page.evaluate(async () => { const { ExamBuilder } = await import('/js/exam-builder.js'); await ExamBuilder.open({ title: 'T', course: 'IT101' }); }); await page.waitForTimeout(600); await look('exam builder');
+    // Group caller: draws each group once until reset, then Grade with timer opens for the called group.
+    await page.evaluate(() => location.hash = '#class-C1'); await page.waitForTimeout(800);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('portal_token', 't'); localStorage.setItem('portal_user', JSON.stringify({ User_ID: 'L1', Name: 'Prof Cruz', role: 'lecturer', Username: 'l', Email: 'a@b.c', account_status: 'Active' })); });
+    await page.evaluate(() => document.getElementById('openGroupCallerBtn')?.click()); await page.waitForTimeout(700); await look('group caller');
+    const names = [];
+    for (let i = 0; i < 3; i++) { await page.evaluate(() => document.getElementById('gcCall').click()); await page.waitForTimeout(300); names.push(await page.evaluate(() => document.querySelector('#gcStage p')?.textContent)); }
+    if (new Set(names).size !== 3) errors.push('group caller repeated a group: ' + names.join(', '));
+    if (!(await page.evaluate(() => document.getElementById('gcCall').disabled))) errors.push('group caller allowed a call when every group was called');
+    await page.evaluate(() => document.getElementById('gcGrade').click()); await page.waitForTimeout(700); await look('group grade screen');
+    const gradeOpen = await page.evaluate(() => !!document.querySelector('#practicalGradeModal, [id^="practical"]'));
+    if (!gradeOpen) errors.push('Grade with timer did not open from the group caller');
     const violations = await page.evaluate(() => window.__csp);
     const missing = await page.evaluate((classes) => { const css = [...document.styleSheets].map(ss => { try { return [...ss.cssRules].map(r => r.cssText).join('\n'); } catch (e) { return ''; } }).join('\n'); return classes.filter(c => !css.includes('.' + CSS.escape(c))); }, [...seen]);
     const NO_RULE_EVER = ['scale-up', 'sm:scale-up'];   // used in index.html but never had a style (not even with the old CDN)

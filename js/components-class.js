@@ -818,6 +818,7 @@ const ClassUI = {
                     <button type="button" id="toggleCalledListBtn" class="hidden text-xs font-bold text-purple-600 hover:text-purple-800 underline focus:outline-none">
                         Called List
                     </button>
+                    <button type="button" id="openGroupCallerBtn" class="min-h-[44px] px-3 -my-2 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100"><i class="fa-solid fa-people-group mr-1" aria-hidden="true"></i>By group</button>
                 </div>
 
                 <div id="wheelContainer" class="w-full flex flex-col items-center">

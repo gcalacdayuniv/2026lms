@@ -771,3 +771,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - **Saves to:** `POST /api/practical-grade-save` (see the Worker section above). Empty grades are skipped; at least one grade is needed.
 - **Tests:** browser check with a fake clock: countdown 10:00 to 9:30, pause holds, custom minutes, overtime `+0:01` in red, group save sends 3 equal entries with the assessment and 62 s elapsed, each-member save sends separate grades and notes, no grade shows an error. Worker tests as before.
 - **Deploy:** site files (sw `portal-shell-v149`); Worker from the earlier commit.
+
+## Group caller (call a group, then grade it with the timer)
+- What: Student Caller has a "By group" button (`#openGroupCallerBtn`). It opens a full-screen Group caller (`js/course-group-caller.js`): pick a group set (Reporting or any set from Groups; the last choice is remembered per class), tap "Call a group" and one group is drawn at random with a short name shuffle (skipped for reduced motion). The result shows group name, topic and members.
+- Rules: a group is not drawn twice until "Reset called". The called list is kept on this device per class, set and day. Members marked Absent/Excused (or UD/Dropped) in the class list are shown "Absent today" and left out of grading. Random pick uses `crypto.getRandomValues`.
+- Grade: "Grade with timer" opens the practical grading screen (see Practical grading) with the group's members, `groupName` and `setId`; grade as a group or for each, notes, timer, copy to an assessment.
+- Tests: `tools/tests/phone-check.cjs` (3 calls give 3 different groups, call disabled when all called, Grade opens). No Worker change.
+- Deploy: site files only (sw `portal-shell-v150`).
