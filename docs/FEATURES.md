@@ -778,3 +778,10 @@ The Details form in the profile panel (`renderProfileDetails`, `js/components-da
 - Grade: "Grade with timer" opens the practical grading screen (see Practical grading) with the group's members, `groupName` and `setId`; grade as a group or for each, notes, timer, copy to an assessment.
 - Tests: `tools/tests/phone-check.cjs` (3 calls give 3 different groups, call disabled when all called, Grade opens). No Worker change.
 - Deploy: site files only (sw `portal-shell-v150`).
+
+## Grading criteria in the practical grading screen
+- What: the Grade with timer screen has a Criteria list the lecturer controls: add, rename, change points, remove (up to 20; default Content 10 + Delivery 10). Each member (or the whole group) gets a score per criterion; the grade is the sum and "Highest score" is the total of the points. Remembered per class on this device (saved on a successful save).
+- Rules: a group call has no free Notes box (criteria carry the feedback); a single student still has Notes. Each criterion score must be 0 to its points. With no criteria left, a single Grade box is used.
+- Storage: no Worker change. The breakdown is written into the existing notes ("Content 8/10; Delivery 7/10"), lecturer-only as before.
+- Tests: `tools/tests/phone-check.cjs` (no notes in a group call, add criterion, total 20/25, saved payload).
+- Deploy: site files only (sw `portal-shell-v151`).

@@ -85,6 +85,22 @@ const UTILITY = /^((sm|md|lg|xl|hover|focus|dark|disabled|group-hover|active):)*
     await page.evaluate(() => document.getElementById('gcGrade').click()); await page.waitForTimeout(700); await look('group grade screen');
     const gradeOpen = await page.evaluate(() => !!document.querySelector('#practicalGradeModal, [id^="practical"]'));
     if (!gradeOpen) errors.push('Grade with timer did not open from the group caller');
+    // Criteria: no free notes in a group call; add a criterion; total = sum; saved score and criteria lines are posted.
+    if (await page.evaluate(() => !!document.querySelector('[data-pg-note]'))) errors.push('group call still shows a notes box');
+    let posted = null; page.on('request', rq => { if (rq.url().includes('/api/practical-grade-save')) posted = rq.postData(); });
+    await page.evaluate(() => document.getElementById('pgAddCrit').click()); await page.waitForTimeout(200);
+    await page.evaluate(() => { const set = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+        set([...document.querySelectorAll('[data-pg-cname]')].pop(), 'Teamwork');
+        const cm = [...document.querySelectorAll('[data-pg-cmax]')].pop(); set(cm, '5');
+        const ins = [...document.querySelectorAll('[data-pg-crit]')]; set(ins[0], '8'); set(ins[1], '7'); set(ins[2], '5');
+        set(document.getElementById('pgActivity'), 'Practical 1'); });
+    await page.waitForTimeout(200); await look('criteria');
+    const tot = await page.evaluate(() => ({ t: document.getElementById('pgT-*').textContent, max: document.getElementById('pgMax').value }));
+    if (tot.t !== '20' || tot.max !== '25') errors.push('criteria total wrong: ' + JSON.stringify(tot));
+    await page.evaluate(() => document.getElementById('pgSave').click()); await page.waitForTimeout(600);
+    const pgErr = await page.evaluate(() => document.getElementById('pgError')?.textContent); if (pgErr) errors.push('pgError: ' + pgErr);
+    let body = null; try { body = JSON.parse(posted); } catch (e) { /* not sent */ }
+    if (!body || body.entries.length !== 2 || body.entries[0].score !== 20 || body.maxScore !== '25' || !/Content 8\/10; Delivery 7\/10; Teamwork 5\/5/.test(body.entries[0].notes)) errors.push('criteria save payload wrong: ' + posted);
     const violations = await page.evaluate(() => window.__csp);
     const missing = await page.evaluate((classes) => { const css = [...document.styleSheets].map(ss => { try { return [...ss.cssRules].map(r => r.cssText).join('\n'); } catch (e) { return ''; } }).join('\n'); return classes.filter(c => !css.includes('.' + CSS.escape(c))); }, [...seen]);
     const NO_RULE_EVER = ['scale-up', 'sm:scale-up'];   // used in index.html but never had a style (not even with the old CDN)

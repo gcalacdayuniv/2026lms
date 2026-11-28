@@ -1,7 +1,7 @@
 // js/course-practical.js
 // Practical / major-term activity grading screen, opened from the Student Caller ("Grade") for a student or a whole group.
-// A countdown timer set by the lecturer, a grade, notes, and optionally a copy of the grade into an assessment (Record Scores).
-// Saved through /api/practical-grade-save (worker/practicals.js). Lecturer-only; notes are never shown to students.
+// A countdown timer set by the lecturer, grading criteria the lecturer can add to (each scored separately, total = the grade), and optionally a copy of the grade into an assessment (Record Scores).
+// Saved through /api/practical-grade-save (worker/practicals.js). Lecturer-only; the criteria breakdown is saved in the notes and never shown to students.
 import { apiFetch } from './globals.js';
 import { UI } from './ui-feedback.js';
 import { escapeHtml } from './html-utils.js';
@@ -9,8 +9,11 @@ import { escapeHtml } from './html-utils.js';
 const PRESETS = [5, 10, 15, 20, 30];
 const FIELD = 'w-full border border-gray-300 rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-blue-500 outline-none bg-white';
 const LABEL = 'block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1';
+let uid = 0;
+const newId = () => `c${Date.now().toString(36)}${uid++}`;
 const $ = (id) => document.getElementById(id);
 const key = (courseId, k) => `practical_${k}_${courseId}`;
+const DEFAULT_CRITERIA = [{ name: 'Content', max: 10 }, { name: 'Delivery', max: 10 }];
 const store = {
     get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
@@ -44,7 +47,7 @@ export const PracticalGrade = {
         PracticalGrade.s = {
             courseId, targets, groupName, setId, mode: targets.length > 1 ? 'group' : 'one',
             total: minutes * 60, startedAt: 0, pausedLeft: minutes * 60, running: false, fired: false, warned: false, tick: null, wake: null,
-            assessments: []
+            assessments: [], criteria: PracticalGrade.loadCriteria(courseId)
         };
         const many = targets.length > 1;
         const who = many ? `${groupName ? escapeHtml(groupName) + ' · ' : ''}${targets.length} students` : escapeHtml(targets[0].Name);
@@ -81,11 +84,17 @@ export const PracticalGrade = {
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                     <div class="sm:col-span-2"><label for="pgActivity" class="${LABEL}">Activity</label>
                         <input id="pgActivity" type="text" maxlength="80" placeholder="e.g. Practical 1" value="${escapeHtml(store.get(key(courseId, 'activity')) || '')}" class="${FIELD}"></div>
-                    <div><label for="pgMax" class="${LABEL}">Highest score</label>
-                        <input id="pgMax" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(store.get(key(courseId, 'max')) || '')}" class="${FIELD}"></div>
+                    <div><label for="pgMax" class="${LABEL}">Highest score (total of criteria)</label>
+                        <input id="pgMax" type="number" readonly class="${FIELD} bg-gray-100 font-black"></div>
                     <div class="sm:col-span-3"><label for="pgAssessment" class="${LABEL}">Also save the grade as a score in</label>
                         <select id="pgAssessment" class="${FIELD}"><option value="">Do not copy to Record Scores</option></select></div>
                 </div>
+
+                <section class="rounded-xl border border-gray-200 p-3 mb-4" aria-label="Grading criteria">
+                    <div class="flex items-center justify-between mb-2"><h4 class="${LABEL} mb-0">Criteria</h4>
+                        <button type="button" id="pgAddCrit" class="min-h-[44px] px-3 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-sm font-bold"><i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>Add criterion</button></div>
+                    <div id="pgCriteria"></div>
+                </section>
 
                 ${many ? `<div class="flex gap-2 mb-3" role="group" aria-label="How to grade">
                     <button type="button" data-pg-mode="group" class="pg-mode flex-1 min-h-[44px] rounded-md border text-sm font-bold">Grade as a group</button>
@@ -98,6 +107,7 @@ export const PracticalGrade = {
                 </div>
             </div>`
         });
+        PracticalGrade.paintCriteria();
         PracticalGrade.paintMode();
         PracticalGrade.paintClock();
         PracticalGrade.loadAssessments();
@@ -166,6 +176,27 @@ export const PracticalGrade = {
     },
     reset: () => { const s = PracticalGrade.s; if (s) PracticalGrade.setMinutes(s.total / 60); },
 
+    // ---- criteria (kept per class on this device; the lecturer can add, rename, change points or remove)
+    loadCriteria: (courseId) => {
+        try { const v = JSON.parse(store.get(key(courseId, 'criteria'))); if (Array.isArray(v) && v.length) return v.slice(0, 20).map(c => ({ id: newId(), name: String(c.name || '').slice(0, 60), max: Number(c.max) > 0 ? Number(c.max) : 10 })); } catch (e) { /* use the default */ }
+        return DEFAULT_CRITERIA.map(c => ({ id: newId(), ...c }));
+    },
+    saveCriteria: () => { const s = PracticalGrade.s; if (s) store.set(key(s.courseId, 'criteria'), JSON.stringify(s.criteria.map(c => ({ name: c.name, max: c.max })))); },
+    total: () => { const s = PracticalGrade.s; return s.criteria.reduce((a, c) => a + (Number(c.max) || 0), 0); },
+    paintCriteria: () => {
+        const s = PracticalGrade.s, box = $('pgCriteria'); if (!s || !box) return;
+        box.innerHTML = s.criteria.map((c, i) => `
+            <div class="flex items-end gap-2 mb-2">
+                <div class="flex-1 min-w-0"><label class="sr-only" for="pgCn-${c.id}">Criterion ${i + 1} name</label>
+                    <input id="pgCn-${c.id}" data-pg-cname="${c.id}" type="text" maxlength="60" placeholder="Criterion name" value="${escapeHtml(c.name)}" class="${FIELD}"></div>
+                <div class="w-24"><label class="sr-only" for="pgCm-${c.id}">Points</label>
+                    <input id="pgCm-${c.id}" data-pg-cmax="${c.id}" type="number" min="1" step="any" inputmode="decimal" value="${escapeHtml(String(c.max))}" class="${FIELD} text-center" aria-label="Points for ${escapeHtml(c.name || 'criterion')}"></div>
+                <button type="button" data-pg-cdel="${c.id}" aria-label="Remove criterion ${escapeHtml(c.name || String(i + 1))}" class="min-w-[44px] min-h-[44px] rounded-md text-red-600 hover:bg-red-50"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+            </div>`).join('') || '<p class="text-sm text-gray-500">No criteria. Add one, or grade with a single total below.</p>';
+        const max = $('pgMax'); if (max) max.value = s.criteria.length ? String(PracticalGrade.total()) : (store.get(key(s.courseId, 'max')) || '');
+        if (max) max.readOnly = s.criteria.length > 0, max.classList.toggle('bg-gray-100', s.criteria.length > 0);
+    },
+
     // ---- grades
     paintMode: () => {
         const s = PracticalGrade.s, box = $('pgGrades'); if (!s || !box) return;
@@ -175,22 +206,33 @@ export const PracticalGrade = {
             b.classList.toggle('bg-white', !on); b.classList.toggle('text-gray-700', !on); b.classList.toggle('border-gray-300', !on);
             b.setAttribute('aria-pressed', String(on));
         });
-        const keep = {};   // what was typed stays when switching
+        const keep = {};   // what was typed stays when switching or when a criterion is added
         box.querySelectorAll('[data-pg-score]').forEach(i => { keep[`s${i.dataset.pgScore}`] = i.value; });
+        box.querySelectorAll('[data-pg-crit]').forEach(i => { keep[`c${i.dataset.pgCrit}`] = i.value; });
         box.querySelectorAll('[data-pg-note]').forEach(i => { keep[`n${i.dataset.pgNote}`] = i.value; });
-        const one = (id, name, extra = '') => `
-            <div class="rounded-lg border border-gray-200 p-3 mb-3">
+        const useCrit = s.criteria.length > 0, showNotes = !s.groupName;   // no free notes in a group call: the criteria carry the feedback
+        const one = (id, name) => `
+            <div class="rounded-lg border border-gray-200 p-3 mb-3" data-pg-card="${escapeHtml(id)}">
                 ${name ? `<p class="font-bold text-gray-800 mb-2">${escapeHtml(name)}</p>` : ''}
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div><label class="${LABEL}" for="pgS-${escapeHtml(id)}">Grade</label>
-                        <input id="pgS-${escapeHtml(id)}" data-pg-score="${escapeHtml(id)}" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(keep[`s${id}`] || '')}" class="${FIELD} text-2xl font-black text-center"></div>
-                    <div class="sm:col-span-3"><label class="${LABEL}" for="pgN-${escapeHtml(id)}">Notes ${extra}</label>
-                        <textarea id="pgN-${escapeHtml(id)}" data-pg-note="${escapeHtml(id)}" rows="3" maxlength="2000" placeholder="What the student or group did well, what to improve..." class="${FIELD}">${escapeHtml(keep[`n${id}`] || '')}</textarea></div>
-                </div>
+                ${useCrit ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${s.criteria.map(c => `
+                    <div><label class="${LABEL}" for="pgC-${escapeHtml(id)}-${c.id}">${escapeHtml(c.name || 'Criterion')} <span class="normal-case text-gray-400">/ ${escapeHtml(String(c.max))}</span></label>
+                        <input id="pgC-${escapeHtml(id)}-${c.id}" data-pg-crit="${escapeHtml(id)}|${c.id}" type="number" min="0" max="${escapeHtml(String(c.max))}" step="any" inputmode="decimal" value="${escapeHtml(keep[`c${id}|${c.id}`] || '')}" class="${FIELD} text-xl font-black text-center"></div>`).join('')}</div>
+                    <p class="mt-3 text-right text-sm font-bold text-gray-600">Total <span id="pgT-${escapeHtml(id)}" class="text-2xl font-black text-emerald-600 tabular-nums">0</span> / ${PracticalGrade.total()}</p>`
+                : `<div><label class="${LABEL}" for="pgS-${escapeHtml(id)}">Grade</label>
+                    <input id="pgS-${escapeHtml(id)}" data-pg-score="${escapeHtml(id)}" type="number" min="0" step="any" inputmode="decimal" value="${escapeHtml(keep[`s${id}`] || '')}" class="${FIELD} text-2xl font-black text-center"></div>`}
+                ${showNotes ? `<div class="mt-3"><label class="${LABEL}" for="pgN-${escapeHtml(id)}">Notes</label>
+                    <textarea id="pgN-${escapeHtml(id)}" data-pg-note="${escapeHtml(id)}" rows="2" maxlength="1500" placeholder="What went well, what to improve..." class="${FIELD}">${escapeHtml(keep[`n${id}`] || '')}</textarea></div>` : ''}
             </div>`;
         box.innerHTML = s.mode === 'each'
             ? s.targets.map(t => one(t.User_ID, t.Name)).join('')
             : one('*', s.mode === 'group' ? `${s.groupName || 'Group'} (all ${s.targets.length} members get this grade)` : '');
+        s.targets.concat([{ User_ID: '*' }]).forEach(t => PracticalGrade.paintTotal(t.User_ID));
+    },
+    // Scores typed for one card: [{c, v}] for the criteria that have a number.
+    cardScores: (id) => PracticalGrade.s.criteria.map(c => ({ c, v: (($(`pgC-${id}-${c.id}`) || {}).value) })),
+    paintTotal: (id) => {
+        const el = $(`pgT-${id}`); if (!el || !PracticalGrade.s) return;
+        el.textContent = String(Math.round(PracticalGrade.cardScores(id).reduce((a, x) => a + (Number(x.v) || 0), 0) * 100) / 100);
     },
 
     save: async () => {
@@ -199,10 +241,26 @@ export const PracticalGrade = {
         const fail = (m) => { err.textContent = m; err.classList.remove('hidden'); err.scrollIntoView({ block: 'nearest' }); };
         const activity = $('pgActivity').value.trim();
         if (!activity) { fail('Give the activity a name first (for example Practical 1).'); $('pgActivity').focus(); return; }
-        const val = (id) => ($(`pgS-${id}`) || {}).value, note = (id) => (($(`pgN-${id}`) || {}).value || '').trim();
+        if (s.criteria.some(c => !c.name.trim())) { fail('Give every criterion a name, or remove it.'); return; }
+        const note = (id) => (($(`pgN-${id}`) || {}).value || '').trim();
+        // One card gives { score, notes }; with criteria the score is the sum and the notes list each criterion.
+        const grade = (id) => {
+            if (!s.criteria.length) return { score: (($(`pgS-${id}`) || {}).value), notes: note(id) };
+            const parts = PracticalGrade.cardScores(id);
+            if (parts.every(x => x.v === '' || x.v == null)) return { score: '', notes: '' };
+            const bad = parts.find(x => Number(x.v) < 0 || Number(x.v) > Number(x.c.max));
+            if (bad) return { error: `${bad.c.name}: enter 0 to ${bad.c.max}.` };
+            const total = Math.round(parts.reduce((a, x) => a + (Number(x.v) || 0), 0) * 100) / 100;
+            const line = parts.map(x => `${x.c.name} ${Number(x.v) || 0}/${x.c.max}`).join('; ');
+            return { score: total, notes: [line, note(id)].filter(Boolean).join('\n') };
+        };
+        const g = s.mode === 'each' ? null : grade('*');
+        const per = s.mode === 'each' ? s.targets.map(t => grade(t.User_ID)) : null;
+        const bad = (g && g.error) || (per && (per.find(x => x.error) || {}).error);
+        if (bad) { fail(bad); return; }
         const entries = s.mode === 'each'
-            ? s.targets.map(t => ({ studentId: t.User_ID, score: val(t.User_ID), notes: note(t.User_ID) }))
-            : s.targets.map(t => ({ studentId: t.User_ID, score: val('*'), notes: note('*') }));
+            ? s.targets.map((t, i) => ({ studentId: t.User_ID, score: per[i].score, notes: per[i].notes }))
+            : s.targets.map(t => ({ studentId: t.User_ID, score: g.score, notes: g.notes }));
         if (!entries.some(e => e.score !== '' && e.score != null)) { fail('Enter a grade first.'); return; }
         const max = $('pgMax').value, assessmentId = $('pgAssessment').value;
         const btn = $('pgSave'); btn.disabled = true;
@@ -212,6 +270,7 @@ export const PracticalGrade = {
                 body: JSON.stringify({ courseId: s.courseId, activity, maxScore: max, timerSeconds: s.total, elapsedSeconds: PracticalGrade.elapsed(), setId: s.setId, groupName: s.groupName, assessmentId, entries })
             });
             store.set(key(s.courseId, 'activity'), activity); store.set(key(s.courseId, 'max'), max); store.set(key(s.courseId, 'assessment'), assessmentId);
+            PracticalGrade.saveCriteria();
             UI.success(`Saved ${r.saved} grade${r.saved === 1 ? '' : 's'}${r.copied ? ` and copied ${r.copied} to Record Scores` : ''}.`);
             document.dispatchEvent(new CustomEvent('practical-saved', { detail: { courseId: s.courseId, copied: r.copied } }));
             PracticalGrade.close();
@@ -227,7 +286,35 @@ export const PracticalGrade = {
             if (t.closest('#pgStart')) { PracticalGrade.toggle(); return; }
             if (t.closest('#pgReset')) { PracticalGrade.reset(); return; }
             const m = t.closest('[data-pg-mode]'); if (m && PracticalGrade.s) { PracticalGrade.s.mode = m.dataset.pgMode; PracticalGrade.paintMode(); return; }
+            const st = PracticalGrade.s;
+            if (t.closest('#pgAddCrit') && st) {
+                if (st.criteria.length >= 20) { UI.error('Up to 20 criteria.'); return; }
+                st.criteria.push({ id: newId(), name: '', max: 10 }); PracticalGrade.paintCriteria(); PracticalGrade.paintMode();
+                const last = st.criteria[st.criteria.length - 1]; const f = $(`pgCn-${last.id}`); if (f) f.focus(); return;
+            }
+            const del = t.closest('[data-pg-cdel]');
+            if (del && st) { st.criteria = st.criteria.filter(c => c.id !== del.dataset.pgCdel); PracticalGrade.saveCriteria(); PracticalGrade.paintCriteria(); PracticalGrade.paintMode(); return; }
             if (t.closest('#pgSave')) PracticalGrade.save();
+        });
+        document.addEventListener('input', (e) => {
+            const st = PracticalGrade.s; if (!st || !$('practicalModal') || !$('practicalModal').contains(e.target)) return;
+            const d = e.target.dataset;
+            if (d.pgCname) { const c = st.criteria.find(x => x.id === d.pgCname); if (c) c.name = e.target.value; }
+            else if (d.pgCmax) { const c = st.criteria.find(x => x.id === d.pgCmax); if (c && Number(e.target.value) > 0) { c.max = Number(e.target.value); const m = $('pgMax'); if (m) m.value = String(PracticalGrade.total()); } }
+            else if (d.pgCrit) PracticalGrade.paintTotal(d.pgCrit.split('|')[0]);
+        });
+        // Names/points changed: refresh the score boxes (labels and limits) once the field is left.
+        document.addEventListener('change', (e) => {
+            const st = PracticalGrade.s, d = e.target.dataset; if (!st) return;
+            const id = d.pgCname || d.pgCmax; if (!id) return;
+            const c = st.criteria.find(x => x.id === id); if (!c) return;
+            PracticalGrade.saveCriteria();
+            // Update the score boxes in place so a tap on one of them is not lost to a redraw.
+            document.querySelectorAll(`[data-pg-crit$="|${id}"]`).forEach(inp => {
+                inp.max = String(c.max);
+                const lab = inp.previousElementSibling; if (lab) lab.innerHTML = `${escapeHtml(c.name || 'Criterion')} <span class="normal-case text-gray-400">/ ${escapeHtml(String(c.max))}</span>`;
+            });
+            document.querySelectorAll('[data-pg-card]').forEach(card => { const t = card.querySelector('p span[id^="pgT-"]'); if (t && t.parentElement) t.parentElement.lastChild.textContent = ` / ${PracticalGrade.total()}`; });
         });
         document.addEventListener('change', (e) => {
             if (e.target.id === 'pgCustom') { const v = Number(e.target.value); if (v >= 1 && v <= 240) PracticalGrade.setMinutes(v); }
